@@ -165,3 +165,21 @@ python tools/drive.py quit
 
 Use your own port when several agents test at once (`--port N`). Give nodes an `id` so
 `state` can tell what is focused. Always end with `quit`.
+
+## Launcher additions
+
+- Routes: `setup` (four steps; "Run setup again" in Settings), `library_options`,
+  `hidden_games`, `statistics`, `game_settings` (param `id`), `collect` (param `id`).
+  `library` also takes `collection=<name>`.
+- `app/screens/home/collections.h`: the user's collections (`library.collections`,
+  `library.collection_games.<name>`), the library order (`library.sort`) and layout
+  (`library.view`: `grid` or `list`). `TouchGames()` (games.h) moves `GamesRevision()`.
+- `app/screens/details/game_prefs.h`: what one game or console overrides in the layered
+  settings. `CoreForGame(entry)` (the game's own core, `player.core`, with its own core
+  options as option hints), `ScreenSizeFor(entry)` (`player.screen_size`),
+  `EngineFullscreenFor` (`engine.screen`: app, fullscreen, window). Core options of a game
+  or console are `core_option.<core>.<key>` in its layer; the list of a core's options is
+  noted in `<data>/cache/core_options/<core>.json` whenever a game runs. Whoever opens a
+  session uses `CoreForGame`, not `plugins->CoreFor`.
+- Themes: Light, Dark, Green, Magenta, Amber, High contrast, High contrast dark
+  (`ui/src/theme.cpp`).

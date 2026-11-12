@@ -4,11 +4,13 @@
 // The first screen: the rail, a clock, the selected game's name and records, and shelves of
 // covers ("Continue playing", favourites, one per console) over the selected cover, blurred.
 
+#include <format>
 #include <map>
 
 #include "../details/launch.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
+#include "collections.h"
 #include "den/app/registry.h"
 #include "game_widgets.h"
 #include "games.h"
@@ -52,6 +54,10 @@ public:
         AddShelf(list, "recent", Tr("home.continue"), WithoutHidden(svc.library->RecentlyPlayed(RECENT_LIMIT)),
                  Tr("home.continue_badge"));
         AddShelf(list, "favourites", Tr("home.favourites"), WithoutHidden(svc.library->Favourites()), "");
+        int collection = 0;
+        for (const std::string& name : Collections()) {
+            AddShelf(list, std::format("collection{}", collection++), name, CollectionGames(name), "");
+        }
 
         std::map<std::string, std::vector<library::Entry>> by_system;
         for (const library::Entry& game : games) {
@@ -205,23 +211,5 @@ private:
 
 DEN_REGISTER_SCREEN("home", HomeScreen);
 DEN_REGISTER_RAIL(0, "Home", "home");
-
-DEN_REGISTER_SETTINGS(40, "Games", [] {
-    std::vector<ui::RowSpec> rows;
-    ui::RowSpec hidden;
-    hidden.kind = ui::RowSpec::Kind::Action;
-    hidden.id = "library.show_hidden";
-    hidden.label = Tr("settings.show_hidden");
-    hidden.description = Tr("settings.show_hidden_help");
-    hidden.value = [] { return std::to_string(HiddenCount()); };
-    hidden.action = [] {
-        if (HiddenCount() > 0) {
-            ShowAllHidden();
-            Svc().stage->Toast(Tr("settings.hidden_shown"));
-        }
-    };
-    rows.push_back(std::move(hidden));
-    return rows;
-});
 
 } // namespace den::app

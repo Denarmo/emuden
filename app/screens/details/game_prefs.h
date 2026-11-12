@@ -1,0 +1,43 @@
+// SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// What a single game or console overrides in the layered settings (den/system/settings.h):
+// the core that plays it, the screen size, core options, and how an engine game opens.
+
+#pragma once
+
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "den/library/library.h"
+#include "den/plugins/host.h"
+#include "den/system/settings.h"
+
+namespace den::app {
+
+/// "player.screen_size": an index into the player's screen sizes.
+extern const system::Key<int> SCREEN_SIZE_KEY;
+/// "player.core": the id of the core chosen for one game; empty = the console's core.
+extern const system::Key<std::string> GAME_CORE_KEY;
+/// "engine.screen": "app" (as EmuDEN's own window), "fullscreen" or "window".
+extern const system::Key<std::string> ENGINE_SCREEN_KEY;
+
+system::Scope ScopeOf(const library::Entry& game);
+
+/// The core that plays this game: the game's own choice when it is installed, else the
+/// console's. Its option hints carry the game's own core options.
+std::optional<plugins::CoreInfo> CoreForGame(const library::Entry& game);
+int ScreenSizeFor(const library::Entry& game);
+bool EngineFullscreenFor(const library::Entry& game, bool app_fullscreen);
+
+/// A core option as the core last described it (noted whenever a game runs).
+struct KnownOption {
+    std::string key, label, fallback;
+    std::vector<std::string> values;
+};
+std::vector<KnownOption> KnownOptions(const std::string& core_id);
+/// The settings key of a core option in a game's or console's layer.
+std::string OptionKey(const std::string& core_id, const std::string& option_key);
+
+} // namespace den::app

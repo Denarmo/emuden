@@ -6,6 +6,7 @@
 #include "den/app/app.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
+#include "game_prefs.h"
 #include "launch.h"
 
 namespace den::app {
@@ -31,7 +32,7 @@ void StartInEngine(const library::Entry& game) {
     request.game_id = game.id;
     request.title = game.name;
     request.content = PathFromUtf8(game.path);
-    request.fullscreen = svc.window->Fullscreen();
+    request.fullscreen = EngineFullscreenFor(game, svc.window->Fullscreen());
     log::Info("launch", "engine: {} ({})", game.name, game.system);
     if (const Status started = svc.engine->Start(request); !started) {
         svc.stage->Toast(started.error.empty() ? Tr("launch.failed") : started.error, 6.0f);
@@ -55,7 +56,7 @@ void StartInPlayer(const library::Entry& game, bool restart) {
 
 void StartRom(const library::Entry& game, bool restart) {
     Services& svc = Svc();
-    const auto core = svc.plugins->CoreFor(game.system);
+    const auto core = CoreForGame(game);
     const std::string console = SystemName(game.system);
     if (!core) {
         svc.stage->Toast(TrF("launch.no_core", console), 5.0f);

@@ -63,6 +63,10 @@ std::uint64_t GamesRevision() {
     return Svc().library->Revision() * 1000003u + Svc().plugins->Revision() * 1009u + g_hidden_revision;
 }
 
+void TouchGames() {
+    ++g_hidden_revision;
+}
+
 std::string SystemName(const std::string& system) {
     if (const auto console = Svc().plugins->FindConsole(system); console && !console->name.empty()) {
         return console->name;

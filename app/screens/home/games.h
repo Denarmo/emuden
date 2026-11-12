@@ -22,6 +22,8 @@ std::vector<library::Entry> WithoutHidden(std::vector<library::Entry> games);
 
 /// Moves whenever what the game screens show may have changed (library, plugins, hidden).
 std::uint64_t GamesRevision();
+/// Moves GamesRevision: something the game screens show changed outside the library.
+void TouchGames();
 
 /// "Game Boy Advance" for "gba": from the plugins, else the library, else the id.
 std::string SystemName(const std::string& system);

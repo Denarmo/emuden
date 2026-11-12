@@ -35,12 +35,48 @@ const Theme& DarkTheme() {
     return theme;
 }
 
+namespace {
+
+// The other named themes: the same object, another page and foreground.
+const std::vector<Theme>& MoreThemes() {
+    static const std::vector<Theme> themes = [] {
+        std::vector<Theme> out{
+            Make("Green", gfx::Color::Rgb(0xf6fff8), gfx::Color::Rgb(0x006b3c), gfx::Color::Rgb(0xe6f6ec)),
+            Make("Magenta", gfx::Color::Rgb(0xfff7fd), gfx::Color::Rgb(0xb4008f), gfx::Color::Rgb(0xfbe8f6)),
+            Make("Amber", gfx::Color::Rgb(0x161000), gfx::Color::Rgb(0xffc24a), gfx::Color::Rgb(0x2a2008)),
+            Make("High contrast", gfx::Color::Rgb(0xffffff), gfx::Color::Rgb(0x000000), gfx::Color::Rgb(0xffffff)),
+            Make("High contrast dark", gfx::Color::Rgb(0x000000), gfx::Color::Rgb(0xffffff),
+                 gfx::Color::Rgb(0x000000)),
+        };
+        for (Theme& theme : out) {
+            if (theme.name.starts_with("High contrast")) {
+                theme.text_dim = theme.fg;
+                theme.panel = theme.fg.WithAlpha(0.14f);
+                theme.panel_strong = theme.fg.WithAlpha(0.34f);
+            }
+        }
+        return out;
+    }();
+    return themes;
+}
+
+} // namespace
+
 const Theme& ThemeByName(const std::string& name) {
+    for (const Theme& theme : MoreThemes()) {
+        if (EqualsNoCase(name, theme.name)) {
+            return theme;
+        }
+    }
     return EqualsNoCase(name, "Dark") ? DarkTheme() : LightTheme();
 }
 
 std::vector<std::string> ThemeNames() {
-    return {"Light", "Dark"};
+    std::vector<std::string> names{"Light", "Dark"};
+    for (const Theme& theme : MoreThemes()) {
+        names.push_back(theme.name);
+    }
+    return names;
 }
 
 } // namespace den::ui

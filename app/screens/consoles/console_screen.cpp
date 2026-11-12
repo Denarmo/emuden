@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <format>
 
+#include "../details/game_prefs.h"
 #include "console_state.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
@@ -231,6 +232,41 @@ private:
                                  ? "These games run in their own engine, outside EmuDEN"
                                  : reason;
         rows.push_back(std::move(engine));
+        if (!Svc().settings->GetString(engine::PathKey(system)).empty()) {
+            rows.push_back(ActionRow(
+                "console.engine_auto", "Find the engine automatically",
+                [system] {
+                    Svc().settings->Remove(engine::PathKey(system));
+                    RebuildTop();
+                },
+                "Forgets the chosen program and looks in the usual places again"));
+        }
+        ui::RowSpec screen = ChoiceRow(
+            "console.engine_screen", "Screen", {"Same as EmuDEN", "Full screen", "Window"},
+            [system] {
+                const std::string value = system::Store().Get(ENGINE_SCREEN_KEY, system::Scope::Console(system));
+                return value == "fullscreen" ? 1 : value == "window" ? 2 : 0;
+            },
+            [system](int index) {
+                system::Store().Set(ENGINE_SCREEN_KEY, std::string(index == 1 ? "fullscreen" : index == 2 ? "window" : "app"),
+                                    system::Scope::Console(system));
+            });
+        screen.description = "How these games open; a game can have its own choice on its settings page";
+        rows.push_back(std::move(screen));
+        rows.push_back(ValueRow("console.engine_args", "Launch options", [system] {
+            const std::vector<std::string> args = Svc().settings->GetList(engine::ArgsKey(system));
+            std::string text;
+            for (const std::string& arg : args) {
+                text += (text.empty() ? "" : " ") + arg;
+            }
+            return text.empty() ? std::string("Default") : text;
+        }));
+        rows.back().description = "The list \"" + engine::ArgsKey(system) + "\" in settings.json replaces them";
+        ui::RowSpec note = ValueRow("console.engine_note", "About the engine",
+                                    [] { return std::string("Installed emulator"); });
+        note.description = "Until the engine plugin exists, EmuDEN starts the emulator installed on this device, "
+                           "and saves and settings stay in that emulator";
+        rows.push_back(std::move(note));
     }
 
     std::uint64_t revision_ = 0;
