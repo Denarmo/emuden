@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <format>
 #include <string>
 #include <string_view>
@@ -18,6 +19,11 @@ const std::string& Tr(std::string_view key);
 template <typename... Args>
 std::string TrF(std::string_view key, const Args&... args) {
     return std::vformat(Tr(key), std::make_format_args(args...));
+}
+
+/// "1 game", "5 games".
+inline std::string GameCount(std::size_t count) {
+    return count == 1 ? Tr("library.count_one") : TrF("library.count", count);
 }
 
 } // namespace den::app

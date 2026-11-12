@@ -33,7 +33,7 @@ std::vector<ui::RowSpec> OptionRows() {
     for (const std::string& name : Collections()) {
         ui::RowSpec row = ValueRow(
             "library.collection." + std::to_string(index++), name,
-            [name] { return TrF("library.count", CollectionIds(name).size()); },
+            [name] { return GameCount(CollectionIds(name).size()); },
             [name] {
                 Svc().stage->Confirm(TrF("collections.delete_title", name), Tr("collections.delete_message"),
                                      Tr("collections.delete"), [name] {

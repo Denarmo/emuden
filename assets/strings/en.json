@@ -28,6 +28,7 @@
   "library.title": "Library",
   "library.all": "All",
   "library.count": "{} games",
+  "library.count_one": "1 game",
 
   "search.title": "Search",
   "search.placeholder": "Type a game or a console",

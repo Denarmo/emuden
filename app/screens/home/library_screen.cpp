@@ -81,7 +81,7 @@ public:
         ui::Node* header = content->Add(ui::MakeBox(ui::Axis::Row, 16));
         header->align = ui::Align::End;
         header->Emplace<ui::Label>(Tr("library.title"), svc.theme->text_title, gfx::FONT_BOLD);
-        auto* count = header->Emplace<ui::Label>(TrF("library.count", games.size()));
+        auto* count = header->Emplace<ui::Label>(GameCount(games.size()));
         count->tone = ui::Tone::Dim;
         count->pad_bottom = 6;
         auto* order = header->Emplace<ui::Label>(TrF("library.sorted_by", SortNames()[static_cast<int>(LibrarySort())]));

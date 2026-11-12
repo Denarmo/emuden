@@ -207,7 +207,7 @@ private:
             }, TrF("setup.import_help", PathToUtf8(profile))));
         }
         rows.push_back(ValueRow("setup.found", Tr("setup.found"), [] {
-            return TrF("library.count", Svc().library->Entries().size());
+            return GameCount(Svc().library->Entries().size());
         }));
     }
 
@@ -225,7 +225,7 @@ private:
                                            return found ? StateText(*found) : std::string();
                                        },
                                        [id = info.id] { Svc().stage->Push("console", {{"system", id}}); });
-            row.description = TrF("library.count", info.game_count);
+            row.description = GameCount(info.game_count);
             rows.push_back(std::move(row));
             if (console->runner == plugins::Runner::Core && !console->installed && console->available) {
                 missing.push_back(info.id);
