@@ -95,15 +95,17 @@ entry), `console` (param `system`). `setup` is shown first when registered and
 
 ## Facades
 
-Each is an abstract class with a factory. The factory is defined in a `fake_*.cpp` file so
-the app links; the real implementation deletes that file and defines the factory itself.
+Each is an abstract class with a factory; all four are real (no fakes are left).
 
-| Facade | Header | Factory | Fake |
+| Facade | Header | Factory | Implementation |
 |---|---|---|---|
-| `den::library::Library` | `den/library/library.h` | `CreateLibrary(Config)` | `library/src/fake_library.cpp`: twelve made-up games |
-| `den::plugins::Host` | `den/plugins/host.h` | `CreateHost(Config)` | `plugins/src/fake_host.cpp`: seven consoles, none installed |
-| `den::player::Session` | `den/player/session.h` | `CreateSession(Config)` | `player/src/fake_session.cpp`: a moving test card |
-| `den::engine::Host` | `den/engine/host.h` | `CreateHost(Config)` | none: `engine/src/host/host.cpp` is the real host |
+| `den::library::Library` | `den/library/library.h` | `CreateLibrary(Config)` | `library/src` (see `library/README.md`) |
+| `den::plugins::Host` | `den/plugins/host.h` | `CreateHost(Config)` | `plugins/src/real_host.h`, `host_install.cpp`; refreshed once per start by `app/screens/consoles/startup_refresh.cpp` (`plugins.refresh_on_start`) |
+| `den::player::Session` | `den/player/session.h` | `CreateSession(Config)` | `player/src`; try it alone with `den_player_play` (`player/tools/play.cpp`) |
+| `den::engine::Host` | `den/engine/host.h` | `CreateHost(Config)` | `engine/src/host/host.cpp` |
+
+A runnable folder: `powershell -ExecutionPolicy Bypass -File tools\package.ps1` writes
+`dist\windows` (executable, assets, licences); `-Build` builds first, `-Zip` adds an archive.
 
 - **Library**: folders (add, remove), `Scan()` as a job, `Entries()` snapshots (id, clean
   name, system id, path, cover image path, favourite, last played, play time and count),
@@ -118,7 +120,15 @@ the app links; the real implementation deletes that file and defines the factory
   `Resume`, `SaveState`/`LoadState`/`HasState` (slots 0-9), `SetFastForward`, `SetRewind`,
   `Reset`, `Options`/`SetOption`, `GetSnapshot()`. Main thread. `Draw` may `canvas.Flush()`,
   use GL from `den/gfx/gl.h`, then `canvas.RestoreState()`. `libretro.h` is in
-  `player/third_party/libretro` (on the include path of `den_player`).
+  `player/third_party/libretro` (on the include path of `den_player`). Also:
+  `OpenRequest::resume` (continue from the state `Close` wrote), `StateThumbnail(slot)`,
+  `SetPointer(x, y, pressed)` (touch screens), `SetAspectOverride`, `FlushSaves()`. Files:
+  `<data>/saves/<system>/<game id>.srm`, `<data>/states/<system>/<game id>.slotN.state` and
+  `.png`, `.resume.state`. Zipped ROMs are unpacked to `<data>/cache/content` while they
+  run. Settings: `player.resume`, `player.rewind`, `player.fast_forward_speed`,
+  `player.integer_scale`, `player.smooth`, `player.pad_by_label`, `player.volume`,
+  `core_options.<core>.<key>`. GPU cores draw in their own GL context that shares objects
+  with the app's.
 - **Engine** (level 0, real; see `contracts/engine-contract.md`): `Available(system)`,
   `UnavailableReason`, `Find(system)` (the `Install` it would use), `Start(LaunchRequest)`,
   `Running`, `Current`, `Stop` (polite, forced after 5 s), `PollEvents()` giving `Started`,
@@ -139,6 +149,7 @@ Off unless the app is started with `EMUDEN_AUTOMATION=<port>`. It listens on
 | `key <name>` | `ok`; names: up down left right confirm back option extra menu view l r home |
 | `go <route> [k=v ...]` | `ok`; pushes a route with parameters |
 | `tap <x> <y>` | `ok`; a tap at a point in logical units |
+| `pad <button...> [ms]` | `ok`; holds game buttons on port 1 (south east west north up down left right l r start select), 150 ms by default |
 | `screenshot <png path>` | `ok <w>x<h>` once the next frame is saved |
 | `quit` | `ok`; the app closes |
 

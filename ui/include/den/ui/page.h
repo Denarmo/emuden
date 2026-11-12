@@ -117,9 +117,10 @@ public:
     std::size_t Depth() const;
 
     void Toast(std::string text, float seconds = 3.0f);
-    /// A modal question. `on_yes` runs when the confirm button is chosen.
+    /// A modal question. `on_yes` runs when the confirm button is chosen. The selection starts
+    /// on the cancel button unless `yes_first` (for questions whose yes loses nothing).
     void Confirm(std::string title, std::string message, std::string yes_label,
-                 std::function<void()> on_yes, std::string no_label = "Cancel");
+                 std::function<void()> on_yes, std::string no_label = "Cancel", bool yes_first = false);
     bool DialogOpen() const;
 
     void HandleEvent(const input::Event& event);

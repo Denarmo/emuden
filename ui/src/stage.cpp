@@ -279,13 +279,14 @@ void Stage::Toast(std::string text, float seconds) {
 }
 
 void Stage::Confirm(std::string title, std::string message, std::string yes_label,
-                    std::function<void()> on_yes, std::string no_label) {
+                    std::function<void()> on_yes, std::string no_label, bool yes_first) {
     impl_->dialog = std::make_unique<Impl::Dialog>();
     impl_->dialog->title = std::move(title);
     impl_->dialog->message = std::move(message);
     impl_->dialog->yes = std::move(yes_label);
     impl_->dialog->no = std::move(no_label);
     impl_->dialog->on_yes = std::move(on_yes);
+    impl_->dialog->selected = yes_first ? 1 : 0;
 }
 
 bool Stage::DialogOpen() const {

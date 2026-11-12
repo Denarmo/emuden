@@ -68,7 +68,8 @@ void StartRom(const library::Entry& game, bool restart) {
                                Svc().stage->Push("install", {{"system", system},
                                                              {"id", id},
                                                              {"restart", restart ? "1" : "0"}});
-                           });
+                           },
+                           Tr("common.cancel"), true);
         return;
     }
     if (!core->missing_bios.empty()) {

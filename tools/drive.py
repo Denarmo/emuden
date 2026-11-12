@@ -8,6 +8,7 @@ Start the app with EMUDEN_AUTOMATION=<port> (default here: 5577), then:
     drive.py state                      route, focused item, fps as JSON
     drive.py key down                   up down left right confirm back option extra menu view l r home
     drive.py go settings                push a route; "go details id=abc" passes parameters
+    drive.py pad start 200              hold game buttons (south east west north up down left right l r start select)
     drive.py tap 640 360                a tap in logical units (the window is 720 units high)
     drive.py screenshot C:/tmp/a.png    the next frame as a PNG
     drive.py quit

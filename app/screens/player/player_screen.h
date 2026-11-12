@@ -78,6 +78,7 @@ private:
 
     // Input while the game has the pad.
     bool wait_release_ = false;
+    bool resume_told_ = false;
     bool pointer_down_ = false;
     bool guide_was_down_ = false;
     double chord_since_ = -1;

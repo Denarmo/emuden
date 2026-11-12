@@ -103,6 +103,32 @@ void Automation::Pump() {
                 shot_path_ = path;
                 continue; // answered after the frame is drawn
             }
+        } else if (command == "pad") {
+            // "pad start 200": holds game buttons on the first port for some milliseconds.
+            static const std::pair<const char*, input::PadButton> NAMES[] = {
+                {"south", input::PadButton::South},   {"east", input::PadButton::East},
+                {"west", input::PadButton::West},     {"north", input::PadButton::North},
+                {"up", input::PadButton::DpadUp},     {"down", input::PadButton::DpadDown},
+                {"left", input::PadButton::DpadLeft}, {"right", input::PadButton::DpadRight},
+                {"l", input::PadButton::L1},          {"r", input::PadButton::R1},
+                {"start", input::PadButton::Start},   {"select", input::PadButton::Select},
+            };
+            std::uint32_t buttons = 0;
+            double ms = 150;
+            std::string word;
+            while (in >> word) {
+                bool known = false;
+                for (const auto& [name, button] : NAMES) {
+                    if (word == name) {
+                        buttons |= 1u << static_cast<std::uint32_t>(button);
+                        known = true;
+                    }
+                }
+                if (!known) {
+                    ms = std::atof(word.c_str());
+                }
+            }
+            svc.input->HoldButtons(buttons, ms / 1000.0);
         } else if (command == "quit") {
             svc.quit = true;
         } else {

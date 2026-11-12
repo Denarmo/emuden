@@ -115,9 +115,7 @@ void PlayerScreen::Begin(const std::filesystem::path& content) {
                         .count();
     aspect_sent_ = 0;
     svc.player->SetAspectOverride(0);
-    if (svc.player->GetSnapshot().resumed) {
-        svc.stage->Toast("Resumed where you left off");
-    }
+    resume_told_ = false;
     svc.input->SetNavFromPads(false);
     wait_release_ = true;
 }
@@ -278,6 +276,11 @@ void PlayerScreen::Update(ui::Context& ctx) {
     const player::Snapshot snapshot = svc.player->GetSnapshot();
     if (snapshot.state == player::State::Failed || snapshot.state == player::State::Closed) {
         return Fail(snapshot.error.empty() ? game_.name + " stopped." : snapshot.error);
+    }
+    // The state is taken on the first frame the core runs, not in Open.
+    if (!resume_told_ && snapshot.resumed) {
+        resume_told_ = true;
+        svc.stage->Toast("Resumed where you left off");
     }
     if (view_ == View::Closed) {
         FeedPads();

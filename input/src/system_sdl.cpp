@@ -131,6 +131,8 @@ struct System::Impl {
     PadFamily held_family = PadFamily::Xbox;
     double next_repeat = 0;
     PadState none;
+    std::uint32_t virtual_buttons = 0;
+    Uint64 virtual_until = 0;
 
     OpenPad* Find(SDL_JoystickID id) {
         for (OpenPad& pad : pads) {
@@ -439,7 +441,15 @@ PadState System::KeyboardPad() const {
     set(SDL_SCANCODE_W, PadButton::R1);
     set(SDL_SCANCODE_RETURN, PadButton::Start);
     set(SDL_SCANCODE_RSHIFT, PadButton::Select);
+    if (SDL_GetTicks() < impl_->virtual_until) {
+        pad.buttons |= impl_->virtual_buttons;
+    }
     return pad;
+}
+
+void System::HoldButtons(std::uint32_t buttons, double seconds) {
+    impl_->virtual_buttons = buttons;
+    impl_->virtual_until = SDL_GetTicks() + static_cast<Uint64>(seconds * 1000.0);
 }
 
 void System::SetNavFromPads(bool on) {

@@ -134,6 +134,8 @@ public:
     /// The keyboard as a pad: arrows, Z/X/A/S as south/east/west/north, Q/W shoulders,
     /// Enter start, right Shift select.
     PadState KeyboardPad() const;
+    /// Holds pad buttons (a PadButton bit mask) on the keyboard pad for a while (automation).
+    void HoldButtons(std::uint32_t buttons, double seconds);
     /// Navigation from pads is held back while true (the player owns the pad).
     void SetNavFromPads(bool on);
 
