@@ -173,6 +173,16 @@ python tools/drive.py key down + key right + key confirm + screenshot C:/tmp/sho
 python tools/drive.py quit
 ```
 
+The player's test endpoint (`app/screens/player/test_endpoint.cpp`) listens on the next
+port, `<port> + 1`; `tools/drive.py` sends these lines there by itself:
+
+| Line | Reply |
+|---|---|
+| `vpad attach <xbox\|playstation\|nintendo>` | `ok <id>`; a virtual gamepad. Also `press`, `down`, `up`, `stick`, `trigger`, `detach` (see `tools/drive.py`) |
+| `player` | JSON: the session (state, core, frames, fps, rewind), its sound counters (`audio`) and the pads |
+| `audio reset` | `ok`; the sound counters start again |
+| `wav <file> [seconds]` | records the device's output; answers with its level and the gaps in it |
+
 Use your own port when several agents test at once (`--port N`). Give nodes an `id` so
 `state` can tell what is focused. Always end with `quit`.
 
