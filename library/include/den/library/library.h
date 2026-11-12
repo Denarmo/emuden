@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Facade of the game library. Screens use only this header. The implementation behind
-// CreateLibrary is a fake (src/fake_library.cpp) until the real scanner replaces it.
+// Facade of the game library. Screens use only this header.
 
 #pragma once
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -34,6 +34,16 @@ struct Entry {
     std::int64_t last_played = 0;  // unix seconds, 0 = never
     std::int64_t play_seconds = 0; // total
     int play_count = 0;
+    /// The name as found (a ROM's file name without extension); artwork is matched on it.
+    std::string original_name;
+    /// For a ROM packed in a zip archive (`path` is the archive): the file in it to start.
+    /// PrepareRom (content.h) unpacks it.
+    std::string archive_member;
+    int disc = 0; // disc number of a multi-disc game, 0 otherwise
+    /// `cover` is a drawn placeholder (colour and initials): print the name over it.
+    bool placeholder_cover = false;
+    /// Files of the same game in other regions, hidden behind this entry.
+    std::vector<std::string> other_versions;
 };
 
 struct SystemInfo {
@@ -42,6 +52,8 @@ struct SystemInfo {
     std::string short_name; // "GBA"
     int game_count = 0;
 };
+
+struct SystemDef;
 
 struct Folder {
     std::string path;   // UTF-8
@@ -73,12 +85,32 @@ public:
     virtual void SetFavourite(const std::string& id, bool favourite) = 0;
     /// Adds one play session to the entry's records.
     virtual void RecordPlay(const std::string& id, std::int64_t started_unix, std::int64_t seconds) = 0;
+
+    /// Consoles from plugin manifests (systems.h). They replace the built-in rules of the same
+    /// id and add new ones. The plugin host or the app calls this; the next scan uses them.
+    virtual void SetSystems(std::vector<SystemDef> systems) = 0;
+    /// Adds the host folders an earlier app's profile lists as game folders (its
+    /// config/qt-config.ini, read only). Fails when there is no such profile.
+    virtual Status ImportFolders(const std::filesystem::path& old_profile) = 0;
 };
+
+/// An answer to a GET: status 0 when the request never got one.
+struct HttpAnswer {
+    int status = 0;
+    std::string body;
+};
+using HttpFetcher = std::function<HttpAnswer(const std::string& url)>;
 
 struct Config {
     std::filesystem::path data_dir; // the library keeps its files under data_dir / "library"
     Jobs* jobs = nullptr;
     store::Settings* settings = nullptr;
+    /// Cover downloads. Empty = the platform's HTTP client; with `offline` nothing is fetched.
+    HttpFetcher http;
+    bool offline = false;
+    /// On the first run (no library file yet) the game folders of this old profile are taken
+    /// over. Empty = the folder the environment variable EMUDEN_IMPORT_PROFILE names, if any.
+    std::filesystem::path import_profile;
 };
 
 std::unique_ptr<Library> CreateLibrary(const Config& config);
