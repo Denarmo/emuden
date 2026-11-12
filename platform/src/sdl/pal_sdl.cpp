@@ -202,6 +202,13 @@ void* GlProcAddress(const char* name) {
 }
 
 std::filesystem::path ExecutableDir() {
+#ifdef __ANDROID__
+    // An APK has no folder of its own: the app's private files folder stands in for it (the
+    // activity unpacks the assets there).
+    if (const char* files = SDL_GetAndroidInternalStoragePath()) {
+        return PathFromUtf8(files);
+    }
+#endif
     const char* base = SDL_GetBasePath();
     return base ? PathFromUtf8(base) : std::filesystem::current_path();
 }

@@ -1,0 +1,75 @@
+plugins {
+    id 'com.android.application'
+}
+
+def repo = file("${rootDir}/../..")
+def sdlJava = file("${repo}/.deps/sdl3-src/android-project/app/src/main/java")
+def packedAssets = layout.buildDirectory.dir('packed-assets')
+
+android {
+    namespace 'io.github.denarmo.emuden'
+    compileSdk 36
+    ndkVersion '29.0.14206865'
+
+    defaultConfig {
+        // ".next" so it installs beside the previous app.
+        applicationId 'io.github.denarmo.emuden.next'
+        minSdk 28
+        targetSdk 36
+        versionCode 1
+        versionName '0.1.0'
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+        externalNativeBuild {
+            cmake {
+                // The same variables as the "android" CMake preset.
+                arguments '-DANDROID_STL=c++_shared', '-DDEN_BUILD_TESTS=OFF',
+                        '-DCMAKE_BUILD_TYPE=RelWithDebInfo'
+                targets 'den_app'
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file("${repo}/CMakeLists.txt")
+            version '3.31.5'
+            buildStagingDirectory file("${repo}/build/android/cxx")
+        }
+    }
+
+    sourceSets {
+        main {
+            // SDL's activity comes from the SDL sources CMake fetched.
+            java.srcDirs = ['src/main/java', sdlJava]
+            assets.srcDirs = [packedAssets]
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+// The app's assets folder goes into the APK as assets/emuden; the activity unpacks it.
+def packAssets = tasks.register('packAssets', Sync) {
+    from("${repo}/assets")
+    into(packedAssets.map { it.dir('emuden') })
+}
+
+tasks.configureEach { task ->
+    if (task.name.startsWith('merge') && task.name.endsWith('Assets')) {
+        task.dependsOn(packAssets)
+    }
+    // The first CMake configure fetches SDL, whose Java sources are compiled here.
+    if (task.name.startsWith('compile') && task.name.endsWith('JavaWithJavac')) {
+        task.dependsOn(tasks.matching { it.name.startsWith('configureCMake') })
+    }
+}

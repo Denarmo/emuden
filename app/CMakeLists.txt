@@ -5,8 +5,17 @@ file(GLOB_RECURSE app_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/screens/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/pages/*.cpp")
 
-add_executable(den_app ${app_sources})
-set_target_properties(den_app PROPERTIES OUTPUT_NAME emuden)
+if(ANDROID)
+    # SDL's activity loads libmain.so and calls SDL_main (shells/android). SDL is linked in,
+    # so its JNI_OnLoad must be kept.
+    add_library(den_app SHARED ${app_sources}
+        "${CMAKE_SOURCE_DIR}/shells/android/app/src/main/cpp/entry.cpp")
+    set_target_properties(den_app PROPERTIES OUTPUT_NAME main)
+    target_link_options(den_app PRIVATE -Wl,-u,JNI_OnLoad)
+else()
+    add_executable(den_app ${app_sources})
+    set_target_properties(den_app PROPERTIES OUTPUT_NAME emuden)
+endif()
 target_include_directories(den_app PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(den_app PRIVATE

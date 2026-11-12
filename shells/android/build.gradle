@@ -1,0 +1,8 @@
+plugins {
+    id 'com.android.application' version '8.9.1' apply false
+}
+
+// Everything Gradle writes goes under build/android of the repository.
+allprojects {
+    layout.buildDirectory = file("${rootDir}/../../build/android/gradle/${project.name}")
+}

@@ -4,6 +4,12 @@ if(WIN32)
 else()
     list(APPEND platform_exclude "/src/win/")
 endif()
+if(ANDROID)
+    # HTTP comes from the platform through JNI (src/android).
+    list(APPEND platform_exclude "/src/posix/http_curl.cpp")
+else()
+    list(APPEND platform_exclude "/src/android/")
+endif()
 
 den_module(platform DEPS den_base PRIVATE_DEPS SDL3::SDL3-static EXCLUDE ${platform_exclude})
 
