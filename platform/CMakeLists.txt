@@ -1,0 +1,18 @@
+set(platform_exclude)
+if(WIN32)
+    list(APPEND platform_exclude "/src/posix/")
+else()
+    list(APPEND platform_exclude "/src/win/")
+endif()
+
+den_module(platform DEPS den_base PRIVATE_DEPS SDL3::SDL3-static EXCLUDE ${platform_exclude})
+
+if(WIN32)
+    target_link_libraries(den_platform PRIVATE winhttp ws2_32)
+elseif(NOT ANDROID)
+    find_package(CURL QUIET)
+    if(CURL_FOUND)
+        target_link_libraries(den_platform PRIVATE CURL::libcurl)
+        target_compile_definitions(den_platform PRIVATE DEN_HAVE_CURL)
+    endif()
+endif()

@@ -1,0 +1,2 @@
+den_module(base PRIVATE_DEPS zlibstatic)
+target_compile_definitions(den_base PRIVATE DEN_HAVE_ZLIB)
