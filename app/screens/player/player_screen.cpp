@@ -151,6 +151,9 @@ void PlayerScreen::Leave() {
         prepare_->Cancel();
     }
     if (phase_ == Phase::Running) {
+        const player::Snapshot snapshot = svc.player->GetSnapshot();
+        log::Info("player", "leave {} at frame {} ({}x{})", game_.name, snapshot.frames,
+                  snapshot.frame_width, snapshot.frame_height);
         // Close writes the battery save and the state the next start resumes from.
         svc.library->RecordPlay(game_.id, started_unix_,
                                 static_cast<std::int64_t>(pal::NowSeconds() - started_));
@@ -166,6 +169,7 @@ void PlayerScreen::OpenMenu() {
         return;
     }
     Svc().player->Pause();
+    log::Info("player", "paused at frame {}", Svc().player->GetSnapshot().frames);
     Svc().input->SetNavFromPads(true);
     Show(View::Main);
 }
