@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <algorithm>
+#include <vector>
 
 #include <SDL3/SDL_audio.h>
 #include <SDL3/SDL_init.h>
@@ -16,6 +17,7 @@ namespace {
 constexpr double TARGET_SECONDS = 0.064;
 constexpr double MAX_SECONDS = 0.25;
 constexpr double MAX_DRIFT = 0.015;
+constexpr double STARVED_SECONDS = 0.004;
 
 SDL_AudioStream* Stream(void* stream) {
     return static_cast<SDL_AudioStream*>(stream);
@@ -37,6 +39,8 @@ bool AudioOut::Open(double sample_rate) {
     sample_rate_ = sample_rate > 1000.0 ? sample_rate : 44100.0;
     pushed_ = 0;
     ratio_ = 1.0;
+    underruns_ = 0;
+    primed_ = false;
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
         log::Warn("player", "no sound: {}", SDL_GetError());
         return false;
@@ -72,11 +76,33 @@ void AudioOut::Push(std::span<const std::int16_t> samples) {
         return;
     }
     // Too far behind (the app stalled): start over rather than play late for good.
-    if (QueuedSeconds() > MAX_SECONDS) {
+    const double queued = QueuedSeconds();
+    if (queued > MAX_SECONDS) {
         SDL_ClearAudioStream(Stream(stream_));
+        primed_ = false;
+    }
+    // An empty queue plays every hiccup of the frame loop as a crackle: start (and start
+    // again after the queue ran dry) with the target's worth of silence in front.
+    if (!primed_ || queued < STARVED_SECONDS) {
+        if (primed_) {
+            ++underruns_;
+        }
+        Prime(queued);
     }
     SDL_PutAudioStreamData(Stream(stream_), samples.data(),
                            static_cast<int>(samples.size() * sizeof(std::int16_t)));
+}
+
+void AudioOut::Prime(double queued) {
+    const double missing = TARGET_SECONDS - queued;
+    if (missing > 0) {
+        const std::vector<std::int16_t> silence(
+            static_cast<std::size_t>(missing * sample_rate_) * 2, 0);
+        SDL_PutAudioStreamData(Stream(stream_), silence.data(),
+                               static_cast<int>(silence.size() * sizeof(std::int16_t)));
+    }
+    primed_ = true;
+    ratio_ = 1.0;
 }
 
 void AudioOut::SetPaused(bool paused) {
@@ -94,6 +120,7 @@ void AudioOut::Clear() {
     if (stream_) {
         SDL_ClearAudioStream(Stream(stream_));
     }
+    primed_ = false;
 }
 
 void AudioOut::Tune() {

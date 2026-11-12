@@ -7,6 +7,7 @@
 #include <cmath>
 #include <format>
 
+#include "../details/game_prefs.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
@@ -67,13 +68,13 @@ void PlayerScreen::Open() {
     }
     game_ = *game;
     const auto console = svc.plugins->FindConsole(game_.system);
-    const auto core = svc.plugins->CoreFor(game_.system);
+    const auto core = CoreForGame(game_);
     if (!console || !core || !core->installed || core->library.empty()) {
         return Fail((console ? console->name : game_.name) + ": its core is not installed. Open Consoles to install it.");
     }
     console_ = *console;
     core_ = *core;
-    size_ = static_cast<ScreenSize>(std::clamp(static_cast<int>(svc.settings->GetNumber(SIZE_KEY, 0)), 0,
+    size_ = static_cast<ScreenSize>(std::clamp(ScreenSizeFor(game_), 0,
                                                static_cast<int>(ScreenSizeNames().size()) - 1));
     show_fps_ = svc.settings->GetBool(FPS_KEY, false);
 
@@ -115,6 +116,19 @@ void PlayerScreen::Begin(const std::filesystem::path& content) {
                         .count();
     aspect_sent_ = 0;
     svc.player->SetAspectOverride(0);
+    // The picture preset: the console's own choice, else the default for every console.
+    const std::string picture = svc.settings->GetString(
+        "player.picture_for." + game_.system, svc.settings->GetString("player.picture", "plain"));
+    const auto& presets = player::PicturePresets();
+    picture_ = 0;
+    for (std::size_t i = 0; i < presets.size(); ++i) {
+        if (presets[i].id == picture) {
+            picture_ = static_cast<int>(i);
+        }
+    }
+    svc.player->SetPicture(presets[static_cast<std::size_t>(picture_)].id);
+    capture_ = -1;
+    swallow_nav_ = false;
     resume_told_ = false;
     svc.input->SetNavFromPads(false);
     wait_release_ = true;
@@ -186,7 +200,7 @@ void PlayerScreen::FeedPads() {
     input::PadState pads[MAX_PORTS];
     pads[0] = input.KeyboardPad();
     std::uint32_t all = pads[0].buttons;
-    bool chord = false, guide = false;
+    bool chord = false, guide = false, hold_fast = false, hold_rewind = false;
     float stick = 0;
     for (int port = 0; port < MAX_PORTS; ++port) {
         const input::PadState& pad = input.Pad(port);
@@ -203,6 +217,15 @@ void PlayerScreen::FeedPads() {
             stick = pad.rx;
         }
         pads[port].buttons &= ~Bit(PadButton::Guide);
+    }
+
+    // Select with a shoulder button: rewind (left) and fast-forward (right), on any port.
+    for (input::PadState& pad : pads) {
+        if (pad.Down(PadButton::Select) && (pad.Down(PadButton::L1) || pad.Down(PadButton::R1))) {
+            hold_rewind = hold_rewind || pad.Down(PadButton::L1);
+            hold_fast = hold_fast || !pad.Down(PadButton::L1);
+            pad.buttons &= ~(Bit(PadButton::Select) | Bit(PadButton::L1) | Bit(PadButton::R1));
+        }
     }
 
     // The menu: the pad's home button, or Start and Select held together.
@@ -232,6 +255,8 @@ void PlayerScreen::FeedPads() {
     // Consoles without a right stick use it to hold fast-forward and rewind.
     stick_fast_ = console_.right_stick_holds && stick > STICK_HOLD;
     stick_rewind_ = console_.right_stick_holds && stick < -STICK_HOLD;
+    chord_fast_ = hold_fast;
+    chord_rewind_ = hold_rewind;
     for (int port = 0; port < MAX_PORTS; ++port) {
         svc.player->SetPad(port, pads[port]);
     }
@@ -239,8 +264,8 @@ void PlayerScreen::FeedPads() {
 
 void PlayerScreen::ApplySpeed() {
     const bool playing = view_ == View::Closed;
-    const bool rewind = playing && (key_rewind_ || stick_rewind_);
-    const bool fast = !rewind && (fast_toggle_ || (playing && (key_fast_ || stick_fast_)));
+    const bool rewind = playing && (key_rewind_ || stick_rewind_ || chord_rewind_);
+    const bool fast = !rewind && (fast_toggle_ || (playing && (key_fast_ || stick_fast_ || chord_fast_)));
     if (fast != fast_sent_) {
         Svc().player->SetFastForward(fast);
         fast_sent_ = fast;
@@ -274,9 +299,20 @@ void PlayerScreen::Update(ui::Context& ctx) {
         focus_after_build_.clear();
     }
     const player::Snapshot snapshot = svc.player->GetSnapshot();
-    if (snapshot.state == player::State::Failed || snapshot.state == player::State::Closed) {
+    if (snapshot.state == player::State::Closed || snapshot.game_id != game_.id) {
+        // Another page opened a game over this one; the session closed this game and kept its
+        // saves. Leave quietly, without closing what runs now.
+        svc.library->RecordPlay(game_.id, started_unix_,
+                                static_cast<std::int64_t>(pal::NowSeconds() - started_));
+        phase_ = Phase::Left;
+        svc.input->SetNavFromPads(true);
+        GetStage().Pop();
+        return;
+    }
+    if (snapshot.state == player::State::Failed) {
         return Fail(snapshot.error.empty() ? game_.name + " stopped." : snapshot.error);
     }
+    TickCapture();
     // The state is taken on the first frame the core runs, not in Open.
     if (!resume_told_ && snapshot.resumed) {
         resume_told_ = true;
@@ -301,6 +337,15 @@ bool PlayerScreen::OnEvent(const input::Event& event) {
             key_rewind_ = event.down;
         }
         return true;
+    }
+    if (capture_ >= 0 || swallow_nav_) {
+        // The next button pressed is the answer, not navigation; Esc gives up.
+        if (capture_ >= 0 && event.type == Type::Nav && event.nav == Nav::Back &&
+            event.family == input::PadFamily::Keyboard) {
+            capture_ = -1;
+            Rebuild();
+        }
+        return event.type == Type::Nav || event.type == Type::PointerDown || event.type == Type::PointerUp;
     }
     if (phase_ == Phase::Preparing) {
         if (event.type == Type::Nav && event.nav == Nav::Back && !event.repeat) {
@@ -341,7 +386,29 @@ bool PlayerScreen::OnEvent(const input::Event& event) {
     return false;
 }
 
+bool PlayerScreen::WrapFocus(Nav nav) {
+    // Up from the first row goes to the last and down from the last to the first.
+    ui::Node* list = Root().FindById("menu.list");
+    if (!list || !Focus() || ui::FindFocusTarget(Root(), Focus(), nav)) {
+        return false;
+    }
+    ui::Node* target = nullptr;
+    for (const auto& child : list->Children()) {
+        if (child->focusable && (!target || nav == Nav::Up)) {
+            target = child.get();
+        }
+    }
+    if (!target || target == Focus()) {
+        return false;
+    }
+    SetFocus(target);
+    return true;
+}
+
 bool PlayerScreen::OnNav(Nav nav) {
+    if ((nav == Nav::Up || nav == Nav::Down) && view_ != View::Closed) {
+        return WrapFocus(nav);
+    }
     if (nav != Nav::Back) {
         return false;
     }
@@ -361,6 +428,9 @@ bool PlayerScreen::OnNav(Nav nav) {
     case View::Buttons:
         Show(View::Main, "menu.buttons");
         break;
+    case View::Players:
+        Show(View::Main, "menu.players");
+        break;
     case View::Closed:
         break;
     }
@@ -379,7 +449,10 @@ void PlayerScreen::DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const p
         canvas.DrawText(text, box.x + 10, box.y + 5, size, ink, gfx::FONT_BOLD);
     };
     if (show_fps_) {
-        badge(std::format("{:.0f} fps", snapshot.measured_fps), true);
+        // Frame rate, the sound waiting to be played, and how often it ran dry.
+        badge(std::format("{:.0f} fps  \xC2\xB7  {:.0f} ms  \xC2\xB7  {} gaps", snapshot.measured_fps,
+                          snapshot.audio_queued_ms, snapshot.audio_underruns),
+              true);
     }
     if (snapshot.rewinding) {
         badge("\xC2\xAB Rewind", false);

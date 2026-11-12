@@ -89,6 +89,13 @@ Status PlayerSession::Start(const OpenRequest& request) {
     }
     snapshot_.core_name = core_->Info().name;
     system_ = request.system;
+    game_key_ = request.game_id;
+    for (char& c : game_key_) {
+        if (!std::isalnum(static_cast<unsigned char>(c))) {
+            c = '_';
+        }
+    }
+    ReloadButtons();
     ApplyStoredOptions();
 
     fs::path content = request.content;
@@ -122,6 +129,7 @@ Status PlayerSession::Start(const OpenRequest& request) {
     uploaded_serial_ = 0;
     pending_resume_ = resume_enabled_ && IsRegularFile(paths_.Resume());
     snapshot_.state = State::Running;
+    snapshot_.picture = picture_;
     snapshot_.can_save_states = core_->StateSize() > 0;
     snapshot_.hardware_rendered = core_->HardwareRendered();
     log::Info("player", "{} {} runs {} ({}x{}, {:.2f} fps, {} Hz{})", snapshot_.core_name,
@@ -144,6 +152,7 @@ void PlayerSession::Close() {
     hw_.reset();
     audio_.Close();
     rewind_.reset();
+    shader_.Release();
     if (texture_ && config_.device) {
         config_.device->DestroyTexture(texture_);
     }
@@ -154,6 +163,7 @@ void PlayerSession::Close() {
         content_cache_.clear();
     }
     snapshot_ = Snapshot{};
+    picture_ = "plain";
 }
 
 void PlayerSession::ReadAvInfo() {
@@ -178,14 +188,24 @@ std::string PlayerSession::OptionSettingKey(const std::string& key) const {
     return "core_options." + name + "." + safe;
 }
 
+std::string PlayerSession::GameOptionKey(const std::string& key) const {
+    std::string safe = key;
+    std::replace(safe.begin(), safe.end(), '.', '_');
+    return "game_options." + system_ + "." + game_key_ + "." + safe;
+}
+
 void PlayerSession::ApplyStoredOptions() {
     if (!config_.settings) {
         return;
     }
     for (const OptionInfo& option : core_->Options()) {
-        const std::string key = OptionSettingKey(option.key);
-        if (config_.settings->Has(key)) {
-            core_->SetOption(option.key, config_.settings->GetString(key));
+        // This game's own value wins over the console's.
+        const std::string game = GameOptionKey(option.key);
+        const std::string console = OptionSettingKey(option.key);
+        if (config_.settings->Has(game)) {
+            core_->SetOption(option.key, config_.settings->GetString(game));
+        } else if (config_.settings->Has(console)) {
+            core_->SetOption(option.key, config_.settings->GetString(console));
         }
     }
 }
@@ -203,6 +223,7 @@ std::vector<CoreOption> PlayerSession::Options() const {
         item.key = option.key;
         item.label = option.label;
         item.value = option.value;
+        item.for_game = config_.settings && config_.settings->Has(GameOptionKey(option.key));
         for (const OptionChoice& value : option.values) {
             item.values.push_back(value.value);
         }
@@ -212,13 +233,52 @@ std::vector<CoreOption> PlayerSession::Options() const {
 }
 
 void PlayerSession::SetOption(const std::string& key, const std::string& value) {
+    SetOption(key, value, OptionScope::Console);
+}
+
+void PlayerSession::SetOption(const std::string& key, const std::string& value, OptionScope scope) {
     if (!core_) {
         return;
     }
     core_->SetOption(key, value);
-    if (config_.settings) {
-        config_.settings->SetString(OptionSettingKey(key), value);
+    if (!config_.settings) {
+        return;
     }
+    if (scope == OptionScope::Game) {
+        config_.settings->SetString(GameOptionKey(key), value);
+    } else {
+        config_.settings->SetString(OptionSettingKey(key), value);
+        config_.settings->Remove(GameOptionKey(key));
+    }
+}
+
+void PlayerSession::ClearGameOptions() {
+    if (!core_ || !config_.settings) {
+        return;
+    }
+    for (const OptionInfo& option : core_->Options()) {
+        const std::string game = GameOptionKey(option.key);
+        if (!config_.settings->Has(game)) {
+            continue;
+        }
+        config_.settings->Remove(game);
+        const std::string console = OptionSettingKey(option.key);
+        core_->SetOption(option.key, config_.settings->Has(console)
+                                         ? config_.settings->GetString(console)
+                                         : option.default_value);
+    }
+}
+
+void PlayerSession::ReloadButtons() {
+    for (std::size_t family = 0; family < button_maps_.size(); ++family) {
+        button_maps_[family] = LoadButtons(config_.settings, system_,
+                                           static_cast<input::PadFamily>(family), pad_by_label_);
+    }
+}
+
+void PlayerSession::SetPicture(const std::string& id) {
+    picture_ = PictureShader::Has(id) ? id : "plain";
+    snapshot_.picture = picture_;
 }
 
 void PlayerSession::Pause() {
@@ -241,7 +301,8 @@ void PlayerSession::SetPad(int port, const input::PadState& pad) {
     if (!core_ || port < 0 || port >= static_cast<int>(MAX_PORTS)) {
         return;
     }
-    const RetroPad mapped = MapPad(pad, system_, pad_by_label_);
+    const auto family = std::min(static_cast<std::size_t>(pad.family), button_maps_.size() - 1);
+    const RetroPad mapped = MapPad(pad, system_, button_maps_[family]);
     const auto index = static_cast<unsigned>(port);
     core_->SetButtons(index, mapped.buttons);
     core_->SetAnalog(index, 0, mapped.lx, mapped.ly);
@@ -364,7 +425,8 @@ void PlayerSession::Advance(double seconds) {
     const double frames = seconds * av_.fps;
     step_ += (frames - step_) * 0.1;
     if (snapshot_.rewinding) {
-        due_ += frames;
+        // One kept state back per the frames between two states: the game's own speed.
+        due_ += frames / static_cast<double>(rewind_interval_);
         while (due_ >= 1.0) {
             due_ -= 1.0;
             if (!StepRewind()) {
@@ -398,6 +460,8 @@ void PlayerSession::Advance(double seconds) {
         }
     }
     MeasureFps(seconds);
+    snapshot_.audio_queued_ms = audio_.QueuedSeconds() * 1000.0;
+    snapshot_.audio_underruns = audio_.Underruns();
     save_timer_ += seconds;
     if (save_timer_ >= SAVE_EVERY_SECONDS) {
         save_timer_ = 0.0;

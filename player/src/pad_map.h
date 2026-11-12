@@ -9,6 +9,7 @@
 #include <string_view>
 
 #include "den/input/input.h"
+#include "den/player/buttons.h"
 
 namespace den::player {
 
@@ -20,9 +21,10 @@ struct RetroPad {
 /// The console's own pad has A on the right and B below it (Nintendo consoles).
 bool NintendoLayout(std::string_view system);
 
-/// `by_label`: on a console with the Nintendo layout, a pad whose buttons carry other letters
-/// in those places (Xbox) presses the console button of the same letter: its A is the game's
-/// A. Other pads and consoles map by position.
+/// Buttons through `map`; triggers count as L2 and R2 when pulled; on consoles without a
+/// stick the left stick is the D-pad too.
+RetroPad MapPad(const input::PadState& pad, std::string_view system, const ButtonMap& map);
+/// With the default map (see DefaultButtons).
 RetroPad MapPad(const input::PadState& pad, std::string_view system, bool by_label);
 
 } // namespace den::player

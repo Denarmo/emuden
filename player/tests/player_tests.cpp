@@ -13,6 +13,7 @@
 #include "core/core.h"
 #include "den/base/files.h"
 #include "den/player/session.h"
+#include "den/store/settings.h"
 #include "game_files.h"
 #include "pad_map.h"
 #include "rewind_buffer.h"
@@ -141,6 +142,26 @@ TEST_CASE("pads map by position, and by label on Nintendo consoles") {
     REQUIRE(MapPad(stick, "gb", true).buttons == (RETRO_RIGHT | RETRO_R2));
     REQUIRE(MapPad(stick, "psx", true).buttons == RETRO_R2);
     REQUIRE(MapPad(stick, "psx", true).lx > 29000);
+}
+
+TEST_CASE("remapped buttons are kept per console") {
+    using input::PadButton;
+    using input::PadFamily;
+    const fs::path dir = FreshDir("remap");
+    store::Settings settings(dir / "settings.json");
+    REQUIRE_FALSE(HasRemap(settings, "psx"));
+    SaveButton(settings, "psx", GameButtonFromName("b"), PadButton::R1);
+    REQUIRE(HasRemap(settings, "psx"));
+    const ButtonMap map = LoadButtons(&settings, "psx", PadFamily::Xbox, true);
+    REQUIRE(MapPad(Pad({PadButton::R1}, PadFamily::Xbox), "psx", map).buttons == (RETRO_B | RETRO_R));
+    REQUIRE(MapPad(Pad({PadButton::South}, PadFamily::Xbox), "psx", map).buttons == 0);
+    // Another console is untouched.
+    const ButtonMap other = LoadButtons(&settings, "gba", PadFamily::Xbox, true);
+    REQUIRE(MapPad(Pad({PadButton::South}, PadFamily::Xbox), "gba", other).buttons == RETRO_A);
+    ResetButtons(settings, "psx");
+    REQUIRE(LoadButtons(&settings, "psx", PadFamily::Xbox, true) ==
+            DefaultButtons("psx", PadFamily::Xbox, true));
+    REQUIRE(std::string(PadButtonName(PadButtonFromName("north"))) == "north");
 }
 
 TEST_CASE("the sound's rate follows its queue") {
@@ -298,6 +319,44 @@ TEST_CASE("a session plays, saves and resumes") {
     session->Advance(1.0 / 60.0);
     REQUIRE_FALSE(session->GetSnapshot().resumed);
     session->Close();
+}
+
+TEST_CASE("core options are kept for the console and for one game") {
+    QuietAudio();
+    const fs::path data = FreshDir("options");
+    const fs::path rom = WriteRom(data, "Game.tst", "A");
+    store::Settings settings(data / "settings.json");
+    Config config;
+    config.data_dir = data;
+    config.settings = &settings;
+    OpenRequest request;
+    request.core = TestCore();
+    request.content = rom;
+    request.system = "test";
+    request.resume = false;
+    const auto value = [](Session& session) { return session.Options().at(0).value; };
+    {
+        auto session = CreateSession(config);
+        request.game_id = "game-1";
+        REQUIRE(session->Open(request));
+        session->SetOption("testcore_color", "blue", OptionScope::Console);
+        session->SetOption("testcore_color", "green", OptionScope::Game);
+        REQUIRE(session->Options().at(0).for_game);
+    }
+    {
+        auto session = CreateSession(config);
+        request.game_id = "game-2";
+        REQUIRE(session->Open(request));
+        REQUIRE(value(*session) == "blue");
+        REQUIRE_FALSE(session->Options().at(0).for_game);
+    }
+    auto session = CreateSession(config);
+    request.game_id = "game-1";
+    REQUIRE(session->Open(request));
+    REQUIRE(value(*session) == "green");
+    session->ClearGameOptions();
+    REQUIRE(value(*session) == "blue");
+    REQUIRE_FALSE(session->Options().at(0).for_game);
 }
 
 TEST_CASE("a session reports what went wrong") {

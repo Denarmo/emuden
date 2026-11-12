@@ -56,6 +56,9 @@ struct Snapshot {
     bool can_rewind = false;
     bool hardware_rendered = false; // the core draws with the GPU
     bool resumed = false;           // this session continued from the state Close wrote
+    double audio_queued_ms = 0.0;   // sound waiting to be played
+    int audio_underruns = 0;        // times the sound ran dry (audible gaps) since Open
+    std::string picture;            // the picture preset in use ("plain", "crt", "lcd")
 };
 
 struct CoreOption {
@@ -63,7 +66,18 @@ struct CoreOption {
     std::string label;
     std::string value;
     std::vector<std::string> values;
+    bool for_game = false; // the value is this game's own, not the console's
 };
+
+/// Whose value SetOption writes: every game of the console (the core), or this game only.
+enum class OptionScope { Console, Game };
+
+/// A built-in picture preset (a GLSL pass over the game's picture).
+struct PicturePreset {
+    std::string id;   // "plain", "crt", "lcd"
+    std::string name; // "Plain", "CRT", "LCD"
+};
+const std::vector<PicturePreset>& PicturePresets();
 
 constexpr int STATE_SLOTS = 10;
 
@@ -73,7 +87,9 @@ constexpr int STATE_SLOTS = 10;
 /// Settings read at Open (all optional): player.resume (true), player.rewind (true),
 /// player.fast_forward_speed (3), player.integer_scale (false), player.smooth (true),
 /// player.pad_by_label (true), player.volume (1.0). A user's core option values are kept
-/// under core_options.<core>.<key>.
+/// under core_options.<core>.<key> for the console and game_options.<system>.<game>.<key>
+/// for one game; the game's value wins. Remapped buttons are under
+/// player.buttons.<system>.<button> (den/player/buttons.h).
 class Session {
 public:
     virtual ~Session() = default;
@@ -117,6 +133,19 @@ public:
 
     virtual std::vector<CoreOption> Options() const = 0;
     virtual void SetOption(const std::string& key, const std::string& value) = 0;
+    /// As SetOption, saved for the console or for this game only. Saving for the console
+    /// drops the game's own value.
+    virtual void SetOption(const std::string& key, const std::string& value, OptionScope scope) {
+        (void)scope;
+        SetOption(key, value);
+    }
+    /// Forgets this game's own option values; the console's apply again.
+    virtual void ClearGameOptions() {}
+    /// Reads the remapped buttons from the settings again (after the remap page changed them).
+    virtual void ReloadButtons() {}
+    /// Chooses a picture preset by id for the running game; an unknown id is "plain". The
+    /// choice is not saved here: the screen keeps it in the settings.
+    virtual void SetPicture(const std::string& /*id*/) {}
 
     virtual Snapshot GetSnapshot() const = 0;
 };

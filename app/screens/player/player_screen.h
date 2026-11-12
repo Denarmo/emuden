@@ -37,7 +37,7 @@ public:
 
 private:
     enum class Phase { New, Preparing, Running, Left };
-    enum class View { Closed, Main, Save, Load, Options, Buttons };
+    enum class View { Closed, Main, Save, Load, Options, Buttons, Players };
 
     // player_screen.cpp: the session.
     void Open();
@@ -50,6 +50,7 @@ private:
     void FeedPads();
     void ApplySpeed();
     void DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const player::Snapshot& snapshot);
+    bool WrapFocus(input::Nav nav);
 
     // pause_menu.cpp: the menu's pages as rows.
     void BuildMenu();
@@ -57,6 +58,12 @@ private:
     void BuildSlots(ui::Node* list, bool save);
     void BuildOptions(ui::Node* list);
     void BuildButtons(ui::Node* list);
+    void BuildPlayers(ui::Node* list);
+    void SetPicture(int index);
+    void StartCapture(int game_button);
+    void TickCapture();
+    std::uint32_t HeldButtons() const;
+    input::PadFamily PadFamilyShown() const;
     void SaveSlot(int slot);
     void LoadSlot(int slot);
 
@@ -86,6 +93,15 @@ private:
     bool stick_fast_ = false, stick_rewind_ = false;
     bool fast_toggle_ = false;
     bool fast_sent_ = false, rewind_sent_ = false;
+    bool chord_fast_ = false, chord_rewind_ = false;
+
+    // The pause menu's pages.
+    int picture_ = 0;                // index into player::PicturePresets()
+    bool options_for_game_ = false;  // "Apply to": this game, or every game of the console
+    int capture_ = -1;               // the game button waiting for a pad button; -1 = none
+    bool capture_armed_ = false;     // every button was released since the capture started
+    double capture_since_ = 0;
+    bool swallow_nav_ = false;       // until the captured button is released
 };
 
 } // namespace den::app

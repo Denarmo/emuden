@@ -92,7 +92,8 @@ void PlayerSession::Draw(gfx::Canvas& canvas, const gfx::Rect& area) {
     const bool whole = !frame.hardware && frame.height > 0 &&
                        std::fabs(std::fmod(picture_rect_.h * canvas.Scale(),
                                            static_cast<float>(frame.height))) < 0.5f;
-    const int filter = smooth_ && !whole ? gl::LINEAR : gl::NEAREST;
+    const bool shaded = PictureShader::Has(picture_);
+    const int filter = shaded || (smooth_ && !whole) ? gl::LINEAR : gl::NEAREST;
     if (filter != texture_filter_ || texture.id != filtered_texture_) {
         canvas.Flush();
         gl::BindTexture(gl::TEXTURE_2D, texture.id);
@@ -102,6 +103,26 @@ void PlayerSession::Draw(gfx::Canvas& canvas, const gfx::Rect& area) {
         canvas.RestoreState();
         texture_filter_ = filter;
         filtered_texture_ = texture.id;
+    }
+    if (shaded) {
+        const float s = canvas.Scale();
+        PictureShader::Quad quad;
+        quad.texture = texture.id;
+        quad.target = gfx::Rect{picture_rect_.x * s, picture_rect_.y * s, picture_rect_.w * s,
+                                picture_rect_.h * s};
+        quad.uv = uv;
+        quad.source_width = static_cast<float>(frame.hardware ? hw_->PictureWidth() : frame.width);
+        quad.source_height = static_cast<float>(frame.hardware ? hw_->PictureHeight() : frame.height);
+        quad.view_width = static_cast<int>(std::lround(canvas.Width() * s));
+        quad.view_height = static_cast<int>(std::lround(canvas.Height() * s));
+        canvas.Flush();
+        const bool drawn = shader_.Draw(device, picture_, quad);
+        canvas.RestoreState();
+        if (drawn) {
+            return;
+        }
+        picture_ = "plain";
+        snapshot_.picture = picture_;
     }
     canvas.DrawImage(picture_rect_, texture, gfx::Color{255, 255, 255, 255}, 0, uv);
     // The texture changes before the canvas would draw it at the end of the frame.

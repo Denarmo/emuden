@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <array>
 #include <memory>
 #include <optional>
 
@@ -14,6 +15,8 @@
 #include "den/player/session.h"
 #include "game_files.h"
 #include "hw_context.h"
+#include "pad_map.h"
+#include "picture_shader.h"
 #include "rewind_buffer.h"
 
 namespace den::player {
@@ -44,6 +47,10 @@ public:
     void FlushSaves() override;
     std::vector<CoreOption> Options() const override;
     void SetOption(const std::string& key, const std::string& value) override;
+    void SetOption(const std::string& key, const std::string& value, OptionScope scope) override;
+    void ClearGameOptions() override;
+    void ReloadButtons() override;
+    void SetPicture(const std::string& id) override;
     Snapshot GetSnapshot() const override;
 
 private:
@@ -51,6 +58,7 @@ private:
     Status Start(const OpenRequest& request);
     void ApplyStoredOptions();
     std::string OptionSettingKey(const std::string& key) const;
+    std::string GameOptionKey(const std::string& key) const;
     void ReadAvInfo();
     void RunForward(int frames, bool sound_on_all);
     bool StepRewind();
@@ -103,6 +111,12 @@ private:
     unsigned filtered_texture_ = 0;
     gfx::Rect picture_rect_;
     float aspect_override_ = 0.0f;
+    PictureShader shader_;
+    std::string picture_ = "plain";
+
+    // Input: the button map per pad family, with the user's remap.
+    std::array<ButtonMap, 4> button_maps_{};
+    std::string game_key_;
 };
 
 } // namespace den::player

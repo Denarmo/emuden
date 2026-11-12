@@ -38,6 +38,30 @@ std::vector<ui::RowSpec> PlayerRows() {
         },
         [](int index) { Svc().settings->SetNumber("player.fast_forward_speed", SPEEDS[index]); }));
     rows.push_back(Switch("player.smooth", "Smooth picture", true, "Off shows sharp pixels"));
+    {
+        std::vector<std::string> names;
+        for (const player::PicturePreset& preset : player::PicturePresets()) {
+            names.push_back(preset.name);
+        }
+        ui::RowSpec picture = ChoiceRow(
+            "player.picture", "Picture", std::move(names),
+            [] {
+                const std::string id = Svc().settings->GetString("player.picture", "plain");
+                const auto& presets = player::PicturePresets();
+                for (std::size_t i = 0; i < presets.size(); ++i) {
+                    if (presets[i].id == id) {
+                        return static_cast<int>(i);
+                    }
+                }
+                return 0;
+            },
+            [](int index) {
+                Svc().settings->SetString("player.picture",
+                                          player::PicturePresets()[static_cast<std::size_t>(index)].id);
+            });
+        picture.description = "For consoles without a choice of their own in the pause menu";
+        rows.push_back(std::move(picture));
+    }
     rows.push_back(Switch("player.pad_by_label", "Buttons by their label", true,
                           "A is A on every pad; off uses the place of the button"));
     rows.push_back(Switch("player.show_fps", "Show the frame rate", false, "F3 switches it while playing"));

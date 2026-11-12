@@ -128,7 +128,17 @@ A runnable folder: `powershell -ExecutionPolicy Bypass -File tools\package.ps1` 
   run. Settings: `player.resume`, `player.rewind`, `player.fast_forward_speed`,
   `player.integer_scale`, `player.smooth`, `player.pad_by_label`, `player.volume`,
   `core_options.<core>.<key>`. GPU cores draw in their own GL context that shares objects
-  with the app's.
+  with the app's. Core options have a scope: `SetOption(key, value, OptionScope::Game)` keeps
+  the value for this game only (`game_options.<system>.<game>.<key>`, wins over the
+  console's), `ClearGameOptions()` drops them; `CoreOption::for_game` tells which is shown.
+  Buttons: `den/player/buttons.h` (`LoadButtons`, `SaveButton`, `ResetButtons`; settings
+  `player.buttons.<system>.<game button>` = a pad button by position), then
+  `Session::ReloadButtons()`. Picture presets: `PicturePresets()` (plain, crt, lcd; one
+  built-in GLSL pass, GL 3.3 and GLES 3) and `Session::SetPicture(id)`; the screen keeps the
+  choice in `player.picture_for.<system>`, default `player.picture`. The snapshot also has
+  `audio_queued_ms`, `audio_underruns` and `picture`. While playing, Select + R1 holds
+  fast-forward and Select + L1 rewind on every pad; button glyphs per pad family are drawn
+  by `app/screens/player/glyphs.h` (`DrawGlyph`, `HintLine`).
 - **Engine** (level 0, real; see `contracts/engine-contract.md`): `Available(system)`,
   `UnavailableReason`, `Find(system)` (the `Install` it would use), `Start(LaunchRequest)`,
   `Running`, `Current`, `Stop` (polite, forced after 5 s), `PollEvents()` giving `Started`,

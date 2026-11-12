@@ -35,17 +35,25 @@ public:
     double RateRatio() const {
         return ratio_;
     }
+    /// Times the queue ran dry while playing since Open (each is a gap one can hear).
+    int Underruns() const {
+        return underruns_;
+    }
     /// Sample frames pushed since Open.
     std::uint64_t FramesPushed() const {
         return pushed_;
     }
 
 private:
+    void Prime(double queued);
+
     void* stream_ = nullptr; // SDL_AudioStream
     double sample_rate_ = 44100.0;
     double ratio_ = 1.0;
     std::uint64_t pushed_ = 0;
     bool audio_started_ = false;
+    bool primed_ = false;
+    int underruns_ = 0;
 };
 
 /// The playback rate for a queue of `queued` seconds against a target: 1.0 on target, at most
