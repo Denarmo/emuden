@@ -18,8 +18,11 @@ public:
     std::optional<int> Exited() override {
         return child_->Poll();
     }
-    void RequestStop() override {
-        child_->RequestClose();
+    bool RequestStop() override {
+        return child_->RequestClose();
+    }
+    void ConfirmStop() override {
+        child_->ConfirmClose();
     }
     void Kill() override {
         child_->Kill();

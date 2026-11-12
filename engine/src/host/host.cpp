@@ -19,9 +19,14 @@ namespace {
 
 // The app's window stays up this long, so an engine that fails at once never makes it blink.
 constexpr double HIDE_AFTER_SECONDS = 1.5;
-// How long a stop may take before the engine is ended.
-constexpr double STOP_GRACE_SECONDS = 5.0;
-constexpr double CLOSE_GRACE_SECONDS = 1.5;
+// How long a stop may take before the engine is ended: it writes its saves on the way out.
+constexpr double STOP_GRACE_SECONDS = 20.0;
+// The same when the engine could not be asked (no window yet): nothing to wait for.
+constexpr double UNASKED_GRACE_SECONDS = 5.0;
+constexpr double UNASKED_CLOSE_GRACE_SECONDS = 1.5;
+// An engine may ask "really close?" first: that is answered for this long after the stop.
+constexpr double CONFIRM_SECONDS = 6.0;
+constexpr double CONFIRM_EVERY_SECONDS = 0.5;
 
 std::int64_t UnixNow() {
     return std::chrono::duration_cast<std::chrono::seconds>(
@@ -35,10 +40,13 @@ public:
 
     ~RealHost() override {
         if (link_) {
-            // The app is closing: give the engine a moment to save, then end it.
-            link_->RequestStop();
-            const double until = pal::NowSeconds() + CLOSE_GRACE_SECONDS;
-            while (!link_->Exited() && pal::NowSeconds() < until) {
+            // The app is closing: give the engine the time to save, then end it. A stop
+            // that is already under way keeps its deadline.
+            if (stop_deadline_ == 0) {
+                AskToStop(UNASKED_CLOSE_GRACE_SECONDS);
+            }
+            while (!link_->Exited() && pal::NowSeconds() < stop_deadline_) {
+                Confirm(pal::NowSeconds());
                 pal::SleepMs(20);
             }
             Finish(link_->Exited());
@@ -103,6 +111,7 @@ public:
         started_ = pal::NowSeconds();
         started_unix_ = UnixNow();
         stop_deadline_ = 0;
+        confirm_until_ = 0;
         window_hidden_ = false;
         Event event;
         event.type = Event::Type::Started;
@@ -121,8 +130,7 @@ public:
 
     void Stop() override {
         if (link_ && stop_deadline_ == 0) {
-            link_->RequestStop();
-            stop_deadline_ = pal::NowSeconds() + STOP_GRACE_SECONDS;
+            AskToStop(UNASKED_GRACE_SECONDS);
         }
     }
 
@@ -138,7 +146,9 @@ public:
             Finish(code);
             return;
         }
+        Confirm(now);
         if (stop_deadline_ != 0 && now >= stop_deadline_) {
+            log::Warn("engine", "{} did not close in time and was ended", request_.game_id);
             link_->Kill();
             Finish(link_->Exited());
             return;
@@ -157,6 +167,21 @@ public:
     }
 
 private:
+    void AskToStop(double unasked_grace) {
+        const double now = pal::NowSeconds();
+        const bool asked = link_->RequestStop();
+        stop_deadline_ = now + (asked ? STOP_GRACE_SECONDS : unasked_grace);
+        confirm_until_ = asked ? now + CONFIRM_SECONDS : 0;
+        confirm_next_ = now + CONFIRM_EVERY_SECONDS;
+    }
+
+    void Confirm(double now) {
+        if (now < confirm_until_ && now >= confirm_next_) {
+            link_->ConfirmStop();
+            confirm_next_ = now + CONFIRM_EVERY_SECONDS;
+        }
+    }
+
     Status Fail(const LaunchRequest& request, std::string message) {
         Event event;
         event.type = Event::Type::Failed;
@@ -193,6 +218,8 @@ private:
     double started_ = 0;
     std::int64_t started_unix_ = 0;
     double stop_deadline_ = 0;
+    double confirm_until_ = 0;
+    double confirm_next_ = 0;
     bool window_hidden_ = false;
     std::vector<Event> events_;
 };

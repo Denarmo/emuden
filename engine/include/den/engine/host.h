@@ -82,7 +82,7 @@ public:
     virtual bool Running() const = 0;
     /// The request of the running session.
     virtual const LaunchRequest* Current() const = 0;
-    /// Asks the running engine to close; it is ended after a few seconds if it does not.
+    /// Asks the running engine to close and save; it is ended 20 s later if it has not.
     virtual void Stop() = 0;
     /// Main thread, once per frame: notices the exit, restores the window, books the time.
     /// The app calls it; PollEvents does too.

@@ -48,9 +48,13 @@ folder and the environment is the app's. One session at a time.
 makes it blink), then hides it; it shows it again when the engine exits. The app ignores
 pad input meanwhile. The engine draws everything, its own menus included.
 
-**Stop.** The app asks politely: `WM_CLOSE` to the top-level windows of the job's processes
-on Windows, `SIGTERM` to the process group on Linux. If the engine has not exited 5 s later
-it is ended (job terminated, `SIGKILL`). When the app itself closes, the wait is 1.5 s.
+**Stop.** The app asks politely: `WM_CLOSE` to the visible, unowned top-level windows of the
+job's processes on Windows, `SIGTERM` to the process group on Linux. An engine that answers
+with a "really close?" dialog gets Enter in that dialog (Windows; tried every 0.5 s for 6 s,
+and only in the dialogs that came up first). If the engine has not exited 20 s after the
+request it is ended (job terminated, `SIGKILL`), which may lose what it saves on exit. When
+it could not be asked at all (no window yet), it is ended after 5 s. The same applies when
+the app itself closes (1.5 s when the engine could not be asked).
 
 **End.** The session is over when the process exits. The exit code is passed on as is; it
 is not interpreted. Play time is the wall time from start to exit, booked by the app when

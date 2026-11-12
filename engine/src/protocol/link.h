@@ -21,8 +21,10 @@ public:
     virtual ~Link() = default;
     /// The exit code once the engine has ended. Never blocks.
     virtual std::optional<int> Exited() = 0;
-    /// Asks the engine to end the session and close.
-    virtual void RequestStop() = 0;
+    /// Asks the engine to end the session and close. False when it could not be asked.
+    virtual bool RequestStop() = 0;
+    /// Called now and then after RequestStop: answers a "really close?" the engine raised.
+    virtual void ConfirmStop() {}
     virtual void Kill() = 0;
     /// Session events beyond start and exit (none at level 0).
     virtual std::vector<Event> Drain() {

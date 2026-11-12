@@ -31,10 +31,11 @@ public:
     std::optional<int> Poll() override {
         return Reap(WNOHANG);
     }
-    void RequestClose() override {
-        if (!Poll()) {
-            kill(-pid_, SIGTERM);
-        }
+    bool RequestClose() override {
+        return !Poll() && kill(-pid_, SIGTERM) == 0;
+    }
+    bool ConfirmClose() override {
+        return false;
     }
     void Kill() override {
         if (!Poll()) {

@@ -87,17 +87,36 @@ std::wstring EnvironmentBlock(const std::vector<std::pair<std::string, std::stri
 struct JobPids {
     JOBOBJECT_BASIC_PROCESS_ID_LIST list;
     ULONG_PTR more[255];
+    std::vector<HWND>* asked = nullptr;   // RequestClose: the windows that were asked
+    std::vector<HWND>* dialogs = nullptr; // ConfirmClose: the visible dialogs they own
 };
 
+bool Has(const std::vector<HWND>& list, HWND window) {
+    return std::find(list.begin(), list.end(), window) != list.end();
+}
+
+// The main windows only: visible, with no owner. Dialogs and helper windows follow them.
 BOOL CALLBACK CloseWindowOfJob(HWND window, LPARAM param) {
-    const auto* list = reinterpret_cast<const JOBOBJECT_BASIC_PROCESS_ID_LIST*>(param);
+    auto* pids = reinterpret_cast<JobPids*>(param);
     DWORD pid = 0;
     GetWindowThreadProcessId(window, &pid);
-    for (DWORD i = 0; i < list->NumberOfProcessIdsInList; ++i) {
-        if (list->ProcessIdList[i] == pid && GetWindow(window, GW_OWNER) == nullptr) {
-            PostMessageW(window, WM_CLOSE, 0, 0);
+    for (DWORD i = 0; i < pids->list.NumberOfProcessIdsInList; ++i) {
+        if (pids->list.ProcessIdList[i] == pid && IsWindowVisible(window) &&
+            GetWindow(window, GW_OWNER) == nullptr) {
+            if (PostMessageW(window, WM_CLOSE, 0, 0)) {
+                pids->asked->push_back(window);
+            }
             break;
         }
+    }
+    return TRUE;
+}
+
+BOOL CALLBACK FindDialogOfJob(HWND window, LPARAM param) {
+    auto* pids = reinterpret_cast<JobPids*>(param);
+    if (IsWindowVisible(window) && IsWindowEnabled(window) &&
+        Has(*pids->asked, GetWindow(window, GW_OWNER))) {
+        pids->dialogs->push_back(window);
     }
     return TRUE;
 }
@@ -120,9 +139,9 @@ public:
         return exit_;
     }
 
-    void RequestClose() override {
+    bool RequestClose() override {
         if (Poll()) {
-            return;
+            return false;
         }
         JobPids pids{};
         if (!QueryInformationJobObject(job_, JobObjectBasicProcessIdList, &pids, sizeof(pids),
@@ -130,7 +149,36 @@ public:
             pids.list.NumberOfProcessIdsInList = 1;
             pids.list.ProcessIdList[0] = GetProcessId(process_);
         }
-        EnumWindows(CloseWindowOfJob, reinterpret_cast<LPARAM>(&pids.list));
+        asked_.clear();
+        answered_.clear();
+        pids.asked = &asked_;
+        EnumWindows(CloseWindowOfJob, reinterpret_cast<LPARAM>(&pids));
+        return !asked_.empty();
+    }
+
+    bool ConfirmClose() override {
+        if (asked_.empty() || Poll()) {
+            return false;
+        }
+        std::vector<HWND> dialogs;
+        JobPids pids{};
+        pids.asked = &asked_;
+        pids.dialogs = &dialogs;
+        EnumWindows(FindDialogOfJob, reinterpret_cast<LPARAM>(&pids));
+        if (answered_.empty()) {
+            answered_ = dialogs;
+        }
+        bool sent = false;
+        for (const HWND dialog : dialogs) {
+            // Never a dialog that came up later: that one is not the question.
+            if (Has(answered_, dialog)) {
+                const LPARAM scan = MapVirtualKeyW(VK_RETURN, MAPVK_VK_TO_VSC) << 16;
+                PostMessageW(dialog, WM_KEYDOWN, VK_RETURN, scan | 1);
+                PostMessageW(dialog, WM_KEYUP, VK_RETURN, scan | 0xC0000001);
+                sent = true;
+            }
+        }
+        return sent;
     }
 
     void Kill() override {
@@ -145,6 +193,8 @@ private:
     HANDLE job_;
     HANDLE process_;
     std::optional<int> exit_;
+    std::vector<HWND> asked_;
+    std::vector<HWND> answered_;
 };
 
 std::string LastError() {
