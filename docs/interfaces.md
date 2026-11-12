@@ -41,6 +41,9 @@ sources live once in `.deps/`.
 | `den/input/input.h` | `System::Poll` gives `Event`s (Nav, pointer, key, text); `PadState` by position for the player; `GlyphName`, `GlyphLabel` per pad family |
 | `den/ui/node.h`, `widgets.h`, `page.h`, `theme.h` | the UI kit, below |
 | `den/store/settings.h` | `Settings`: dotted keys in `settings.json` |
+| `den/platform/child.h` | `StartChild`: a child that never outlives the app (job object, parent-death signal), working directory, `RequestClose`, `Kill` |
+| `den/system/settings.h` | layered settings: `Key<T> K{"a.b", default, {meta}}` declared next to the feature registers itself; `system::Store().Get(K, Scope::Game(system, id))` resolves game, console, global (`settings.json`), default; overrides in `settings-overrides.json` (versioned); `Keys()`, `KeysIn(section)` for pages |
+| `den/system/first_run.h` | `NoteStart` (called by the app), `ThisStart()` (`first_run`, `upgraded`), `SetupDone`, `MarkSetupDone` (`setup.done`) |
 
 No OS `#ifdef` outside `platform/`. What differs between devices is asked from
 `pal::GetCaps()` (`gles`, `touch`, `windowed`, `child_processes`, `handheld`, `platform_key`).
@@ -100,7 +103,7 @@ the app links; the real implementation deletes that file and defines the factory
 | `den::library::Library` | `den/library/library.h` | `CreateLibrary(Config)` | `library/src/fake_library.cpp`: twelve made-up games |
 | `den::plugins::Host` | `den/plugins/host.h` | `CreateHost(Config)` | `plugins/src/fake_host.cpp`: seven consoles, none installed |
 | `den::player::Session` | `den/player/session.h` | `CreateSession(Config)` | `player/src/fake_session.cpp`: a moving test card |
-| `den::engine::Host` | `den/engine/host.h` | `CreateHost(Config)` | `engine/src/fake_host.cpp`: never available |
+| `den::engine::Host` | `den/engine/host.h` | `CreateHost(Config)` | none: `engine/src/host/host.cpp` is the real host |
 
 - **Library**: folders (add, remove), `Scan()` as a job, `Entries()` snapshots (id, clean
   name, system id, path, cover image path, favourite, last played, play time and count),
@@ -116,9 +119,14 @@ the app links; the real implementation deletes that file and defines the factory
   `Reset`, `Options`/`SetOption`, `GetSnapshot()`. Main thread. `Draw` may `canvas.Flush()`,
   use GL from `den/gfx/gl.h`, then `canvas.RestoreState()`. `libretro.h` is in
   `player/third_party/libretro` (on the include path of `den_player`).
-- **Engine** (level 0): `Available(system)`, `UnavailableReason`, `Start(LaunchRequest)`,
-  `Running`, `Stop`, `PollEvents()` giving `Started`, `Exited` (exit code, seconds) and
-  `Failed` (message).
+- **Engine** (level 0, real; see `contracts/engine-contract.md`): `Available(system)`,
+  `UnavailableReason`, `Find(system)` (the `Install` it would use), `Start(LaunchRequest)`,
+  `Running`, `Current`, `Stop` (polite, forced after 5 s), `PollEvents()` giving `Started`,
+  `Exited` (exit code, seconds) and `Failed` (message). Settings `engine.<system>.path` and
+  `.args` (`engine::PathKey`, `ArgsKey`). `app/screens/engine/engine_glue.cpp` pumps the
+  host every frame, hides the window while a game runs, covers the app with the
+  `engine.running` page (pad input ignored) and books the play time with
+  `Library::RecordPlay`: screens must not book engine sessions again.
 
 ## Automation endpoint
 

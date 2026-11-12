@@ -10,7 +10,9 @@
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
+#include "den/system/first_run.h"
 #include "den/system/info.h"
+#include "den/system/settings.h"
 
 namespace den::app {
 
@@ -62,6 +64,8 @@ int Run(int argc, char** argv) {
 
     store::Settings settings(svc.data_dir / "settings.json");
     svc.settings = &settings;
+    system::InitSettings(&settings, svc.data_dir);
+    system::NoteStart(settings);
     svc.theme = &ui::ThemeByName(settings.GetString("ui.theme", "Light"));
 
     pal::WindowDesc desc;
