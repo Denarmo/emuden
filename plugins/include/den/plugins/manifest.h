@@ -42,8 +42,15 @@ struct Download {
     std::string sha256;
     std::uint64_t size = 0;
     std::string archive; // "zip" or "none"
-    std::string entry;   // the member to unpack from a zip
+    std::string entry;   // the member to unpack from a zip; "Name/" is a whole folder of it
 };
+
+/// Component types this app reads; others are left out of the manifest.
+inline constexpr const char* TYPE_CORE = "libretro-core";
+inline constexpr const char* TYPE_ENGINE = "engine";
+/// Files a core needs in the system folder (PPSSPP's assets): a zip whose folder `entry`
+/// is unpacked there when the core is installed.
+inline constexpr const char* TYPE_SYSTEM_FILES = "system-files";
 
 struct Component {
     std::string id; // for a libretro core its library base name ("mgba")
@@ -53,6 +60,7 @@ struct Component {
     bool opengl = false;
     std::vector<std::pair<std::string, std::string>> forced_core_options;
     std::map<std::string, Download, std::less<>> downloads; // by platform key or "any"
+    std::vector<std::string> cores; // system files: the cores they are for (empty = all)
 
     const Download* DownloadFor(std::string_view platform_key) const;
 };
@@ -85,6 +93,9 @@ struct Manifest {
     /// The cores of the system with a download for the platform, best first.
     std::vector<const Component*> CoresFor(const SystemDef& system,
                                            std::string_view platform_key) const;
+    /// The system files that belong to a core and have a download for the platform.
+    std::vector<const Component*> SystemFilesFor(std::string_view core_id,
+                                                 std::string_view platform_key) const;
 };
 
 /// Reads plugin.json. Fails with the reason for anything this app cannot use: a bad id or

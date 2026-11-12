@@ -37,6 +37,13 @@ Status UnpackEntry(const std::filesystem::path& archive, std::string_view entry,
                    const std::filesystem::path& destination, std::uint64_t max_size = 0,
                    Job* job = nullptr);
 
+/// Unpacks every member under the folder `prefix` ("Name/") of a zip into `root`, keeping
+/// the paths (root/Name/...). Fails without a member, and for links, encrypted members, unsafe
+/// names, or more than `max_files` files or `max_bytes` bytes.
+Status UnpackFolder(const std::filesystem::path& archive, std::string_view prefix,
+                    const std::filesystem::path& root, std::size_t max_files,
+                    std::uint64_t max_bytes, Job* job = nullptr);
+
 struct CoreRecord {
     std::string file; // the library's name in the cores folder
     std::string file_sha256;

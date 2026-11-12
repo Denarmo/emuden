@@ -149,6 +149,7 @@ Status RealHost::DoInstall(Job& job, const std::string& system) {
     Component core;
     Download download;
     bool from_index = false;
+    bool have_core = false;
     {
         std::lock_guard lock(mutex_);
         const Found found = Find(system);
@@ -182,10 +183,22 @@ Status RealHost::DoInstall(Job& job, const std::string& system) {
             ledger_.AddOwner(core.id, manifest.id);
             ledger_.Save();
             ++revision_;
-            return result;
+            have_core = true;
         }
     }
+    if (!have_core) {
+        if (const Status status = InstallCore(job, manifest, core, download, from_index);
+            !status.ok) {
+            return status;
+        }
+    }
+    InstallSystemFiles(job, manifest, core.id, result);
+    job.SetProgress(1.0f);
+    return result;
+}
 
+Status RealHost::InstallCore(Job& job, const Manifest& manifest, const Component& core,
+                             const Download& download, bool from_index) {
     job.SetMessage("Downloading " + core.name);
     const fs::path temp =
         ledger_.Directory() / "tmp" / PathFromUtf8(core.id + "-" + download.sha256.substr(0, 12));
@@ -226,8 +239,52 @@ Status RealHost::DoInstall(Job& job, const std::string& system) {
     }
     checked_.erase(core.id);
     ++revision_;
-    job.SetProgress(1.0f);
-    return result;
+    return {};
+}
+
+void RealHost::InstallSystemFiles(Job& job, const Manifest& manifest, const std::string& core_id,
+                                  Status& result) {
+    std::vector<Component> wanted;
+    {
+        std::lock_guard lock(mutex_);
+        for (const Component* files : manifest.SystemFilesFor(core_id, deps_.platform_key)) {
+            if (!SystemFilesGood(manifest, *files)) {
+                wanted.push_back(*files);
+            }
+        }
+    }
+    for (const Component& files : wanted) {
+        const Download download = *files.DownloadFor(deps_.platform_key);
+        job.SetMessage("Downloading " + files.name);
+        const fs::path temp = ledger_.Directory() / "tmp" /
+                              PathFromUtf8(files.id + "-" + download.sha256.substr(0, 12));
+        Status status;
+        {
+            std::lock_guard lock(mutex_);
+            if (const auto reason = index_ ? index_->BlockedReason(download.sha256) : std::nullopt) {
+                status = Status::Fail("it must not be used: " + *reason);
+            }
+        }
+        if (status.ok) {
+            status = DownloadPinned(deps_.http, download.url, download.sha256, download.size, temp,
+                                    &job);
+        }
+        if (status.ok) {
+            job.SetMessage("Installing " + files.name);
+            status = UnpackFolder(temp, download.entry, bios_dir_, MAX_SYSTEM_FILES,
+                                  MAX_SYSTEM_FILES_BYTES, &job);
+        }
+        std::error_code ec;
+        fs::remove(temp, ec);
+        if (!status.ok) {
+            result.notes.push_back(files.name + " could not be installed: " + status.error);
+            continue;
+        }
+        std::lock_guard lock(mutex_);
+        system_files_[SystemFilesKey(manifest, files)] = download.sha256;
+        SaveState();
+        ++revision_;
+    }
 }
 
 Status RealHost::DoRemove(const std::string& system) {

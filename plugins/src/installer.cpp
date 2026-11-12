@@ -98,6 +98,47 @@ Status UnpackEntry(const fs::path& archive, std::string_view entry, const fs::pa
                            [job] { return job != nullptr && job->CancelRequested(); });
 }
 
+Status UnpackFolder(const fs::path& archive, std::string_view prefix, const fs::path& root,
+                    std::size_t max_files, std::uint64_t max_bytes, Job* job) {
+    const auto entries = ListZip(archive);
+    if (!entries) {
+        return Status::Fail("The download is not a zip archive.");
+    }
+    if (!prefix.ends_with("/") || !IsSafeRelativePath(prefix)) {
+        return Status::Fail("The archive names no folder to unpack.");
+    }
+    std::vector<const ZipEntry*> wanted;
+    std::uint64_t bytes = 0;
+    for (const ZipEntry& entry : *entries) {
+        if (!entry.name.starts_with(prefix) || entry.name.ends_with("/")) {
+            continue;
+        }
+        if (entry.symlink || entry.encrypted || !CanExtractZipEntry(entry) ||
+            !IsSafeRelativePath(entry.name)) {
+            return Status::Fail("The archive member " + entry.name + " cannot be unpacked.");
+        }
+        bytes += entry.size;
+        wanted.push_back(&entry);
+    }
+    if (wanted.empty()) {
+        return Status::Fail("The archive does not hold " + std::string(prefix) + ".");
+    }
+    if (wanted.size() > max_files || bytes > max_bytes) {
+        return Status::Fail("The archive holds more than it may.");
+    }
+    for (const ZipEntry* entry : wanted) {
+        const fs::path destination = root / PathFromUtf8(entry->name);
+        std::error_code ec;
+        fs::create_directories(destination.parent_path(), ec);
+        const Status status = ExtractZipEntry(
+            archive, *entry, destination, [job] { return job != nullptr && job->CancelRequested(); });
+        if (!status.ok) {
+            return status;
+        }
+    }
+    return {};
+}
+
 CoreLedger::CoreLedger(fs::path cores_dir) : cores_dir_(std::move(cores_dir)) {
     const auto text = ReadTextFile(cores_dir_ / "cores.json");
     const auto root = text ? ParseJson(*text) : std::nullopt;

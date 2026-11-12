@@ -97,9 +97,16 @@ Result<Component> ParseComponent(const JsonValue& value) {
             }
         }
     }
+    component.cores = json::Strings(value, "cores", false);
     if (const JsonValue* downloads = value.Find("downloads")) {
         for (const auto& [platform, entry] : downloads->members) {
             Result<Download> download = ParseDownload(entry);
+            // System files are a folder of a zip; a download that is not is left out, and
+            // the console still plays.
+            if (component.type == TYPE_SYSTEM_FILES &&
+                (!download || download->archive != "zip" || !download->entry.ends_with("/"))) {
+                continue;
+            }
             if (!download) {
                 return Status::Fail(component.id + ": " + download.error());
             }
@@ -377,9 +384,23 @@ std::vector<const Component*> Manifest::CoresFor(const SystemDef& system,
     std::vector<const Component*> out;
     for (const std::string& core : system.cores) {
         const Component* component = FindComponent(core);
-        if (component != nullptr && component->type == "libretro-core" &&
+        if (component != nullptr && component->type == TYPE_CORE &&
             component->DownloadFor(platform_key) != nullptr) {
             out.push_back(component);
+        }
+    }
+    return out;
+}
+
+std::vector<const Component*> Manifest::SystemFilesFor(std::string_view core_id,
+                                                       std::string_view platform_key) const {
+    std::vector<const Component*> out;
+    for (const Component& component : components) {
+        if (component.type == TYPE_SYSTEM_FILES &&
+            component.DownloadFor(platform_key) != nullptr &&
+            (component.cores.empty() || std::find(component.cores.begin(), component.cores.end(),
+                                                  core_id) != component.cores.end())) {
+            out.push_back(&component);
         }
     }
     return out;
@@ -424,6 +445,11 @@ Result<Manifest> ParseManifest(std::string_view text) {
     }
     if (const JsonValue* components = root->Find("components")) {
         for (const JsonValue& value : components->items) {
+            // A component of a type this version does not know is not its business.
+            const std::string type = value.String("type");
+            if (type != TYPE_CORE && type != TYPE_ENGINE && type != TYPE_SYSTEM_FILES) {
+                continue;
+            }
             Result<Component> component = ParseComponent(value);
             if (!component) {
                 return Status::Fail(manifest.id + ": " + component.error());

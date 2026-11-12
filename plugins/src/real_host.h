@@ -27,6 +27,8 @@ namespace den::plugins {
 namespace fs = std::filesystem;
 
 inline constexpr std::int64_t POLL_INTERVAL_SECONDS = 6 * 3600;
+inline constexpr std::size_t MAX_SYSTEM_FILES = 4096;
+inline constexpr std::uint64_t MAX_SYSTEM_FILES_BYTES = 512ull << 20;
 
 struct Loaded {
     Manifest manifest;
@@ -281,6 +283,18 @@ private:
         return checked.good;
     }
 
+    static std::string SystemFilesKey(const Manifest& manifest, const Component& files) {
+        return manifest.id + "/" + files.id;
+    }
+
+    // The files were unpacked from the download the manifest names and their folder is there.
+    bool SystemFilesGood(const Manifest& manifest, const Component& files) const {
+        const Download* download = files.DownloadFor(deps_.platform_key);
+        const auto it = system_files_.find(SystemFilesKey(manifest, files));
+        return download != nullptr && it != system_files_.end() &&
+               it->second == download->sha256 && BiosPresent(bios_dir_, {download->entry, false});
+    }
+
     Console Describe(const Loaded& loaded, const SystemDef& system) const {
         Console console = system.console;
         if (console.runner == Runner::Engine) {
@@ -294,6 +308,11 @@ private:
                 const Download* download = core->DownloadFor(deps_.platform_key);
                 console.update_available = record != nullptr && download != nullptr &&
                                            record->download_sha256 != download->sha256;
+                for (const Component* files :
+                     loaded.manifest.SystemFilesFor(core->id, deps_.platform_key)) {
+                    console.update_available = console.update_available ||
+                                               !SystemFilesGood(loaded.manifest, *files);
+                }
             }
         }
         if (const IndexPlugin* offered = index_ ? index_->Find(loaded.manifest.id) : nullptr) {
@@ -365,14 +384,26 @@ private:
         if (const auto root = text ? ParseJson(*text) : std::nullopt) {
             last_sequence_ = static_cast<std::int64_t>(json::Number(*root, "last_sequence", 0));
             fetched_ = static_cast<std::int64_t>(json::Number(*root, "fetched", 0));
+            if (const JsonValue* files = root->Find("system_files")) {
+                for (const auto& [key, sha256] : files->members) {
+                    if (sha256.kind == JsonValue::Kind::String) {
+                        system_files_[key] = sha256.string;
+                    }
+                }
+            }
         }
     }
 
     void SaveState() const {
+        std::vector<std::pair<std::string, JsonValue>> files;
+        for (const auto& [key, sha256] : system_files_) {
+            files.emplace_back(key, JsonString(sha256));
+        }
         WriteFileAtomic(plugins_dir_ / "state.json",
                         WriteJson(JsonObject({
                             {"last_sequence", JsonNumber(static_cast<double>(last_sequence_))},
                             {"fetched", JsonNumber(static_cast<double>(fetched_))},
+                            {"system_files", JsonObject(std::move(files))},
                         })));
     }
 
@@ -402,6 +433,14 @@ private:
 
     Status DoInstall(Job& job, const std::string& system);
 
+    Status InstallCore(Job& job, const Manifest& manifest, const Component& core,
+                       const Download& download, bool from_index);
+
+    // Puts the files a core needs into the system folder. A failure is a note on `result`:
+    // the core is installed and most games do not need them.
+    void InstallSystemFiles(Job& job, const Manifest& manifest, const std::string& core_id,
+                            Status& result);
+
     Status DoRemove(const std::string& system);
 
     Config config_;
@@ -416,6 +455,7 @@ private:
     bool index_expired_ = false;
     std::int64_t last_sequence_ = 0;
     std::int64_t fetched_ = 0;
+    std::map<std::string, std::string, std::less<>> system_files_; // plugin/component -> sha256
     mutable std::map<std::string, Checked, std::less<>> checked_;
     std::atomic<std::uint64_t> revision_{1};
 };

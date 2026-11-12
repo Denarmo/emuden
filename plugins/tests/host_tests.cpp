@@ -116,6 +116,7 @@ struct Fixture {
     FakeSource source;
     KeyPair key;
     std::string core_zip = StoredZip("testcore_libretro.dll", CORE_BYTES);
+    std::string files_zip = StoredZip("TestFiles/font/a.bin", "a font");
     std::int64_t now = *ParseUtcTime("2026-11-13T00:00:00Z");
 
     Fixture() {
@@ -126,6 +127,7 @@ struct Fixture {
         seed[3] = 42;
         key = KeyPairFromSeed(seed);
         source.files["https://example.org/cores/testcore.zip"] = core_zip;
+        source.files["https://example.org/files.zip"] = files_zip;
         Publish(1, "1.0.0", Hash(core_zip));
     }
 
@@ -151,7 +153,12 @@ struct Fixture {
                "downloads":{"test-plat":{"url":"https://example.org/cores/testcore.zip",
                  "sha256":")" +
             core_sha256 + R"(","size":)" + std::to_string(core_zip.size()) +
-            R"(,"archive":"zip","entry":"testcore_libretro.dll"}}}]})";
+            R"(,"archive":"zip","entry":"testcore_libretro.dll"}}},
+              {"id":"later","type":"a-later-type","downloads":{"any":{"how":"unknown"}}},
+              {"id":"testfiles","type":"system-files","name":"Test Files","cores":["testcore"],
+               "downloads":{"any":{"url":"https://example.org/files.zip","sha256":")" +
+            Hash(files_zip) + R"(","size":)" + std::to_string(files_zip.size()) +
+            R"(,"archive":"zip","entry":"TestFiles/"}}}]})";
         const std::string package = StoredZip("plugin.json", manifest);
         const std::string package_path = "packages/emuden.testcon-" + version + ".emuplugin";
         const std::string index =
@@ -227,6 +234,24 @@ TEST_CASE("a console is listed, installed, verified and removed") {
     CHECK(ReadTextFile(core->library) == std::optional<std::string>(CORE_BYTES));
     CHECK(host->VerifyCore(core->library).ok);
     CHECK(fs::is_empty(f.dir / "cores" / "tmp"));
+    CHECK(ReadTextFile(f.dir / "bios" / "TestFiles" / "font" / "a.bin") ==
+          std::optional<std::string>("a font"));
+    CHECK_FALSE(host->FindConsole("testcon")->update_available);
+
+    SECTION("system files that are gone come back with the next install") {
+        fs::remove_all(f.dir / "bios" / "TestFiles");
+        CHECK(host->FindConsole("testcon")->update_available);
+        REQUIRE(f.Run(host->Install("testcon"))->State() == JobState::Done);
+        CHECK(fs::exists(f.dir / "bios" / "TestFiles" / "font" / "a.bin"));
+    }
+
+    SECTION("system files that cannot be fetched leave the core installed") {
+        fs::remove_all(f.dir / "bios" / "TestFiles");
+        f.source.files.erase("https://example.org/files.zip");
+        REQUIRE(f.Run(host->Install("testcon"))->State() == JobState::Done);
+        CHECK(host->Installed("testcon"));
+        CHECK_FALSE(fs::exists(f.dir / "bios" / "TestFiles"));
+    }
 
     SECTION("a new host finds it without the network") {
         f.source.files.clear();
