@@ -22,6 +22,9 @@ struct JsonValue {
     std::vector<JsonValue> items;
     std::vector<std::pair<std::string, JsonValue>> members;
 
+    // User-provided: clang with libstdc++ cannot default it for this recursive type.
+    JsonValue() {}
+
     /// An object's member, null when this is no object or has no such member.
     const JsonValue* Find(std::string_view key) const;
     /// A member that is a string, "" otherwise.

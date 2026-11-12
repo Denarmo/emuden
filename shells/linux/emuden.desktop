@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=EmuDEN
+Comment=Console-style game launcher
+Exec=emuden
+Icon=emuden
+Categories=Game;Emulator;
+Terminal=false
+StartupWMClass=emuden

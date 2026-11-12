@@ -12,7 +12,7 @@ exe="$build/bin/emuden"
 command -v mksquashfs >/dev/null || { echo "mksquashfs is missing (apt install squashfs-tools)" >&2; exit 1; }
 
 runtime_tag=20251108
-runtime_sha=RUNTIME_SHA256
+runtime_sha=2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d
 runtime="$out/runtime-x86_64-$runtime_tag"
 mkdir -p "$out"
 if [ ! -f "$runtime" ]; then

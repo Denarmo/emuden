@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// HTTP for Linux through libcurl. Without libcurl (and on Android until the shell provides
-// platform HTTP) requests fail with a clear error.
+// HTTP for Linux through libcurl. The library is loaded at run time, so one binary starts on
+// any distribution whichever TLS flavour of libcurl it ships; without it requests fail with a
+// clear error.
 
 #include <fstream>
 #include <system_error>
@@ -11,12 +12,56 @@
 
 #ifdef DEN_HAVE_CURL
 #include <curl/curl.h>
+#include <dlfcn.h>
 #endif
 
 namespace den::pal {
 
 #ifdef DEN_HAVE_CURL
 namespace {
+
+struct Curl {
+    decltype(&curl_easy_init) init = nullptr;
+    decltype(&curl_easy_setopt) setopt = nullptr;
+    decltype(&curl_easy_perform) perform = nullptr;
+    decltype(&curl_easy_getinfo) getinfo = nullptr;
+    decltype(&curl_easy_cleanup) cleanup = nullptr;
+    decltype(&curl_easy_strerror) strerror = nullptr;
+    decltype(&curl_slist_append) slist_append = nullptr;
+    decltype(&curl_slist_free_all) slist_free_all = nullptr;
+    bool ok = false;
+};
+
+template <typename Fn>
+bool Bind(void* lib, const char* name, Fn& fn) {
+    fn = reinterpret_cast<Fn>(dlsym(lib, name));
+    return fn != nullptr;
+}
+
+const Curl& GetCurl() {
+    static const Curl curl = [] {
+        Curl c;
+        void* lib = nullptr;
+        for (const char* name : {"libcurl.so.4", "libcurl-gnutls.so.4", "libcurl.so"}) {
+            if ((lib = dlopen(name, RTLD_NOW | RTLD_GLOBAL)) != nullptr) {
+                break;
+            }
+        }
+        if (!lib) {
+            return c;
+        }
+        auto global_init = reinterpret_cast<decltype(&curl_global_init)>(dlsym(lib, "curl_global_init"));
+        c.ok = global_init && Bind(lib, "curl_easy_init", c.init) &&
+               Bind(lib, "curl_easy_setopt", c.setopt) && Bind(lib, "curl_easy_perform", c.perform) &&
+               Bind(lib, "curl_easy_getinfo", c.getinfo) && Bind(lib, "curl_easy_cleanup", c.cleanup) &&
+               Bind(lib, "curl_easy_strerror", c.strerror) &&
+               Bind(lib, "curl_slist_append", c.slist_append) &&
+               Bind(lib, "curl_slist_free_all", c.slist_free_all) &&
+               global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK;
+        return c;
+    }();
+    return curl;
+}
 
 struct Transfer {
     const HttpRequest* request;
@@ -55,7 +100,12 @@ int OnProgress(void* user, curl_off_t total, curl_off_t now, curl_off_t, curl_of
 
 HttpResponse HttpGet(const HttpRequest& request) {
     HttpResponse response;
-    CURL* curl = curl_easy_init();
+    const Curl& api = GetCurl();
+    if (!api.ok) {
+        response.error = "libcurl is not installed";
+        return response;
+    }
+    CURL* curl = api.init();
     if (!curl) {
         response.error = "curl could not start";
         return response;
@@ -68,29 +118,32 @@ HttpResponse HttpGet(const HttpRequest& request) {
     }
     curl_slist* headers = nullptr;
     for (const auto& [name, value] : request.headers) {
-        headers = curl_slist_append(headers, (name + ": " + value).c_str());
+        headers = api.slist_append(headers, (name + ": " + value).c_str());
     }
-    curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 10L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "EmuDEN");
-    curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, static_cast<long>(request.timeout_seconds));
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, OnData);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &transfer);
-    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
-    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, OnProgress);
-    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &transfer);
-    const CURLcode code = curl_easy_perform(curl);
+    api.setopt(curl, CURLOPT_URL, request.url.c_str());
+    api.setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    api.setopt(curl, CURLOPT_MAXREDIRS, 10L);
+    api.setopt(curl, CURLOPT_USERAGENT, "EmuDEN");
+    api.setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
+    api.setopt(curl, CURLOPT_CONNECTTIMEOUT, static_cast<long>(request.timeout_seconds));
+    api.setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);
+    api.setopt(curl, CURLOPT_LOW_SPEED_TIME, 60L);
+    api.setopt(curl, CURLOPT_NOSIGNAL, 1L);
+    api.setopt(curl, CURLOPT_HTTPHEADER, headers);
+    api.setopt(curl, CURLOPT_WRITEFUNCTION, OnData);
+    api.setopt(curl, CURLOPT_WRITEDATA, &transfer);
+    api.setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    api.setopt(curl, CURLOPT_XFERINFOFUNCTION, OnProgress);
+    api.setopt(curl, CURLOPT_XFERINFODATA, &transfer);
+    const CURLcode code = api.perform(curl);
     long status = 0;
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+    api.getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
     response.status = static_cast<int>(status);
     if (code != CURLE_OK && response.error.empty()) {
-        response.error = curl_easy_strerror(code);
+        response.error = api.strerror(code);
     }
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
+    api.slist_free_all(headers);
+    api.cleanup(curl);
     if (transfer.to_file) {
         transfer.file.close();
         std::error_code ec;

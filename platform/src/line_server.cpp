@@ -6,6 +6,7 @@
 #include <ws2tcpip.h>
 using SocketHandle = SOCKET;
 #define DEN_CLOSE_SOCKET closesocket
+#define DEN_STOP_LISTENING(s) (void)0
 #else
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -14,6 +15,8 @@ using SocketHandle = SOCKET;
 using SocketHandle = int;
 #define DEN_CLOSE_SOCKET ::close
 constexpr int INVALID_SOCKET = -1;
+// close() alone does not wake a thread blocked in accept().
+#define DEN_STOP_LISTENING(s) ::shutdown(s, SHUT_RDWR)
 #endif
 
 #include <atomic>
@@ -35,6 +38,7 @@ public:
     }
     ~TcpLineServer() override {
         stopping_ = true;
+        DEN_STOP_LISTENING(listener_);
         DEN_CLOSE_SOCKET(listener_);
         thread_.join();
         std::lock_guard lock(mutex_);
@@ -110,6 +114,10 @@ Result<std::unique_ptr<LineServer>> StartLineServer(int port) {
     if (listener == INVALID_SOCKET) {
         return Status::Fail("could not create a socket");
     }
+#ifndef _WIN32
+    const int reuse = 1;
+    setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+#endif
     sockaddr_in address{};
     address.sin_family = AF_INET;
     address.sin_port = htons(static_cast<unsigned short>(port));
