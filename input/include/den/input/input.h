@@ -114,6 +114,12 @@ const char* NavName(Nav nav);
 Nav NavFromName(const std::string& name);
 const char* FamilyName(PadFamily family);
 
+/// Asks for typed text (Event::Type::Text) while something on screen takes it. The System
+/// applies it on its next Poll, and only where a keyboard is attached, so no system keyboard
+/// slides over the app's own. Calls are counted: every true needs its false.
+void RequestTextInput(bool on);
+bool TextInputWanted();
+
 /// Owns SDL's event queue: gamepads, keyboard, mouse and touch all become Events.
 class System {
 public:
@@ -129,8 +135,12 @@ public:
     /// The family of the device used last, which decides the button hints shown.
     PadFamily ActiveFamily() const;
     int PadCount() const;
-    /// Pads in the order they connected; a default state for an index out of range.
+    /// Pads by player: index 0 is player 1. New pads join at the end; a default state for an
+    /// index out of range.
     const PadState& Pad(int index) const;
+    /// Makes the pad at `index` the pad of `player` (0 = player 1); the pad that was there
+    /// takes its place.
+    void SetPlayer(int index, int player);
     /// The keyboard as a pad: arrows, Z/X/A/S as south/east/west/north, Q/W shoulders,
     /// Enter start, right Shift select.
     PadState KeyboardPad() const;

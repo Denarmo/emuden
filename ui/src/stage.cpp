@@ -5,8 +5,10 @@
 
 #include "den/base/json.h"
 #include "den/base/log.h"
+#include "den/ui/glyphs.h"
 #include "den/ui/page.h"
 #include "den/ui/selection.h"
+#include "den/ui/text_entry.h"
 
 namespace den::ui {
 
@@ -73,6 +75,7 @@ struct Stage::Impl {
     std::vector<Pending> pending;
     std::vector<ToastItem> toasts;
     std::unique_ptr<Dialog> dialog;
+    std::unique_ptr<TextEntry> entry;
     float scale = 1.0f;
 
     void Show(Page* page) {
@@ -140,23 +143,14 @@ struct Stage::Impl {
     void DrawHints(Context& ctx, Page& page) {
         const Theme& theme = *ctx.theme;
         gfx::Canvas& canvas = *ctx.canvas;
-        gfx::Text& text = ctx.Text();
         const float y = canvas.Height() - HINT_BAR_HEIGHT;
         float x = canvas.Width() - theme.margin;
         const std::vector<Hint> hints = page.Hints();
+        const float glyph_h = 26;
         for (auto it = hints.rbegin(); it != hints.rend(); ++it) {
-            const std::string glyph = input::GlyphLabel(ctx.family, it->nav);
-            const float text_w = text.Measure(it->text, theme.text_small + 1);
-            const float glyph_w = std::max(26.0f, text.Measure(glyph, theme.text_small, gfx::FONT_BOLD) + 16);
-            x -= text_w;
-            canvas.DrawText(it->text, x, y + 13, theme.text_small + 1, theme.fg);
-            x -= glyph_w + 8;
-            const gfx::Rect badge{x, y + 9, glyph_w, 26};
-            canvas.FillRect(badge, theme.panel_strong, 13);
-            const float gw = text.Measure(glyph, theme.text_small, gfx::FONT_BOLD);
-            canvas.DrawText(glyph, badge.x + (badge.w - gw) * 0.5f, badge.y + 4, theme.text_small,
-                            theme.fg, gfx::FONT_BOLD);
-            x -= 22;
+            x -= HintWidth(ctx, ctx.family, it->nav, it->text, glyph_h);
+            DrawHint(ctx, ctx.family, it->nav, it->text, x, y + 11, glyph_h, theme.fg);
+            x -= 24;
         }
     }
 
@@ -290,13 +284,30 @@ void Stage::Confirm(std::string title, std::string message, std::string yes_labe
 }
 
 bool Stage::DialogOpen() const {
-    return impl_->dialog != nullptr;
+    return impl_->dialog != nullptr || impl_->entry != nullptr;
+}
+
+void Stage::AskText(TextRequest request, std::function<void(const std::string&)> on_done) {
+    impl_->entry = std::make_unique<TextEntry>(std::move(request), std::move(on_done));
+}
+
+bool Stage::TextEntryOpen() const {
+    return impl_->entry != nullptr;
 }
 
 void Stage::HandleEvent(const input::Event& event) {
     impl_->Apply(*this);
     if (impl_->dialog) {
         impl_->DialogEvent(event);
+    } else if (impl_->entry) {
+        const TextEntry::Outcome outcome = impl_->entry->HandleEvent(event, impl_->scale);
+        if (outcome != TextEntry::Outcome::Open) {
+            // Closed first: the callback may ask for the next text.
+            const std::unique_ptr<TextEntry> entry = std::move(impl_->entry);
+            if (outcome == TextEntry::Outcome::Done) {
+                entry->Finish();
+            }
+        }
     } else if (Page* page = Top()) {
         page->Dispatch(event, impl_->scale);
     }
@@ -326,6 +337,9 @@ void Stage::Frame(Context& ctx) {
             impl_->DrawHints(ctx, *page);
         }
     }
+    if (impl_->entry) {
+        impl_->entry->Draw(ctx);
+    }
     impl_->DrawToasts(ctx);
     if (impl_->dialog) {
         impl_->DrawDialog(ctx);
@@ -346,6 +360,11 @@ std::string Stage::StateJson() const {
     if (impl_->dialog) {
         members.emplace_back("dialog", JsonObject({{"title", JsonString(impl_->dialog->title)},
                                                    {"selected", JsonString(impl_->dialog->selected ? impl_->dialog->yes : impl_->dialog->no)}}));
+    }
+    if (impl_->entry) {
+        members.emplace_back("text_entry", JsonObject({{"title", JsonString(impl_->entry->Title())},
+                                                       {"text", JsonString(impl_->entry->Text())},
+                                                       {"key", JsonString(impl_->entry->SelectedKey())}}));
     }
     std::vector<JsonValue> toasts;
     for (const auto& toast : impl_->toasts) {

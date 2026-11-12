@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <deque>
 
@@ -110,6 +111,8 @@ Nav NavForKey(SDL_Keycode key) {
     }
 }
 
+std::atomic<int> g_text_requests{0};
+
 struct OpenPad {
     SDL_JoystickID id = 0;
     SDL_Gamepad* handle = nullptr;
@@ -119,8 +122,17 @@ struct OpenPad {
 
 } // namespace
 
+void RequestTextInput(bool on) {
+    g_text_requests += on ? 1 : -1;
+}
+
+bool TextInputWanted() {
+    return g_text_requests.load() > 0;
+}
+
 struct System::Impl {
     SDL_Window* window = nullptr;
+    bool text_input = false;
     std::vector<OpenPad> pads;
     std::deque<Event> injected;
     PadFamily active = PadFamily::Keyboard;
@@ -380,6 +392,15 @@ System::~System() {
 }
 
 void System::Poll(std::vector<Event>& out) {
+    const bool want_text = TextInputWanted() && SDL_HasKeyboard();
+    if (want_text != impl_->text_input && impl_->window) {
+        impl_->text_input = want_text;
+        if (want_text) {
+            SDL_StartTextInput(impl_->window);
+        } else {
+            SDL_StopTextInput(impl_->window);
+        }
+    }
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         impl_->Handle(e, out);
@@ -416,6 +437,14 @@ const PadState& System::Pad(int index) const {
         return impl_->none;
     }
     return impl_->pads[static_cast<std::size_t>(index)].state;
+}
+
+void System::SetPlayer(int index, int player) {
+    const int count = PadCount();
+    if (index < 0 || index >= count || player < 0 || player >= count || index == player) {
+        return;
+    }
+    std::swap(impl_->pads[static_cast<std::size_t>(index)], impl_->pads[static_cast<std::size_t>(player)]);
 }
 
 PadState System::KeyboardPad() const {

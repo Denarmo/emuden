@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "den/ui/node.h"
+#include "den/ui/text_entry.h"
 
 namespace den::ui {
 
@@ -121,7 +122,12 @@ public:
     /// on the cancel button unless `yes_first` (for questions whose yes loses nothing).
     void Confirm(std::string title, std::string message, std::string yes_label,
                  std::function<void()> on_yes, std::string no_label = "Cancel", bool yes_first = false);
+    /// True while a question or a text entry is open.
     bool DialogOpen() const;
+    /// Opens the on-screen text entry above the page. `on_done` gets the text when the user
+    /// finishes; it is not called when they back out.
+    void AskText(TextRequest request, std::function<void(const std::string&)> on_done);
+    bool TextEntryOpen() const;
 
     void HandleEvent(const input::Event& event);
     /// Ticks, lays out and draws the top page and the overlays. The canvas must be begun.

@@ -1,9 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Controllers (what is connected, and its family) and System (version, folders, engine).
-
-#include <format>
+// System: version, folders, engines.
 
 #include "den/app/app.h"
 #include "den/app/pages.h"
@@ -14,31 +12,6 @@
 namespace den::app {
 
 namespace {
-
-std::vector<ui::RowSpec> ControllerRows() {
-    std::vector<ui::RowSpec> rows;
-    const input::System& input = *Svc().input;
-    for (int i = 0; i < input.PadCount(); ++i) {
-        const input::PadState pad = input.Pad(i);
-        ui::RowSpec row = ValueRow(std::format("pad.{}", i), pad.name.empty() ? "Controller" : pad.name,
-                                   [family = pad.family] { return std::string(input::FamilyName(family)); });
-        row.description = std::format("Player {}", i + 1);
-        rows.push_back(std::move(row));
-    }
-    if (rows.empty()) {
-        rows.push_back(ValueRow("pad.none", "No controller connected",
-                                [] { return std::string("Connect one at any time"); }));
-    }
-    ui::RowSpec keyboard = ValueRow("pad.keyboard", "Keyboard", [] { return std::string("Player 1"); });
-    keyboard.description = "Arrows, Z X A S, Q W, Enter, right Shift";
-    rows.push_back(std::move(keyboard));
-    ui::RowSpec active = ValueRow("pad.active", "Button hints", [] {
-        return std::string(input::FamilyName(Svc().input->ActiveFamily()));
-    });
-    active.description = "Follow the device used last";
-    rows.push_back(std::move(active));
-    return rows;
-}
 
 std::vector<ui::RowSpec> SystemRows() {
     std::vector<ui::RowSpec> rows;
@@ -72,7 +45,6 @@ std::vector<ui::RowSpec> SystemRows() {
 
 } // namespace
 
-DEN_REGISTER_SETTINGS(40, "Controllers", ControllerRows);
 DEN_REGISTER_SETTINGS(100, "System", SystemRows);
 
 } // namespace den::app

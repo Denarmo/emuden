@@ -83,3 +83,69 @@ TEST_CASE("themes: light is the default and blue on white") {
     CHECK(LightTheme().fg.r == 0);
     CHECK(LightTheme().page.r == 255);
 }
+
+TEST_CASE("the text entry types with navigation and finishes with Menu") {
+    using input::Event;
+    using input::Nav;
+    TextRequest request;
+    request.max_length = 4;
+    std::string result;
+    TextEntry entry(request, [&](const std::string& text) { result = text; });
+    const auto nav = [&](Nav which) { return entry.HandleEvent(Event::MakeNav(which, input::PadFamily::Xbox), 1.0f); };
+
+    // Empty: Done is refused, and the first letter is a capital.
+    CHECK(nav(Nav::Menu) == TextEntry::Outcome::Open);
+    CHECK(entry.SelectedKey() == "Q");
+    nav(Nav::Confirm);
+    CHECK(entry.SelectedKey() == "q");
+    nav(Nav::Right);
+    nav(Nav::Confirm);
+    nav(Nav::Extra);
+    nav(Nav::Confirm);
+    nav(Nav::Confirm); // over the limit of four characters
+    CHECK(entry.Text() == "Qw w");
+    nav(Nav::Option);
+    nav(Nav::Option);
+    CHECK(entry.Text() == "Qw");
+
+    // The bottom row has wide keys; left and right step over whole keys and wrap.
+    for (int i = 0; i < 4; ++i) {
+        nav(Nav::Down);
+    }
+    CHECK(entry.SelectedKey() == "Shift");
+    nav(Nav::Left);
+    CHECK(entry.SelectedKey() == "Done");
+    CHECK(nav(Nav::Confirm) == TextEntry::Outcome::Done);
+    entry.Finish();
+    CHECK(result == "Qw");
+}
+
+TEST_CASE("a real keyboard types into the text entry without acting twice") {
+    using input::Event;
+    TextEntry entry(TextRequest{}, {});
+    const auto key = [&](int code, const char* text) {
+        Event down;
+        down.type = Event::Type::Key;
+        down.key = code;
+        down.down = true;
+        entry.HandleEvent(down, 1.0f);
+        // The same key as navigation (X is Option, Backspace is Back, Enter is Confirm).
+        const input::Nav as_nav = code == 'x' ? input::Nav::Option : code == 8 ? input::Nav::Back : input::Nav::Confirm;
+        const TextEntry::Outcome outcome = entry.HandleEvent(Event::MakeNav(as_nav), 1.0f);
+        if (text) {
+            Event typed;
+            typed.type = Event::Type::Text;
+            typed.text = text;
+            entry.HandleEvent(typed, 1.0f);
+        }
+        return outcome;
+    };
+    CHECK(key('x', "x") == TextEntry::Outcome::Open);
+    CHECK(key('x', "x") == TextEntry::Outcome::Open);
+    CHECK(entry.Text() == "xx");
+    CHECK(key(8, nullptr) == TextEntry::Outcome::Open);
+    CHECK(entry.Text() == "x");
+    CHECK(key(13, nullptr) == TextEntry::Outcome::Done);
+    // Escape arrives as navigation only.
+    CHECK(entry.HandleEvent(Event::MakeNav(input::Nav::Back), 1.0f) == TextEntry::Outcome::Cancelled);
+}
