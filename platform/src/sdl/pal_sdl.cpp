@@ -215,20 +215,29 @@ std::filesystem::path ExecutableDir() {
     return base ? PathFromUtf8(base) : std::filesystem::current_path();
 }
 
+// Where a portable "user" folder sits: beside the executable, or beside the AppImage file when
+// the app runs from one (its own folder is a read-only mount then).
+std::filesystem::path PortableBase() {
+    if (const std::string image = GetEnv("APPIMAGE"); !image.empty()) {
+        return PathFromUtf8(image).parent_path();
+    }
+    return ExecutableDir();
+}
+
 bool IsPortable() {
-    return IsDirectory(ExecutableDir() / "user");
+    return IsDirectory(PortableBase() / "user");
 }
 
 std::filesystem::path DataDir() {
     static const std::filesystem::path dir = [] {
         std::filesystem::path path;
         if (IsPortable()) {
-            path = ExecutableDir() / "user";
+            path = PortableBase() / "user";
         } else if (char* pref = SDL_GetPrefPath(nullptr, "EmuDEN")) {
             path = PathFromUtf8(pref);
             SDL_free(pref);
         } else {
-            path = ExecutableDir() / "user";
+            path = PortableBase() / "user";
         }
         std::error_code ec;
         std::filesystem::create_directories(path, ec);

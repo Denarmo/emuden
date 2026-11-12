@@ -34,6 +34,7 @@ struct Entry {
     std::int64_t last_played = 0;  // unix seconds, 0 = never
     std::int64_t play_seconds = 0; // total
     int play_count = 0;
+    std::int64_t added = 0; // unix seconds the library first saw the game, 0 = not known
     /// The name as found (a ROM's file name without extension); artwork is matched on it.
     std::string original_name;
     /// For a ROM packed in a zip archive (`path` is the archive): the file in it to start.
@@ -54,6 +55,13 @@ struct SystemInfo {
 };
 
 struct SystemDef;
+
+/// One time a game was played, as RecordPlay booked it.
+struct Session {
+    std::string id; // the entry's id
+    std::int64_t started = 0; // unix seconds
+    std::int64_t seconds = 0;
+};
 
 struct Folder {
     std::string path;   // UTF-8
@@ -81,9 +89,14 @@ public:
     virtual std::vector<SystemInfo> Systems() const = 0;
     virtual std::vector<Entry> RecentlyPlayed(int limit) const = 0;
     virtual std::vector<Entry> Favourites() const = 0;
+    /// The games the library saw first most recently, newest first.
+    virtual std::vector<Entry> RecentlyAdded(int limit) const = 0;
+    /// The session log, oldest first; with `since_unix`, the sessions that ended after it.
+    virtual std::vector<Session> Sessions(std::int64_t since_unix = 0) const = 0;
 
     virtual void SetFavourite(const std::string& id, bool favourite) = 0;
-    /// Adds one play session to the entry's records.
+    /// Adds one play session to the entry's records and the session log. Time the log already
+    /// holds for another game inside this session (a game opened over this one) is left out.
     virtual void RecordPlay(const std::string& id, std::int64_t started_unix, std::int64_t seconds) = 0;
 
     /// Consoles from plugin manifests (systems.h). They replace the built-in rules of the same

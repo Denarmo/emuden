@@ -45,6 +45,8 @@ struct Scan {
     const SystemTable& systems;
     std::set<std::string> seen;
     std::vector<Entry> out;
+    /// The images of a folder by the match key of their names, listed once.
+    std::map<std::string, std::vector<std::pair<std::string, fs::path>>> images;
 
     bool Cancelled() const {
         return options.cancelled && options.cancelled();
@@ -67,8 +69,32 @@ fs::path FindImage(const fs::path& dir, const std::string& stem) {
     return {};
 }
 
-fs::path FindRomCover(const fs::path& rom, const std::string& stem, const SystemDef& def,
-                      const ScanOptions& options) {
+// An image named like the game without its tags: "Pokemon Lazarus.jpg" for
+// "Pokemon - Lazarus (v2.1).gba". This is how a hack keeps a picture of its own.
+fs::path FindImageByKey(Scan& scan, const fs::path& dir, const std::string& key) {
+    const std::string dir_key = PathKey(dir);
+    auto listed = scan.images.find(dir_key);
+    if (listed == scan.images.end()) {
+        listed = scan.images.emplace(dir_key, std::vector<std::pair<std::string, fs::path>>()).first;
+        for (const fs::path& file : ListDirectory(dir)) {
+            const std::string extension = ToLower(PathToUtf8(file.extension()));
+            if (std::find(IMAGE_EXT.begin(), IMAGE_EXT.end(), extension) != IMAGE_EXT.end() &&
+                IsRegularFile(file)) {
+                listed->second.emplace_back(MatchKey(PathToUtf8(file.stem())), file);
+            }
+        }
+        std::sort(listed->second.begin(), listed->second.end());
+    }
+    for (const auto& [image_key, file] : listed->second) {
+        if (image_key == key) {
+            return file;
+        }
+    }
+    return {};
+}
+
+fs::path FindRomCover(Scan& scan, const fs::path& rom, const std::string& stem, const SystemDef& def) {
+    const ScanOptions& options = scan.options;
     if (!options.covers_dir.empty()) {
         if (fs::path found = FindImage(options.covers_dir / PathFromUtf8(def.id), stem);
             !found.empty()) {
@@ -82,6 +108,19 @@ fs::path FindRomCover(const fs::path& rom, const std::string& stem, const System
     }
     for (const std::string_view folder : ART_FOLDERS) {
         if (fs::path found = FindImage(dir / PathFromUtf8(folder), stem); !found.empty()) {
+            return found;
+        }
+    }
+    // Where carts are pictures themselves a picture's name says nothing.
+    const std::string key = def.cover_is_rom ? std::string() : MatchKey(stem);
+    if (key.empty()) {
+        return {};
+    }
+    if (fs::path found = FindImageByKey(scan, dir, key); !found.empty()) {
+        return found;
+    }
+    for (const std::string_view folder : ART_FOLDERS) {
+        if (fs::path found = FindImageByKey(scan, dir / PathFromUtf8(folder), key); !found.empty()) {
             return found;
         }
     }
@@ -217,7 +256,7 @@ void AddRom(Scan& scan, const fs::path& file, const SystemDef* def, const fs::pa
     entry.path = PathToUtf8(file);
     entry.archive_member = std::move(archive_member);
     entry.size_bytes = FileSize(file);
-    fs::path cover = FindRomCover(file, stem, *def, scan.options);
+    fs::path cover = FindRomCover(scan, file, stem, *def);
     // A cart that is a picture is its own cover.
     if (cover.empty() && def->cover_is_rom && extension.ends_with("png")) {
         cover = file;

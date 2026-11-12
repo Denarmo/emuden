@@ -243,6 +243,13 @@ TEST_CASE("local covers and cartridge titles") {
     REQUIRE(ByName(entries, "Game") != nullptr);
     CHECK(ByName(entries, "Game")->cover.ends_with("Game.png"));
     CHECK(ByName(entries, "Bare")->cover.empty());
+    // A hack keeps the picture beside it, whatever tags its file name carries.
+    Put(root / "gba" / "Pokemon - Lazarus (v2.1).gba");
+    Put(root / "gba" / "Pokemon Lazarus.jpg", "jpg");
+    const std::vector<Entry> again = ScanFolders(Options(root));
+    REQUIRE(ByName(again, "Pokemon - Lazarus") != nullptr);
+    CHECK(ByName(again, "Pokemon - Lazarus")->cover.ends_with("Pokemon Lazarus.jpg"));
+    CHECK(ByName(again, "Bare")->cover.empty());
     const SystemTable table;
     CHECK(ReadRomHeaderTitle(*table.Find("gba"), root / "gba" / "Game.gba") == "POKEMON EMER");
     CHECK(ReadRomHeaderTitle(*table.Find("gba"), root / "gba" / "Bare.gba").empty());

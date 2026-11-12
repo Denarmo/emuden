@@ -23,11 +23,13 @@ struct Record {
     std::int64_t last_played = 0;
     std::int64_t play_seconds = 0;
     int play_count = 0;
+    std::int64_t added = 0;
 };
 
 struct Saved {
     std::vector<Folder> folders;
     std::map<std::string, Record> records;
+    std::vector<Session> sessions; // oldest first
 };
 
 /// nullopt when there is no library file yet (the first run).

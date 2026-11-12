@@ -25,10 +25,16 @@ The games on this device. Screens use `den/library/library.h` only; the player a
   is listed only when the game is not there unpacked, and regional versions of a game are one
   entry (`Entry::other_versions`; order in the setting `library.region_order`).
 - **Covers.** An image next to the ROM (or in `media`, `covers`, `boxart`, `images`, or
-  `<data>/library/covers/<system>/`), the icon inside a Switch 2 package, else the libretro
+  `<data>/library/covers/<system>/`) named like the ROM file, or like the game without its
+  tags (`Pokemon Lazarus.jpg` for `Pokemon - Lazarus (v2.1).gba`: a hack keeps its own picture), the icon inside a Switch 2 package, else the libretro
   thumbnail collection (cached under `<data>/library/artwork`; a miss is not asked again for
   two weeks), else a drawn placeholder (`Entry::placeholder_cover`).
-- **Files.** `<data>/library/library.json` (folders, play records; versioned, see
+- **Records.** `RecordPlay` adds a session to the log (`Sessions(since)`, the last 5000) and
+  to the game's totals; time the log already holds for another game inside the session (a
+  game opened over this one) is left out. `Entry::added` is when the library first saw the
+  game: the file's date for the games of the first scan, the scan's time after that
+  (`RecentlyAdded`).
+- **Files.** `<data>/library/library.json` (folders, play records, session log; versioned, see
   `den/store/document.h`) and `cache.json` (the last scan, shown at once on the next start).
 - **Import.** On the first run the game folders of an earlier app's profile are taken over
   when `Config::import_profile` or the environment variable `EMUDEN_IMPORT_PROFILE` names it.

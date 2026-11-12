@@ -31,6 +31,10 @@ private:
     float fade_ = 1.0f;
 };
 
+/// A cover inside `rect`: the whole picture, on a soft tint where its shape leaves room.
+/// `fill` crops it to the rectangle instead (drawn placeholders).
+void DrawCover(ui::Context& ctx, const gfx::Rect& rect, const gfx::Texture& texture, bool fill);
+
 /// A cover that is not focusable: the image, or the game's name on a tinted card.
 class CoverView final : public ui::Node {
 public:
@@ -63,7 +67,8 @@ struct GameTileOptions {
     std::function<void(const library::Entry&)> on_focus;
 };
 
-/// A tile for a game; a placeholder cover gets the game's name printed over it.
+/// A tile for a game: the cover is shown whole; a placeholder cover gets the game's name
+/// printed over it.
 class GameTile final : public ui::Tile {
 public:
     using ui::Tile::Tile;

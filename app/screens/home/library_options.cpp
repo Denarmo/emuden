@@ -6,6 +6,7 @@
 // the same rows are the Games section of Settings.
 
 #include <algorithm>
+#include <ctime>
 #include <map>
 
 #include "collections.h"
@@ -146,6 +147,19 @@ public:
         rows.push_back(ValueRow("statistics.played", Tr("statistics.played"),
                                 text(TrF("statistics.of", played, games.size()))));
         rows.push_back(ValueRow("statistics.sessions", Tr("statistics.sessions"), text(std::to_string(sessions))));
+        // From the session log: what was played in the last seven days.
+        const std::int64_t week_start = static_cast<std::int64_t>(std::time(nullptr)) - 7 * 24 * 3600;
+        std::int64_t week_seconds = 0;
+        std::size_t week_sessions = 0;
+        for (const library::Session& session : Svc().library->Sessions(week_start)) {
+            week_seconds += session.seconds;
+            ++week_sessions;
+        }
+        rows.push_back(ValueRow(
+            "statistics.week", Tr("statistics.week"),
+            text(TrF("statistics.week_value", PlayTimeText(week_seconds),
+                     week_sessions == 1 ? Tr("statistics.sessions_one")
+                                        : TrF("statistics.sessions_count", week_sessions)))));
         if (last) {
             rows.push_back(ValueRow("statistics.last", Tr("statistics.last"),
                                     text(last->name + "  \xC2\xB7  " + LastPlayedText(last->last_played)),

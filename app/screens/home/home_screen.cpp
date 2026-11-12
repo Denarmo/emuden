@@ -4,6 +4,7 @@
 // The first screen: the rail, a clock, the selected game's name and records, and shelves of
 // covers ("Continue playing", favourites, one per console) over the selected cover, blurred.
 
+#include <ctime>
 #include <format>
 #include <map>
 
@@ -21,6 +22,21 @@ namespace den::app {
 namespace {
 
 constexpr int RECENT_LIMIT = 12;
+constexpr std::int64_t ADDED_WINDOW = 30 * 24 * 3600; // "recently" added: the last 30 days
+
+// The games added lately, newest first; none when that is the whole library (a first scan).
+std::vector<library::Entry> RecentlyAdded(std::size_t library_size) {
+    const std::int64_t since = static_cast<std::int64_t>(std::time(nullptr)) - ADDED_WINDOW;
+    std::vector<library::Entry> games = WithoutHidden(Svc().library->RecentlyAdded(-1));
+    std::erase_if(games, [&](const library::Entry& game) { return game.added < since; });
+    if (games.size() >= library_size) {
+        return {};
+    }
+    if (games.size() > RECENT_LIMIT) {
+        games.resize(RECENT_LIMIT);
+    }
+    return games;
+}
 
 class HomeScreen final : public ui::Page {
 public:
@@ -53,6 +69,7 @@ public:
 
         AddShelf(list, "recent", Tr("home.continue"), WithoutHidden(svc.library->RecentlyPlayed(RECENT_LIMIT)),
                  Tr("home.continue_badge"));
+        AddShelf(list, "added", Tr("home.recently_added"), RecentlyAdded(games.size()), "", false);
         AddShelf(list, "favourites", Tr("home.favourites"), WithoutHidden(svc.library->Favourites()), "");
         int collection = 0;
         for (const std::string& name : Collections()) {

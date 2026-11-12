@@ -108,6 +108,20 @@ TEST_CASE("the library scans, keeps records and remembers them") {
         CHECK(library->RecentlyPlayed(5)[0].id == tetris_id);
         CHECK(library->RecentlyPlayed(1).size() == 1);
         CHECK(library->Favourites().size() == 1);
+        // Every game has the date it was added, and every play is in the session log.
+        CHECK(tetris->added > 0);
+        CHECK(library->RecentlyAdded(2).size() == 2);
+        REQUIRE(library->Sessions().size() == 3);
+        CHECK(library->Sessions()[1].started == 1700000500);
+        CHECK(library->Sessions(1700000400).size() == 1);
+        // A game opened over another one: the first game's session ends after the second
+        // one's and does not count its time.
+        const std::string homebrew = entries[1].id;
+        library->RecordPlay(tetris_id, 1700001100, 60);
+        library->RecordPlay(homebrew, 1700001000, 300);
+        CHECK(library->Find(homebrew)->play_seconds == 240);
+        CHECK(library->Sessions().back().seconds == 240);
+        CHECK(library->Find(tetris_id)->play_seconds == 210);
         CHECK_FALSE(library->Find("gb:none"));
     }
     {
@@ -121,7 +135,9 @@ TEST_CASE("the library scans, keeps records and remembers them") {
         const auto tetris = library->Find(tetris_id);
         REQUIRE(tetris);
         CHECK(tetris->favourite);
-        CHECK(tetris->play_seconds == 150);
+        CHECK(tetris->play_seconds == 210);
+        CHECK(tetris->added > 0);
+        CHECK(library->Sessions().size() == 5);
         CHECK_FALSE(tetris->cover.empty());
         CHECK(requests == asked);
         REQUIRE(library->RemoveFolder(PathToUtf8(roms)));

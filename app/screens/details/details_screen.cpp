@@ -59,6 +59,9 @@ public:
             fact(TrF("details.times_played", game.play_count));
             fact(TrF("details.average", PlayTimeText(game.play_seconds / game.play_count)));
         }
+        if (game.added > 0) {
+            fact(TrF("details.added", LastPlayedText(game.added)));
+        }
         std::string in;
         for (const std::string& name : Collections()) {
             if (InCollection(name, id)) {

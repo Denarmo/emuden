@@ -49,7 +49,17 @@ std::optional<Saved> LoadSaved(const std::filesystem::path& file) {
             record.last_played = static_cast<std::int64_t>(Number(value, "last_played"));
             record.play_seconds = static_cast<std::int64_t>(Number(value, "play_seconds"));
             record.play_count = static_cast<int>(Number(value, "play_count"));
+            record.added = static_cast<std::int64_t>(Number(value, "added"));
             saved.records[id] = record;
+        }
+    }
+    if (const JsonValue* sessions = document->data.Find("sessions"); sessions != nullptr) {
+        for (const JsonValue& item : sessions->items) {
+            Session session{item.String("id"), static_cast<std::int64_t>(Number(item, "started")),
+                            static_cast<std::int64_t>(Number(item, "seconds"))};
+            if (!session.id.empty()) {
+                saved.sessions.push_back(std::move(session));
+            }
         }
     }
     return saved;
@@ -67,11 +77,20 @@ bool SaveSaved(const std::filesystem::path& file, const Saved& saved) {
             id, JsonObject({{"favourite", JsonBool(record.favourite)},
                             {"last_played", JsonNumber(static_cast<double>(record.last_played))},
                             {"play_seconds", JsonNumber(static_cast<double>(record.play_seconds))},
-                            {"play_count", JsonNumber(record.play_count)}}));
+                            {"play_count", JsonNumber(record.play_count)},
+                            {"added", JsonNumber(static_cast<double>(record.added))}}));
     }
-    return store::SaveDocument(
-        file, SAVED_VERSION,
-        JsonObject({{"folders", std::move(folders)}, {"records", std::move(records)}}));
+    JsonValue sessions = JsonArray();
+    for (const Session& session : saved.sessions) {
+        sessions.items.push_back(
+            JsonObject({{"id", JsonString(session.id)},
+                        {"started", JsonNumber(static_cast<double>(session.started))},
+                        {"seconds", JsonNumber(static_cast<double>(session.seconds))}}));
+    }
+    return store::SaveDocument(file, SAVED_VERSION,
+                               JsonObject({{"folders", std::move(folders)},
+                                           {"records", std::move(records)},
+                                           {"sessions", std::move(sessions)}}));
 }
 
 std::vector<Entry> LoadEntryCache(const std::filesystem::path& file) {

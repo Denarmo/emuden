@@ -94,14 +94,22 @@ gfx::Texture BlurTexture(const std::string& path) {
     return Svc().textures->Get(key);
 }
 
-void DrawCentered(ui::Context& ctx, const gfx::Rect& rect, const std::string& text, float size, int font,
-                  gfx::Color color) {
+void DrawLine(ui::Context& ctx, const gfx::Rect& rect, const std::string& text, float size, int font,
+              gfx::Color color, bool centered) {
     const std::string shown = ctx.Text().Elide(text, size, rect.w, font);
-    const float width = ctx.Text().Measure(shown, size, font);
+    const float width = centered ? ctx.Text().Measure(shown, size, font) : rect.w;
     const float line = ctx.Text().Metrics(size, font).line_height;
     ctx.canvas->DrawText(shown, rect.x + (rect.w - width) * 0.5f, rect.y + (rect.h - line) * 0.5f, size, color,
                          font);
 }
+
+void DrawCentered(ui::Context& ctx, const gfx::Rect& rect, const std::string& text, float size, int font,
+                  gfx::Color color) {
+    DrawLine(ctx, rect, text, size, font, color, true);
+}
+
+// A picture this close to the tile's shape fills it: the sliver cut off is not box art.
+constexpr float FILL_TOLERANCE = 0.04f;
 
 } // namespace
 
@@ -135,6 +143,18 @@ void Backdrop::Draw(ui::Context& ctx, const gfx::Rect& area) {
     ctx.canvas->FillRect(area, ctx.theme->page.WithAlpha(0.74f));
 }
 
+void DrawCover(ui::Context& ctx, const gfx::Rect& rect, const gfx::Texture& texture, bool fill) {
+    const float radius = ctx.theme->radius;
+    const gfx::Rect fit = gfx::FitRect(texture.width, texture.height, rect);
+    if (fill || (fit.w >= rect.w * (1 - FILL_TOLERANCE) && fit.h >= rect.h * (1 - FILL_TOLERANCE))) {
+        ctx.canvas->DrawImage(rect, texture, gfx::Color{255, 255, 255, 255}, radius,
+                              gfx::CoverUv(texture.width, texture.height, rect));
+        return;
+    }
+    ctx.canvas->FillRect(rect, ctx.theme->panel, radius);
+    ctx.canvas->DrawImage(fit, texture, gfx::Color{255, 255, 255, 255}, ctx.theme->radius_small);
+}
+
 CoverView::CoverView(std::string title, std::string image_path, float w, float h)
     : title_(std::move(title)), image_path_(std::move(image_path)) {
     width = w;
@@ -145,8 +165,7 @@ void CoverView::DrawContent(ui::Context& ctx) {
     const ui::Theme& theme = *ctx.theme;
     const gfx::Texture texture = image_path_.empty() ? gfx::Texture{} : ctx.textures->Get(image_path_, 1024);
     if (texture) {
-        ctx.canvas->DrawImage(rect, texture, gfx::Color{255, 255, 255, 255}, theme.radius,
-                              gfx::CoverUv(texture.width, texture.height, rect));
+        DrawCover(ctx, rect, texture, overlay_title);
         if (overlay_title) {
             DrawCentered(ctx, rect.Inset(16), title_, theme.text_heading, gfx::FONT_BOLD, theme.page);
         }
@@ -175,10 +194,28 @@ void ProgressBar::DrawContent(ui::Context& ctx) {
 }
 
 void GameTile::DrawContent(ui::Context& ctx) {
-    ui::Tile::DrawContent(ctx);
-    if (overlay_title && ctx.textures->StateOf(image_path) == gfx::TextureCache::State::Ready) {
-        DrawCentered(ctx, FocusRect().Inset(10), title, ctx.theme->text_body, gfx::FONT_BOLD, ctx.theme->page);
+    const ui::Theme& theme = *ctx.theme;
+    const gfx::Rect image = FocusRect();
+    const gfx::Texture texture =
+        ctx.textures && !image_path.empty() ? ctx.textures->Get(image_path) : gfx::Texture{};
+    if (texture) {
+        DrawCover(ctx, image, texture, overlay_title);
+        if (overlay_title) {
+            DrawCentered(ctx, image.Inset(10), title, theme.text_body, gfx::FONT_BOLD, theme.page);
+        }
+    } else {
+        ctx.canvas->FillRect(image, theme.panel, theme.radius);
+        DrawCentered(ctx, image.Inset(12), title, theme.text_body, gfx::FONT_BOLD, theme.fg);
     }
+    if (!badge.empty()) {
+        const float w = ctx.Text().Measure(badge, theme.text_small, gfx::FONT_BOLD) + 14;
+        const gfx::Rect chip{image.x + 8, image.y + 8, w, 22};
+        ctx.canvas->FillRect(chip, theme.dialog, theme.radius_small);
+        DrawCentered(ctx, chip, badge, theme.text_small, gfx::FONT_BOLD, theme.fg);
+    }
+    const gfx::Rect caption{rect.x, image.Bottom() + 6, image_width, 24};
+    DrawLine(ctx, caption, title, theme.text_small + 1, focused ? gfx::FONT_BOLD : gfx::FONT_REGULAR,
+             focused ? theme.fg : theme.text_dim, false);
 }
 
 ui::Tile* AddGameTile(ui::Node* parent, const library::Entry& game, const GameTileOptions& options) {

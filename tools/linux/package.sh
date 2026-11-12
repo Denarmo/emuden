@@ -39,6 +39,14 @@ cp "$shell/emuden.desktop" "$app/usr/share/applications/emuden.desktop"
 cp "$shell/emuden.svg" "$app/emuden.svg"
 cp "$shell/emuden.svg" "$app/usr/share/icons/hicolor/scalable/apps/emuden.svg"
 ln -s emuden.svg "$app/.DirIcon"
+# Launchers that take no SVG get a PNG when this machine can draw one.
+if command -v rsvg-convert >/dev/null; then
+    mkdir -p "$app/usr/share/icons/hicolor/256x256/apps"
+    rsvg-convert -w 256 -h 256 "$shell/emuden.svg" -o "$app/usr/share/icons/hicolor/256x256/apps/emuden.png"
+fi
+if command -v desktop-file-validate >/dev/null; then
+    desktop-file-validate "$app/emuden.desktop"
+fi
 
 deps="$(sed -n 's/^DEN_DEPS_DIR:PATH=//p' "$build/CMakeCache.txt")"
 lic="$app/usr/share/licenses/emuden"

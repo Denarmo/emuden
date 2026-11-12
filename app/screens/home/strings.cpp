@@ -30,9 +30,20 @@ void Load(Table& table, const std::string& language) {
     }
 }
 
+// Texts of this folder's screens that the strings file does not have yet; the file wins.
+void LoadBuiltIn(Table& table) {
+    table["home.recently_added"] = "Recently added";
+    table["details.added"] = "Added: {}";
+    table["statistics.week"] = "Last 7 days";
+    table["statistics.week_value"] = "{} in {}";
+    table["statistics.sessions_one"] = "1 session";
+    table["statistics.sessions_count"] = "{} sessions";
+}
+
 Table& Texts() {
     static Table table = [] {
         Table loaded;
+        LoadBuiltIn(loaded);
         Load(loaded, "en");
         const std::string language =
             Svc().settings ? Svc().settings->GetString("ui.language", "en") : std::string("en");

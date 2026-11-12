@@ -27,6 +27,25 @@ namespace fs = std::filesystem;
 namespace {
 
 constexpr unsigned ARTWORK_THREADS = 4;
+constexpr std::size_t SESSION_LOG_LIMIT = 5000;
+
+std::int64_t UnixNow() {
+    return std::chrono::duration_cast<std::chrono::seconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+
+// When the file was last written, as unix seconds; 0 when it cannot be told.
+std::int64_t WrittenUnix(const fs::path& file) {
+    std::error_code ec;
+    const auto written = fs::last_write_time(file, ec);
+    if (ec) {
+        return 0;
+    }
+    const auto age = std::chrono::duration_cast<std::chrono::seconds>(
+        fs::file_time_type::clock::now() - written);
+    return UnixNow() - age.count();
+}
 
 HttpAnswer PlatformGet(const std::string& url) {
     pal::HttpRequest request;
@@ -246,6 +265,33 @@ public:
         return out;
     }
 
+    std::vector<Entry> RecentlyAdded(int limit) const override {
+        std::lock_guard lock(mutex_);
+        std::vector<Entry> out;
+        for (const Entry& entry : entries_) {
+            if (entry.added > 0) {
+                out.push_back(entry);
+            }
+        }
+        std::stable_sort(out.begin(), out.end(),
+                         [](const Entry& a, const Entry& b) { return a.added > b.added; });
+        if (limit >= 0 && static_cast<int>(out.size()) > limit) {
+            out.resize(static_cast<std::size_t>(limit));
+        }
+        return out;
+    }
+
+    std::vector<Session> Sessions(std::int64_t since_unix) const override {
+        std::lock_guard lock(mutex_);
+        std::vector<Session> out;
+        for (const Session& session : saved_.sessions) {
+            if (session.started + session.seconds > since_unix) {
+                out.push_back(session);
+            }
+        }
+        return out;
+    }
+
     void SetFavourite(const std::string& id, bool favourite) override {
         std::lock_guard lock(mutex_);
         saved_.records[id].favourite = favourite;
@@ -254,9 +300,25 @@ public:
 
     void RecordPlay(const std::string& id, std::int64_t started_unix, std::int64_t seconds) override {
         std::lock_guard lock(mutex_);
+        seconds = std::max<std::int64_t>(seconds, 0);
+        // A game opened over this one was booked on its own: its time is not this game's.
+        const std::int64_t end = started_unix + seconds;
+        std::int64_t others = 0;
+        for (const Session& other : saved_.sessions) {
+            if (other.id != id) {
+                others += std::max<std::int64_t>(
+                    std::min(end, other.started + other.seconds) - std::max(started_unix, other.started), 0);
+            }
+        }
+        seconds = std::max<std::int64_t>(seconds - others, 0);
+        saved_.sessions.push_back({id, started_unix, seconds});
+        if (saved_.sessions.size() > SESSION_LOG_LIMIT) {
+            saved_.sessions.erase(saved_.sessions.begin(),
+                                  saved_.sessions.end() - static_cast<std::ptrdiff_t>(SESSION_LOG_LIMIT));
+        }
         Record& record = saved_.records[id];
         record.last_played = std::max(record.last_played, started_unix);
-        record.play_seconds += std::max<std::int64_t>(seconds, 0);
+        record.play_seconds += seconds;
         ++record.play_count;
         RecordChanged(id);
     }
@@ -319,6 +381,7 @@ private:
         entry.last_played = record.last_played;
         entry.play_seconds = record.play_seconds;
         entry.play_count = record.play_count;
+        entry.added = record.added;
     }
 
     void RecordChanged(const std::string& id) {
@@ -375,7 +438,18 @@ private:
             for (const Entry& entry : entries_) {
                 before[entry.id] = &entry;
             }
+            // Games of the first scan are as old as their files; later ones were added now.
+            const bool first_scan =
+                std::none_of(saved_.records.begin(), saved_.records.end(),
+                             [](const auto& record) { return record.second.added > 0; });
+            const std::int64_t now = UnixNow();
+            bool dated = false;
             for (Entry& entry : found) {
+                if (Record& record = saved_.records[entry.id]; record.added <= 0) {
+                    const std::int64_t written = first_scan ? WrittenUnix(PathFromUtf8(entry.path)) : 0;
+                    record.added = written > 0 ? std::min(written, now) : now;
+                    dated = true;
+                }
                 ApplyRecord(entry);
                 if (entry.cover.empty()) {
                     // The cover of the last scan stays up until the lookup has answered.
@@ -391,6 +465,9 @@ private:
             }
             entries_ = std::move(found);
             SaveEntryCache(dir_ / "cache.json", entries_);
+            if (dated) {
+                SaveSaved(dir_ / "library.json", saved_);
+            }
             ++revision_;
         }
         job.SetProgress(0.2f);
