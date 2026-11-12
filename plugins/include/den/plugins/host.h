@@ -1,9 +1,8 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Facade of the plugin host: which consoles exist, which core plays a system, and installing
-// it from the signed plugin index. The implementation behind CreateHost is a fake
-// (src/fake_host.cpp) until the real one replaces it.
+// Facade of the plugin host: which consoles exist (from the plugin manifests), which core
+// plays a system, and installing it from the signed plugin index.
 
 #pragma once
 
@@ -30,6 +29,45 @@ enum class Runner {
     Engine, // an out-of-app engine started by den::engine (Switch 2)
 };
 
+/// What the console's own pad calls a RetroPad button ("b" is "Cross" on a PlayStation).
+struct ButtonName {
+    std::string pad;
+    std::string label;
+};
+
+struct BiosFile {
+    std::string path; // relative to the system folder; a trailing slash means a non-empty folder
+    bool optional = false;
+};
+
+struct BiosSet {
+    std::string label;
+    bool any_one = false; // one of the files is enough
+    std::vector<BiosFile> files;
+};
+
+/// Where a ROM keeps its own title.
+struct HeaderTitle {
+    std::uint64_t offset = 0;
+    std::uint32_t length = 0;
+};
+
+/// How the library finds a console's games (the manifest's content object).
+struct ScanRules {
+    std::vector<std::string> compound_extensions;    // matched before simple ones ("p8.png")
+    std::vector<std::string> folder_aliases;         // folder names besides the id
+    std::vector<std::string> folder_only_extensions; // claimed only inside the console's folder
+    std::string zip = "unpack";                      // unpack, pass or no
+    /// Multi-file games: index files (cue, m3u) and the members they name (bin).
+    std::vector<std::string> index_extensions;
+    std::vector<std::string> member_extensions;
+    bool loose_members = false; // a member without an index is a game
+    std::string track_naming;   // "redump": "(Track N)" files belong together
+    std::vector<HeaderTitle> header_title;
+    bool cover_is_rom = false;
+    std::string scanner; // "switch2": the engine scans, not the extensions
+};
+
 /// A console, from a plugin manifest's systems[].
 struct Console {
     std::string id;         // system id: "gb", "gba", "nds", "psx", "switch2"
@@ -38,7 +76,38 @@ struct Console {
     std::string plugin_id;  // the plugin that provides it
     std::vector<std::string> extensions; // lower case, without the dot
     Runner runner = Runner::Core;
-    bool installed = false; // its core or engine is on disk and verified
+    /// A core console: its core is on disk and matches its checksum. Engine consoles are
+    /// always true here; ask den::engine whether the engine can start.
+    bool installed = false;
+    bool update_available = false; // the index has a newer version than the one on disk
+    /// False when no core of the console has a download for this device.
+    bool available = true;
+    std::string group;         // "nintendo", "sega", "sony", ...
+    int order = 0;             // position on the home screen, ascending
+    float cover_aspect = 1.0f; // width over height
+    bool handheld = false;
+    bool right_stick_holds = false;
+    ScanRules scan;
+    std::vector<ButtonName> buttons;
+    std::string thumbnails; // the libretro thumbnail folder ("Nintendo - Game Boy"), or empty
+    std::string rdb;        // the libretro database name, or empty
+    int rcheevos_console = 0;
+    std::vector<BiosSet> bios;
+};
+
+/// A setting a plugin manifest declares for a console ("settings"). The Consoles screen
+/// builds a row from it and keeps the value as text in the app settings under
+/// "console.<system>.<key>" ("true"/"false" for a toggle, the number for a range); whoever
+/// starts the game applies it.
+struct SettingSpec {
+    std::string key;
+    std::string label;
+    std::string help;
+    std::string type; // "toggle", "choice", "range", "text", "path"
+    std::vector<std::pair<std::string, std::string>> choices; // value, label
+    double min = 0, max = 0, step = 1;
+    std::string suffix;
+    std::string default_value;
 };
 
 /// The core that plays a system on this device.
@@ -66,6 +135,20 @@ public:
     /// The core for a system on this device; nullopt for engine consoles and unknown systems.
     virtual std::optional<CoreInfo> CoreFor(const std::string& system) const = 0;
     virtual bool Installed(const std::string& system) const = 0;
+    /// Call right before a core library is loaded: hashes the file again and fails when it
+    /// is not the file that was installed or when a source blocked its checksum.
+    virtual Status VerifyCore(const std::filesystem::path& library) const = 0;
+    /// Every core that can play a system on this device, the chosen one (CoreFor) included.
+    virtual std::vector<CoreInfo> CoresFor(const std::string& system) const {
+        const std::optional<CoreInfo> core = CoreFor(system);
+        return core ? std::vector<CoreInfo>{*core} : std::vector<CoreInfo>{};
+    }
+    /// Makes `core_id` the core CoreFor returns for the system, and remembers it.
+    virtual void SelectCore(const std::string& /*system*/, const std::string& /*core_id*/) {}
+    /// The settings the console's manifest declares; empty when it has none.
+    virtual std::vector<SettingSpec> SettingsFor(const std::string& /*system*/) const {
+        return {};
+    }
 
     /// Downloads, verifies (SHA-256 and size from the signed index) and unpacks what the
     /// system needs. Progress and cancel through the job; the failure text is user-facing.
