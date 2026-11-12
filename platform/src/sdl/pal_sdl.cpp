@@ -146,6 +146,8 @@ private:
 
 Status Init() {
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "0");
+    // Android: Back is a key for the app (it goes back a page), never the end of the activity.
+    SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
     SDL_SetAppMetadata("EmuDEN", "0.1.0", "io.github.denarmo.emuden");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         return Status::Fail(std::string("SDL_Init: ") + SDL_GetError());

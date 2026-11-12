@@ -5,6 +5,7 @@ package io.github.denarmo.emuden;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
@@ -45,9 +46,26 @@ public class EmuDenActivity extends SDLActivity {
         } catch (Exception e) {
             Log.w(TAG, "HOME could not be set", e);
         }
+        automationFromIntent();
         unpackAssets();
         super.onCreate(savedInstanceState);
         askForStorage();
+    }
+
+    // Debug builds only: "am start ... --ei automation <port>" turns the automation endpoint
+    // on (docs/interfaces.md); "adb forward tcp:<port> tcp:<port>" then reaches it.
+    private void automationFromIntent() {
+        if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+            return;
+        }
+        int port = getIntent() != null ? getIntent().getIntExtra("automation", 0) : 0;
+        if (port > 0) {
+            try {
+                Os.setenv("EMUDEN_AUTOMATION", Integer.toString(port), true);
+            } catch (Exception e) {
+                Log.w(TAG, "automation could not be turned on", e);
+            }
+        }
     }
 
     /** Called from native code (platform/src/android). */

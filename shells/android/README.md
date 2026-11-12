@@ -32,14 +32,27 @@ in `build\android\cxx`. arm64-v8a only, OpenGL ES 3, minSdk 28. The application 
 - Cores are installed under the data folder, which is app-private, and loaded with
   `dlopen` from there like on the desktop.
 
+## Running on a device
+
+`toolsndroidun.ps1 -Device <serial> -Port 5601 -GrantStorage` builds, installs and starts
+the app with the automation endpoint on (debug builds only: the intent extra
+`--ei automation <port>`), forwarded over adb, so `python tools/drive.py --port 5601 ...`
+drives it as on the desktop. `-Stop` stops the app. The app's log is `files/log.txt`
+(`adb shell run-as io.github.denarmo.emuden.next cat files/log.txt`), not logcat.
+
+Seen on a Retroid Pocket Duo (Android 16, Adreno 722) on 2026-11-12: setup with
+`/storage/emulated/0/ROMS`, the mGBA and PCSX-ReARMed cores installed from the plugin
+source, Tetris (Game Boy), Pokemon - Lazarus (GBA) and Gran Turismo 2 (PlayStation) show
+their picture with an AAudio stream started, touch taps, the built-in pad, Back opening the
+pause menu, and leaving the app with Home and coming back.
+
 ## Limits for now
 
 - **Storage:** games are read by path. On Android 11 and later the app asks for "all files
   access" at every start until it is granted; without it the folder browser sees nothing
   under `/storage`. Folder grants (SAF) are not built. The folder browser starts at the
   shared storage root (`HOME` is set to it).
-- **Cores:** the published plugin manifests have no `android-arm64` downloads for libretro
-  cores yet, so every core console reports "not available on this device yet". Adding those
-  downloads to `Denarmo/emuden-plugins` (signed index) is all that is missing on the app side.
+- **BIOS files:** the BIOS folder is inside the app's private data, where a file manager
+  cannot put files.
 - Secrets are kept in memory only (no Keystore), there is no second-screen surface, and the
   Switch 2 engine is not available on Android.
