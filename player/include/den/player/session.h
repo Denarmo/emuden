@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Facade of the ROM player: one libretro core with one game, running inside the app's
-// window. The implementation behind CreateSession is a fake (src/fake_session.cpp) until the
-// real player replaces it. libretro.h (from upstream libretro) is in third_party/libretro.
+// window. libretro.h (from upstream libretro) is in third_party/libretro.
 
 #pragma once
 
@@ -33,6 +32,9 @@ struct OpenRequest {
     std::string system;               // system id
     /// Option values from the plugin manifest, applied before the user's own.
     std::vector<std::pair<std::string, std::string>> option_hints;
+    /// Continue from where the game was left (the state written by Close), when there is one
+    /// and the "player.resume" setting allows it.
+    bool resume = true;
 };
 
 enum class State { Closed, Running, Paused, Failed };
@@ -52,6 +54,8 @@ struct Snapshot {
     bool rewinding = false;
     bool can_save_states = false;
     bool can_rewind = false;
+    bool hardware_rendered = false; // the core draws with the GPU
+    bool resumed = false;           // this session continued from the state Close wrote
 };
 
 struct CoreOption {
@@ -63,8 +67,13 @@ struct CoreOption {
 
 constexpr int STATE_SLOTS = 10;
 
-/// Main thread only. The app's player screen drives it: Open, then per frame SetPad,
-/// Advance and Draw, and Close when the screen leaves.
+/// Main thread only, with the app's GL context current. The app's player screen drives it:
+/// Open, then per frame SetPad, Advance and Draw, and Close when the screen leaves.
+///
+/// Settings read at Open (all optional): player.resume (true), player.rewind (true),
+/// player.fast_forward_speed (3), player.integer_scale (false), player.smooth (true),
+/// player.pad_by_label (true), player.volume (1.0). A user's core option values are kept
+/// under core_options.<core>.<key>.
 class Session {
 public:
     virtual ~Session() = default;
@@ -79,6 +88,9 @@ public:
     virtual void Resume() = 0;
     /// The pad for a port (0 = player one), by position. Call before Advance.
     virtual void SetPad(int port, const input::PadState& pad) = 0;
+    /// A finger or the mouse on the picture (a touch screen console), in the units of the
+    /// canvas last drawn to. Outside the picture it counts as lifted.
+    virtual void SetPointer(float x, float y, bool pressed) = 0;
     /// Runs as many core frames as `seconds` of real time ask for (none while paused) and
     /// queues their audio.
     virtual void Advance(double seconds) = 0;
@@ -87,13 +99,21 @@ public:
     /// leave the canvas usable (canvas.RestoreState()).
     virtual void Draw(gfx::Canvas& canvas, const gfx::Rect& area) = 0;
 
+    /// Forces the picture's width / height in Draw (the screen size choice); 0 returns to the
+    /// core's own aspect ratio.
+    virtual void SetAspectOverride(float /*aspect*/) {}
+
     virtual Status SaveState(int slot) = 0;
     virtual Status LoadState(int slot) = 0;
     virtual bool HasState(int slot) const = 0;
+    /// The PNG taken when the slot was saved; an empty path when the slot has none.
+    virtual std::filesystem::path StateThumbnail(int slot) const = 0;
     virtual void SetFastForward(bool on) = 0;
     /// While on, Advance steps backwards through the rewind buffer.
     virtual void SetRewind(bool on) = 0;
     virtual void Reset() = 0;
+    /// Writes the battery save now when it changed (Close and a timer do too).
+    virtual void FlushSaves() = 0;
 
     virtual std::vector<CoreOption> Options() const = 0;
     virtual void SetOption(const std::string& key, const std::string& value) = 0;
