@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">EmuDEN</string>
+    <string name="storage_title">Access to your games</string>
+    <string name="storage_message">EmuDEN reads games from folders on this device. Allow access to all files, or choose one folder whose games are copied into the EmuDEN folder.</string>
+    <string name="storage_refused">Access to all files was not allowed. You can choose one folder instead; its games are copied into the EmuDEN folder.</string>
+    <string name="storage_allow">Allow access</string>
+    <string name="storage_folder">Choose a folder</string>
+    <string name="storage_later">Not now</string>
+    <string name="storage_allowed">EmuDEN can read your games now.</string>
+    <string name="storage_no_picker">This device has no folder picker.</string>
+    <string name="import_title">Copying games</string>
+    <string name="import_done">%1$d files are in %2$s. Add that folder as a game folder.</string>
+    <string name="import_failed">%1$d could not be copied.</string>
 </resources>

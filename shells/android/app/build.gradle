@@ -39,6 +39,14 @@ android {
         }
     }
 
+    buildTypes {
+        release {
+            // No release key yet: signed with the debug key, so it updates a debug install.
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+        }
+    }
+
     sourceSets {
         main {
             // SDL's activity comes from the SDL sources CMake fetched.
