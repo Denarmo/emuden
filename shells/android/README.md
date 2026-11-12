@@ -34,7 +34,7 @@ in `build\android\cxx`. arm64-v8a only, OpenGL ES 3, minSdk 28. The application 
 
 ## Running on a device
 
-`toolsndroidun.ps1 -Device <serial> -Port 5601 -GrantStorage` builds, installs and starts
+`tools\android\run.ps1 -Device <serial> -Port 5601 -GrantStorage` builds, installs and starts
 the app with the automation endpoint on (debug builds only: the intent extra
 `--ei automation <port>`), forwarded over adb, so `python tools/drive.py --port 5601 ...`
 drives it as on the desktop. `-Stop` stops the app. The app's log is `files/log.txt`

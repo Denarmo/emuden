@@ -1,73 +1,137 @@
 # Status
 
-State of the rebuild after the first night (2026-11-12). The Windows app plays a game on
-every console in the test library. Linux builds and runs in WSL only; Android builds but
-was never started.
+State of the rebuild after the second round of the first night (2026-11-12). The Windows
+app starts every game in the test library, PSP text shows, and a Switch 2 game stops
+cleanly. Android played three consoles on the Retroid. Linux builds and passes its tests in
+WSL; the AppImage was still never run on the Legion Go S.
 
-## Consoles (Windows, final play check)
+## Release check (Windows, last thing done)
 
-One game each, started from the home screen with a fresh portable `user` folder and the
-game folder added in first-run setup. Cores were downloaded from the official plugin source
-on first Play. Driven through the automation endpoint (`tools/drive.py`); no real gamepad,
-no touch, and sound was not listened to.
+`win` preset built from an empty build directory with everything committed; 11 of 11 unit
+test programs pass. Then one driven run (`tools/drive.py`) with a fresh portable `user`
+folder holding only the game folder and the engine path; cores were downloaded from the
+official plugin source on first Play.
 
-| Console | Game | Core or engine | Runs | Pause | Save state | Exit to home |
-|---|---|---|---|---|---|---|
-| Game Boy | Tetris | mGBA | yes | yes | yes | yes |
-| Game Boy Color | Mario Tennis | mGBA | yes | yes | yes | yes |
-| Game Boy Advance | Pokemon - Lazarus | mGBA | yes | yes | yes | yes |
-| Nintendo DS | Explorers of Sky | melonDS (FreeBIOS) | yes | yes | yes | yes |
-| PlayStation | Gran Turismo 2 | PCSX-ReARMed (no BIOS) | yes | yes | yes | yes |
-| PSP | PoPoLoCrois | PPSSPP | yes | yes | yes | yes |
-| Switch 2 | Ocarina of Time | installed emulator (engine level 0) | starts | - | - | "Stop the game" returns to home |
+| Game | Result |
+|---|---|
+| Tetris (Game Boy, mGBA) | core downloaded, title screen, 515 frames, exit to details |
+| PoPoLoCrois (PSP, PPSSPP) | core and its assets downloaded, title screen with its menu text at 24 s, 1459 frames, no `ppge_atlas` warning |
+| Ocarina of Time (Switch 2) | engine window for 27 s, "Stop the game" ended it in under 4 s with exit code 0, no engine process left |
 
-- Reopening a game resumes where it was left (seen on DS, PlayStation and PSP).
-- The Switch 2 game ran 32 s in the engine's own window; after "Stop the game" no engine
-  process was left. The engine is closed by force after 5 s (exit code 1).
+The app left with exit code 0.
+
+## Games (Windows)
+
+All 17 ROMs in the test library start, show a picture and advance frames; each ran about
+10 s from the beginning, unpacked. "Picture" comes from screenshot statistics (colour
+spread, two shots differing); only the PSP, Gran Turismo 2 and Racing Lagoon pictures were
+looked at.
+
+| Console | Game | Core | Frames in ~10 s | Picture |
+|---|---|---|---|---|
+| GB | Pokemon - Brown | mGBA | 621 | yes |
+| GB | Tetris | mGBA | 603 | yes |
+| GBA | Pokemon - Heart & Soul | mGBA | 605 | yes |
+| GBA | Pokemon - Lazarus | mGBA | 604 | yes |
+| GBA | Pokemon - Seaglass | mGBA | 605 | yes |
+| GBC | Mario Golf | mGBA | 611 | yes |
+| GBC | Mario Tennis | mGBA | 610 | yes |
+| GBC | Pokemon - Ambrosia | mGBA | 612 | yes |
+| GBC | Pokemon - Crystal Awakening | mGBA | 598 | yes |
+| GBC | Pokemon - Edicion Cristal | mGBA | 606 | yes |
+| GBC | Pokemon - Polished Crystal | mGBA | 605 | yes |
+| GBC | Super Mario Bros. Deluxe | mGBA | 608 | yes |
+| GBC | Wario Land 3 | mGBA | 609 | yes |
+| NDS | Explorers of Skies | melonDS (FreeBIOS) | 606 | yes |
+| PSP | PoPoLoCrois | PPSSPP | 606 | yes; title screen by about 20 s, black in between |
+| PS1 | Gran Turismo 2 | PCSX-ReARMed (no BIOS) | 513 (50 fps game) | yes |
+| PS1 | Racing Lagoon | PCSX-ReARMed (no BIOS) | 621 | black for the first ~12 s, then the intro plays |
+| Switch 2 | Ocarina of Time | installed emulator (engine level 0) | - | in the engine's own window |
+
+Pause, save state and exit to home were confirmed on one game per console in the first
+round (Tetris, Mario Tennis, Pokemon - Lazarus, Explorers of Skies, Gran Turismo 2,
+PoPoLoCrois).
+
+Zipped ROMs play (from a scratch library, since the zips in the test library are hidden
+behind their unpacked copies):
+
+| Game (zip) | Starts | Save and load state | Fast-forward | Reset |
+|---|---|---|---|---|
+| Tetris (GB) | yes | yes, picture back at the saved point | about 3x | back at the copyright screen |
+| Gran Turismo 2 | yes | yes, picture back at the saved point | yes, badge shown | back at the first logo |
+| Racing Lagoon | yes | "Loaded slot 1" (screen still black then) | yes | not confirmed on the picture |
 
 ## Platforms
 
 | Platform | State |
 |---|---|
-| Windows | `win` preset builds from an empty build directory in about a minute; 11 of 11 unit test programs pass. `tools/package.ps1` writes `dist\windows` (13.6 MB). All consoles above play. |
-| Linux | `linux` preset builds in WSL Debian (clang); tests pass there. An AppImage is written by `tools/linux/package.sh`. Game Boy played under WSLg. Never run on the Legion Go S (it was not reachable). |
-| Android | `shells/android` builds a debug APK (arm64). Never installed or started. No core has an `android-arm64` download in the plugin source yet, so no core console can play there. |
+| Windows | Everything above. `tools/package.ps1` writes `dist\windows` (13.7 MB); the same files are in `C:\Users\david\Desktop\EmuDEN`. |
+| Linux | `linux` preset builds in WSL Debian (clang) and 11 of 11 test programs pass there. `tools/linux/package.sh` writes the AppImage (5.7 MB, copy in `dist\linux`). Game Boy played under WSLg in the first round; nothing was played on Linux in the second. Never run on the Legion Go S: its sshd refused the connection, so the AppImage was not copied. |
+| Android | Debug APK (`io.github.denarmo.emuden.next`, arm64) installed and ran on the Retroid Pocket Duo (Android 16, Adreno 722): setup found 18 games on 7 consoles; Tetris (GB), Pokemon - Lazarus (GBA) and Gran Turismo 2 (PlayStation) showed their picture with a sound stream started; cores downloaded from the plugin source; touch taps, a Start press on the built-in pad, Back opening the pause menu, and Home and back again all worked. See `shells/android/README.md`. |
+
+Plugin source (Denarmo/emuden-plugins, index sequence 6): every core except `fake08` has
+`android-arm64` and `linux-x86_64` downloads (26 Android cores; N64 on Android is the
+`mupen64plus_next_gles3` build), and `emuden.psp` carries PPSSPP's assets as a
+`system-files` component that the app unpacks into the system folder with the core.
+
+## What the second round added
+
+- **Engine**: a clean stop. The app asks the engine window to close, answers its "are you
+  sure" dialog, and waits up to 20 s before forcing; on POSIX `SIGTERM` to the process
+  group, then `SIGKILL` after 20 s. Closing the app while a game runs uses the same stop.
+- **Text entry**: `Stage::AskText` (pad, touch and a real keyboard). Collections can be
+  created and renamed in a "Collections" settings section.
+- **Controllers page**: pads by name with a Player 1..N choice (`input.players`), a button
+  test view (`controller_test`) and a sheet of every symbol (`controller_glyphs`).
+- **Glyphs**: button symbols per pad family drawn by the ui kit (`ui/src/glyphs.cpp`).
+- **Plugins**: system files of a core; component types the app does not know are skipped.
+- **Player**: the frame count is logged when a game is paused or left.
+- **Android**: Back is trapped, automation over `adb forward` in debug builds,
+  `tools/android/run.ps1`.
 
 ## Not run
 
-- A real gamepad, two pads, touch, and listening to sound.
-- Load state in this pass (it was confirmed earlier on Game Boy and PlayStation), rewind,
-  fast-forward, Reset, screen sizes other than Fit, core options and button remap during
-  this pass.
-- Zipped ROMs (the two PlayStation zips are hidden behind their unpacked copies), Racing
-  Lagoon, and every game other than the one per console listed above.
-- The Switch 2 engine in full screen, and the engine copy on the Desktop (only its
-  detection was checked, it was not started).
+- A real gamepad held in the hand, two pads, and listening to sound on any platform.
+- Rewind anywhere. Load state, fast-forward and Reset on NDS, PSP and GBA, and on the
+  unpacked games in this round.
+- The Switch 2 engine in full screen (the app passes `-f`; only read in the source), the
+  clean stop on Linux, and the engine copy on the Desktop.
+- The text entry, Controllers page and glyph sheet with a real pad or touch; they were
+  driven through the automation endpoint once each.
+- Linux on real hardware (GPU drivers, gamescope, the handheld), and any game on Linux
+  with tonight's build.
+- Android: the storage permission screen (access was granted with `appops`),
+  `tools/android/run.ps1` itself, save and load state, rewind, the second screen, sticks
+  and the other buttons, NDS, PSP and GBC games, the Android cores other than mGBA and
+  PCSX-ReARMed, and the PSP assets download.
+- The Linux core downloads added to the plugin source, and the Desktop copy from the first
+  round reading the new PSP manifest (its parser was read, not run).
 - "Install all" in setup, hidden games, the statistics page with real play time, the high
   contrast themes, per-game core and screen size end to end.
-- Linux on real hardware (GPU drivers, gamescope, the handheld), and anything on Android.
 
 ## Known problems
 
-- PPSSPP's own assets (`ppge_atlas.zim`, fonts) are not installed, because the published
-  manifest has no download for them. PSP games that use the system font or the built-in
-  dialogs will miss text.
-- Stopping a Switch 2 game ends the engine by force, so what it saves on exit may be lost.
+- `fake08` (PICO-8) has no download on any platform: the buildbot has no build of it.
+- Racing Lagoon stays black for its first ~12 s and PoPoLoCrois for ~15 s before the title.
+- PPSSPP logs "Exception handler not implemented on this platform" at start; the game runs.
+- Two apps started on the same automation port: the second one runs without automation
+  and commands go to the first. Use a port of your own for every test.
 - Switch 2 saves and settings stay in the installed emulator; per-game launch arguments
-  are not possible yet.
-- Button hints are lettered badges, not the pad families' real glyph art; only the
-  keyboard look was seen on screen.
+  are not possible yet. The engine runs in its own window, not inside the app.
+- The engine's executable name is written in `engine/src/host/locate.cpp` and its test,
+  which the naming rule forbids; it goes when the engine becomes a plugin.
+- Android: no folder grants (SAF), BIOS files cannot be put into the app's private folder
+  with a file manager, secrets are kept in memory only, no Switch 2 engine.
 - Covers are cropped to fill their tiles. ROM hacks get the cover of the game they are
   based on or none that fits (Pokemon - Lazarus shows Emerald's).
 - Gran Turismo 2 shows the game's border colour left and right of the picture.
-- Collections are named "Collection N": there is no text entry to rename them.
 - A button remap is per console, not per pad or port.
 - The library keeps no session log or date added, so there is no "last 7 days".
 - Play time of a first game includes a second one opened over it.
-- An AppImage has no portable mode. Android keeps secrets in memory only.
-- Not built at all tonight: online (accounts, achievements, netplay, cloud saves), PC and
-  Steam games, manuals, capture, accessibility tree, languages other than English, the
-  Vulkan backend, SQLite store.
+- An AppImage has no portable mode.
+- Not built: online (accounts, achievements, netplay, cloud saves), PC and Steam games,
+  manuals, capture, accessibility tree, languages other than English, the Vulkan backend,
+  SQLite store.
 
 ## Where things are
 
@@ -75,19 +139,20 @@ no touch, and sound was not listened to.
   `C:\Users\david\Desktop\EmuDEN`. It keeps its data in `%APPDATA%\EmuDEN` unless a `user`
   folder is created beside `emuden.exe`. With no `engine.switch2.path` set it finds the
   installed emulator in the Desktop folder by itself.
+- Linux AppImage: `dist\linux\EmuDEN-x86_64.AppImage`. On SteamOS it goes to
+  `~/Games/EmuDEN/` (`shells/linux/README.md`).
+- Android APK: `build\android\gradle\app\outputs\apk\debug\app-debug.apk`.
 - `docs/interfaces.md`: what each module offers the others.
 - `tools/drive.py`: drives a running app (`EMUDEN_AUTOMATION=<port>`).
 
 ## Next, from the build plan
 
-1. Plugin source: add `android-arm64` (and check `linux-x86_64`) core downloads and the
-   PPSSPP assets to the manifests, then re-sign the index. This unblocks Android and PSP text.
-2. Run on the devices: the AppImage on the Legion Go S, the APK on the Retroid, each with a
-   real pad and touch. Fix what the first run shows (surface loss, permissions, glyphs).
-3. Stage 2 leftovers: controller settings page, real glyph art per pad family, text entry.
-4. Stage 3, full player: hardware-rendered cores on GLES, libretro shader presets, pacing,
-   disc swap and zipped content, second screen on Android, capture.
-5. Stage 4: library data (session log, date added, manuals), appearance, languages.
-6. Stage 6: the Switch 2 engine contract above level 0 (clean stop, embedded window,
-   saves and settings owned by EmuDEN), then the engine as a plugin.
-7. Stages 5, 7 and 8 after that: online, PC and Steam, hardening.
+1. Run the AppImage on the Legion Go S with a real pad, and finish the Android pass (PSP
+   with its assets, NDS, states, the storage permission screen, a folder grant).
+2. A real pad and listening to sound on every platform; rewind.
+3. Stage 3, full player: hardware-rendered cores on GLES, libretro shader presets, pacing,
+   disc swap, second screen on Android, capture.
+4. Stage 4: library data (session log, date added, manuals), appearance, languages.
+5. Stage 6: the Switch 2 engine contract above level 0 (embedded window, saves and
+   settings owned by EmuDEN), then the engine as a plugin.
+6. Stages 5, 7 and 8 after that: online, PC and Steam, hardening.
