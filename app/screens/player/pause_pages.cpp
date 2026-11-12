@@ -169,10 +169,16 @@ void PlayerScreen::BuildPlayers(ui::Node* list) {
         if (port == 0) {
             who = who.empty() ? "Keyboard" : who + " + keyboard";
         }
+        // Choosing a pad's row makes it player 1; the pad that was player 1 takes its place.
         rows.push_back(ValueRow(std::format("players.{}", port + 1), std::format("Player {}", port + 1),
-                                [who] { return who; }));
+                                [who] { return who; }, [this, port] {
+                                    if (port > 0 && Svc().input->Pad(port).connected) {
+                                        Svc().input->SetPlayer(port, 0);
+                                        Show(View::Players, "players.1");
+                                    }
+                                }));
     }
-    ui::RowSpec note = ValueRow("players.note", "Pads join in the order they connect",
+    ui::RowSpec note = ValueRow("players.note", "Pads join in the order they connect; choose one to make it player 1",
                                 [] { return std::string(); });
     rows.push_back(std::move(note));
     AddRows(list, std::move(rows), ROW_HEIGHT);

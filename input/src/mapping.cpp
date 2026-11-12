@@ -109,6 +109,22 @@ Nav NavFromName(const std::string& name) {
     return Nav::None;
 }
 
+PadFamily FamilyFromName(const std::string& name) {
+    std::string lower;
+    for (const char c : name) {
+        lower.push_back(c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c);
+    }
+    const auto has = [&](const char* word) { return lower.find(word) != std::string::npos; };
+    if (has("nintendo") || has("switch") || has("joy-con") || has("joycon") || has("pro controller")) {
+        return PadFamily::Nintendo;
+    }
+    if (has("playstation") || has("dualsense") || has("dualshock") || has("ps3") || has("ps4") ||
+        has("ps5") || has("sony")) {
+        return PadFamily::PlayStation;
+    }
+    return PadFamily::Xbox;
+}
+
 const char* FamilyName(PadFamily family) {
     switch (family) {
     case PadFamily::Xbox:

@@ -132,6 +132,7 @@ void PlayerScreen::Begin(const std::filesystem::path& content) {
     resume_told_ = false;
     svc.input->SetNavFromPads(false);
     wait_release_ = true;
+    pads_seen_ = svc.input->PadCount();
 }
 
 void PlayerScreen::Fail(const std::string& message) {
@@ -322,6 +323,13 @@ void PlayerScreen::Update(ui::Context& ctx) {
         resume_told_ = true;
         svc.stage->Toast("Resumed where you left off");
     }
+    // A pad that went away mid-game (unplugged, battery, out of range) pauses the game.
+    const int pads = svc.input->PadCount();
+    if (pads < pads_seen_ && view_ == View::Closed) {
+        OpenMenu();
+        svc.stage->Toast("Controller disconnected");
+    }
+    pads_seen_ = pads;
     if (view_ == View::Closed) {
         FeedPads();
     }

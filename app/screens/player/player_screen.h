@@ -88,6 +88,7 @@ private:
     bool resume_told_ = false;
     bool pointer_down_ = false;
     bool guide_was_down_ = false;
+    int pads_seen_ = 0;
     double chord_since_ = -1;
     bool key_fast_ = false, key_rewind_ = false;
     bool stick_fast_ = false, stick_rewind_ = false;

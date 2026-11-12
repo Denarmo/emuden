@@ -9,6 +9,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include "audio_capture.h"
 #include "audio_out.h"
 #include "core/core.h"
 #include "den/base/files.h"
@@ -140,8 +141,10 @@ TEST_CASE("pads map by position, and by label on Nintendo consoles") {
     stick.lx = 0.9f;
     stick.rt = 1.0f;
     REQUIRE(MapPad(stick, "gb", true).buttons == (RETRO_RIGHT | RETRO_R2));
-    REQUIRE(MapPad(stick, "psx", true).buttons == RETRO_R2);
-    REQUIRE(MapPad(stick, "psx", true).lx > 29000);
+    // PlayStation games get the digital pad: the stick has to be its D-pad.
+    REQUIRE(MapPad(stick, "psx", true).buttons == (RETRO_RIGHT | RETRO_R2));
+    REQUIRE(MapPad(stick, "psp", true).buttons == RETRO_R2);
+    REQUIRE(MapPad(stick, "psp", true).lx > 29000);
 }
 
 TEST_CASE("remapped buttons are kept per console") {
@@ -169,6 +172,12 @@ TEST_CASE("the sound's rate follows its queue") {
     REQUIRE(DriftRatio(0.2, 0.064) > 1.0);
     REQUIRE(DriftRatio(0.0, 0.064) < 1.0);
     REQUIRE(DriftRatio(5.0, 0.064) <= 1.0151);
+    // The queue's target: up after a dip that nearly emptied it, slowly back down when calm.
+    REQUIRE(NextTarget(0.064, 0.010) > 0.085);
+    REQUIRE(NextTarget(0.064, 0.040) == Catch::Approx(0.064));
+    REQUIRE(NextTarget(0.064, 0.060) == Catch::Approx(0.064));
+    REQUIRE(NextTarget(0.120, 0.100) < 0.120);
+    REQUIRE(NextTarget(0.190, 0.001) <= 0.1921);
 }
 
 TEST_CASE("the core host runs the test core") {
@@ -380,4 +389,40 @@ TEST_CASE("a session reports what went wrong") {
     request.content = WriteRom(data, "Good.tst", "B");
     REQUIRE(session->Open(request));
     session->Close();
+}
+
+TEST_CASE("a recording is measured: level and the gaps in it") {
+    // One second at 1000 Hz, stereo: a tone, 100 ms of nothing, a tone again.
+    std::vector<float> samples;
+    for (int frame = 0; frame < 1000; ++frame) {
+        const float value = frame >= 400 && frame < 500 ? 0.0f : (frame % 2 ? 0.5f : -0.5f);
+        samples.push_back(value);
+        samples.push_back(value);
+    }
+    const AudioCapture capture = MeasureAudio(samples, 1000, 2);
+    REQUIRE(capture.frames == 1000);
+    REQUIRE(capture.peak == Catch::Approx(0.5));
+    REQUIRE(capture.rms > 0.4);
+    REQUIRE(capture.longest_silence_ms == Catch::Approx(100.0));
+    REQUIRE(capture.silences == 1);
+    REQUIRE(capture.silence_ms == Catch::Approx(100.0));
+
+    const std::vector<float> nothing(2000, 0.0f);
+    const AudioCapture silent = MeasureAudio(nothing, 1000, 2);
+    REQUIRE(silent.peak == 0.0);
+    REQUIRE(silent.longest_silence_ms == Catch::Approx(1000.0));
+}
+
+TEST_CASE("a recording stops at its length and is written as a WAV file") {
+    AudioRecording recording;
+    recording.Begin(0.5);
+    const std::vector<float> block(200, 0.25f); // 100 stereo frames
+    for (int i = 0; i < 10 && !recording.Complete(); ++i) {
+        recording.Add(1000, 2, block);
+    }
+    REQUIRE(recording.Complete());
+    REQUIRE(recording.Measure().frames == 500);
+    const fs::path file = FreshDir("wav") / "out.wav";
+    REQUIRE(recording.WriteWav(file));
+    REQUIRE(fs::file_size(file) == 44 + 500 * 2 * 2);
 }

@@ -30,8 +30,11 @@ PadFamily FamilyOf(SDL_Gamepad* pad) {
     case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_RIGHT:
     case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_PAIR:
         return PadFamily::Nintendo;
-    default:
-        return PadFamily::Xbox;
+    default: {
+        // A pad SDL has no entry for: its name is the next best hint.
+        const char* name = SDL_GetGamepadName(pad);
+        return FamilyFromName(name ? name : "");
+    }
     }
 }
 
@@ -176,6 +179,13 @@ struct System::Impl {
     void Close(SDL_JoystickID id) {
         for (auto it = pads.begin(); it != pads.end(); ++it) {
             if (it->id == id) {
+                // What it held is not held any more: a direction must not repeat for ever.
+                Release(it->stick_nav);
+                for (std::uint32_t b = 0; b < static_cast<std::uint32_t>(PadButton::Count); ++b) {
+                    if (it->state.buttons & (1u << b)) {
+                        Release(NavForButton(it->state.family, static_cast<PadButton>(b)));
+                    }
+                }
                 SDL_CloseGamepad(it->handle);
                 pads.erase(it);
                 return;

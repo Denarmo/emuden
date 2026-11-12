@@ -13,6 +13,21 @@ Start the app with EMUDEN_AUTOMATION=<port> (default here: 5577), then:
     drive.py screenshot C:/tmp/a.png    the next frame as a PNG
     drive.py quit
 
+The player's test endpoint (app/screens/player/test_endpoint.cpp) listens on the next port;
+its commands are sent there:
+
+    drive.py vpad attach xbox           a virtual gamepad (xbox, playstation, nintendo): ok <id>
+    drive.py vpad press south 200       hold its buttons (south east west north up down left right
+                                        l1 r1 l2 r2 l3 r3 start select guide); "pad=<id>" picks a pad
+    drive.py vpad down start select     held until "vpad up start select"
+    drive.py vpad stick left 1 0 300    a stick (-1..1), back to the middle after 300 ms
+    drive.py vpad trigger right 1 300
+    drive.py vpad detach                unplug it
+    drive.py player                     the session, its sound counters and the pads as JSON
+    drive.py audio reset                start the sound counters again
+    drive.py wav C:/tmp/a.wav 3         record 3 s of the device's output; answers with its level
+                                        and the gaps in it
+
 Several commands run in order when separated by "+":
 
     drive.py key down + key confirm + screenshot out.png
@@ -29,7 +44,7 @@ def send(port, line, wait):
     deadline = time.time() + wait
     while True:
         try:
-            with socket.create_connection(("127.0.0.1", port), timeout=10) as s:
+            with socket.create_connection(("127.0.0.1", port), timeout=150) as s:
                 s.sendall((line + "\n").encode("utf-8"))
                 data = b""
                 while not data.endswith(b"\n"):
@@ -70,7 +85,8 @@ def main(argv):
     for n, command in enumerate(c for c in commands if c):
         if n:
             time.sleep(pause)
-        reply = send(port, " ".join(command), wait)
+        own = command[0] in ("vpad", "player", "audio", "wav")
+        reply = send(port + 1 if own else port, " ".join(command), wait)
         print(reply)
         failed = failed or reply.startswith("error")
     return 1 if failed else 0

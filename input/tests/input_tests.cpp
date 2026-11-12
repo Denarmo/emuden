@@ -27,3 +27,28 @@ TEST_CASE("glyphs are per family") {
     CHECK(NavFromName("confirm") == Nav::Confirm);
     CHECK(NavFromName("nope") == Nav::None);
 }
+
+TEST_CASE("a pad SDL does not know is sorted by its name") {
+    CHECK(FamilyFromName("Nintendo Switch Pro Controller") == PadFamily::Nintendo);
+    CHECK(FamilyFromName("8BitDo Pro 2 (Switch mode)") == PadFamily::Nintendo);
+    CHECK(FamilyFromName("DualSense Wireless Controller") == PadFamily::PlayStation);
+    CHECK(FamilyFromName("Sony Interactive Entertainment Controller") == PadFamily::PlayStation);
+    CHECK(FamilyFromName("Xbox Series X Controller") == PadFamily::Xbox);
+    CHECK(FamilyFromName("Generic USB Joystick") == PadFamily::Xbox);
+}
+
+TEST_CASE("the face buttons follow their letters on every family") {
+    // Xbox and PlayStation: the bottom button confirms, the right one goes back.
+    for (const PadFamily family : {PadFamily::Xbox, PadFamily::PlayStation}) {
+        CHECK(NavForButton(family, PadButton::South) == Nav::Confirm);
+        CHECK(NavForButton(family, PadButton::East) == Nav::Back);
+        CHECK(NavForButton(family, PadButton::West) == Nav::Option);
+        CHECK(NavForButton(family, PadButton::North) == Nav::Extra);
+    }
+    // Nintendo: A is on the right, B below, X above, Y on the left.
+    CHECK(NavForButton(PadFamily::Nintendo, PadButton::East) == Nav::Confirm);
+    CHECK(NavForButton(PadFamily::Nintendo, PadButton::South) == Nav::Back);
+    CHECK(NavForButton(PadFamily::Nintendo, PadButton::North) == Nav::Option);
+    CHECK(NavForButton(PadFamily::Nintendo, PadButton::West) == Nav::Extra);
+    CHECK(NavForButton(PadFamily::Nintendo, PadButton::Guide) == Nav::Home);
+}

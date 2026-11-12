@@ -114,7 +114,7 @@ Status PlayerSession::Start(const OpenRequest& request) {
     ApplyStoredOptions();
     ReadAvInfo();
     core_->SetAudioSink([this](std::span<const std::int16_t> samples) { audio_.Push(samples); });
-    audio_.Open(av_.sample_rate);
+    audio_.Open(av_.sample_rate, !core_->HardwareRendered());
     if (settings) {
         audio_.SetVolume(static_cast<float>(settings->GetNumber("player.volume", 1.0)));
     }
@@ -305,6 +305,9 @@ void PlayerSession::SetPad(int port, const input::PadState& pad) {
     const RetroPad mapped = MapPad(pad, system_, button_maps_[family]);
     const auto index = static_cast<unsigned>(port);
     core_->SetButtons(index, mapped.buttons);
+    if (index < snapshot_.game_buttons.size()) {
+        snapshot_.game_buttons[index] = mapped.buttons;
+    }
     core_->SetAnalog(index, 0, mapped.lx, mapped.ly);
     core_->SetAnalog(index, 1, mapped.rx, mapped.ry);
 }
@@ -456,12 +459,14 @@ void PlayerSession::Advance(double seconds) {
         const double old_rate = av_.sample_rate;
         ReadAvInfo();
         if (std::fabs(old_rate - av_.sample_rate) > 1.0) {
-            audio_.Open(av_.sample_rate);
+            audio_.Open(av_.sample_rate, !core_->HardwareRendered());
+            if (config_.settings) {
+                audio_.SetVolume(static_cast<float>(config_.settings->GetNumber("player.volume", 1.0)));
+            }
         }
     }
     MeasureFps(seconds);
     snapshot_.audio_queued_ms = audio_.QueuedSeconds() * 1000.0;
-    snapshot_.audio_underruns = audio_.Underruns();
     save_timer_ += seconds;
     if (save_timer_ >= SAVE_EVERY_SECONDS) {
         save_timer_ = 0.0;
@@ -479,7 +484,30 @@ void PlayerSession::MeasureFps(double seconds) {
 }
 
 Snapshot PlayerSession::GetSnapshot() const {
-    return snapshot_;
+    Snapshot snapshot = snapshot_;
+    if (core_) {
+        snapshot.audio = audio_.Stats();
+        // The same gap is seen from both ends: the device missing sound, the queue restarted.
+        snapshot.audio_underruns = std::max(snapshot.audio.underruns, snapshot.audio.refills);
+        snapshot.audio_capturing = audio_.Capturing();
+        snapshot.rewind_states = rewind_ ? rewind_->Count() : 0;
+    }
+    return snapshot;
+}
+
+Status PlayerSession::StartAudioCapture(double seconds) {
+    if (!core_ || !audio_.StartCapture(seconds)) {
+        return Status::Fail("There is no sound device to record.");
+    }
+    return {};
+}
+
+Result<AudioCapture> PlayerSession::SaveAudioCapture(const std::filesystem::path& wav) {
+    const AudioRecording& recording = audio_.FinishCapture();
+    if (const Status written = recording.WriteWav(wav); !written) {
+        return written;
+    }
+    return recording.Measure();
 }
 
 std::unique_ptr<Session> CreateSession(const Config& config) {

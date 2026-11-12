@@ -140,9 +140,11 @@ RetroPad MapPad(const input::PadState& pad, std::string_view system, const Butto
             out.buttons |= static_cast<std::uint16_t>(1u << button);
         }
     }
-    // Consoles without a stick: the left stick is the D-pad too.
-    static constexpr std::array<std::string_view, 11> DIGITAL = {
-        "gb", "gbc", "gba", "nds", "nes", "snes", "genesis", "sms", "gg", "pico8", "virtualboy"};
+    // Consoles without a stick: the left stick is the D-pad too. PlayStation is among them
+    // because its games are given the digital pad (the port device is always a joypad), which
+    // has no sticks at all.
+    static constexpr std::array<std::string_view, 12> DIGITAL = {
+        "gb", "gbc", "gba", "nds", "nes", "snes", "genesis", "sms", "gg", "pico8", "virtualboy", "psx"};
     if (std::find(DIGITAL.begin(), DIGITAL.end(), system) != DIGITAL.end()) {
         constexpr float PUSHED = 0.5f;
         out.buttons |= pad.lx < -PUSHED ? RETRO_LEFT : 0;

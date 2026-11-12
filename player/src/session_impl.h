@@ -51,6 +51,11 @@ public:
     void ClearGameOptions() override;
     void ReloadButtons() override;
     void SetPicture(const std::string& id) override;
+    void ResetAudioStats() override {
+        audio_.ResetStats();
+    }
+    Status StartAudioCapture(double seconds) override;
+    Result<AudioCapture> SaveAudioCapture(const std::filesystem::path& wav) override;
     Snapshot GetSnapshot() const override;
 
 private:

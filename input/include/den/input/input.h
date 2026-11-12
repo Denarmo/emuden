@@ -120,6 +120,27 @@ const char* FamilyName(PadFamily family);
 void RequestTextInput(bool on);
 bool TextInputWanted();
 
+/// Virtual gamepads (automation and tests). One is attached through SDL like a real pad, so
+/// hot-plug, the mapping by label, player order and the in-game buttons all run their real
+/// code. A System sees it on its next Poll.
+namespace virtual_pad {
+enum class Axis { LeftX, LeftY, RightX, RightY, LeftTrigger, RightTrigger };
+/// A pad that reports itself as an Xbox, PlayStation or Nintendo pad; 0 when SDL refuses.
+int Attach(PadFamily family);
+/// Unplugs it. False for an id that is not attached.
+bool Detach(int id);
+void DetachAll();
+bool SetButton(int id, PadButton button, bool down);
+/// Sticks -1..1 (down and right positive), triggers 0..1.
+bool SetAxis(int id, Axis axis, float value);
+/// The ids attached, oldest first.
+std::vector<int> Attached();
+} // namespace virtual_pad
+
+/// The family a pad's name points to, for pads SDL does not know by their USB id; Xbox when
+/// the name says nothing.
+PadFamily FamilyFromName(const std::string& name);
+
 /// Owns SDL's event queue: gamepads, keyboard, mouse and touch all become Events.
 class System {
 public:

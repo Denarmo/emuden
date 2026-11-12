@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -39,6 +40,34 @@ struct OpenRequest {
 
 enum class State { Closed, Running, Paused, Failed };
 
+/// Counters of the sound path, since the game opened (or ResetAudioStats).
+struct AudioStats {
+    double sample_rate = 0.0;          // the core's
+    std::uint64_t frames_queued = 0;   // sample frames the core handed over
+    std::uint64_t frames_dropped = 0;  // thrown away: the queue was too long, or there is no device
+    int overruns = 0;                  // times the queue was too long and was dropped
+    int underruns = 0;                 // times the device asked for more than was queued (a gap)
+    std::uint64_t frames_starved = 0;  // sample frames the device missed in those gaps
+    int refills = 0;                   // times the queue was started again after running dry
+    double target_ms = 0.0;            // what the queue is kept at; raised when the game stalls
+    double queue_ms = 0.0;             // queued now
+    double queue_avg_ms = 0.0, queue_min_ms = 0.0, queue_max_ms = 0.0; // sampled once per frame
+    double ratio = 1.0;                // playback rate set on the resampler (1.0 = the core's)
+    double ratio_min = 1.0, ratio_max = 1.0;
+};
+
+/// What a finished capture of the device's output held.
+struct AudioCapture {
+    int sample_rate = 0;
+    int channels = 0;
+    std::uint64_t frames = 0;
+    double peak = 0.0;            // 0..1
+    double rms = 0.0;             // 0..1
+    double longest_silence_ms = 0.0; // the longest run of zero samples
+    double silence_ms = 0.0;         // all runs of zero samples over 5 ms, added up
+    int silences = 0;                // how many such runs
+};
+
 /// What the screens show about a session. A copy; cheap to take every frame.
 struct Snapshot {
     State state = State::Closed;
@@ -59,6 +88,12 @@ struct Snapshot {
     double audio_queued_ms = 0.0;   // sound waiting to be played
     int audio_underruns = 0;        // times the sound ran dry (audible gaps) since Open
     std::string picture;            // the picture preset in use ("plain", "crt", "lcd")
+    AudioStats audio;
+    /// The buttons the game was last given per port, as RetroPad bits (B, Y, Select, Start,
+    /// Up, Down, Left, Right, A, X, L, R, L2, R2, L3, R3 from bit 0).
+    std::array<std::uint16_t, 4> game_buttons{};
+    std::size_t rewind_states = 0;  // states the rewind history holds
+    bool audio_capturing = false;   // a capture asked for with StartAudioCapture still runs
 };
 
 struct CoreOption {
@@ -146,6 +181,18 @@ public:
     /// Chooses a picture preset by id for the running game; an unknown id is "plain". The
     /// choice is not saved here: the screen keeps it in the settings.
     virtual void SetPicture(const std::string& /*id*/) {}
+
+    /// Starts the audio counters again (the totals and the queue's average, minimum, maximum).
+    virtual void ResetAudioStats() {}
+    /// Records what the sound device is given (after the resampler, the volume and the mix:
+    /// gaps included) for `seconds`. Snapshot::audio_capturing tells when it is complete.
+    virtual Status StartAudioCapture(double /*seconds*/) {
+        return Status::Fail("This player cannot record its sound.");
+    }
+    /// Writes the finished capture as a 16-bit WAV file and says what it held.
+    virtual Result<AudioCapture> SaveAudioCapture(const std::filesystem::path& /*wav*/) {
+        return Status::Fail("This player cannot record its sound.");
+    }
 
     virtual Snapshot GetSnapshot() const = 0;
 };
