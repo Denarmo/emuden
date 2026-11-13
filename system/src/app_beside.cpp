@@ -42,8 +42,16 @@ BesideActions AppBeside::SetGame(bool running, BesideScreen screen) {
     }
     // The app was beside that game on that display: neither is so any more.
     Forget(out);
+    const bool ended = running_ && !running;
     running_ = running;
     game_screen_ = screen;
+    if (ended && !Shown(BesideScreen::Main)) {
+        // The game was left (Exit, on its own display) while an app covers this app's main
+        // window: what the game was left for is that window, the home screen, not the app.
+        raise_pending_ = true;
+        raise_screen_ = BesideScreen::Main;
+        out.push_back({Kind::Raise, BesideScreen::Main, {}});
+    }
     if (!running) {
         held_ = false;
     } else if (held_ && Shown(screen)) {

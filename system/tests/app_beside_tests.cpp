@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 
 #include "den/system/app_beside.h"
@@ -388,4 +389,20 @@ TEST_CASE("without a game an app just opens") {
     REQUIRE(out.size() == 1);
     CHECK(out[0] == BesideAction{Kind::Launch, Screen::Main, VIDEO.id});
     CHECK(beside.GetStage() == Stage::None);
+}
+
+TEST_CASE("leaving the game while an app covers the main window brings the home screen back") {
+    Device d(Screen::Second); // the game on the second display, the app goes on the main one
+    d.Run(d.beside.Launch(VIDEO));
+    CHECK_FALSE(d.main);
+    d.Run(d.beside.SetGame(false, Screen::Second));
+    CHECK(d.main);
+    CHECK(d.beside.GetStage() == Stage::None);
+    CHECK_FALSE(d.beside.HandleShown());
+
+    Device beside(Screen::Main); // the app on the second display: the main window is the game's
+    beside.Run(beside.beside.Launch(VIDEO));
+    beside.log.clear();
+    beside.Run(beside.beside.SetGame(false, Screen::Main));
+    CHECK(std::find(beside.log.begin(), beside.log.end(), Kind::Raise) == beside.log.end());
 }
