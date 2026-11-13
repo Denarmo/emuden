@@ -56,5 +56,25 @@
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>
         </activity>
+
+        <!-- Lies under an app opened beside the game, to notice when it is left. -->
+        <activity
+            android:name=".AppHost"
+            android:exported="false"
+            android:taskAffinity="io.github.denarmo.emuden.beside"
+            android:excludeFromRecents="true"
+            android:resizeableActivity="true"
+            android:configChanges="layoutDirection|locale|fontScale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation|density"
+            android:theme="@android:style/Theme.Black.NoTitleBar" />
+
+        <!-- Shows nothing: started on a display to move the input focus there. -->
+        <activity
+            android:name=".FocusHop"
+            android:exported="false"
+            android:taskAffinity="io.github.denarmo.emuden.hop"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:resizeableActivity="true"
+            android:theme="@android:style/Theme.NoDisplay" />
     </application>
 </manifest>

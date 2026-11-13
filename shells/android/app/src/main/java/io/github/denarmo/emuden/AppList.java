@@ -19,6 +19,7 @@ import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.util.Log;
+import android.view.Display;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -177,15 +178,11 @@ final class AppList {
             ActivityManager manager = (ActivityManager) activity.getSystemService(Context.ACTIVITY_SERVICE);
             boolean allowed = Build.VERSION.SDK_INT < 29
                     || (manager != null && manager.isActivityStartAllowedOnDisplay(activity, target, intent));
-            if (allowed) {
-                try {
-                    ActivityOptions options = ActivityOptions.makeBasic();
-                    options.setLaunchDisplayId(target);
-                    activity.startActivity(intent, options.toBundle());
-                    return "";
-                } catch (RuntimeException e) {
-                    Log.w(TAG, "the app could not open on display " + target, e);
-                }
+            Display other = SecondScreen.otherDisplay(activity);
+            if (allowed && other != null) {
+                // The quick settings lie over that display's activities: they make room.
+                activity.runOnUiThread(() -> AppBeside.open(activity, intent, other));
+                return "";
             }
             note = "note:This screen cannot show other apps, so it opened on the main one";
         } else if (display == DISPLAY_SECOND) {

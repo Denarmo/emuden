@@ -38,6 +38,8 @@ public class EmuDenActivity extends SDLActivity {
     private static EmuDenActivity self;
     private OnBackInvokedCallback backCallback;
     private long lastBack;
+    private boolean windowFocus = true;
+    private boolean topResumed = true;
 
     @Override
     protected String[] getLibraries() {
@@ -69,6 +71,7 @@ public class EmuDenActivity extends SDLActivity {
     @Override
     protected void onStop() {
         textBridge.onStop();
+        AppBeside.onStop();
         secondScreen.onStop();
         super.onStop();
     }
@@ -136,11 +139,25 @@ public class EmuDenActivity extends SDLActivity {
 
     // With an app opened on the other display this activity stays resumed and keeps drawing
     // and playing (SDL pauses on stop only); it just no longer has the keys and the pad.
+    // Each display keeps a focused window of its own, so the window does not lose its focus
+    // then: what moves on is which activity is the top resumed one.
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
+        windowFocus = hasFocus;
+        tellFocus();
+    }
+
+    @Override
+    public void onTopResumedActivityChanged(boolean isTopResumedActivity) {
+        super.onTopResumedActivityChanged(isTopResumedActivity);
+        topResumed = isTopResumedActivity;
+        tellFocus();
+    }
+
+    private void tellFocus() {
         try {
-            AppList.nativeFocus(hasFocus);
+            AppList.nativeFocus(windowFocus && topResumed);
         } catch (UnsatisfiedLinkError e) {
             // Before the native library is loaded nobody asks.
         }

@@ -51,22 +51,42 @@ another branch was installed in between and replaced by this release build again
 device is left with the release APK, force-stopped, "Top on second" and Tetris on dot matrix
 as they were.
 
-## Apps and the system keyboard (written, not run on a device)
+## Apps and the system keyboard
 
-Three requests for Android, built on Windows and as a debug APK; the device was not touched.
+Checked on the Retroid Pocket Duo with the release APK through `adb` only (`input` on a
+named display, `sendevent` on the built-in pad, `screencap -d` of both displays, every
+picture looked at), after the device had been idle for 24 minutes with both launchers in
+front. The first run found two things that did not work; both are fixed and were run again.
 
 | Item | State | What was run |
 |---|---|---|
-| "Apps" in the main menu | A rail entry where the platform lists apps (`pal::apps`, Android only): icons with names, by name, favourites first (Option or a held finger), a "Recent" shelf, search, pad and touch; the app itself is not listed | Windows with a made-up list (`EMUDEN_FAKE_APPS=1`): the grid, the recent shelf after opening one, the search with its keys. Unit tests of the list model (`den_system_tests`). The Android side (package manager, icons, package changes) compiles only |
-| "Apps" in the quick settings | The same grid on the second display; the app opens there (`setLaunchDisplayId`) and the game goes on on the main one. One display, or the game swapped to the second one: the game is paused and the app takes the screen (pause menu row "Apps" with one display) | Compiles only |
-| System keyboard on the second screen | A text entry asks `pal::TextInput`: the keyboard opens on the second display, the text is shown on the main one; with one display the line moves above the keyboard. A request made with the pad keeps the app's keys on the main display as well. Settings > System, "Keyboard: System / EmuDEN". No keyboard within a second, or one put away: the app's keys, drawn on the second display | Unit tests with a fake keyboard (`den_ui_tests`). The Android side compiles only |
+| "Apps" in the main menu | Works | The rail entry lists the 13 apps of the device with their icons and names; Settings tapped, opened on the main display; Back returned to the list with Settings under "Recent" |
+| "Apps" in the quick settings | Fixed, works | Tetris running, quick settings > Apps on the bottom screen, Settings tapped: it is on the bottom screen under a "Quick settings" handle, two pictures of the top screen a second apart differ (58 to 60 fps in the readout), the app's AAudio stream is `started` in `dumpsys audio` |
+| The built-in pad meanwhile | As Android has it | Start sent through `/dev/input/event8` while Settings had the focus did not reach the game (the other app got it); the game showed "The pad is with the app on the other screen"; after a tap on the game Start reached it |
+| Coming back | Fixed, works | `input -d 2 keyevent 4`: quick settings again and Start reaches the game without a tap. The handle tapped with Settings open: the same. Home on that display, then the handle: the same |
+| System keyboard on the second screen | Fixed, works | Search page, the field tapped: Gboard on the bottom screen, `input -d 2 text tetris` in the line on the top screen and one result, Enter closed the keyboard and the focus was back on the top display |
 
-Known before any run: while another app is on the other display the pad goes to that app,
-not to the game (Android sends keys to the focused window); the game says so and a tap on
-it takes the pad back. With the game swapped to the second display an app opened from the
-quick settings covers the activity, which Android stops, so the game waits. The search of
-the Search page opens the keyboard only when its field is chosen; its own letters stay.
-See `shells/android/README.md`.
+What was wrong before: the Presentation with the quick settings is a layer above every app
+of its display, so the app opened under it and was never seen; the quick settings now make
+room (`AppBeside`, `AppHost`). The keyboard never came, because Android's keyboard serves
+only the focused display and a window shown on the other one does not move the focus; an
+activity that shows nothing is started there first (`FocusHop`). The note about the pad
+never showed, because the activity's window keeps its focus on its own display; the top
+resumed activity is what changes. See `shells/android/README.md`.
+
+Not run: one display (the keyboard line above the keyboard, the pause-menu "Apps" row);
+the game swapped to the second display; a keyboard request made with the pad; pinning an
+app; the search of the Apps pages; an app that plays sound beside the game; an app that
+refuses the second display; package changes while the list is open. Known: the handle
+covers a strip 260 pixels wide at the top of the other app; after Home on that display the
+quick settings come back only with the handle; the Search page says "1 games"; the Apps
+page has no backdrop and the second screen keeps showing the last game there.
+
+The frame rate readout (`1544857`) in the same run: the plate's left edge is at the same
+pixel in pictures with 58, 59 and 60 fps on the Retroid, and on Windows (packaged build,
+port 35400, portable `user` folder, Tetris) three pictures a second apart differ only inside
+the two number slots; the dots are middle dots. On Windows the plate is black on the black
+border, so its edge cannot be seen there.
 
 ## The owner's notes
 
@@ -89,6 +109,11 @@ Windows and Linux tests ran again (11 of 11 on both) and every package below was
 All three were rebuilt at `75fa362` after the second-screen check (11 of 11 tests on Windows
 and Linux again) and put in the same places; the Legion Go S start was repeated (10 s, log
 read), the Windows build of that commit was not started.
+
+After the Apps and keyboard check Windows and Android were built again from `main` (Windows
+11 of 11 tests): `dist\windows` is mirrored to the Desktop folder and was started once from
+a copy, `dist\android\EmuDEN.apk` is the APK left on the Retroid, force-stopped. Linux was
+not rebuilt and the Legion Go S not touched: its AppImage is still `75fa362`.
 
 - **Windows** (automation port 28467, portable `user` folder): the fifth-round table above.
   The app left no process behind. `dist\windows` (14.5 MB) is mirrored to

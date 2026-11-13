@@ -27,8 +27,8 @@ import android.view.WindowManager;
  * app's own GL context, and its touches go the same way. Nothing is drawn or decided here.
  *
  * The Presentation exists while the activity is started, a presentation display exists and
- * the native side wants the screen. It cannot take the focus, so keys and the pad stay with
- * the activity.
+ * the native side wants the screen, except while another app has the display (AppBeside). It
+ * cannot take the focus, so keys and the pad stay with the activity.
  */
 final class SecondScreen implements DisplayManager.DisplayListener {
     private static final String TAG = "EmuDEN";
@@ -41,6 +41,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     private Screen shown;
     private boolean started;
     private boolean wanted;
+    private boolean lent; // another app has the display (AppBeside)
 
     SecondScreen(Activity activity) {
         this.activity = activity;
@@ -56,6 +57,15 @@ final class SecondScreen implements DisplayManager.DisplayListener {
                 self.wanted = wanted;
                 self.update();
             });
+        }
+    }
+
+    /** On the UI thread: the display is given to another app, or taken back. */
+    static void lend(boolean lent) {
+        SecondScreen self = instance;
+        if (self != null && self.lent != lent) {
+            self.lent = lent;
+            self.update();
         }
     }
 
@@ -138,7 +148,7 @@ final class SecondScreen implements DisplayManager.DisplayListener {
     private void update() {
         Display target = pick();
         tell(target != null);
-        if (!started || !wanted) {
+        if (!started || !wanted || lent) {
             target = null;
         }
         if (shown != null && (target == null || shown.getDisplay().getDisplayId() != target.getDisplayId())) {

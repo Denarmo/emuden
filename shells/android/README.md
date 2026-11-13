@@ -66,14 +66,14 @@ nothing useful in a game. The pad's own Select (`BTN_SELECT`) is untouched. A re
 ## Second screen
 
 `SecondScreen` shows a `Presentation` with one `SurfaceView` on the first presentation
-display the activity is not on itself (display 2 on the Retroid Pocket Duo, 1280x960; it
-cannot host activities). The Surface and the touches go to
+display the activity is not on itself (display 2 on the Retroid Pocket Duo, 1280x960). The Surface and the touches go to
 `platform/src/android/second_display_android.cpp`, which makes an EGL window surface with
 the app's own display and config: the one GL context draws both screens, the second without
 waiting for its display. The Presentation exists while the activity is started, the display
 exists and the app wants it (`ui.companion.enabled`, or a claim by the player); it is shown
 again after stop and start and when a display is added. Its window cannot take the focus,
-so keys and the pad stay with the activity. What is drawn there is the app's business
+so keys and the pad stay with the activity, and it lies over every activity on that display
+(a Presentation is a layer above the apps). What is drawn there is the app's business
 (`app/screens/companion`, `docs/interfaces.md`).
 
 `screencap -d <id>` shows either screen; `input -d 2 tap <x> <y>` touches the second one.
@@ -90,32 +90,52 @@ except the app's own. Icons, adaptive ones included, are drawn into 192 pixel PN
 added, removed, changed and replaced makes the native side list again. An app is opened
 with its launcher intent and `FLAG_ACTIVITY_NEW_TASK`.
 
-From the quick settings the app opens on the other display
-(`ActivityOptions.setLaunchDisplayId`, after `isActivityStartAllowedOnDisplay`), under
-which the Presentation with the quick settings stays; the page with the apps closes with
-the choice, so the quick settings are there again when the app is left. There is no button
-of ours inside another app: the user leaves it with the system's Back or Home gesture on
-that screen. When the system does not allow activities on that display the app opens on the
-main one instead, a toast says so, and the game is paused.
+From the quick settings the app opens on the other display (`AppBeside`, after
+`isActivityStartAllowedOnDisplay`). The Presentation with the quick settings would cover it,
+so it is taken away for that time (`SecondScreen.lend`) and a small handle, "Quick
+settings", hangs from the top edge of that display over the other app. The quick settings
+come back
+
+- when the app is left with Back: `AppHost`, an empty activity of ours started under the
+  app on that display, comes up again, which is the only sign Android gives;
+- when the handle is tapped, with the app still open under them or after Home, which
+  `AppHost` does not notice;
+- when the activity is stopped.
+
+Coming back also gives the keys and the pad back to the game (`FocusHop.home`: the main
+activity is brought to the front on its own display). When the system does not allow
+activities on that display the app opens on the main one instead, a toast says so, and the
+game is paused.
 
 While the app is on the other display the activity stays resumed (only "top resumed" moves
 on), so SDL keeps running: SDL 3 pauses its thread in `onStop`, not on a lost focus or
 `onPause`, and nothing in the app pauses a game for a lost focus. Picture and sound go on.
-The keys and the built-in pad go to the window with the input focus, which is the other app
-now, and Android has no way to keep them: the game shows "The pad is with the app on the
-other screen. Tap the game to take it back", because a touch on a display moves the focus
-to the window touched there. `AppList.nativeFocus` (from `onWindowFocusChanged`) tells the
-native side. With the game swapped to the second display, or with one display, the app
-takes the activity's own display: the activity is stopped, SDL pauses, and the game waits
-paused with its saves written until the user comes back.
+The keys and the built-in pad go to the focused window of the focused display, which is the
+other app now, and Android has no way to keep them: the game shows "The pad is with the app
+on the other screen. Tap the game to take it back", because a touch on a display moves the
+focus there. Each display keeps a focused window of its own, so the activity's window does
+not lose its focus then; `onTopResumedActivityChanged` is what tells (`AppList.nativeFocus`).
+With the game swapped to the second display, or with one display, the app takes the
+activity's own display: the activity is stopped, SDL pauses, and the game waits paused with
+its saves written until the user comes back.
 
-None of this was run on a device (see `docs/status.md`).
+Seen on the Retroid Pocket Duo (release APK, `adb` only): Settings beside a running Tetris
+with the handle over it, the game drawing on and its AAudio stream started; Start on the
+built-in pad did not reach the game while Settings had the focus and did after a tap on the
+game; Back on that display, the handle with the app open, and the handle after Home each
+brought the quick settings back, and Start reached the game again without a tap. Not run:
+the game swapped to the second display, one display, an app that plays sound.
 
 ## System keyboard
 
 `TextBridge` opens a window that can take the focus on the display the keyboard should be
 on: a `Presentation` on the other display when the app asks for the second screen and it is
-there, else a `Dialog` on the activity's own. It holds one invisible `EditText`, is one
+there, else a `Dialog` on the activity's own. The keyboard serves the focused window of the
+focused display only, and a window shown on the other display does not move that focus: an
+activity that shows nothing is started there first and ends at once (`FocusHop`), which
+leaves that display focused, and the main activity is brought to the front again when the
+session ends. Without this no keyboard came on the Retroid and the app's own keys took over
+after a second. It holds one invisible `EditText`, is one
 pixel wide and not touch-modal, so the quick settings under it can still be touched. The
 keyboard is shown for the field (`SOFT_INPUT_STATE_ALWAYS_VISIBLE` plus `showSoftInput`);
 its text (`TextWatcher`), its done action and Back go to
@@ -131,6 +151,11 @@ app while the keyboard is open. A keyboard that refuses the second display never
 itself shown; after a second the app ends the session and draws its own keys on the second
 display. The same happens when the keyboard is put away (the system's Back closes it first,
 and a touch on the other display takes the focus from it).
+
+Seen on the Retroid Pocket Duo: the field of the Search page tapped, Gboard on the second
+display, `input text tetris` in the line on the main one with the result filtered, Enter
+closing it, the focus back on the main display. Not run: one display (the device has two),
+a request made with the pad, a keyboard put away by hand.
 
 ## Storage
 

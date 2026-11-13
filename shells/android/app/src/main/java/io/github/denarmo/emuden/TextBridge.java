@@ -42,7 +42,8 @@ import org.libsdl.app.SDLControllerManager;
  * the keyboard is shown for it, and what is typed, the keyboard's done key and Back go to the
  * native side, which draws the text itself. The window is one pixel wide, so touches still
  * reach what is under it. Pad keys and sticks arriving here, because this window has the
- * focus, are handed on to SDL: the pad keeps driving the app.
+ * focus, are handed on to SDL: the pad keeps driving the app. For the second display the
+ * focus is moved there first (FocusHop) and brought back when the session ends.
  */
 final class TextBridge {
     private static final String TAG = "EmuDEN";
@@ -56,6 +57,7 @@ final class TextBridge {
     private int session;
     private boolean quiet;   // the text is being set from the native side
     private boolean visible; // the keyboard was seen on screen in this session
+    private boolean hopped;  // the focus was moved to the other display for this session
 
     TextBridge(Activity activity) {
         this.activity = activity;
@@ -97,6 +99,8 @@ final class TextBridge {
 
     /** The activity is no longer shown: the keyboard goes with it. */
     void onStop() {
+        // The activity is leaving the screen: the focus is not fetched back.
+        hopped = false;
         if (dialog != null) {
             int ended = session;
             close();
@@ -105,6 +109,9 @@ final class TextBridge {
     }
 
     private void open(int id, String text, String hint, int maxLength, boolean second) {
+        // A session that follows another keeps the focus where it is.
+        boolean there = hopped && second;
+        hopped = hopped && !second;
         close();
         session = id;
         visible = false;
@@ -145,18 +152,22 @@ final class TextBridge {
             }
             dialog = made;
             edit = field;
-            made.show();
-            field.requestFocus();
-            // Once the window has the focus; some keyboards ignore the window's own request.
-            field.postDelayed(() -> {
-                if (edit == field) {
-                    InputMethodManager manager =
-                            (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
-                    if (manager != null) {
-                        manager.showSoftInput(field, 0);
-                    }
+            // The keyboard serves the focused window of the focused display only, and that is
+            // the activity's: the focus goes to the other display first.
+            if (there && target != null) {
+                hopped = true;
+                reveal(made, field);
+            } else if (target == null || !FocusHop.to(activity, target.getDisplayId(), () -> {
+                if (dialog == made) {
+                    hopped = true;
+                    reveal(made, field);
+                } else {
+                    // Ended before the focus arrived.
+                    FocusHop.home(activity);
                 }
-            }, 120);
+            })) {
+                reveal(made, field);
+            }
         } catch (RuntimeException e) {
             // The display does not take such a window: the native side sees no keyboard
             // appear and shows its own keys.
@@ -164,6 +175,27 @@ final class TextBridge {
             dialog = null;
             edit = null;
         }
+    }
+
+    private void reveal(Dialog made, EditText field) {
+        try {
+            made.show();
+        } catch (RuntimeException e) {
+            Log.w(TAG, "the keyboard window could not be shown", e);
+            close();
+            return;
+        }
+        field.requestFocus();
+        // Once the window has the focus; some keyboards ignore the window's own request.
+        field.postDelayed(() -> {
+            if (edit == field) {
+                InputMethodManager manager =
+                        (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (manager != null) {
+                    manager.showSoftInput(field, 0);
+                }
+            }
+        }, 120);
     }
 
     private EditText makeField(Context context, int id, String text, String hint, int maxLength) {
@@ -281,6 +313,11 @@ final class TextBridge {
             } catch (RuntimeException e) {
                 Log.w(TAG, "the keyboard window was already gone", e);
             }
+        }
+        if (hopped) {
+            // The keys and the pad back to the activity.
+            hopped = false;
+            FocusHop.home(activity);
         }
     }
 
