@@ -22,6 +22,7 @@
 #include "../player/picture_choice.h"
 #include "../player/player_screen.h"
 #include "../player/volume_rows.h"
+#include "companion_cells.h"
 #include "companion_page.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
@@ -36,10 +37,10 @@ namespace {
 
 constexpr float BUTTON_HEIGHT = 56;
 constexpr float COVER_W = 112, COVER_H = 150;
-constexpr float SLOT_W = 150, SLOT_H = 112;
-constexpr float CHOICE_HEIGHT = 48, CHOICE_LABEL = 104;
 constexpr float ROW_HEIGHT = 64;
-constexpr std::size_t RECENT_APPS = 3;
+constexpr float GAP = 12;
+constexpr int SLOT_COLUMNS = 4, PICTURE_COLUMNS = 4, APP_COLUMNS = 3;
+constexpr std::size_t RECENT_APPS = 6;
 
 bool Playing(const player::Snapshot& snapshot) {
     return snapshot.state == player::State::Running || snapshot.state == player::State::Paused;
@@ -63,9 +64,11 @@ public:
 
         // One list, so a display too low for every row scrolls; a rebuilt page keeps every
         // scrolling node with an id where it was (ui::Page).
+        // The main view scrolls when the display is too low for every row; a section fills it.
         Root().SetPadding(24, 16);
-        ui::Node& root = *Root().Add(ui::MakeList(10));
-        root.id = "companion.page";
+        ui::Node& root = *Root().Add(view_ == View::Main ? ui::MakeList(10) : ui::MakeBox(ui::Axis::Column, 12));
+        root.id = view_ == View::Main ? "companion.page" : "companion.section";
+        root.grow = 1;
 
         if (const system::AppBeside& beside = Beside();
             beside.GetStage() == system::AppBeside::Stage::SettingsOver) {
@@ -257,94 +260,90 @@ private:
 
     void BuildStates(ui::Node& root) {
         Services& svc = Svc();
-        ui::Node* modes = root.Add(ui::MakeBox(ui::Axis::Row, 10));
+        ui::Node* modes = root.Add(ui::MakeBox(ui::Axis::Row, GAP));
+        modes->height = BUTTON_HEIGHT;
         const auto mode = [&](const char* id, const std::string& text, bool save) {
-            auto* button = modes->Emplace<ui::Button>(text, [this, save] {
+            auto* card = modes->Emplace<CompanionCard>(text, [this, save] {
                 save_mode_ = save;
                 Rebuild();
             });
-            button->id = id;
-            button->grow = 1;
-            button->height = BUTTON_HEIGHT;
-            button->selected = save_mode_ == save;
+            card->id = id;
+            card->grow = 1;
+            card->width = 0;
+            card->selected = save_mode_ == save;
         };
         mode("companion.load_mode", "Load state", false);
         mode("companion.save_mode", "Save state", true);
 
-        ui::Node* slots = root.Add(ui::MakeShelf(12));
-        slots->height = SLOT_H + 36;
-        slots->id = "companion.slots";
-        for (int slot = 0; slot < player::STATE_SLOTS; ++slot) {
+        CompanionGrid(root, player::STATE_SLOTS, SLOT_COLUMNS, GAP, [&](ui::Node& row, int slot) -> ui::Node* {
             const bool used = svc.player->HasState(slot);
-            const std::string image = used ? PathToUtf8(svc.player->StateThumbnail(slot)) : std::string();
-            auto* tile = slots->Emplace<ui::Tile>(std::format("Slot {}", slot + 1), image, SLOT_W, SLOT_H);
-            tile->id = std::format("companion.slot{}", slot);
-            tile->on_activate = [this, slot] {
+            auto* cell = row.Emplace<CompanionSlot>(
+                std::format("Slot {}", slot + 1),
+                used ? PathToUtf8(svc.player->StateThumbnail(slot)) : std::string());
+            cell->id = std::format("companion.slot{}", slot);
+            cell->on_activate = [this, slot] {
                 if (save_mode_) {
                     Save(slot);
                 } else {
                     Load(slot);
                 }
             };
-        }
+            return cell;
+        });
     }
 
-    // A row of choices beside its name.
-    static ui::Node* Choices(ui::Node& root, const char* id, const char* title) {
-        ui::Node* line = root.Add(ui::MakeBox(ui::Axis::Row, 10));
-        line->align = ui::Align::Center;
-        auto* label = line->Emplace<ui::Label>(title, Svc().theme->text_small, gfx::FONT_BOLD);
+    static void Caption(ui::Node& root, const char* text) {
+        auto* label = root.Emplace<ui::Label>(text, Svc().theme->text_small, gfx::FONT_BOLD);
         label->tone = ui::Tone::Dim;
-        label->width = CHOICE_LABEL;
-        ui::Node* shelf = line->Add(ui::MakeShelf(10));
-        shelf->id = id;
-        shelf->height = CHOICE_HEIGHT;
-        shelf->grow = 1;
-        return shelf;
     }
 
     void BuildScreen(ui::Node& root, const player::Snapshot& snapshot) {
         PlayerScreen* screen = PlayerScreen::Current();
         if (screen) {
-            ui::Node* sizes = Choices(root, "companion.sizes", "Screen size");
+            Caption(root, "Screen size");
             const auto& names = ScreenSizeNames();
-            for (int index = 0; index < static_cast<int>(names.size()); ++index) {
-                auto* button = sizes->Emplace<ui::Button>(names[static_cast<std::size_t>(index)], [index] {
+            const int count = static_cast<int>(names.size());
+            const int current = screen->ScreenSizeIndex();
+            CompanionGrid(root, count, count, GAP, [&](ui::Node& row, int index) -> ui::Node* {
+                auto* card = row.Emplace<CompanionCard>(names[static_cast<std::size_t>(index)], [index] {
                     if (PlayerScreen* now = PlayerScreen::Current()) {
                         now->SetScreenSize(index);
                     }
                 });
-                button->id = std::format("companion.size{}", index);
-                button->height = CHOICE_HEIGHT;
-                button->selected = index == screen->ScreenSizeIndex();
-            }
+                card->id = std::format("companion.size{}", index);
+                card->selected = index == current;
+                return card;
+            });
         }
         const auto& presets = player::PicturePresets();
         if (presets.size() > 1) {
-            ui::Node* pictures = Choices(root, "companion.pictures", "Picture");
-            for (const player::PicturePreset& preset : presets) {
-                auto* button = pictures->Emplace<ui::Button>(preset.name, [this, id = preset.id] {
+            Caption(root, "Picture");
+            CompanionGrid(root, static_cast<int>(presets.size()), PICTURE_COLUMNS, GAP,
+                          [&](ui::Node& row, int index) -> ui::Node* {
+                const player::PicturePreset& preset = presets[static_cast<std::size_t>(index)];
+                auto* card = row.Emplace<CompanionCard>(preset.name, [this, id = preset.id] {
                     // Kept where the pause menu keeps it, for the same games.
                     if (const auto game = Svc().library->Find(game_id_)) {
                         SavePicture(*game, PictureScopeOf(*game), id);
                     }
                     Svc().player->SetPicture(id);
                 });
-                button->id = "companion.picture." + preset.id;
-                button->height = CHOICE_HEIGHT;
-                button->selected = preset.id == snapshot.picture;
-            }
+                card->id = "companion.picture." + preset.id;
+                card->selected = preset.id == snapshot.picture;
+                return card;
+            });
         }
         if (screen) {
-            AddRows(&root,
-                    {ActionRow("companion.swap", "Swap screens",
-                               [] {
-                                   if (PlayerScreen* now = PlayerScreen::Current()) {
-                                       now->SwapDisplays();
-                                   }
-                               },
-                               "The game on this screen, these settings on the other")},
-                    ROW_HEIGHT);
+            auto* swap = root.Emplace<CompanionCard>(
+                "Swap screens",
+                [] {
+                    if (PlayerScreen* now = PlayerScreen::Current()) {
+                        now->SwapDisplays();
+                    }
+                },
+                "The game on this screen, these settings on the other");
+            swap->id = "companion.swap";
+            swap->grow = 1;
         }
     }
 
@@ -356,29 +355,37 @@ private:
                 }
             };
         };
-        AddRows(&root,
-                {ActionRow("companion.options", "Core options", page("options"),
-                           "How the system is emulated, for this game"),
-                 ActionRow("companion.buttons", "Buttons", page("buttons"), "Which button does what")},
-                ROW_HEIGHT);
+        ui::Node* row = root.Add(ui::MakeBox(ui::Axis::Row, GAP));
+        row->grow = 1;
+        auto* options = row->Emplace<CompanionCard>("Core options", page("options"),
+                                                    "How the system is emulated, for this game");
+        options->id = "companion.options";
+        options->grow = 1;
+        options->width = 0;
+        auto* buttons = row->Emplace<CompanionCard>("Buttons", page("buttons"), "Which button does what");
+        buttons->id = "companion.buttons";
+        buttons->grow = 1;
+        buttons->width = 0;
     }
 
     void BuildApps(ui::Node& root) {
         // The apps opened last, to open one again beside the game with one tap.
         const std::vector<system::AppItem> recent = Apps().Recent(RECENT_APPS);
         if (!recent.empty()) {
-            ui::Node* apps = Choices(root, "companion.recent_apps", "Recent");
-            for (const system::AppItem& app : recent) {
-                auto* chip = apps->Emplace<AppChip>(app.label, app.icon);
-                chip->id = "companion.recent." + app.id;
-                chip->height = CHOICE_HEIGHT;
-                chip->on_activate = [this, id = app.id] { OpenApp(id, true, GetStage()); };
-            }
+            Caption(root, "Opened last");
+            CompanionGrid(root, static_cast<int>(recent.size()), APP_COLUMNS, GAP,
+                          [&](ui::Node& row, int index) -> ui::Node* {
+                const system::AppItem& app = recent[static_cast<std::size_t>(index)];
+                auto* card = row.Emplace<CompanionCard>(
+                    app.label, [this, id = app.id] { OpenApp(id, true, GetStage()); }, std::string(), app.icon);
+                card->id = "companion.recent." + app.id;
+                return card;
+            });
         }
-        AddRows(&root,
-                {ActionRow("companion.apps", "All apps", [this] { GetStage().Push("companion.apps"); },
-                           "Another app on this screen while the game goes on")},
-                ROW_HEIGHT);
+        auto* all = root.Emplace<CompanionCard>("All apps", [this] { GetStage().Push("companion.apps"); },
+                                                "Another app on this screen while the game goes on");
+        all->id = "companion.apps";
+        all->grow = 1;
     }
 
     // What the page shows; it is built again when this changes.
