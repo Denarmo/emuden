@@ -59,6 +59,7 @@ public:
     std::vector<PictureParam> PictureParams() const override;
     void SetPictureParam(const std::string& param, float value) override;
     void ResetPictureParams() override;
+    gfx::Texture PicturePreview(gfx::Canvas& canvas, const std::string& id, int width, int height) override;
     void SetVolume(float volume) override {
         audio_.SetVolume(volume);
     }
@@ -90,6 +91,7 @@ private:
     void DrawRegion(gfx::Canvas& canvas, const PictureSource& source, const PictureRegion& region,
                     int slot);
     bool ReadyChain(gfx::Device& device);
+    std::vector<float> SavedValues(const PresetData& preset) const;
     void ReleasePicture();
 
     Config config_;
@@ -131,6 +133,8 @@ private:
     int texture_filter_ = -1;
     unsigned filtered_texture_ = 0;
     gfx::Rect picture_rect_;
+    gfx::Rect shown_part_{0, 0, 1, 1}; // what DrawRegion drew last, for PicturePreview
+    float shown_w_ = 0, shown_h_ = 0;  // ... and its size in pixels
     float aspect_override_ = 0.0f;
     // The picture preset: its passes are compiled when it is first drawn.
     std::string picture_ = "plain";

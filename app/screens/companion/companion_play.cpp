@@ -24,6 +24,7 @@
 #include "../player/volume_rows.h"
 #include "companion_cells.h"
 #include "companion_page.h"
+#include "companion_pictures.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
 #include "den/app/pages.h"
@@ -39,7 +40,8 @@ constexpr float BUTTON_HEIGHT = 56;
 constexpr float COVER_W = 112, COVER_H = 150;
 constexpr float ROW_HEIGHT = 64;
 constexpr float GAP = 12;
-constexpr int SLOT_COLUMNS = 4, PICTURE_COLUMNS = 4;
+constexpr int SLOT_COLUMNS = 4;
+constexpr float PICTURE_W = 300; // a card of the picture carousel
 constexpr const char* FPS_NAMES[] = {"FPS: Off", "FPS: On", "FPS: Graph"};
 
 bool Playing(const player::Snapshot& snapshot) {
@@ -59,6 +61,7 @@ public:
         }
         key_ = Key(snapshot);
         game_id_ = snapshot.game_id;
+        KeepPicturePreviews(game_id_);
         const auto game = svc.library->Find(snapshot.game_id);
         system_ = game ? game->system : std::string();
 
@@ -129,11 +132,23 @@ public:
         }
         if (Key(snapshot) != key_) {
             Rebuild();
+            return;
+        }
+        if (ui::Node* shelf = reveal_index_ >= 0 ? Root().FindById("companion.pictures") : nullptr;
+            shelf && shelf->rect.w > 0) {
+            const float start = static_cast<float>(reveal_index_) * (PICTURE_W + GAP);
+            shelf->scroller.Jump(std::clamp(start - (shelf->rect.w - PICTURE_W) * 0.5f, 0.0f, shelf->scroller.Max()));
+            reveal_index_ = -1;
         }
     }
 
 private:
     void Open(View view) {
+        if (view_ == View::Picture) {
+            // Its sliders may have moved.
+            ForgetPicturePreview(Svc().player->GetSnapshot().picture);
+        }
+        reveal_picture_ = view == View::Screen && view_ != View::Screen;
         view_ = view;
         Rebuild();
     }
@@ -309,14 +324,22 @@ private:
                 card->selected = index == current;
                 return card;
             });
+            // The carousel below takes the room.
+            root.Children().back()->grow = 0;
+            root.Children().back()->height = BUTTON_HEIGHT;
         }
         const auto& presets = player::PicturePresets();
         if (presets.size() > 1) {
             Caption(root, "Picture");
-            CompanionGrid(root, static_cast<int>(presets.size()), PICTURE_COLUMNS, GAP,
-                          [&](ui::Node& row, int index) -> ui::Node* {
-                const player::PicturePreset& preset = presets[static_cast<std::size_t>(index)];
-                auto* card = row.Emplace<CompanionCard>(preset.name, [this, id = preset.id] {
+            // A carousel: the game through each preset, swiped sideways.
+            ui::Node* shelf = root.Add(ui::MakeShelf(GAP));
+            shelf->id = "companion.pictures";
+            shelf->grow = 1;
+            shelf->align = ui::Align::Stretch;
+            int in_use = -1;
+            for (const player::PicturePreset& preset : presets) {
+                const bool current = preset.id == snapshot.picture;
+                auto* card = shelf->Emplace<PictureCard>(preset.id, preset.name, current, [this, id = preset.id] {
                     // The picture shown now opens its settings.
                     if (Svc().player->GetSnapshot().picture == id) {
                         if (!Svc().player->PictureParams().empty()) {
@@ -331,13 +354,17 @@ private:
                     Svc().player->SetPicture(id);
                 });
                 card->id = "companion.picture." + preset.id;
-                card->selected = preset.id == snapshot.picture;
-                return card;
-            });
+                card->width = PICTURE_W;
+                in_use = current ? static_cast<int>(&preset - presets.data()) : in_use;
+            }
+            // Opened from the main view: the carousel starts at the picture in use, once it
+            // is laid out (Update).
+            reveal_index_ = reveal_picture_ ? in_use : -1;
+            reveal_picture_ = false;
         }
         if (screen) {
             ui::Node* row = root.Add(ui::MakeBox(ui::Axis::Row, GAP));
-            row->grow = 1;
+            row->height = BUTTON_HEIGHT;
             auto* swap = row->Emplace<CompanionCard>("Swap screens", [] {
                 if (PlayerScreen* now = PlayerScreen::Current()) {
                     now->SwapDisplays();
@@ -482,6 +509,8 @@ private:
     std::string key_, game_id_, system_;
     View view_ = View::Main;
     bool save_mode_ = false;
+    bool reveal_picture_ = false; // the Screen view was just opened
+    int reveal_index_ = -1;       // the carousel card to bring into view
     bool fast_ = false, rewind_ = false;
     bool other_volume_ = false;
 };

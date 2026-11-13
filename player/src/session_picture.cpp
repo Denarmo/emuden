@@ -39,16 +39,22 @@ void PlayerSession::SetPicture(const std::string& id) {
     if (!preset_) {
         return;
     }
-    for (std::size_t i = 0; i < preset_->uniforms.size(); ++i) {
-        float value = preset_->uniforms[i].second;
-        if (i < preset_->info.params.size() && config_.settings) {
-            const PictureParam& param = preset_->info.params[i];
+    picture_values_ = SavedValues(*preset_);
+}
+
+std::vector<float> PlayerSession::SavedValues(const PresetData& preset) const {
+    std::vector<float> values;
+    for (std::size_t i = 0; i < preset.uniforms.size(); ++i) {
+        float value = preset.uniforms[i].second;
+        if (i < preset.info.params.size() && config_.settings) {
+            const PictureParam& param = preset.info.params[i];
             value = std::clamp(static_cast<float>(config_.settings->GetNumber(
-                                   ParamKey(picture_, param.id), param.fallback)),
+                                   ParamKey(preset.info.id, param.id), param.fallback)),
                                param.min, param.max);
         }
-        picture_values_.push_back(value);
+        values.push_back(value);
     }
+    return values;
 }
 
 std::vector<PictureParam> PlayerSession::PictureParams() const {

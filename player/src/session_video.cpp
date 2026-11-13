@@ -94,6 +94,9 @@ void PlayerSession::DrawRegion(gfx::Canvas& canvas, const PictureSource& source,
     const gfx::Rect uv{source.uv.x + region.part.x * source.uv.w, source.uv.y + region.part.y * source.uv.h,
                        region.part.w * source.uv.w, region.part.h * source.uv.h};
     const float rows = source.height * region.part.h;
+    shown_part_ = region.part;
+    shown_w_ = region.target.w * s;
+    shown_h_ = region.target.h * s;
     if (chain_stale_) {
         // Compiling the preset's passes uses GL behind the canvas's back.
         canvas.Flush();

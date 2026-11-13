@@ -240,6 +240,14 @@ public:
     virtual void SetPictureParam(const std::string& /*param*/, float /*value*/) {}
     /// Back to the preset's own values.
     virtual void ResetPictureParams() {}
+    /// The latest picture through preset `id` (its saved slider values) as it looks on the
+    /// game's display: the middle of it at its real size, `width` x `height` pixels. The
+    /// caller destroys the texture; none before a picture was shown. Compiles the preset,
+    /// so it can take a moment.
+    virtual gfx::Texture PicturePreview(gfx::Canvas& /*canvas*/, const std::string& /*id*/, int /*width*/,
+                                        int /*height*/) {
+        return {};
+    }
     /// The volume of the running game, 0..1, at once. Not saved here ("player.volume" is
     /// what the next game opens with).
     virtual void SetVolume(float /*volume*/) {}
