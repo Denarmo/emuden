@@ -10,6 +10,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- The quick settings handle over an app on the main display, with the game on the second. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Games are read by path from a folder the user picks. Until folder grants (SAF) are
          built this needs "all files access" on Android 11 and later. -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
