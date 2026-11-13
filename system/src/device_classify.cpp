@@ -133,6 +133,11 @@ DeviceProfile Classify(DeviceInfo info, std::optional<Tier> override_tier) {
         if (!info.model.empty()) {
             profile.name += (profile.name.empty() ? "" : " ") + info.model;
         }
+        // A name its owner gave it comes first, as the system's settings show it:
+        // "DENA-PC (MS-7E80)".
+        if (!info.device_name.empty()) {
+            profile.name = info.device_name + (info.model.empty() ? "" : " (" + info.model + ")");
+        }
         if (profile.name.empty()) {
             profile.name = "this device";
         }

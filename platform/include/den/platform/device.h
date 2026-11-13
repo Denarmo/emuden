@@ -22,6 +22,7 @@ struct DisplayFacts {
 struct DeviceFacts {
     std::string manufacturer; // "Retroid", "Valve", "LENOVO"
     std::string model;        // Build.MODEL, the DMI product name
+    std::string device_name;  // the name its owner gave it (Windows: the PC's name); may be empty
     std::string soc;          // Android: the chip's model; elsewhere the CPU's name
     std::string os_version;
     int api_level = 0;                  // Android SDK level; 0 elsewhere

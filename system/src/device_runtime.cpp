@@ -34,6 +34,7 @@ DeviceInfo Detect() {
     DeviceInfo info;
     info.manufacturer = facts.manufacturer;
     info.model = facts.model;
+    info.device_name = facts.device_name;
     info.soc = facts.soc;
     info.os = caps.os;
     info.os_version = facts.os_version;

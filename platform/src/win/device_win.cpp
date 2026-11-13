@@ -26,15 +26,36 @@ std::string RegistryText(const wchar_t* path, const wchar_t* name) {
     return length > 1 ? std::string(utf8, static_cast<std::size_t>(length - 1)) : std::string();
 }
 
+// Board makers leave these in fields they do not fill.
+bool Placeholder(const std::string& text) {
+    for (const char* filler : {"O.E.M.", "Default string", "System Product Name", "Not Applicable"}) {
+        if (text.find(filler) != std::string::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 void FillNativeFacts(DeviceFacts& facts) {
     const wchar_t* bios = L"HARDWARE\\DESCRIPTION\\System\\BIOS";
     facts.manufacturer = RegistryText(bios, L"SystemManufacturer");
     facts.model = RegistryText(bios, L"SystemProductName");
+    if (Placeholder(facts.model)) {
+        facts.model.clear();
+    }
     // Handheld makers put the name people know in the family field.
-    if (const std::string family = RegistryText(bios, L"SystemFamily"); !family.empty()) {
-        facts.model += " (" + family + ")";
+    if (const std::string family = RegistryText(bios, L"SystemFamily"); !family.empty() && !Placeholder(family)) {
+        facts.model += (facts.model.empty() ? "" : " (") + family + (facts.model.empty() ? "" : ")");
+    }
+    wchar_t name[256];
+    DWORD length = 256;
+    if (GetComputerNameExW(ComputerNamePhysicalDnsHostname, name, &length) && length > 0) {
+        char utf8[1024];
+        const int bytes = WideCharToMultiByte(CP_UTF8, 0, name, static_cast<int>(length), utf8, sizeof(utf8),
+                                              nullptr, nullptr);
+        facts.device_name.assign(utf8, bytes > 0 ? bytes : 0);
     }
     facts.soc = RegistryText(L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", L"ProcessorNameString");
     facts.touch = facts.touch || (GetSystemMetrics(SM_DIGITIZER) & NID_INTEGRATED_TOUCH) != 0;

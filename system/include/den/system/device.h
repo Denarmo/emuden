@@ -42,6 +42,7 @@ struct Screen {
 /// The facts, from the platform (or a test).
 struct DeviceInfo {
     std::string manufacturer, model, soc;
+    std::string device_name; // the name its owner gave it ("DENA-PC"); may be empty
     std::string os; // "windows", "linux", "android", "macos"
     std::string os_version;
     int api_level = 0;           // Android SDK level
