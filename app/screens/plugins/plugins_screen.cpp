@@ -82,7 +82,12 @@ public:
                 auto* tile = shelf->Emplace<ui::Tile>(plugin.name, PathToUtf8(plugin.icon), ICON, ICON);
                 tile->id = "plugins.tile." + plugin.id;
                 tile->badge = Badge(plugin);
-                tile->on_activate = [id = plugin.id] { Svc().stage->Push("plugin.view", {{"id", id}}); };
+                // A plugin whose files are there but that was never accepted (a developer
+                // folder) is accepted first; an update waiting for consent still opens.
+                const bool accept = plugin.needs_consent && !plugin.update_available;
+                tile->on_activate = [id = plugin.id, accept] {
+                    Svc().stage->Push(accept ? "plugin.consent" : "plugin.view", {{"id", id}});
+                };
                 tile->on_focus = [this, id = plugin.id] { selected_ = id; };
             }
         }

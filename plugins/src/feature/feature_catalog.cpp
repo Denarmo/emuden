@@ -89,6 +89,13 @@ RealFeatureHost::RealFeatureHost(const FeatureConfig& config, FeatureDeps deps)
         if (!deps_.services) {
             deps_.services = CreateLibraryServices(config.library);
         }
+        if (deps_.downloads_dir.empty()) {
+            // "plugins.downloads_folder": where the user's browser saves, when not the usual one.
+            const std::string chosen = config.settings != nullptr
+                                           ? config.settings->GetString("plugins.downloads_folder")
+                                           : std::string();
+            deps_.downloads_dir = chosen.empty() ? pal::DownloadsDir() : PathFromUtf8(chosen);
+        }
         if (const auto* source = dynamic_cast<const IndexSource*>(config.plugins)) {
             const Result<SourceLocation> location = ParseSourceUrl(source->SourceText());
             if (location && source->SourceText() != OFFICIAL_SOURCE) {

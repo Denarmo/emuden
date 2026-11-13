@@ -7,6 +7,40 @@ Windows and on the Retroid Pocket Duo, and the AppImage started for the first ti
 Legion Go S. Everything was driven through automation, adb and screenshots: nobody held a
 device, dragged a real finger or listened.
 
+## Feature plugins and ROM Hacks (branch `feat/hackdex`, 2026-11-13)
+
+Design and contract: `docs/feature-plugins.md`. Not merged into main.
+
+- **Plugins section** on the rail lists installed and available feature plugins; a feature
+  plugin is a Lua 5.4 package from the signed index, run in a sandbox.
+- **ROM Hacks** (`emuden.romhacks` 1.0.0) is published in `Denarmo/emuden-plugins` as index 7.
+  Its source is there (`plugins/emuden.romhacks`), not in this repository; the copy under
+  `plugins/tests/fixtures` is an older sample the tests run.
+- **What Hackdex allows:** nothing automated. Its terms (1.1.0, section 8) forbid apps and
+  scripts from reading the site or downloading from it without written permission, and the
+  site answers a plain client with a bot checkpoint. So the plugin makes no request at all:
+  no browse, search, filters, covers or descriptions from Hackdex. The user downloads the
+  patch in their browser; the plugin finds it in the Downloads folder (or a chosen file),
+  reads the base checksum, finds that game in the library, patches a copy and registers the
+  hack. Name, version, description, cover picture and the hack's Hackdex address are typed or
+  chosen by the user. Updates are a newer patch file, matched by file name. In-app browsing
+  needs Hackdex's written permission first (admin@hackdex.app).
+- **Run on Windows** (automation port 27413, fresh portable `user` folder, scratch library
+  with copies of two ROMs): the plugin was installed from the live source with one press,
+  found a patch in the Downloads folder (`plugins.downloads_folder` pointed at a scratch
+  folder), showed "You have the base game", installed it, the hack appeared in the library
+  with the base game's cover and ran for about 20 s (1244 frames, mGBA). No clean base ROM of
+  Hackdex's 39 is in `D:\ROMS`, so the patch was a generated BPS on a copy of Tetris, not a
+  real hack. Also looked at: Installed, a hack's page, Base games, a base's page, About.
+- **Not run:** xdelta, UPS and IPS through the plugin (unit tests only); the cover picker,
+  rename, remove, "Update from a file" and "Look for newer patches"; the missing-base page;
+  a patch opened with the app; Linux and Android; the real Downloads folder
+  (`pal::DownloadsDir`, SDL's user folder; empty on Android, where the file picker is used).
+- **Known:** `den.open_url` shows the address as a toast (the platform layer opens no
+  browser). Pressing the selected tab chip again clears its mark until the tab changes.
+  Builds older than this branch download the plugin's package on every list refresh, refuse
+  it ("not a console plugin") and keep the rest of the list.
+
 ## The owner's notes
 
 | Note | State | What was run |

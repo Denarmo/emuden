@@ -74,6 +74,8 @@ std::filesystem::path DataDir();
 bool IsPortable();
 /// The read-only files shipped with the app (fonts, strings).
 std::filesystem::path AssetsDir();
+/// The user's Downloads folder; empty when the device has none the app can list.
+std::filesystem::path DownloadsDir();
 
 double NowSeconds();
 void SleepMs(int ms);

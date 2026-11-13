@@ -211,7 +211,7 @@ Unknown types and fields are ignored, so later API versions can add some.
 
 | Step | What happens |
 |---|---|
-| Listed | Feature plugins come through the same signed index as consoles. The entry's `kind` is `feature`; it also carries `permissions`, `http_hosts`, `open_hosts` and `systems`, so the list shows them before any download |
+| Listed | Feature plugins come through the same signed index as consoles. The entry's `kind` is `feature`; it also carries `permissions`, `http_hosts`, `open_hosts` and `feature_systems`, so the list shows them before any download |
 | Installed | The package is fetched, its SHA-256 and size checked against the index, and unpacked to `<data>/plugins/<id>/<version>/`. A package holds at most 200 files and 8 MiB, only `.json .lua .png .jpg .txt .md`. The granted permissions go to `grant.json` |
 | Started | When the user opens it or a file is routed to it: a Lua state is created, `entry` runs, then `plugin.open`. One state per plugin; it stays while its page is on the stage and 60 s after, then `plugin.close` runs, waits in flight are cancelled and the state is dropped |
 | Updated | A newer version in the index is installed beside the old one and used from the next start; the data stays. An update asking for more permissions, hosts or systems than `grant.json` holds waits until the user accepts the difference on the consent page |
@@ -290,7 +290,9 @@ The base ROM is only read. A plugin can change and remove only entries whose sid
 
 On Android "open with" and share intents for `file_types`, and on desktop a file path on the
 command line, reach `FeatureHost::RouteFile`. The plugin never requests anything from
-hackdex.app or its storage hosts, never downloads a ROM and bundles no patches.
+hackdex.app or its storage hosts, never downloads a ROM and bundles no patches. Its source is
+`plugins/emuden.romhacks` in `Denarmo/emuden-plugins`. The Downloads folder is
+`pal::DownloadsDir()`, or the folder the setting `plugins.downloads_folder` names.
 
 ### 8.2 Stage 2 (needs written permission first)
 

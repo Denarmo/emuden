@@ -246,6 +246,11 @@ std::filesystem::path DataDir() {
     return dir;
 }
 
+std::filesystem::path DownloadsDir() {
+    const char* folder = SDL_GetUserFolder(SDL_FOLDER_DOWNLOADS);
+    return folder ? PathFromUtf8(folder) : std::filesystem::path();
+}
+
 std::filesystem::path AssetsDir() {
     const std::filesystem::path beside = ExecutableDir() / "assets";
     if (IsDirectory(beside)) {
