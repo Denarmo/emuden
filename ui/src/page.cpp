@@ -346,13 +346,8 @@ void Page::Draw(Context& ctx, const gfx::Rect& area) {
     // The border is clipped like the node it surrounds: along each scrolling ancestor's axis.
     gfx::Rect clip{0, 0, ctx.canvas->Width(), ctx.canvas->Height()};
     for (const Node* n = focus_->Parent(); n; n = n->Parent()) {
-        if (!n->scrollable) {
-            continue;
-        }
-        if (n->axis == Axis::Row) {
-            clip = clip.Intersect(gfx::Rect{n->rect.x, clip.y, n->rect.w, clip.h});
-        } else {
-            clip = clip.Intersect(gfx::Rect{clip.x, n->rect.y, clip.w, n->rect.h});
+        if (n->scrollable) {
+            clip = n->ScrollWindow(clip);
         }
     }
     ctx.canvas->PushClip(clip);

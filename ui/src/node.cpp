@@ -155,6 +155,18 @@ void Node::Tick(Context& ctx) {
     }
 }
 
+gfx::Rect Node::ScrollWindow(const gfx::Rect& clip) const {
+    // At rest on an end nothing is scrolled out there, so the window opens by the border's
+    // width and the first or last child keeps its whole selection border.
+    constexpr float BORDER = 8.0f;
+    const float before = scroller.Position() <= 0.5f ? BORDER : 0.0f;
+    const float after = scroller.Position() >= scroller.Max() - 0.5f ? BORDER : 0.0f;
+    if (axis == Axis::Row) {
+        return clip.Intersect(gfx::Rect{rect.x - before, clip.y, rect.w + before + after, clip.h});
+    }
+    return clip.Intersect(gfx::Rect{clip.x, rect.y - before, clip.w, rect.h + before + after});
+}
+
 void Node::Draw(Context& ctx) {
     if (!visible) {
         return;
@@ -175,15 +187,7 @@ void Node::Draw(Context& ctx) {
     if (scrollable) {
         // Clip along the scroll axis only, so the selection border and focus growth of a
         // child are not cut across it.
-        gfx::Rect window = rect;
-        if (axis == Axis::Row) {
-            window.y = clip.y;
-            window.h = clip.h;
-        } else {
-            window.x = clip.x;
-            window.w = clip.w;
-        }
-        ctx.canvas->PushClip(window);
+        ctx.canvas->PushClip(ScrollWindow(clip));
     }
     for (auto& child : children_) {
         child->Draw(ctx);

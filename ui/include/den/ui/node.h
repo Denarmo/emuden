@@ -110,6 +110,9 @@ public:
     Size Measure(Context& ctx);
     void Arrange(Context& ctx, const gfx::Rect& area);
     void Draw(Context& ctx);
+    /// What a scrolling node shows of `clip`: its own length along its axis, opened by the
+    /// selection border's width at an end it rests on.
+    gfx::Rect ScrollWindow(const gfx::Rect& clip) const;
     /// Advances animations in the whole subtree.
     void Tick(Context& ctx);
 
