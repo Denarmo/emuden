@@ -241,7 +241,7 @@ folder, other plugins' data, ROM contents, save files, settings, processes or na
 | UPS | `UPS1` | source, target and patch CRC32 | Applies in either direction; only source to target is used |
 | BPS | `BPS1` | source, target and patch CRC32 | The four actions; metadata skipped |
 | APS (GBA) | `APS1` | source and target size, CRC16 per 64 KiB block | The GBA flavour only (not the N64 `APS10`) |
-| xdelta3 / VCDIFF | `D6 C3 C4` | Adler-32 of each target window | Decoder of xdelta3 v3.1.0 (`den_fetch`, Apache-2.0) with secondary compressors DJW, FGK and LZMA (xz v5.8.1, `liblzma` only); source window up to the whole ROM |
+| xdelta3 / VCDIFF | `D6 C3 C4` | Adler-32 of each target window | Own decoder, with xdelta3's secondary compressors: LZMA through XZ Embedded (`den_fetch`, 0BSD, decoder only), DJW and FGK in `patching/src/secondary_*.cpp`; source window up to the whole ROM |
 | PPF 1, 2, 3 | `PPF10/20/30` | v2/v3: optional 1024-byte block check at `0x9320`; v3 undo data skipped | PlayStation disc images (`.bin`, `.iso`); 64-bit offsets in v3 |
 
 A patch is applied to a temporary file beside the target, then renamed; a failed check deletes

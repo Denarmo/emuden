@@ -2,15 +2,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // VCDIFF (RFC 3284) as xdelta3 writes it: the standard instruction table, source and target
-// windows, the Adler-32 of each target window. Sections packed by a secondary compressor
-// (DJW, FGK, LZMA) are not decoded; such a patch is refused with that reason.
+// windows, the Adler-32 of each target window, and sections packed by one of its secondary
+// compressors (secondary.h).
 
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <memory>
+#include <vector>
 
 #include "den/base/files.h"
 #include "io.h"
+#include "secondary.h"
 
 namespace den::patching {
 
@@ -151,9 +154,32 @@ bool ReadWindow(Cursor& p, Window& w) {
     return (w.flags & (FROM_SOURCE | FROM_TARGET)) != (FROM_SOURCE | FROM_TARGET);
 }
 
-std::string CompressorName(std::uint8_t id) {
-    return id == 2 ? "LZMA" : id == 1 ? "DJW" : id == 16 ? "FGK" : "an unknown method";
-}
+// The sections of a patch that went through its secondary compressor: a decoder per kind of
+// section, made when the first such section comes, and the unpacked bytes of this window.
+struct Unpacker {
+    std::uint8_t compressor = 0;
+    std::array<std::unique_ptr<Secondary>, 3> decoders;
+    std::array<std::vector<std::uint8_t>, 3> bytes;
+
+    /// Replaces `section` by what it unpacks to: its size first, then the packed bytes.
+    Status Unpack(int kind, Cursor& section) {
+        if (decoders[kind] == nullptr && (decoders[kind] = MakeSecondary(compressor)) == nullptr) {
+            return Status::Fail("This xdelta patch is packed with a method this app does not know (" +
+                                std::to_string(compressor) + ")");
+        }
+        const std::uint64_t size = Number(section);
+        if (section.bad || size == 0 || size > MAX_WINDOW) {
+            return Corrupt("xdelta");
+        }
+        bytes[kind].resize(static_cast<std::size_t>(size));
+        if (!decoders[kind]->Decode(section, bytes[kind].data(), bytes[kind].size()) || section.bad ||
+            section.Left() != 0) {
+            return Corrupt("xdelta");
+        }
+        section = {bytes[kind].data(), bytes[kind].size()};
+        return {};
+    }
+};
 
 // The addresses of the last copies, which later copies are written against.
 struct AddressCache {
@@ -209,15 +235,20 @@ Status ApplyVcdiff(Context& c) {
     }
     static const std::array<Code, 256> table = StandardTable();
     std::vector<std::uint8_t> target;
+    Unpacker unpacker;
+    unpacker.compressor = header.compressor;
     while (p.Left() > 0) {
         Window w;
         if (!ReadWindow(p, w) || w.target_length > MAX_WINDOW) {
             return Corrupt("xdelta");
         }
-        if (w.packed & 7) {
-            return Status::Fail("This xdelta patch is packed with " + CompressorName(header.compressor) +
-                                " secondary compression, which is not supported yet. Ask for one "
-                                "made with \"xdelta3 -S none\", or a BPS patch");
+        Cursor* const sections[3] = {&w.data, &w.instructions, &w.addresses};
+        for (int kind = 0; kind < 3; ++kind) {
+            if (w.packed & (1 << kind)) {
+                if (const Status unpacked = unpacker.Unpack(kind, *sections[kind]); !unpacked.ok) {
+                    return unpacked;
+                }
+            }
         }
         const bool from_target = (w.flags & FROM_TARGET) != 0;
         const std::uint64_t source_size = from_target ? c.out.Size() : c.source.Size();

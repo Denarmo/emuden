@@ -96,3 +96,19 @@ if(WIN32)
         "${webview2_src}/build/native/${webview2_arch}/WebView2LoaderStatic.lib"
         advapi32 ole32 oleaut32 shell32 shlwapi user32 gdi32 version)
 endif()
+
+# XZ Embedded (0BSD) decodes the LZMA sections of xdelta patches (patching/src). It is a
+# decoder only; the three files below are all of it that is built.
+den_fetch(xzembedded https://github.com/tukaani-project/xz-embedded.git v2024-12-30 GIT_SHALLOW ON)
+add_library(den_xz STATIC
+    "${xzembedded_SOURCE_DIR}/linux/lib/xz/xz_crc32.c"
+    "${xzembedded_SOURCE_DIR}/linux/lib/xz/xz_dec_lzma2.c"
+    "${xzembedded_SOURCE_DIR}/linux/lib/xz/xz_dec_stream.c")
+target_include_directories(den_xz SYSTEM PUBLIC "${xzembedded_SOURCE_DIR}/linux/include/linux"
+    PRIVATE "${xzembedded_SOURCE_DIR}/userspace")
+set_target_properties(den_xz PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(MSVC)
+    target_compile_options(den_xz PRIVATE /w)
+else()
+    target_compile_options(den_xz PRIVATE -w)
+endif()

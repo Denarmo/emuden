@@ -315,15 +315,6 @@ TEST_CASE("VCDIFF: address modes, paired instructions, copies inside the window 
 }
 
 TEST_CASE("VCDIFF: what is refused") {
-    // A section that went through a secondary compressor.
-    VcdiffWriter packed(2);
-    packed.Begin(1 | 4, ROM.size(), 0);
-    packed.Copy(0, ROM.data(), 100);
-    packed.End(1);
-    const Applied lzma = Run("vcdiff-lzma", ROM, packed.out);
-    REQUIRE(!lzma.status.ok);
-    REQUIRE(lzma.status.error.find("LZMA") != std::string::npos);
-
     // The header names a compressor, yet no section uses it: that applies.
     VcdiffWriter named(2);
     named.Begin(1 | 4, ROM.size(), 0);
