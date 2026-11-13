@@ -1,11 +1,23 @@
 # Status
 
-State of the rebuild after the fourth round (2026-11-13), which took the owner's six notes:
-more picture shaders, Back on Android, a bigger default interface, two screens, touch
-scrolling with weight, and settings chosen for the device. All six are in, were driven on
-Windows and on the Retroid Pocket Duo, and the AppImage started for the first time on the
-Legion Go S. Everything was driven through automation, adb and screenshots: nobody held a
-device, dragged a real finger or listened.
+State of the rebuild after the fifth round (2026-11-13): the small problems left by the
+fourth round, the dot matrix and LCD pictures on high resolution screens, and covers for ROM
+hacks. The fourth round took the owner's six notes (table below). Everything was driven
+through automation, adb and screenshots: nobody held a device, dragged a real finger or
+listened.
+
+## Fifth round
+
+| Item | State | What was run |
+|---|---|---|
+| Hint bar shows the pad from the start | Fixed: a handheld starts with its pad's glyphs, a desktop with the keyboard until a pad is used | Retroid, release APK: A / X / Y in the hint bar of home and the library at the first frame. Windows: keyboard names, as it has no pad |
+| Hint bar over a shelf heading | Fixed: a shelf scrolls into view with its heading, and a heading the list edge would cut is not drawn | Windows at 125% in a 1280x720 window: home and two steps down, no heading under the bar |
+| Pause menu picture past the right edge | Fixed: on the Picture pages the game is fitted beside the menu; the main pause menu lies over the dimmed game by design | Windows at 125%: Gran Turismo 2 (4:3) inside the window in the pause menu, on the Picture page and while running |
+| Row labels, held LB | "Auto: CRT" style labels, a value takes the width it needs; LB is filled when held | Windows: the labels seen in the pause menu; the test page was seen by the fix's author only |
+| Dot matrix, Pocket, LCD on high resolution screens | Rewritten: each output pixel takes its share of each dot in linear light, gaps never thinner than a pixel, whole multiples chosen automatically when they cost under 10% of the height | Tetris in the app in a real 3840x2160 window (15x, 60 fps) and at 1280x720 (5x): even grid, same brightness, crops looked at. Retroid (GLES 3, 1920x1080): dot matrix and LCD grid at 7x, crops looked at |
+| Covers for ROM hacks | Own art from a fan collection on GitHub and libretro's hack entries, optional RetroAchievements and SteamGridDB keys, else the original's box with a HACK tag in its bottom left corner; "Find cover" on the details page. `docs/covers.md` says which sites are not used and why (Hackdex, GBAtemp, Whack a Hack and others forbid or block automated reading) | Windows and Retroid libraries: Brown, Lazarus, Heart & Soul, Seaglass and Polished Crystal show their own covers; Ambrosia and Crystal Awakening show Crystal's box tagged HACK |
+
+`emuden --windowed --size 3840x2160` opens a window of that size (new, for such checks).
 
 ## The owner's notes
 
@@ -20,23 +32,20 @@ device, dragged a real finger or listened.
 
 ## Release check (last thing done)
 
-`win` preset from an empty build directory at `3e202f5`: 11 of 11 test programs pass and the
-seven parallel commits built together without a change. Two fixes came out of the device
-check (`964602f`, `410665a`); after them the Windows and Linux tests ran again (11 of 11 on
-both) and every package below was rebuilt.
+`win` preset from an empty build directory at `e82045d`: 11 of 11 test programs pass and the
+three parallel commits built together without a change. Two small commits came out of the
+check (`--size`, and the HACK tag moved out from under the tiles' badges); after them the
+Windows and Linux tests ran again (11 of 11 on both) and every package below was rebuilt.
 
-- **Windows** (automation port 34712, portable `user` folder): Tetris by Auto in dot matrix,
-  pause menu, exit; Gran Turismo 2 with CRT bloom chosen on the Picture page; a fling on the
-  library grid; Settings > Device; the details page at 100% and with a simulated handheld.
-  The app left no process behind. `dist\windows` (14.3 MB) is mirrored to
+- **Windows** (automation port 28467, portable `user` folder): the fifth-round table above.
+  The app left no process behind. `dist\windows` (14.5 MB) is mirrored to
   `C:\Users\david\Desktop\EmuDEN`; the Desktop copy was not started.
-- **Android** (Retroid Pocket Duo; the debug APK with automation on port 34722, then the
-  release APK driven by adb touches): everything in the table above, from cleared app data.
-  The Game Boy and DS cores were downloaded on Play. The release APK (debug key) is
-  installed and force-stopped; it is `dist\android\EmuDEN.apk`. The fling, the first-run
-  setup and the DS game were run on the debug APK of the commit before the two fixes; the
-  final release APK was started, opened the details page and Tetris, and paused on Back.
-- **Linux**: built in WSL Debian, 11 of 11 tests, AppImage 5.8 MB in `dist\linux`. Installed
+- **Android** (Retroid Pocket Duo, app data kept): the debug APK was installed over the old
+  one and driven on port 28517 (home, library, Tetris), then the release APK (debug key),
+  which was started, showed home and the library, and is left installed and force-stopped.
+  It is `dist\android\EmuDEN.apk`. The device had "LCD grid" saved for Game Boy games; dot
+  matrix was chosen for the screenshot and LCD grid put back.
+- **Linux**: built in WSL Debian, 11 of 11 tests, AppImage 5.9 MB in `dist\linux`. Installed
   on the Legion Go S with `install-steamos.sh` and started once for 10 s over ssh: OpenGL
   4.6 on Mesa (radeonsi), the device recognised, closed on the signal. Nothing was looked
   at or played there.
@@ -166,7 +175,13 @@ per pad family, system files of a core, and Back trapped on Android.
 - Linux on real hardware (GPU drivers, gamescope, the handheld), `install-steamos.sh` on
   real SteamOS and its `--steam` option, the PNG icon (`rsvg-convert` is not in WSL), any
   start of the final AppImage, and pads and sound on Linux.
-- This round: a real finger on any scrolling page; the shaders other than dot matrix on
+- Fifth round: a touch-only device (no hint bar there: unit-tested only); Screen size
+  "Pixel perfect" in a room smaller than the frame; the controller test page; the Settings >
+  Covers rows, "Choose an image file" and "Choose automatically"; RetroAchievements and
+  SteamGridDB with a real key (SteamGridDB's endpoints were written from memory); the CRT,
+  composite, S-Video and VHS presets after their rewrite beyond one look at CRT on Gran
+  Turismo 2; every preset on Linux; a two-screen game in the pause menu.
+- Fourth round: a real finger on any scrolling page; the shaders other than dot matrix on
   GLES and all of them on Linux; a 3DS game; the AYN Thor and every device of the table
   other than the Retroid, the Legion Go S and this PC (their defaults are unit-tested
   only); the performance defaults themselves (nobody measured that PSP 3x holds its speed
@@ -177,7 +192,7 @@ per pad family, system files of a core, and Back trapped on Android.
   folder copy or cancelling one, the first storage dialog in the final build (its garbled
   text was fixed but not seen again), the folder browser opening in the copied `Games`
   folder, and rewind.
-- The ROM hack cover with a real image, the high contrast themes, per-game core and screen
+- The high contrast themes, per-game core and screen
   size end to end.
 - The three agents' reports reached this file cut off at the end; their own "not run"
   lists may be longer than what is here.
@@ -199,13 +214,15 @@ per pad family, system files of a core, and Back trapped on Android.
   which the naming rule forbids; it goes when the engine becomes a plugin.
 - Android: a picked folder is copied, not read in place, so it takes its space twice; once
   a folder has been copied the app stops offering all files access. A game ended by force-stop is
-  missing from "Continue playing". On the test page LB and RB are outlined while other
-  pressed buttons are filled. Secrets are kept in memory only; no Switch 2 engine.
-- The hint bar shows keyboard names (Enter, Esc) on a handheld until a pad button is
-  pressed, and on the home screen it lies over the heading of the next shelf.
-- The picture drawn beside the pause menu runs past the right edge for 4:3 games.
-- ROM hacks without an image beside them still get the cover of the game they are based on
-  (Pokemon - Lazarus shows Emerald's).
+  missing from "Continue playing". Secrets are kept in memory only; no Switch 2 engine.
+- ROM hack covers: a game counts as a hack when libretro has no box under its name (no
+  checksum database); the default fan collection (`tttrash/pokehackcovers`) has no licence
+  and covers Pokemon hacks only; name matching has no typo tolerance and WebP pictures are
+  skipped; the new texts are not in `assets/strings/en.json`. The HACK tag hides the bottom
+  left corner of the box.
+- In the library grid a long console badge ("Game Boy Advance") is wider than its tile.
+- A game closed with the automation `quit` while it runs does not move to the front of
+  "Continue playing".
 - Gran Turismo 2 shows the game's border colour left and right of the picture.
 - A button remap is per console, not per pad or port.
 - Not built: online (accounts, achievements, netplay, cloud saves), PC and Steam games,
