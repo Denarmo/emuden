@@ -4,10 +4,12 @@
 // What the player screen draws where. One display: the game with the pause menu over it.
 // Two displays: an open menu takes the display the quick settings are on and the game stays
 // as it is on its own ("player.overlay_on_second_screen"), and a one-screen game can change
-// places with the quick settings ("player.swap_displays"). For a game with two screens of
-// its own the menu takes the display that shows the touch screen.
+// places with the quick settings ("player.swap_displays"). For a game with one screen on
+// each display the menu takes the second display, whichever screen that shows.
 
 #include <algorithm>
+#include <cmath>
+#include <iterator>
 #include <format>
 
 #include "../companion/second_screen.h"
@@ -44,8 +46,7 @@ void PlayerScreen::PlaceDisplays() {
     Services& svc = Svc();
     const bool two = phase_ == Phase::Running && SecondScreenReady();
     swapped_ = two && !dual_.Active() && svc.settings->GetBool(SWAP_KEY, false);
-    // With one screen on each display the menu may only take the one with the touch screen.
-    menu_apart_ = two && svc.settings->GetBool(OVERLAY_KEY, true) && (!dual_.Split() || dual_.TouchOnSecond());
+    menu_apart_ = two && svc.settings->GetBool(OVERLAY_KEY, true);
     // Apart from a game on the main display, or over a game on the second one.
     menu_second_ = menu_apart_ != swapped_;
 }
@@ -96,9 +97,37 @@ void PlayerScreen::DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const p
     };
     if (show_fps_) {
         // Frame rate, the sound waiting to be played, and how often it ran dry.
-        badge(std::format("{:.0f} fps  \xC2\xB7  {:.0f} ms  \xC2\xB7  {} gaps", snapshot.measured_fps,
-                          snapshot.audio_queued_ms, snapshot.audio_underruns),
-              true);
+        // Each number sits right-aligned in a slot as wide as its widest value, so the box
+        // and the words in it stay where they are while the digits change.
+        struct Field {
+            std::string number, widest, unit;
+        };
+        const std::string gaps = std::format("{}", snapshot.audio_underruns);
+        const Field fields[] = {
+            {std::format("{:.0f}", snapshot.measured_fps), "888", " fps"},
+            {std::format("{:.0f}", snapshot.audio_queued_ms), "888", " ms"},
+            {gaps, std::string(std::max<std::size_t>(2, gaps.size()), '8'), " gaps"},
+        };
+        const std::string dot = "  Â·  ";
+        const auto measure = [&](const std::string& text) { return ctx.Text().Measure(text, size, gfx::FONT_BOLD); };
+        float w = 20 + 2 * measure(dot);
+        for (const Field& field : fields) {
+            w += std::ceil(measure(field.widest)) + measure(field.unit);
+        }
+        const gfx::Rect box{area.Right() - w - 12, area.y + 12, w, size + 12};
+        canvas.FillRect(box, plate, 8);
+        float x = box.x + 10;
+        for (std::size_t i = 0; i < std::size(fields); ++i) {
+            const Field& field = fields[i];
+            const float slot = std::ceil(measure(field.widest));
+            canvas.DrawText(field.number, x + slot - measure(field.number), box.y + 5, size, ink, gfx::FONT_BOLD);
+            canvas.DrawText(field.unit, x + slot, box.y + 5, size, ink, gfx::FONT_BOLD);
+            x += slot + measure(field.unit);
+            if (i + 1 < std::size(fields)) {
+                canvas.DrawText(dot, x, box.y + 5, size, ink, gfx::FONT_BOLD);
+                x += measure(dot);
+            }
+        }
     }
     if (snapshot.rewinding) {
         badge("\xC2\xAB Rewind", false);
