@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdlib>
 #include <fstream>
+#include <iterator>
 #include <utility>
 
 #include "den/base/files.h"

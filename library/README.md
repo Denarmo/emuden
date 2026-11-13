@@ -11,6 +11,7 @@ The games on this device. Screens use `den/library/library.h` only; the player a
 | `systems.h` | `SystemDef` (a manifest's `systems[]` entry), `ParseSystems`, `SystemTable` |
 | `names.h` | `ParseGameName`, `CleanDisplayName`, `MatchKey`, `RegionTags` |
 | `artwork.h` | box art matching, `Artwork::Resolve`, `WritePlaceholderCover` |
+| `hacks.h` | `HacksOf(library)`: `FindBase` (a game by CRC-32, MD5 or SHA-1), `InstallHack`, `List`, `Update`, `Remove`; `OpenPatchFile` ("Patch a game") |
 
 - **Consoles.** `src/systems_data.cpp` holds the `systems[]` of the official plugin manifests,
   so the library works with no plugin installed. The plugin host (or the app) hands the
@@ -36,6 +37,14 @@ The games on this device. Screens use `den/library/library.h` only; the player a
   (`RecentlyAdded`).
 - **Files.** `<data>/library/library.json` (folders, play records, session log; versioned, see
   `den/store/document.h`) and `cache.json` (the last scan, shown at once on the next start).
+- **Hacks.** `InstallHack` patches a copy of a game (`patching/`) into `Hacks` in the console's
+  folder, or into `<data>/library/hacks/<system>/Hacks` when the game is a loose file or the
+  folder cannot be written. `<rom>.hack.json` beside it holds the title, version, base game,
+  plugin and source; the entry has `hack_of` and appears without a scan. The file is named by
+  the title, so a newer patch keeps the id, the saves and the records (`keep_old`: the new
+  version becomes `<title> (<version>)` beside the old one). Checksums of the user's games
+  are computed once and kept in `checksums.json` (path, size, date). A cue sheet's first image
+  is the file that is patched; the result is that image alone.
 - **Import.** On the first run the game folders of an earlier app's profile are taken over
   when `Config::import_profile` or the environment variable `EMUDEN_IMPORT_PROFILE` names it.
 
