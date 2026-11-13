@@ -64,8 +64,8 @@ Status RealHost::SyncPackages(Job& job, const std::string& only) {
             return {};
         }
         for (const IndexPlugin& offered : index_->plugins) {
-            if (!only.empty() && offered.id != only) {
-                continue;
+            if ((!only.empty() && offered.id != only) || offered.kind != "console") {
+                continue; // feature plugins are the feature host's
             }
             const auto it =
                 std::find_if(manifests_.begin(), manifests_.end(),

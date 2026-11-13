@@ -225,6 +225,15 @@ display, `input text tetris` in the line on the main one with the result filtere
 closing it, the focus back on the main display. Not run: one display (the device has two),
 a request made with the pad, a keyboard put away by hand.
 
+## In-app browser
+
+`WebPage` puts an `android.webkit.WebView` into SDL's layout above the surface, inside the
+bounds the app gives, for `platform/src/android/webview_android.cpp` (`docs/in-app-browser.md`).
+`WebDownloads` saves what the user downloads there. The browser page's test endpoint is on
+the automation port + 3, forwarded by `run.ps1`. `screencap` shows the page; the app's own
+screenshot does not. A local test server is reached with `adb reverse tcp:<port> tcp:<port>`
+and `http://127.0.0.1:<port>/` (plain http is allowed for the device itself only).
+
 ## Storage
 
 Games are read by path. `StorageAccess` shows a dialog at every start until the app has all

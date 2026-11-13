@@ -20,7 +20,7 @@ if(DEN_BUILD_TESTS)
 endif()
 
 # Order matters: a directory never includes one listed after it.
-foreach(dir base platform gfx input ui store library plugins online engine player system app)
+foreach(dir base platform patching gfx input ui store library plugins online engine player system app)
     if(EXISTS "${CMAKE_SOURCE_DIR}/${dir}/CMakeLists.txt")
         add_subdirectory(${dir})
     endif()

@@ -245,11 +245,12 @@ void Frame() {
         TrackGame(c);
         const player::State state = svc.player->GetSnapshot().state;
         // The quick settings while a game runs; the focused game while browsing; under the
-        // Apps section, which is about no game, a page that says so.
+        // Apps section and the in-app browser, which are about no game, a page that says so.
         const ui::Page* top = svc.stage->Top();
         const char* route = state == player::State::Running || state == player::State::Paused
                                 ? "companion.play"
                                 : top && top->Route() == "apps" ? "companion.idle"
+                                : top && top->Route() == "web"  ? "companion.web"
                                                                 : "companion.browse";
         if (!c.stage->Top()) {
             c.stage->Push(route);

@@ -324,3 +324,15 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
   session uses `CoreForGame`, not `plugins->CoreFor`.
 - Themes: Light, Dark, Green, Magenta, Amber, High contrast, High contrast dark
   (`ui/src/theme.cpp`).
+
+## In-app browser
+
+`docs/in-app-browser.md`. `den/platform/webview.h` is `pal::WebView`: a page shown with the
+platform's web engine in a native view over part of the window (WebView2 on Windows,
+android.webkit.WebView on Android, WebKitGTK on Linux when the system has it, a fake for
+tests). Without an engine the same route opens the site in the user's browser and offers the
+wanted files that then appear in the Downloads folder (`den/platform/downloads.h`:
+`pal::OpenInBrowser`, `pal::DownloadFolders`, `pal::DownloadWatch`). The route `web` (`app/screens/web/web_browser.h`:
+`web::Open(OpenRequest)`, `web::RegisterOpener`) lets the user browse the hosts an opener
+allows and hands the opener the files the user downloads there (`<data>/inbox/web`; patch and
+archive formats, never a ROM image). Its test endpoint is on the automation port + 3.

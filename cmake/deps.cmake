@@ -47,3 +47,68 @@ target_include_directories(den_stb SYSTEM INTERFACE "${stb_SOURCE_DIR}")
 if(DEN_BUILD_TESTS)
     den_fetch(catch2 https://github.com/catchorg/Catch2.git v3.8.1 GIT_SHALLOW ON)
 endif()
+
+# Lua 5.4 runs feature plugins (plugins/src/feature). It is built as C++ so that a script
+# error unwinds the host's frames as an exception instead of jumping over them.
+den_fetch(lua https://github.com/lua/lua.git v5.4.8 GIT_SHALLOW ON)
+file(GLOB den_lua_sources "${lua_SOURCE_DIR}/l*.c")
+list(FILTER den_lua_sources EXCLUDE REGEX "/(lua|ltests|onelua)\.c$")
+add_library(den_lua STATIC ${den_lua_sources})
+set_source_files_properties(${den_lua_sources} PROPERTIES LANGUAGE CXX)
+target_include_directories(den_lua SYSTEM PUBLIC "${lua_SOURCE_DIR}")
+if(MSVC)
+    target_compile_options(den_lua PRIVATE /w /EHsc)
+else()
+    target_compile_options(den_lua PRIVATE -w)
+endif()
+
+if(WIN32)
+    # The WebView2 SDK: headers and the static loader from Microsoft's NuGet package (a zip).
+    # The engine itself is the Evergreen runtime that ships with Windows.
+    set(DEN_WEBVIEW2_VERSION 1.0.2903.40)
+    set(webview2_src "${DEN_DEPS_DIR}/webview2-src")
+    if(NOT EXISTS "${webview2_src}/.den-ready-${DEN_WEBVIEW2_VERSION}")
+        set(webview2_zip "${DEN_DEPS_DIR}/webview2-${DEN_WEBVIEW2_VERSION}.zip")
+        file(DOWNLOAD
+            "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/${DEN_WEBVIEW2_VERSION}"
+            "${webview2_zip}"
+            EXPECTED_HASH SHA256=ef128016dd1e51c59178c827ed5b8aa3322c57afa8675d930f8109505542ad74
+            TLS_VERIFY ON STATUS webview2_status)
+        list(GET webview2_status 0 webview2_code)
+        if(NOT webview2_code EQUAL 0)
+            message(FATAL_ERROR "WebView2 SDK download failed: ${webview2_status}")
+        endif()
+        file(ARCHIVE_EXTRACT INPUT "${webview2_zip}" DESTINATION "${webview2_src}"
+            PATTERNS "build/native/include/*" "build/native/*/WebView2LoaderStatic.lib" "LICENSE.txt")
+        file(REMOVE "${webview2_zip}")
+        file(TOUCH "${webview2_src}/.den-ready-${DEN_WEBVIEW2_VERSION}")
+    endif()
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
+        set(webview2_arch arm64)
+    elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+        set(webview2_arch x86)
+    else()
+        set(webview2_arch x64)
+    endif()
+    add_library(den_webview2 INTERFACE)
+    target_include_directories(den_webview2 SYSTEM INTERFACE "${webview2_src}/build/native/include")
+    target_link_libraries(den_webview2 INTERFACE
+        "${webview2_src}/build/native/${webview2_arch}/WebView2LoaderStatic.lib"
+        advapi32 ole32 oleaut32 shell32 shlwapi user32 gdi32 version)
+endif()
+
+# XZ Embedded (0BSD) decodes the LZMA sections of xdelta patches (patching/src). It is a
+# decoder only; the three files below are all of it that is built.
+den_fetch(xzembedded https://github.com/tukaani-project/xz-embedded.git v2024-12-30 GIT_SHALLOW ON)
+add_library(den_xz STATIC
+    "${xzembedded_SOURCE_DIR}/linux/lib/xz/xz_crc32.c"
+    "${xzembedded_SOURCE_DIR}/linux/lib/xz/xz_dec_lzma2.c"
+    "${xzembedded_SOURCE_DIR}/linux/lib/xz/xz_dec_stream.c")
+target_include_directories(den_xz SYSTEM PUBLIC "${xzembedded_SOURCE_DIR}/linux/include/linux"
+    PRIVATE "${xzembedded_SOURCE_DIR}/userspace")
+set_target_properties(den_xz PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(MSVC)
+    target_compile_options(den_xz PRIVATE /w)
+else()
+    target_compile_options(den_xz PRIVATE -w)
+endif()

@@ -1,4 +1,4 @@
-den_module(plugins DEPS den_base den_platform den_store)
+den_module(plugins DEPS den_base den_platform den_store den_library den_patching PRIVATE_DEPS den_lua)
 
 # Monocypher (Ed25519) is vendored as it is; its warnings are not ours.
 file(GLOB monocypher "${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/monocypher/*.c")
@@ -30,4 +30,7 @@ target_sources(den_plugins PRIVATE "${generated}")
 if(TARGET den_plugins_tests)
     target_compile_definitions(den_plugins_tests PRIVATE
         DEN_PLUGINS_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+    # The feature tests drive the script runner directly.
+    target_include_directories(den_plugins_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(den_plugins_tests PRIVATE den_lua)
 endif()

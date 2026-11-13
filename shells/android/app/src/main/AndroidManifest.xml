@@ -33,6 +33,7 @@
         android:isGame="true"
         android:enableOnBackInvokedCallback="true"
         android:requestLegacyExternalStorage="true"
+        android:networkSecurityConfig="@xml/network_security"
         android:theme="@style/AppTheme">
 
         <meta-data android:name="SDL_ENV.SDL_ANDROID_TRAP_BACK_BUTTON" android:value="1" />

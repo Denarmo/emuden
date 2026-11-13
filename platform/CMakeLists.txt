@@ -13,14 +13,22 @@ if(ANDROID)
     list(APPEND platform_exclude "/src/sdl/apps_desktop.cpp" "/src/sdl/text_input_desktop.cpp")
     # The app goes on while its activity is stopped, and Android has a media volume.
     list(APPEND platform_exclude "/src/sdl/lifecycle_desktop.cpp")
+    # The web view is android.webkit.WebView (src/android).
+    list(APPEND platform_exclude "/src/posix/webview_posix.cpp")
 else()
     list(APPEND platform_exclude "/src/android/")
+endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT ANDROID)
+    # The web view is WebKitGTK found at run time (src/linux); the stub is for the others.
+    list(APPEND platform_exclude "/src/posix/webview_posix.cpp")
+else()
+    list(APPEND platform_exclude "/src/linux/")
 endif()
 
 den_module(platform DEPS den_base PRIVATE_DEPS SDL3::SDL3-static EXCLUDE ${platform_exclude})
 
 if(WIN32)
-    target_link_libraries(den_platform PRIVATE winhttp ws2_32)
+    target_link_libraries(den_platform PRIVATE winhttp ws2_32 den_webview2)
 elseif(ANDROID)
     target_link_libraries(den_platform PRIVATE EGL android)
 else()
@@ -29,4 +37,6 @@ else()
         target_link_libraries(den_platform PRIVATE CURL::libcurl)
         target_compile_definitions(den_platform PRIVATE DEN_HAVE_CURL)
     endif()
+    # dlopen for the web engine (src/linux): never a link dependency on it.
+    target_link_libraries(den_platform PRIVATE ${CMAKE_DL_LIBS})
 endif()

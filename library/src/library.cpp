@@ -18,6 +18,7 @@
 #include "den/library/scan.h"
 #include "den/store/settings.h"
 #include "cover_files.h"
+#include "hacks_store.h"
 #include "state.h"
 
 namespace den::library {
@@ -94,6 +95,9 @@ public:
             }
         }
         SortByName(entries_);
+        hacks_ = CreateHacks({this, config.data_dir, [this] { return SystemsCopy(); },
+                              [this](Entry entry) { AdoptEntry(std::move(entry)); },
+                              [this](const std::string& id) { DropEntry(id); }});
         if (!saved_.folders.empty() && config_.jobs != nullptr) {
             Scan();
         }
@@ -385,7 +389,39 @@ public:
         constructed_ = true;
     }
 
+    Hacks* HackStore() override {
+        return hacks_.get();
+    }
+
 private:
+    SystemTable SystemsCopy() const {
+        std::lock_guard lock(mutex_);
+        return systems_;
+    }
+
+    // A game made by the app itself (a hack) is listed at once, without a scan.
+    void AdoptEntry(Entry entry) {
+        std::lock_guard lock(mutex_);
+        if (Record& record = saved_.records[entry.id]; record.added <= 0) {
+            record.added = UnixNow();
+            SaveSaved(dir_ / "library.json", saved_);
+        }
+        ApplyRecord(entry);
+        std::erase_if(entries_, [&](const Entry& other) { return other.id == entry.id; });
+        entries_.push_back(std::move(entry));
+        SortByName(entries_);
+        SaveEntryCache(dir_ / "cache.json", entries_);
+        rescan_ = rescan_ || scan_active_; // a scan under way has not seen it
+        ++revision_;
+    }
+
+    void DropEntry(const std::string& id) {
+        std::lock_guard lock(mutex_);
+        std::erase_if(entries_, [&](const Entry& other) { return other.id == id; });
+        SaveEntryCache(dir_ / "cache.json", entries_);
+        ++revision_;
+    }
+
     bool AddFolderLocked(const std::string& path, const std::string& system) {
         const std::string key = FolderKey(path);
         for (const Folder& folder : saved_.folders) {
@@ -435,6 +471,7 @@ private:
             options.folders = saved_.folders;
             systems = systems_;
         }
+        AddHackFolders(dir_, options.folders);
         options.systems = &systems;
         options.covers_dir = dir_ / "covers";
         options.icons_dir = dir_ / "artwork" / "switch2";
@@ -451,6 +488,7 @@ private:
         if (job.CancelRequested()) {
             return;
         }
+        ApplyHackSidecars(found);
         SortByName(found);
 
         artwork_.SetHackOptions(ReadHackOptions(config_.settings));
@@ -516,7 +554,10 @@ private:
                 {
                     std::lock_guard lock(mutex_);
                     for (Entry& shown : entries_) {
-                        if (shown.id == entry.id &&
+                        // A hack that shows the box of its base game keeps it over a placeholder.
+                        const bool keeps = placeholder && !shown.hack_of.empty() && !shown.cover.empty() &&
+                                           !shown.placeholder_cover;
+                        if (shown.id == entry.id && !keeps &&
                             (shown.cover != cover || shown.placeholder_cover != placeholder)) {
                             shown.cover = cover;
                             shown.placeholder_cover = placeholder;
@@ -547,6 +588,7 @@ private:
         }
         {
             std::lock_guard lock(mutex_);
+            changed_ = UseBaseCovers(entries_) || changed_;
             SaveEntryCache(dir_ / "cache.json", entries_);
         }
         BumpIfChanged();
@@ -575,6 +617,7 @@ private:
     bool rescan_ = false;
     bool changed_ = false;
     bool constructed_ = false;
+    std::unique_ptr<Hacks> hacks_;
     std::atomic<std::uint64_t> revision_{1};
 };
 

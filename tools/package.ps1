@@ -36,6 +36,8 @@ $third = [ordered]@{
     'FreeType-FTL.txt'  = '.deps\freetype-src\docs\FTL.TXT'
     'stb.txt'           = '.deps\stb-src\LICENSE'
     'Monocypher.md'     = 'plugins\src\third_party\monocypher\LICENCE.md'
+    'WebView2.txt'      = '.deps\webview2-src\LICENSE.txt'
+    'XZ-Embedded.txt'   = '.deps\xzembedded-src\COPYING'
     'Google-Sans-OFL.txt' = 'assets\fonts\OFL.txt'
 }
 foreach ($name in $third.Keys) {

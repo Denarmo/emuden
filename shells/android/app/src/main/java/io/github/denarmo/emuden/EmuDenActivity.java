@@ -15,10 +15,14 @@ import android.os.SystemClock;
 import android.system.Os;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
 import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 
 import org.libsdl.app.SDLActivity;
+import org.libsdl.app.SDLControllerManager;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -73,6 +77,7 @@ public class EmuDenActivity extends SDLActivity {
         tellStopped(false);
         super.onStart();
         secondScreen.onStart();
+        WebPage.onActivityStart();
     }
 
     // Another app covers this display, or the user left. The native loop is not ended or
@@ -81,6 +86,7 @@ public class EmuDenActivity extends SDLActivity {
     @Override
     protected void onStop() {
         textBridge.onStop();
+        WebPage.onActivityStop();
         secondScreen.onStop();
         super.onStop();
         tellStopped(true);
@@ -113,6 +119,7 @@ public class EmuDenActivity extends SDLActivity {
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
             backCallback = null;
         }
+        WebPage.onActivityDestroy();
         super.onDestroy();
     }
 
@@ -169,6 +176,10 @@ public class EmuDenActivity extends SDLActivity {
                 onBack();
             }
             return true;
+        }
+        // The browser's page may hold the focus (for typing); the pad still belongs to the app.
+        if (WebPage.showing() && mSurface != null && SDLControllerManager.isDeviceSDLJoystick(event.getDeviceId())) {
+            return handleKeyEvent(mSurface, event.getKeyCode(), event, null);
         }
         return super.dispatchKeyEvent(event);
     }
@@ -272,6 +283,38 @@ public class EmuDenActivity extends SDLActivity {
 
     public static void textEnd(int session) {
         TextBridge.end(session);
+    }
+
+    @Override
+    public boolean dispatchGenericMotionEvent(MotionEvent event) {
+        if (WebPage.showing() && mSurface != null && SDLControllerManager.isDeviceSDLJoystick(event.getDeviceId())) {
+            View.OnGenericMotionListener pad = getMotionListener();
+            return pad.onGenericMotion(mSurface, event);
+        }
+        return super.dispatchGenericMotionEvent(event);
+    }
+
+    // The in-app browser (WebPage, platform/src/android/webview_android.cpp).
+    static EmuDenActivity current() {
+        return self;
+    }
+
+    static ViewGroup webLayout() {
+        return mLayout;
+    }
+
+    static View webSurface() {
+        return mSurface;
+    }
+
+    /** Called from native code (platform/src/android). */
+    public static boolean webAvailable() {
+        return WebPage.available();
+    }
+
+    /** Called from native code (platform/src/android). */
+    public static void webCommand(long handle, int op, int a, int b, int c, int d, byte[] s, byte[] t) {
+        WebPage.command(handle, op, a, b, c, d, s, t);
     }
 
     /** Called from native code (platform/src/android): the second screen is wanted or not. */

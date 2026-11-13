@@ -1,0 +1,181 @@
+// SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// Plugins: the installed feature plugins as tiles, what the sources offer, and a row per
+// installed plugin to manage it. Route "plugins".
+
+#include <format>
+
+#include "den/app/app.h"
+#include "den/app/frame.h"
+#include "den/app/pages.h"
+#include "den/app/registry.h"
+#include "den/base/files.h"
+#include "feature_api.h"
+#include "model_widgets.h"
+
+namespace den::app {
+
+namespace {
+
+using plugins::FeaturePlugin;
+
+constexpr float ICON = 144, RAIL_W = 232;
+
+std::string Badge(const FeaturePlugin& plugin) {
+    if (!plugin.error.empty()) {
+        return "Stopped";
+    }
+    if (plugin.update_available) {
+        return "Update";
+    }
+    return plugin.trust == FeaturePlugin::Trust::Developer ? "Developer" : "";
+}
+
+void StartInstall(const FeaturePlugin& plugin) {
+    if (FeaturePluginJob(plugin.id)) {
+        return;
+    }
+    if (plugin.needs_consent || plugin.trust != FeaturePlugin::Trust::Official) {
+        Svc().stage->Push("plugin.consent", {{"id", plugin.id}});
+    } else {
+        InstallFeaturePlugin(plugin.id, false);
+    }
+}
+
+class PluginsScreen final : public ui::Page {
+public:
+    void Build() override {
+        Services& svc = Svc();
+        plugins::FeatureHost* host = FeatureHostSvc();
+        width_ = svc.canvas->Width();
+        revision_ = host ? host->Revision() : 0;
+        selected_.clear();
+        ui::Node* content = BuildRailFrame(*this, "Plugins");
+        content->pad_right = svc.theme->margin;
+        const float room = (width_ > 0 ? width_ : 1280.0f) - RAIL_W - svc.theme->margin * 2;
+        if (!host) {
+            auto* text = content->Emplace<Paragraph>(
+                "Plugins add features to EmuDEN, such as installing ROM hacks on your own games. "
+                "This version cannot run them yet.",
+                std::min(room, 720.0f));
+            text->tone = ui::Tone::Dim;
+            return;
+        }
+        ui::Node* list = content->Add(ui::MakeList(10));
+        list->id = "plugins.list";
+        list->pad_bottom = 28;
+
+        std::vector<FeaturePlugin> installed, available;
+        for (FeaturePlugin& plugin : host->Plugins()) {
+            (plugin.installed ? installed : available).push_back(std::move(plugin));
+        }
+
+        AddHeading(list, "Installed");
+        if (installed.empty()) {
+            list->Emplace<ui::Label>("Nothing is installed yet.")->tone = ui::Tone::Dim;
+        } else {
+            ui::Node* shelf = list->Add(ui::MakeShelf(18));
+            shelf->id = "plugins.installed";
+            shelf->SetPadding(10, 10);
+            for (const FeaturePlugin& plugin : installed) {
+                auto* tile = shelf->Emplace<ui::Tile>(plugin.name, PathToUtf8(plugin.icon), ICON, ICON);
+                tile->id = "plugins.tile." + plugin.id;
+                tile->badge = Badge(plugin);
+                // A plugin whose files are there but that was never accepted (a developer
+                // folder) is accepted first; an update waiting for consent still opens.
+                const bool accept = plugin.needs_consent && !plugin.update_available;
+                tile->on_activate = [id = plugin.id, accept] {
+                    Svc().stage->Push(accept ? "plugin.consent" : "plugin.view", {{"id", id}});
+                };
+                tile->on_focus = [this, id = plugin.id] { selected_ = id; };
+            }
+        }
+
+        AddHeading(list, "Available");
+        std::vector<ui::RowSpec> rows;
+        for (const FeaturePlugin& plugin : available) {
+            ui::RowSpec row = ValueRow(
+                "plugins.get." + plugin.id, plugin.name,
+                [id = plugin.id] { return JobText(FeaturePluginJob(id), "Install"); },
+                [plugin] { StartInstall(plugin); });
+            row.description = std::format("{}  ·  {}  ·  {}", plugin.publisher, plugin.summary, plugin.source_name);
+            rows.push_back(std::move(row));
+        }
+        if (rows.empty()) {
+            list->Emplace<ui::Label>(installed.empty() ? "Your plugin sources offer nothing yet."
+                                                       : "Everything your sources offer is installed.")
+                ->tone = ui::Tone::Dim;
+        }
+        AddRows(list, std::move(rows));
+
+        if (!installed.empty()) {
+            AddHeading(list, "Manage");
+            rows.clear();
+            for (const FeaturePlugin& plugin : installed) {
+                ui::RowSpec row = ValueRow(
+                    "plugins.manage." + plugin.id, plugin.name,
+                    [id = plugin.id, update = plugin.update_available, version = plugin.version] {
+                        return JobText(FeaturePluginJob(id), update ? "Update available" : "Version " + version);
+                    },
+                    [id = plugin.id] { Svc().stage->Push("plugin.manage", {{"id", id}}); });
+                row.description = std::format("{}  ·  {}", plugin.publisher, plugin.source_name);
+                rows.push_back(std::move(row));
+            }
+            AddRows(list, std::move(rows));
+        }
+    }
+
+    void Update(ui::Context&) override {
+        plugins::FeatureHost* host = FeatureHostSvc();
+        if ((host && host->Revision() != revision_) || Svc().canvas->Width() != width_) {
+            Rebuild();
+        }
+    }
+
+    std::vector<ui::Hint> Hints() const override {
+        if (OnTile()) {
+            return {{input::Nav::Confirm, "Open"}, {input::Nav::Option, "Manage"}, {input::Nav::Back, "Back"}};
+        }
+        return {{input::Nav::Confirm, "Select"}, {input::Nav::Back, "Back"}};
+    }
+
+    bool OnNav(input::Nav nav) override {
+        if (nav == input::Nav::Option && OnTile()) {
+            GetStage().Push("plugin.manage", {{"id", selected_}});
+            return true;
+        }
+        if (nav != input::Nav::Back) {
+            return false;
+        }
+        if (GetStage().Depth() > 1) {
+            GetStage().Pop();
+        } else {
+            GetStage().Replace("home");
+        }
+        return true;
+    }
+
+private:
+    static void AddHeading(ui::Node* list, const std::string& text) {
+        auto heading = ui::MakeHeading(text);
+        heading->size = 20;
+        heading->tone = ui::Tone::Dim;
+        heading->pad_top = 8;
+        list->Add(std::move(heading));
+    }
+
+    bool OnTile() const {
+        return !selected_.empty() && Focus() && Focus()->id == "plugins.tile." + selected_;
+    }
+
+    std::string selected_;
+    std::uint64_t revision_ = 0;
+    float width_ = 0;
+};
+
+} // namespace
+
+DEN_REGISTER_SCREEN("plugins", PluginsScreen);
+
+} // namespace den::app

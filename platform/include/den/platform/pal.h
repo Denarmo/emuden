@@ -74,6 +74,12 @@ std::filesystem::path DataDir();
 bool IsPortable();
 /// The read-only files shipped with the app (fonts, strings).
 std::filesystem::path AssetsDir();
+/// The user's Downloads folder; empty when the device has none the app can list.
+std::filesystem::path DownloadsDir();
+
+/// Opens an http or https address in the user's browser (the Windows shell, xdg-open, an
+/// Android intent). Only for something the user just pressed: the app opens no page by itself.
+Status OpenUrl(const std::string& url);
 
 double NowSeconds();
 void SleepMs(int ms);
