@@ -92,7 +92,7 @@ private:
     Stage* stage_ = nullptr;
     std::string route_;
     Params params_;
-    bool built_ = false, rebuild_ = false;
+    bool built_ = false, rebuild_ = false, reveal_ = false;
     float enter_ = 0;
     // Pointer state.
     Node* press_node_ = nullptr;

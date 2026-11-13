@@ -30,9 +30,15 @@ public:
         ui::Node& root = Root();
         root.axis = ui::Axis::Row;
         root.gap = 56;
-        root.align = ui::Align::Center;
+        // Centred when it all fits; on a small screen the facts and buttons scroll under the
+        // title, above the hint bar.
+        root.align = compact_ ? ui::Align::Stretch : ui::Align::Center;
         root.justify = ui::Align::Center;
-        root.SetPadding(svc.theme->margin * 2, 28);
+        side_ = nullptr;
+        root.SetPadding(svc.theme->margin * 2, PAD);
+        if (compact_) {
+            root.pad_bottom = PAD + HINTS;
+        }
         if (!found) {
             root.Emplace<ui::Label>(Tr("launch.gone"));
             return;
@@ -40,17 +46,28 @@ public:
         const library::Entry game = *found;
         backdrop_.Set(game.cover);
 
-        root.Emplace<CoverView>(game.name, game.cover, COVER_SIDE_W, COVER_SIDE_H)->overlay_title =
+        ui::Node* cover = root.Add(ui::MakeBox(ui::Axis::Column, 0));
+        cover->justify = ui::Align::Center;
+        cover->Emplace<CoverView>(game.name, game.cover, COVER_SIDE_W, COVER_SIDE_H)->overlay_title =
             game.placeholder_cover;
 
         ui::Node* side = root.Add(ui::MakeBox(ui::Axis::Column, 6));
-        side->width = 520;
+        if (compact_) {
+            side->grow = 1;
+        } else {
+            side->width = 520;
+        }
+        side_ = side;
         side->Emplace<ui::Label>(game.name, svc.theme->text_title, gfx::FONT_BOLD);
         auto* console = side->Emplace<ui::Label>(SystemName(game.system), svc.theme->text_heading, gfx::FONT_BOLD);
         console->tone = ui::Tone::Dim;
         console->pad_bottom = 6;
+        ui::Node* body = compact_ ? side->Add(ui::MakeList(6)) : side;
+        if (compact_) {
+            body->id = "details.body";
+        }
         const auto fact = [&](const std::string& text) {
-            side->Emplace<ui::Label>(text)->tone = ui::Tone::Dim;
+            body->Emplace<ui::Label>(text)->tone = ui::Tone::Dim;
         };
         fact(TrF("details.play_time", game.play_seconds > 0 ? PlayTimeText(game.play_seconds)
                                                             : Tr("records.not_played")));
@@ -82,8 +99,8 @@ public:
             fact(TrF("details.core", core->installed ? name : TrF("details.core_missing", name)));
         }
 
-        ui::Node* actions = side->Add(ui::MakeBox(ui::Axis::Column, 8));
-        actions->pad_top = 18;
+        body->Emplace<ui::Node>()->height = 12;
+        ui::Node* actions = compact_ ? body : side->Add(ui::MakeBox(ui::Axis::Column, 8));
         const auto action = [&](const char* node_id, const std::string& text, std::function<void()> fn) {
             auto* button = actions->Emplace<ui::Button>(text, std::move(fn));
             button->id = node_id;
@@ -110,7 +127,10 @@ public:
     }
 
     void Update(ui::Context&) override {
-        if (GamesRevision() != revision_) {
+        if (!compact_ && side_ && side_->rect.h > Root().rect.h - PAD * 2 - HINTS) {
+            compact_ = true;
+            Rebuild();
+        } else if (GamesRevision() != revision_) {
             Rebuild();
         }
     }
@@ -138,7 +158,10 @@ public:
 
 private:
     Backdrop backdrop_;
+    static constexpr float PAD = 28, HINTS = 44;
     std::uint64_t revision_ = 0;
+    ui::Node* side_ = nullptr;
+    bool compact_ = false;
 };
 
 } // namespace

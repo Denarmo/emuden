@@ -211,6 +211,7 @@ void Page::Prepare() {
         }
     }
     SetFocus(target, false);
+    reveal_ = true;
 }
 
 void Page::Activate(Node* node) {
@@ -339,6 +340,19 @@ void Page::Draw(Context& ctx, const gfx::Rect& area) {
     root_.Tick(ctx);
     root_.Measure(ctx);
     root_.Arrange(ctx, shifted);
+    if (reveal_) {
+        // The first layout after a build: the kept focus is brought into view at once.
+        reveal_ = false;
+        if (focus_) {
+            EnsureVisible(focus_);
+            for (Node* n = focus_->Parent(); n; n = n->Parent()) {
+                if (n->scrollable) {
+                    n->scroller.Jump(n->scroller.Destination());
+                }
+            }
+            root_.Arrange(ctx, shifted);
+        }
+    }
     root_.Draw(ctx);
     if (!focus_) {
         return;
