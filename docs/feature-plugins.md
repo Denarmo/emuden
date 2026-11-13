@@ -244,9 +244,8 @@ folder, other plugins' data, ROM contents, save files, settings, processes or na
 | xdelta3 / VCDIFF | `D6 C3 C4` | Adler-32 of each target window | Decoder of xdelta3 v3.1.0 (`den_fetch`, Apache-2.0) with secondary compressors DJW, FGK and LZMA (xz v5.8.1, `liblzma` only); source window up to the whole ROM |
 | PPF 1, 2, 3 | `PPF10/20/30` | v2/v3: optional 1024-byte block check at `0x9320`; v3 undo data skipped | PlayStation disc images (`.bin`, `.iso`); 64-bit offsets in v3 |
 
-A patch is applied to a temporary file beside the target and renamed; a failed check
-deletes it. Memory: inputs are memory-mapped or streamed, never more than the patch plus
-64 MiB held (NDS ROMs reach 512 MiB).
+A patch is applied to a temporary file beside the target, then renamed; a failed check deletes
+it. Inputs are mapped or streamed: at most the patch plus 64 MiB in memory (NDS: 512 MiB ROMs).
 
 ### 7.2 Checksums and headers
 
@@ -289,13 +288,11 @@ The base ROM is only read. A plugin can change and remove only entries whose sid
 | Install | After a tile or the picker: `den.patch.inspect`. BPS carries the base CRC32, so the base is found without a question. xdelta has no source checksum: the plugin tries the library's games that are in `bases.json`, six at most, and keeps the one whose target windows verify; with none, a list to choose from. Then a `detail`: title (from the file name, an editable `input`), base game, format, "Install". A missing base gives a page naming the game, region and checksums: "Add your own copy of this game to the library". Nothing offers to download it |
 | Hack | A tile of "Installed hacks": "Play" (`den.app.open_game`), "Update from a file", "Rename", "Remove" |
 
-On Android, "open with" and share intents for `file_types`, and on desktop a file path on
-the command line, reach `FeatureHost::RouteFile`.
+On Android "open with" and share intents for `file_types`, and on desktop a file path on the
+command line, reach `FeatureHost::RouteFile`. The plugin never requests anything from
+hackdex.app or its storage hosts, never downloads a ROM and bundles no patches.
 
-It never requests anything from hackdex.app or its storage hosts, never downloads a ROM,
-bundles no patches and does not use the Hackdex name as its own.
-
-### 8.3 Stage 2 (needs written permission first)
+### 8.2 Stage 2 (needs written permission first)
 
 Adds `http`, `download` and the agreed hosts to the manifest, and a `catalog.lua` adapter the
 pages are written against: `list{query, base, tags, sort, page}` -> `{items = {slug, title,
