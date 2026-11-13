@@ -77,7 +77,20 @@ struct Stage::Impl {
     std::vector<ToastItem> toasts;
     std::unique_ptr<Dialog> dialog;
     std::unique_ptr<TextEntry> entry;
+    KeyboardSetup keyboard;
+    bool by_pad = false; // the last input was a pad's button, not a touch or a key
     float scale = 1.0f;
+
+    void CloseEntry(TextEntry::Outcome outcome) {
+        if (outcome == TextEntry::Outcome::Open) {
+            return;
+        }
+        // Closed first: the callback may ask for the next text.
+        const std::unique_ptr<TextEntry> closed = std::move(entry);
+        if (outcome == TextEntry::Outcome::Done) {
+            closed->Finish();
+        }
+    }
 
     void Show(Page* page) {
         if (page) {
@@ -289,7 +302,17 @@ bool Stage::DialogOpen() const {
 }
 
 void Stage::AskText(TextRequest request, std::function<void(const std::string&)> on_done) {
-    impl_->entry = std::make_unique<TextEntry>(std::move(request), std::move(on_done));
+    impl_->entry.reset(); // one keyboard session at a time
+    impl_->entry =
+        std::make_unique<TextEntry>(std::move(request), std::move(on_done), impl_->keyboard, impl_->by_pad);
+}
+
+TextEntry* Stage::Entry() const {
+    return impl_->entry.get();
+}
+
+void Stage::SetKeyboard(const KeyboardSetup& setup) {
+    impl_->keyboard = setup;
 }
 
 bool Stage::TextEntryOpen() const {
@@ -304,17 +327,16 @@ void Stage::HandleEvent(const input::Event& event) {
 
 void Stage::HandleEvent(const input::Event& event, double time) {
     impl_->Apply(*this);
+    using Type = input::Event::Type;
+    if (event.type == Type::Nav) {
+        impl_->by_pad = event.family != input::PadFamily::Keyboard;
+    } else if (event.type == Type::PointerDown || event.type == Type::Key) {
+        impl_->by_pad = false;
+    }
     if (impl_->dialog) {
         impl_->DialogEvent(event);
     } else if (impl_->entry) {
-        const TextEntry::Outcome outcome = impl_->entry->HandleEvent(event, impl_->scale);
-        if (outcome != TextEntry::Outcome::Open) {
-            // Closed first: the callback may ask for the next text.
-            const std::unique_ptr<TextEntry> entry = std::move(impl_->entry);
-            if (outcome == TextEntry::Outcome::Done) {
-                entry->Finish();
-            }
-        }
+        impl_->CloseEntry(impl_->entry->HandleEvent(event, impl_->scale));
     } else if (Page* page = Top()) {
         page->Dispatch(event, impl_->scale, time);
     }
@@ -325,6 +347,11 @@ void Stage::Frame(Context& ctx) {
     impl_->Apply(*this);
     impl_->scale = ctx.canvas->Scale();
     gfx::Canvas& canvas = *ctx.canvas;
+    if (impl_->entry) {
+        // What the platform's keyboard did since the last frame.
+        impl_->CloseEntry(impl_->entry->Update(ctx.dt));
+        impl_->Apply(*this);
+    }
     if (Page* page = Top()) {
         page->Prepare();
         page->Update(ctx);
@@ -372,6 +399,7 @@ std::string Stage::StateJson() const {
     if (impl_->entry) {
         members.emplace_back("text_entry", JsonObject({{"title", JsonString(impl_->entry->Title())},
                                                        {"text", JsonString(impl_->entry->Text())},
+                                                       {"mode", JsonString(impl_->entry->Mode())},
                                                        {"key", JsonString(impl_->entry->SelectedKey())}}));
     }
     std::vector<JsonValue> toasts;

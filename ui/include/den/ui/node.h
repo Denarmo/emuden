@@ -89,6 +89,9 @@ public:
     float scroll_margin = 48; // room kept around the focused child when scrolling to it
     std::function<void()> on_activate;
     std::function<void()> on_focus;
+    /// A finger held on the node for half a second (the pad has a button for the same on
+    /// the page). The press then no longer counts as a tap.
+    std::function<void()> on_hold;
 
     void SetPadding(float all) {
         pad_left = pad_top = pad_right = pad_bottom = all;

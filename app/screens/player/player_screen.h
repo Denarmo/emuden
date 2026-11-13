@@ -52,6 +52,14 @@ public:
         return static_cast<int>(size_);
     }
     void SetScreenSize(int index);
+    /// The game is on the second display and the quick settings in the main window.
+    bool Swapped() const {
+        return swapped_;
+    }
+    /// Pauses with the menu open, as the menu button does; nothing when it is open already.
+    void Pause() {
+        OpenMenu();
+    }
     /// Saves and leaves the game, as the pause menu's "Exit to home".
     void Exit() {
         Leave();

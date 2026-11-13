@@ -7,7 +7,7 @@
 //
 // With EMUDEN_AUTOMATION=<port> a test endpoint listens on <port>+2, one line in and one
 // line out:
-//   state                  JSON: present, ready, size, route, claimed, overlay, game
+//   state                  JSON: present, ready, size, route, claimed, overlay, keys, game
 //   tap <x> <y>            a press at a point in the second screen's logical units
 //   drag <x1> <y1> <x2> <y2>  a finger dragged between two points over a few frames
 //   screenshot <png path>  the second screen's next frame
@@ -42,6 +42,7 @@ struct Controller {
     bool overlaid = false;
     bool claimed = false;
     bool ready_logged = false;
+    std::string base; // the page the stage rests on: browsing or quick settings
     float scale = 1.0f;
     double last_frame = 0;
     std::vector<pal::SecondPointer> pointer;
@@ -127,10 +128,11 @@ void PumpEndpoint(Controller& c) {
             int w = 0, h = 0;
             display.PixelSize(w, h);
             const ui::Page* page = c.stage ? c.stage->Top() : nullptr;
+            const ui::TextEntry* typing = Svc().stage ? Svc().stage->Entry() : nullptr;
             reply = std::format("{{\"present\":{},\"ready\":{},\"width\":{},\"height\":{},\"route\":\"{}\","
-                                "\"claimed\":{},\"overlay\":{},\"game\":\"{}\"}}",
+                                "\"claimed\":{},\"overlay\":{},\"keys\":{},\"game\":\"{}\"}}",
                                 display.Present(), display.Ready(), w, h, page ? page->Route() : "",
-                                c.claimed, c.overlaid, c.game);
+                                c.claimed, c.overlaid, typing && typing->KeysApart(), c.game);
         } else if (command == "tap") {
             float x = 0, y = 0;
             in >> x >> y;
@@ -239,13 +241,22 @@ void Frame() {
                                 : "companion.browse";
         if (!c.stage->Top()) {
             c.stage->Push(route);
-        } else if (c.stage->Top()->Route() != route) {
+        } else if (c.base != route) {
+            // Another base page: what was opened over the old one (the apps) goes with it.
+            c.stage->PopToRoot();
             c.stage->Replace(route);
         }
+        c.base = route;
     }
+    // A text entry of the main window whose own keys belong here (the system keyboard did
+    // not come): they are drawn over everything else and take the presses.
+    ui::TextEntry* typing = svc.stage->Entry();
+    const bool keys = typing && typing->KeysApart();
     for (const pal::SecondPointer& p : c.pointer) {
         const input::Event event = PointerEvent(p);
-        if (c.overlaid) {
+        if (keys) {
+            typing->KeysPointer(event, c.scale);
+        } else if (c.overlaid) {
             if (c.overlay.pointer) {
                 c.overlay.pointer(event);
             }
@@ -270,7 +281,9 @@ void Frame() {
     ctx.dt = static_cast<float>(std::clamp(now - c.last_frame, 0.0, 0.1));
     ctx.time = now;
     c.last_frame = now;
-    if (c.overlaid) {
+    if (keys) {
+        typing->DrawKeys(ctx);
+    } else if (c.overlaid) {
         if (c.overlay.draw) {
             c.overlay.draw(ctx, gfx::Rect{0, 0, svc.canvas->Width(), svc.canvas->Height()});
         }

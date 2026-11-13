@@ -11,6 +11,7 @@
 #include <cmath>
 #include <format>
 
+#include "../apps/apps_catalog.h"
 #include "../home/games.h"
 #include "../player/picture_choice.h"
 #include "../player/player_screen.h"
@@ -117,6 +118,10 @@ public:
                     now->OpenPage("buttons");
                 }
             });
+            if (AppsAvailable()) {
+                // Another app on this display while the game goes on on the other.
+                tool("companion.apps", "Apps", [this] { GetStage().Push("companion.apps"); });
+            }
         }
 
         if (snapshot.can_save_states) {

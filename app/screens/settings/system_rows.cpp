@@ -8,6 +8,7 @@
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/system/info.h"
+#include "keyboard.h"
 
 namespace den::app {
 
@@ -20,6 +21,7 @@ std::vector<ui::RowSpec> SystemRows() {
     data.description = pal::IsPortable() ? "Portable: the \"user\" folder next to the program"
                                          : "Saves, states, covers and settings";
     rows.push_back(std::move(data));
+    AddKeyboardRow(rows);
 
     for (const plugins::Console& console : Svc().plugins->Consoles()) {
         if (console.runner != plugins::Runner::Engine) {

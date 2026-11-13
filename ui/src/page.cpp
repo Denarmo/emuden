@@ -13,6 +13,7 @@ namespace {
 
 using input::Nav;
 constexpr float DRAG_THRESHOLD = 10; // units a finger moves before a press becomes a drag
+constexpr float HOLD_SECONDS = 0.5f; // a finger resting this long is a hold, not a tap
 constexpr float WHEEL_STEP = 90;     // units per wheel line
 
 bool IsDirection(Nav nav) {
@@ -300,6 +301,8 @@ void Page::Pointer(const input::Event& event, float scale, double time) {
         stopped_fling_ = false;
         press_x_ = last_x_ = x;
         press_y_ = last_y_ = y;
+        hold_ = 0;
+        hold_fired_ = false;
         press_node_ = root_.HitTest(x, y, [](const Node& n) { return n.focusable; });
         // A finger on moving content stops it, and that press is not a tap.
         for (Node* n = root_.HitTest(x, y, scrollable); n; n = n->Parent()) {
@@ -347,7 +350,8 @@ void Page::Pointer(const input::Event& event, float scale, double time) {
         break;
     }
     case Type::PointerUp:
-        if (pressed_ && !dragging_ && !stopped_fling_ && press_node_ && press_node_->rect.Contains(x, y)) {
+        if (pressed_ && !dragging_ && !stopped_fling_ && !hold_fired_ && press_node_ &&
+            press_node_->rect.Contains(x, y)) {
             SetFocus(press_node_, false);
             Activate(press_node_);
         }
@@ -377,6 +381,17 @@ void Page::Pointer(const input::Event& event, float scale, double time) {
 
 void Page::Draw(Context& ctx, const gfx::Rect& area) {
     enter_ = Approach(enter_, 1.0f, ctx.dt, 12.0f);
+    // A finger resting on a node that answers to it.
+    if (pressed_ && !dragging_ && !stopped_fling_ && !hold_fired_ && press_node_ && press_node_->on_hold) {
+        hold_ += ctx.dt;
+        if (hold_ >= HOLD_SECONDS) {
+            hold_fired_ = true;
+            SetFocus(press_node_, false);
+            // The callback may rebuild the page, which drops the node.
+            const std::function<void()> held = press_node_->on_hold;
+            held();
+        }
+    }
     gfx::Rect shifted = area;
     shifted.y += (1.0f - enter_) * 18.0f;
     root_.Tick(ctx);

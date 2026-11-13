@@ -34,6 +34,8 @@ public class EmuDenActivity extends SDLActivity {
 
     private StorageAccess storage;
     private SecondScreen secondScreen;
+    private TextBridge textBridge;
+    private static EmuDenActivity self;
     private OnBackInvokedCallback backCallback;
     private long lastBack;
 
@@ -50,7 +52,10 @@ public class EmuDenActivity extends SDLActivity {
         automationFromIntent();
         unpackAssets();
         secondScreen = new SecondScreen(this);
+        textBridge = new TextBridge(this);
+        self = this;
         super.onCreate(savedInstanceState);
+        AppList.watch(this);
         trapBack();
         storage.askAtStart();
     }
@@ -63,6 +68,7 @@ public class EmuDenActivity extends SDLActivity {
 
     @Override
     protected void onStop() {
+        textBridge.onStop();
         secondScreen.onStop();
         super.onStop();
     }
@@ -75,6 +81,10 @@ public class EmuDenActivity extends SDLActivity {
 
     @Override
     protected void onDestroy() {
+        AppList.unwatch(this);
+        if (self == this) {
+            self = null;
+        }
         if (backCallback != null && Build.VERSION.SDK_INT >= 33) {
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
             backCallback = null;
@@ -122,6 +132,42 @@ public class EmuDenActivity extends SDLActivity {
             return true;
         }
         return super.dispatchKeyEvent(event);
+    }
+
+    // With an app opened on the other display this activity stays resumed and keeps drawing
+    // and playing (SDL pauses on stop only); it just no longer has the keys and the pad.
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        try {
+            AppList.nativeFocus(hasFocus);
+        } catch (UnsatisfiedLinkError e) {
+            // Before the native library is loaded nobody asks.
+        }
+    }
+
+    /** Called from native code (platform/src/android/apps_android.cpp), from a job's thread. */
+    public static String[] appsList() {
+        EmuDenActivity activity = self;
+        return activity != null ? AppList.list(activity) : new String[0];
+    }
+
+    public static String appsLaunch(String id, int display) {
+        EmuDenActivity activity = self;
+        return activity != null ? AppList.launch(activity, id, display) : "error:The app is closing";
+    }
+
+    /** Called from native code (platform/src/android/text_input_android.cpp). */
+    public static void textBegin(int session, String text, String hint, int maxLength, boolean second) {
+        TextBridge.begin(session, text, hint, maxLength, second);
+    }
+
+    public static void textSet(int session, String text) {
+        TextBridge.setText(session, text);
+    }
+
+    public static void textEnd(int session) {
+        TextBridge.end(session);
     }
 
     /** Called from native code (platform/src/android): the second screen is wanted or not. */

@@ -14,6 +14,7 @@
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/registry.h"
+#include "den/platform/text_input.h"
 
 namespace den::app {
 
@@ -68,6 +69,15 @@ public:
         field_ = content->Emplace<QueryField>();
         field_->text = query_;
         field_->placeholder = Tr("search.placeholder");
+        if (pal::GetTextInput().Available()) {
+            // Where the device has a keyboard of its own, the field opens it (the text entry
+            // decides between it and the app's keys); the results follow the typing.
+            field_->id = "search.field";
+            field_->label = Tr("search.title");
+            field_->focusable = true;
+            field_->chrome = true; // the keys below keep the first focus
+            field_->on_activate = [this] { AskQuery(); };
+        }
 
         ui::Node* body = content->Add(ui::MakeBox(ui::Axis::Row, 28));
         body->grow = 1;
@@ -197,6 +207,31 @@ private:
         options.on_focus = [this](const library::Entry& game) { selected_ = game.id; };
         const float room = width_ - RAIL_W - Svc().theme->margin * 2 - KEYBOARD_W - 28 - 10;
         AddGameGrid(results_, games, GridColumns(room), options)->id = "search.grid";
+    }
+
+    void AskQuery() {
+        ui::TextRequest request;
+        request.title = Tr("search.title");
+        request.text = query_;
+        request.placeholder = Tr("search.placeholder");
+        request.max_length = static_cast<int>(MAX_QUERY);
+        request.allow_empty = true;
+        request.on_change = [this](const std::string& text) { SetTyped(text); };
+        GetStage().AskText(std::move(request), [this](const std::string& text) { SetTyped(text); });
+    }
+
+    // A text from the text entry, held to what a query may be: lower case, plain characters.
+    void SetTyped(const std::string& text) {
+        std::string query;
+        for (const char c : text) {
+            const unsigned char u = static_cast<unsigned char>(c);
+            if (u >= 32 && u < 127 && query.size() < MAX_QUERY && !(c == ' ' && query.empty())) {
+                query.push_back(static_cast<char>(std::tolower(u)));
+            }
+        }
+        if (query != query_) {
+            SetQuery(std::move(query));
+        }
     }
 
     // True when the key was a character of the query (or erased one).

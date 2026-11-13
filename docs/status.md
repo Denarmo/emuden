@@ -51,6 +51,23 @@ another branch was installed in between and replaced by this release build again
 device is left with the release APK, force-stopped, "Top on second" and Tetris on dot matrix
 as they were.
 
+## Apps and the system keyboard (written, not run on a device)
+
+Three requests for Android, built on Windows and as a debug APK; the device was not touched.
+
+| Item | State | What was run |
+|---|---|---|
+| "Apps" in the main menu | A rail entry where the platform lists apps (`pal::apps`, Android only): icons with names, by name, favourites first (Option or a held finger), a "Recent" shelf, search, pad and touch; the app itself is not listed | Windows with a made-up list (`EMUDEN_FAKE_APPS=1`): the grid, the recent shelf after opening one, the search with its keys. Unit tests of the list model (`den_system_tests`). The Android side (package manager, icons, package changes) compiles only |
+| "Apps" in the quick settings | The same grid on the second display; the app opens there (`setLaunchDisplayId`) and the game goes on on the main one. One display, or the game swapped to the second one: the game is paused and the app takes the screen (pause menu row "Apps" with one display) | Compiles only |
+| System keyboard on the second screen | A text entry asks `pal::TextInput`: the keyboard opens on the second display, the text is shown on the main one; with one display the line moves above the keyboard. A request made with the pad keeps the app's keys on the main display as well. Settings > System, "Keyboard: System / EmuDEN". No keyboard within a second, or one put away: the app's keys, drawn on the second display | Unit tests with a fake keyboard (`den_ui_tests`). The Android side compiles only |
+
+Known before any run: while another app is on the other display the pad goes to that app,
+not to the game (Android sends keys to the focused window); the game says so and a tap on
+it takes the pad back. With the game swapped to the second display an app opened from the
+quick settings covers the activity, which Android stops, so the game waits. The search of
+the Search page opens the keyboard only when its field is chosen; its own letters stay.
+See `shells/android/README.md`.
+
 ## The owner's notes
 
 | Note | State | What was run |

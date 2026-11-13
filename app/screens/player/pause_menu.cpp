@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <format>
 
+#include "../apps/apps_catalog.h"
 #include "../companion/second_screen.h"
 #include "den/app/pages.h"
 #include "den/base/files.h"
@@ -158,6 +159,11 @@ void PlayerScreen::BuildMain(ui::Node* list) {
                                CloseMenu();
                            });
     }));
+    if (AppsAvailable() && !SecondScreenReady()) {
+        // One display: an app takes it and the game waits, paused as it is now. With two
+        // the quick settings have the button, and the app opens beside the game.
+        rows.push_back(ActionRow("menu.apps", "Apps", [this] { GetStage().Push("apps", {{"from", "game"}}); }));
+    }
     rows.push_back(ActionRow("menu.exit", "Exit to home", [this] { Leave(); }));
     options_ = Svc().player->Options();
     AddRows(list, std::move(rows), ROW_HEIGHT);

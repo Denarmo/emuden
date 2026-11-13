@@ -9,6 +9,8 @@ if(ANDROID)
     list(APPEND platform_exclude "/src/posix/http_curl.cpp")
     # The second screen is a Presentation (src/android), not a second window.
     list(APPEND platform_exclude "/src/sdl/second_display_sdl.cpp")
+    # Other apps and the system keyboard exist on Android only (src/android).
+    list(APPEND platform_exclude "/src/sdl/apps_desktop.cpp" "/src/sdl/text_input_desktop.cpp")
 else()
     list(APPEND platform_exclude "/src/android/")
 endif()

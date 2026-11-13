@@ -33,6 +33,8 @@ sources live once in `.deps/`.
 | `den/base/zip.h` | `ListZip`, `ExtractZipEntry` |
 | `den/base/jobs.h` | `Jobs::Run(name, fn(Job&), on_done)`: progress, message, cancel; `on_done` runs on the main thread |
 | `den/platform/pal.h` | window and GL context, `DataDir`, `AssetsDir`, `HttpGet` (redirects, streaming to a file, progress, cancel), `StartProcess`, `GetSecrets`, `GetCaps`, `StartLineServer` |
+| `den/platform/apps.h` | `pal::apps`: the device's other apps where the platform can list them (Android): `Available`, `List` (id, label, icon PNG in the app cache; call it from a job), `Revision`, `Launch(id, Display::Default / Main / Second)`, `HasInputFocus` |
+| `den/platform/text_input.h` | `pal::GetTextInput()`: the platform's own keyboard for a text (Android): `Begin(request, TextDisplay::Main / Second)`, `SetText`, `End`, `Poll` (Shown, Hidden, Text, Done, Cancel), `CoveredShare`. `Available()` is false on the desktop |
 | `den/gfx/gl.h` | the GL functions, loaded at run time (`gl::Viewport`, ...); add one by adding a line |
 | `den/gfx/device.h` | textures, shader programs, `ReadPixels`, `SavePng` |
 | `den/gfx/canvas.h` | `Canvas`: `FillRect`, `StrokeRect`, `DrawImage`, `DrawText`, clips, `Flush`, `RestoreState` |
@@ -63,7 +65,21 @@ Everything is in logical units: the window is always 720 units high, the width f
   `Hints`, `Immersive` (no hint bar) and `Draw` (a page that draws itself, like the player).
   `Rebuild()` builds again and keeps the focus by node id.
 - `ui::Stage`: `Push(route, params)`, `Replace`, `Pop`, `PopToRoot`, `Toast(text)`,
-  `Confirm(title, message, yes, on_yes)`.
+  `Confirm(title, message, yes, on_yes)`, `AskText(request, on_done)` (the text entry;
+  `TextRequest::on_change` follows the typing).
+- `Node::on_hold` runs when a finger rests on the node for half a second; the release is
+  then not a tap. The pad's button for the same thing is the page's business (`OnNav`).
+- Text entry and keyboards (`den/ui/text_entry.h`): `Stage::SetKeyboard(KeyboardSetup)` says
+  where the keys of the next entries come from: the platform's keyboard (`pal::TextInput`),
+  whether the user prefers it, the display it opens on, and whether that is another display
+  than the stage's. With it the entry shows the line alone (plus the app's keys when the
+  request was made with a pad and the keyboard is on the other display); on the same
+  display the panel sits above the keyboard (`CoveredShare`). A keyboard that does not
+  report `Shown` within a second, or is put away, gives way to the app's keys; when
+  `keys_apart` is set they are wanted on the other display (`Stage::Entry()->KeysApart()`,
+  `DrawKeys`, `KeysPointer`), which `app/screens/companion/second_screen.cpp` does. The
+  app's choice is made every frame in `app/screens/settings/keyboard.cpp` (`ui.keyboard`:
+  `system` or `emuden`).
 - `ui::Theme`: Light (default) and Dark; widgets read `ctx.theme`. The accent exists only in
   `ui/src/selection.cpp`, as the border of the current selection.
 
@@ -247,6 +263,24 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
   answers `screens` with the mode and where each screen is drawn.
 - Test endpoint on the automation port + 2: `state`, `tap <x> <y>` (the second screen is 600
   units high), `drag <x1> <y1> <x2> <y2>`, `screenshot <png>`.
+
+## Apps
+
+- `den/system/app_shelf.h`: `system::AppShelf`, the list as it is shown: by name,
+  favourites first, a search by words, the apps opened last. Pure data, unit-tested.
+- `app/screens/apps/apps_catalog.h`: `AppsAvailable()`, `Apps()` (the shelf, filled from
+  `pal::apps::List()` on a job and again when `pal::apps::Revision()` moves),
+  `AppsRevision()`, `ToggleAppFavourite`, `OpenApp(id, beside_game, stage)` and
+  `PadWithOtherApp()`. Settings `apps.favourites`, `apps.recent`. `EMUDEN_FAKE_APPS=1`
+  gives the desktop a made-up list for driving the screens (opening only shows a toast).
+- `app/screens/apps/app_grid.h`: `AddAppGrid(parent, options)`, the grid both pages use.
+- Routes: `apps` (in the rail only when `AppsAvailable()`; `from=game` is the pause menu's
+  "Apps" row on a device with one display) and `companion.apps` on the companion stage (the
+  quick settings' "Apps" button). Confirm or a tap opens, Option or a held finger pins,
+  Extra searches.
+- `OpenApp` with `beside_game`: two displays: `Display::Second` and the game goes on; the
+  game swapped to the second display, or one display: the game is paused
+  (`PlayerScreen::Pause()`), its saves flushed, and the app takes this window's display.
 
 ## Launcher additions
 

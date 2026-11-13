@@ -145,7 +145,11 @@ private:
 } // namespace
 
 Status Init() {
-    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "0");
+    // A pad must not drive the app from behind another window. Android has no such case
+    // (pad events only ever reach the app's own windows), and there the game must keep its
+    // pad while the system keyboard on the second display has the focus.
+    const bool android = std::string(SDL_GetPlatform()) == "Android";
+    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, android ? "1" : "0");
     // Android: Back is a key for the app (it goes back a page), never the end of the activity.
     SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
     SDL_SetAppMetadata("EmuDEN", "0.1.0", "io.github.denarmo.emuden");

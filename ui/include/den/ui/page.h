@@ -108,6 +108,8 @@ private:
     float press_x_ = 0, press_y_ = 0, last_x_ = 0, last_y_ = 0;
     bool pressed_ = false, dragging_ = false;
     bool stopped_fling_ = false; // the press stopped a fling, so it is not a tap
+    float hold_ = 0;             // seconds the finger has rested on press_node_
+    bool hold_fired_ = false;    // ... long enough: on_hold ran, the release is not a tap
 };
 
 /// The router and everything drawn above pages: hint bar, toasts, the confirm dialog.
@@ -139,6 +141,11 @@ public:
     /// finishes; it is not called when they back out.
     void AskText(TextRequest request, std::function<void(const std::string&)> on_done);
     bool TextEntryOpen() const;
+    /// The open text entry, for the app to draw its keys on another display; else null.
+    TextEntry* Entry() const;
+    /// Where the keys of the text entries opened from now on come from (the platform's
+    /// keyboard, the display it goes to). Without the call: the app's own keys.
+    void SetKeyboard(const KeyboardSetup& setup);
 
     void HandleEvent(const input::Event& event);
     /// The same with the time the event happened (seconds, any steady origin); flings read

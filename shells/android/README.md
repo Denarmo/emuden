@@ -81,6 +81,57 @@ The companion's test endpoint is on the automation port + 2 (`state`, `tap`, `sc
 forwarded by `run.ps1`. `run.ps1 -BuildName <name>` (Gradle: `-PemudenBuild=<name>`) builds in
 `build/<name>` instead of `build/android`.
 
+## Apps
+
+`AppList` lists the launcher's activities (`queryIntentActivities` for `MAIN` / `LAUNCHER`;
+the manifest's `<queries>` element makes them visible, there is no `QUERY_ALL_PACKAGES`),
+except the app's own. Icons, adaptive ones included, are drawn into 192 pixel PNGs in
+`<cache>/app_icons` and drawn again when the package was updated; a receiver for package
+added, removed, changed and replaced makes the native side list again. An app is opened
+with its launcher intent and `FLAG_ACTIVITY_NEW_TASK`.
+
+From the quick settings the app opens on the other display
+(`ActivityOptions.setLaunchDisplayId`, after `isActivityStartAllowedOnDisplay`), under
+which the Presentation with the quick settings stays; the page with the apps closes with
+the choice, so the quick settings are there again when the app is left. There is no button
+of ours inside another app: the user leaves it with the system's Back or Home gesture on
+that screen. When the system does not allow activities on that display the app opens on the
+main one instead, a toast says so, and the game is paused.
+
+While the app is on the other display the activity stays resumed (only "top resumed" moves
+on), so SDL keeps running: SDL 3 pauses its thread in `onStop`, not on a lost focus or
+`onPause`, and nothing in the app pauses a game for a lost focus. Picture and sound go on.
+The keys and the built-in pad go to the window with the input focus, which is the other app
+now, and Android has no way to keep them: the game shows "The pad is with the app on the
+other screen. Tap the game to take it back", because a touch on a display moves the focus
+to the window touched there. `AppList.nativeFocus` (from `onWindowFocusChanged`) tells the
+native side. With the game swapped to the second display, or with one display, the app
+takes the activity's own display: the activity is stopped, SDL pauses, and the game waits
+paused with its saves written until the user comes back.
+
+None of this was run on a device (see `docs/status.md`).
+
+## System keyboard
+
+`TextBridge` opens a window that can take the focus on the display the keyboard should be
+on: a `Presentation` on the other display when the app asks for the second screen and it is
+there, else a `Dialog` on the activity's own. It holds one invisible `EditText`, is one
+pixel wide and not touch-modal, so the quick settings under it can still be touched. The
+keyboard is shown for the field (`SOFT_INPUT_STATE_ALWAYS_VISIBLE` plus `showSoftInput`);
+its text (`TextWatcher`), its done action and Back go to
+`platform/src/android/text_input_android.cpp` with the number of the session, and the app
+draws the text itself. The window's insets say when the keyboard is on screen and how much
+of the display it covers (`WindowInsets.Type.ime()` from Android 11, the system window
+inset before), which moves the app's text line up when both are on one display.
+
+Pad keys and stick motion that arrive at this window, because it has the focus, are handed
+to SDL (`SDLActivity.handleKeyEvent`, `SDLControllerManager.handleJoystickMotionEvent`), and
+`SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS` is on for Android, so the pad keeps driving the
+app while the keyboard is open. A keyboard that refuses the second display never reports
+itself shown; after a second the app ends the session and draws its own keys on the second
+display. The same happens when the keyboard is put away (the system's Back closes it first,
+and a touch on the other display takes the focus from it).
+
 ## Storage
 
 Games are read by path. `StorageAccess` shows a dialog at every start until the app has all

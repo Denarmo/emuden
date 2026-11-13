@@ -100,6 +100,30 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         return own != null ? own.getDisplayId() : Display.DEFAULT_DISPLAY;
     }
 
+    /** The display the activity is on, for code that opens something beside it. */
+    @SuppressWarnings("deprecation")
+    static int ownDisplayId(Activity activity) {
+        Display own = activity.getWindowManager().getDefaultDisplay();
+        return own != null ? own.getDisplayId() : Display.DEFAULT_DISPLAY;
+    }
+
+    /** The other display of the device (where the Presentation goes), or null without one. */
+    static Display otherDisplay(Activity activity) {
+        DisplayManager manager = (DisplayManager) activity.getSystemService(Context.DISPLAY_SERVICE);
+        int own = ownDisplayId(activity);
+        for (Display display : manager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)) {
+            if (display.getDisplayId() != own && display.isValid()) {
+                return display;
+            }
+        }
+        return null;
+    }
+
+    static int otherDisplayId(Activity activity) {
+        Display other = otherDisplay(activity);
+        return other != null ? other.getDisplayId() : -1;
+    }
+
     // The display a Presentation may be shown on that the activity is not on itself.
     private Display pick() {
         int own = ownDisplayId();

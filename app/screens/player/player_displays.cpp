@@ -12,6 +12,7 @@
 #include <iterator>
 #include <format>
 
+#include "../apps/apps_catalog.h"
 #include "../companion/second_screen.h"
 #include "player_screen.h"
 
@@ -128,6 +129,16 @@ void PlayerScreen::DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const p
                 x += measure(dot);
             }
         }
+    }
+    if (PadWithOtherApp()) {
+        // An app opened on the other display has the keys and the pad; Android gives them
+        // back to the window that is touched.
+        const std::string text = "The pad is with the app on the other screen. Tap the game to take it back";
+        const float w = std::min(area.w - 24, ctx.Text().Measure(text, size, gfx::FONT_BOLD) + 20);
+        const gfx::Rect box{area.CenterX() - w * 0.5f, area.Bottom() - size - 24, w, size + 12};
+        canvas.FillRect(box, plate, 8);
+        canvas.DrawText(ctx.Text().Elide(text, size, w - 20, gfx::FONT_BOLD), box.x + 10, box.y + 5, size, ink,
+                        gfx::FONT_BOLD);
     }
     if (snapshot.rewinding) {
         badge("\xC2\xAB Rewind", false);
