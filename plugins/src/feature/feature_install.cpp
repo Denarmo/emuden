@@ -29,6 +29,7 @@ FeatureAccess AccessOf(const IndexPlugin& offered) {
     access.permissions = offered.permissions;
     access.http_hosts = offered.http_hosts;
     access.open_hosts = offered.open_hosts;
+    access.browse_hosts = offered.browse_hosts;
     access.systems = offered.systems;
     return access;
 }

@@ -5,11 +5,14 @@
 // ROM images nobody gets.
 
 #include <algorithm>
+#include <chrono>
 #include <format>
 #include <map>
 
 #include "den/app/app.h"
+#include "den/app/registry.h"
 #include "den/base/files.h"
+#include "den/patching/patch.h"
 #include "web_browser.h"
 
 namespace den::app::web {
@@ -19,6 +22,25 @@ namespace {
 std::map<std::string, Opener>& Openers() {
     static std::map<std::string, Opener> openers;
     return openers;
+}
+
+// A download nobody collected (its opener was gone, or the app was closed first) does not
+// stay for ever: what is older than a day goes when the app starts.
+void CleanInbox() {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    const auto limit = fs::file_time_type::clock::now() - std::chrono::hours(24);
+    std::vector<fs::path> old;
+    for (fs::directory_iterator it(InboxDir(), ec), end; !ec && it != end; it.increment(ec)) {
+        std::error_code failed;
+        const auto written = fs::last_write_time(it->path(), failed);
+        if (!failed && written < limit) {
+            old.push_back(it->path());
+        }
+    }
+    for (const fs::path& path : old) {
+        fs::remove_all(path, ec);
+    }
 }
 
 std::string Join(const std::vector<std::string>& items) {
@@ -43,14 +65,7 @@ std::string ExtensionOf(const std::string& file_name) {
 }
 
 bool IsRomImage(const std::string& extension) {
-    static const char* const IMAGES[] = {
-        "gb",  "gbc", "sgb", "gba", "nds", "dsi", "3ds", "cci", "cia", "3dsx", "nes", "fds", "unf", "unif",
-        "sfc", "smc", "n64", "z64", "v64", "ndd", "gcm", "gcz", "rvz", "wbfs", "wad", "iso", "bin", "cue",
-        "chd", "img", "ccd", "mdf", "mds", "nrg", "ecm", "cso", "pbp", "xci",  "nsp", "nsz", "xcz", "md",
-        "gen", "smd", "32x", "sms", "gg",  "sg",  "pce", "ngp", "ngc", "ws",   "wsc", "vb",  "lnx", "a26",
-        "a78", "j64", "jag", "col", "min", "gdi", "cdi", "rom", "vpk", "pkg",
-    };
-    return std::any_of(std::begin(IMAGES), std::end(IMAGES), [&](const char* image) { return extension == image; });
+    return patching::IsRomImageExtension(extension);
 }
 
 Verdict JudgeDownload(const std::string& file_name, const std::vector<std::string>& wanted) {
@@ -88,6 +103,8 @@ const Opener* FindOpener(const std::string& name) {
     const auto it = Openers().find(name);
     return it == Openers().end() ? nullptr : &it->second;
 }
+
+DEN_REGISTER_STARTUP(CleanInbox);
 
 void Open(OpenRequest request) {
     // One visit at a time: the name is reused, so openers do not pile up.

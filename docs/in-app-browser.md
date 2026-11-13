@@ -71,7 +71,13 @@ Svc().stage->Push("web", {{"url", url}, {"hosts", "example.com,*.example.com"},
                           {"title", "ROM hacks"}, {"opener", "romhacks"}, {"ext", "bps"}});
 ```
 
-Files nobody collected stay in the inbox; nothing cleans it yet.
+Files nobody collected stay in the inbox for a day: what is older is removed when the app
+starts.
+
+A feature plugin reaches the page through `den.web.open` (permission `browse`,
+`docs/feature-plugins.md` section 4.1). `app/screens/plugins/plugin_view.cpp` is the opener:
+it passes every download to the feature host, which checks the file once more and moves it
+into the plugin's folder.
 
 ## The page
 

@@ -20,14 +20,6 @@ namespace fs = std::filesystem;
 constexpr std::uint64_t MAX_READ = 4ull << 20;
 constexpr std::size_t MAX_INBOX = 50;
 
-std::string ExtensionOf(const fs::path& file) {
-    std::string extension = ToLower(PathToUtf8(file.extension()));
-    if (!extension.empty() && extension.front() == '.') {
-        extension.erase(0, 1);
-    }
-    return extension;
-}
-
 // The file's own name, made safe to live in the plugin's folder.
 std::string SafeName(const fs::path& file) {
     std::string name = PathToUtf8(file.filename());
@@ -64,23 +56,6 @@ int PushCopied(lua_State* L, const Result<std::string>& copied) {
     return 1;
 }
 
-std::vector<std::string> TextList(lua_State* L, int table, const char* key) {
-    std::vector<std::string> out;
-    lua_getfield(L, table, key);
-    if (lua_istable(L, -1)) {
-        const lua_Unsigned count = std::min<lua_Unsigned>(lua_rawlen(L, -1), 32);
-        for (lua_Unsigned i = 1; i <= count; ++i) {
-            lua_rawgeti(L, -1, static_cast<lua_Integer>(i));
-            if (lua_type(L, -1) == LUA_TSTRING) {
-                out.push_back(ToLower(lua_tostring(L, -1)));
-            }
-            lua_pop(L, 1);
-        }
-    }
-    lua_pop(L, 1);
-    return out;
-}
-
 int Import(lua_State* L) {
     Runner& runner = Runner::Of(L);
     const FeatureManifest& manifest = runner.Config().manifest;
@@ -91,7 +66,7 @@ int Import(lua_State* L) {
     ask.kind = AskKind::PickFile;
     if (lua_istable(L, 1)) {
         ask.title = CutText(FieldText(L, 1, "title"));
-        ask.extensions = TextList(L, 1, "extensions");
+        ask.extensions = FieldList(L, 1, "extensions");
     }
     if (ask.extensions.empty()) {
         ask.extensions = manifest.file_types;
@@ -240,6 +215,31 @@ int Remove(lua_State* L) {
 }
 
 } // namespace
+
+std::string ExtensionOf(const fs::path& file) {
+    std::string extension = ToLower(PathToUtf8(file.extension()));
+    if (!extension.empty() && extension.front() == '.') {
+        extension.erase(0, 1);
+    }
+    return extension;
+}
+
+std::vector<std::string> FieldList(lua_State* L, int table, const char* key) {
+    std::vector<std::string> out;
+    lua_getfield(L, table, key);
+    if (lua_istable(L, -1)) {
+        const lua_Unsigned count = std::min<lua_Unsigned>(lua_rawlen(L, -1), 32);
+        for (lua_Unsigned i = 1; i <= count; ++i) {
+            lua_rawgeti(L, -1, static_cast<lua_Integer>(i));
+            if (lua_type(L, -1) == LUA_TSTRING) {
+                out.push_back(ToLower(lua_tostring(L, -1)));
+            }
+            lua_pop(L, 1);
+        }
+    }
+    lua_pop(L, 1);
+    return out;
+}
 
 Result<std::string> CopyIntoInbox(const fs::path& data_dir, const fs::path& file,
                                   const std::vector<std::string>& extensions,

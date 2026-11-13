@@ -7,11 +7,16 @@
 
 #include "den/base/files.h"
 #include "den/platform/downloads.h"
+#include "den/platform/pal.h"
 #include "den/platform/webview.h"
 
 namespace den::pal {
 
 Status OpenInBrowser(const std::string& url) {
+    return OpenUrl(url);
+}
+
+Status OpenUrl(const std::string& url) {
     const std::string scheme = WebUrlScheme(url);
     if ((scheme != "https" && scheme != "http") || WebUrlHost(url).empty()) {
         return Status::Fail("only web addresses are opened in the browser");

@@ -84,9 +84,12 @@ public:
             BuildPlainFrame(*this, "Plugin")->Emplace<ui::Label>("This plugin is no longer offered.");
             return;
         }
-        const bool update = plugin.installed;
+        const bool update = plugin.installed && plugin.update_available;
+        // On the device already, never agreed to: a plugin of the developer folder.
+        const bool allow = plugin.installed && !update;
+        const char* const verb = update ? "Update" : (allow ? "Allow" : "Install");
         const bool careful = plugin.trust != FeaturePlugin::Trust::Official;
-        ui::Node* content = BuildPlainFrame(*this, std::format("{} {}?", update ? "Update" : "Install", plugin.name));
+        ui::Node* content = BuildPlainFrame(*this, std::format("{} {}?", verb, plugin.name));
         ui::Node* list = content->Add(ui::MakeList(8));
         list->id = "consent.list";
         AddFact(list, "Publisher", plugin.publisher);
@@ -95,7 +98,8 @@ public:
         AddFact(list, "Version", plugin.version);
         if (careful) {
             auto* warning = list->Emplace<Paragraph>(
-                std::format("EmuDEN did not check this plugin. Install it only if you trust {}.", plugin.publisher),
+                std::format("EmuDEN did not check this plugin. {} it only if you trust {}.", allow ? "Run" : "Install",
+                            plugin.publisher.empty() ? std::string("where it comes from") : plugin.publisher),
                 TextWidth());
             warning->boxed = true;
             warning->font = gfx::FONT_BOLD;
@@ -126,7 +130,7 @@ public:
             button->width = 220;
         };
         const auto accept = [&] {
-            auto* button = buttons->Emplace<ui::Button>(update ? "Update" : "Install", [this, id] {
+            auto* button = buttons->Emplace<ui::Button>(verb, [this, id] {
                 InstallFeaturePlugin(id, true);
                 GetStage().Pop();
             });

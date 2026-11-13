@@ -4,7 +4,7 @@
 // A running plugin: the top page of its stack, drawn from the UI model. It starts the plugin
 // when shown and closes it when the page goes; Back pops the plugin's own pages first. Also
 // does for the plugin what only a screen can: the file browser, questions, messages, opening
-// a game in the library. Route "plugin.view", param id.
+// a game in the library, the in-app browser. Route "plugin.view", param id.
 
 #include <format>
 #include <utility>
@@ -14,8 +14,10 @@
 #include "den/app/pages.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
+#include "den/platform/pal.h"
 #include "feature_api.h"
 #include "model_render.h"
+#include "../web/web_browser.h"
 
 namespace den::app {
 
@@ -29,10 +31,21 @@ using plugins::PageModel;
 constexpr int GRACE_FRAMES = 3;  // frames an unanswered question may be gone before it counts as "no"
 constexpr float NEAR_END = 140;  // this close to the end of a grid, more of it is asked for
 
+class PluginView;
+// The view whose plugin has the browser page open above it. A covered page gets no Update,
+// so the frame serves that plugin's asks meanwhile (WhileBrowsing).
+PluginView* g_browsing = nullptr;
+
 class PluginView final : public ui::Page {
 public:
     ~PluginView() override {
         plugins::FeatureHost* host = FeatureHostSvc();
+        if (g_browsing == this) {
+            g_browsing = nullptr;
+        }
+        if (host && web_ask_ != 0) {
+            host->Answer(web_ask_, false);
+        }
         if (host && opened_) {
             if (pick_ask_ != 0) {
                 host->Answer(pick_ask_, false);
@@ -146,6 +159,16 @@ public:
 
     std::vector<ui::Hint> Hints() const override {
         return {{input::Nav::Confirm, "Select"}, {input::Nav::Back, depth_ > 1 ? "Back" : "Close"}};
+    }
+
+    // Every frame while the browser page is above this one: messages about files that were
+    // not taken, and the plugin closing the page.
+    void WhileBrowsing() {
+        plugins::FeatureHost* host = FeatureHostSvc();
+        if (host && web_ask_ != 0 && GetStage().Top() != this) {
+            web_gone_ = 0;
+            ServeAsks(*host);
+        }
     }
 
 private:
@@ -267,8 +290,18 @@ private:
                 }
                 break;
             case AskKind::OpenUrl:
-                // The platform layer cannot open a browser yet: the address is shown instead.
-                GetStage().Toast(std::format("Open in your browser: {}", ask.value), 6.0f);
+                // An address of a host the plugin declared, after something the user pressed.
+                if (!pal::OpenUrl(ask.value).ok) {
+                    GetStage().Toast(std::format("Open in your browser: {}", ask.value), 6.0f);
+                }
+                break;
+            case AskKind::OpenWeb:
+                OpenWeb(host, ask);
+                break;
+            case AskKind::CloseWeb:
+                if (web_ask_ != 0 && GetStage().Top() != this) {
+                    GetStage().Pop();
+                }
                 break;
             case AskKind::Pop:
                 GetStage().Pop();
@@ -277,9 +310,40 @@ private:
         }
     }
 
+    // The browser page (route "web") for the plugin: every file the user downloads there
+    // goes to the host, which checks it and hands it to the script.
+    void OpenWeb(plugins::FeatureHost& host, const Ask& ask) {
+        if (web_ask_ != 0) {
+            host.Answer(ask.id, false); // one page at a time
+            return;
+        }
+        web::OpenRequest request;
+        request.url = ask.value;
+        request.title = ask.title;
+        request.allowed_hosts = ask.hosts;
+        request.opener.extensions = ask.extensions;
+        request.opener.on_download = [id = ask.id](const web::Download& download) {
+            if (plugins::FeatureHost* h = FeatureHostSvc()) {
+                h->Answer(id, true,
+                          plugins::WebFileAnswer({PathToUtf8(download.file), download.name, download.host}));
+            }
+        };
+        web_ask_ = ask.id;
+        web_gone_ = 0;
+        g_browsing = this;
+        web::Open(std::move(request));
+    }
+
     // A question or a file browser the user backed out of has no callback: the plugin gets
-    // "no" once this page is in front again without an answer.
+    // "no" once this page is in front again without an answer. The same tells it that the
+    // browser page was closed.
     void WatchQuestions(plugins::FeatureHost& host) {
+        if (web_ask_ != 0 && ++web_gone_ >= GRACE_FRAMES) {
+            host.Answer(std::exchange(web_ask_, 0), false);
+            if (g_browsing == this) {
+                g_browsing = nullptr;
+            }
+        }
         if (confirm_ask_ != 0 && !GetStage().DialogOpen() && ++confirm_gone_ >= GRACE_FRAMES) {
             host.Answer(std::exchange(confirm_ask_, 0), false);
         }
@@ -310,8 +374,8 @@ private:
     std::vector<Place> focus_stack_;
     Place restore_;
     std::size_t depth_ = 0;
-    std::uint64_t revision_ = 0, host_revision_ = 0, pick_ask_ = 0, confirm_ask_ = 0;
-    int pick_gone_ = 0, confirm_gone_ = 0;
+    std::uint64_t revision_ = 0, host_revision_ = 0, pick_ask_ = 0, confirm_ask_ = 0, web_ask_ = 0;
+    int pick_gone_ = 0, confirm_gone_ = 0, web_gone_ = 0;
     float width_ = 0, keep_scroll_ = 0;
     bool opened_ = false, built_ = false, restore_pending_ = false;
 };
@@ -319,5 +383,10 @@ private:
 } // namespace
 
 DEN_REGISTER_SCREEN("plugin.view", PluginView);
+DEN_REGISTER_FRAME([] {
+    if (g_browsing != nullptr) {
+        g_browsing->WhileBrowsing();
+    }
+});
 
 } // namespace den::app

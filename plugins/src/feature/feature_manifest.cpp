@@ -13,9 +13,9 @@ namespace {
 constexpr std::size_t MAX_HOSTS = 8;
 
 const char* const PERMISSIONS[] = {
-    PERMISSION_HTTP,            PERMISSION_DOWNLOAD,     PERMISSION_OPEN_URL,
-    PERMISSION_FILES_IMPORT,    PERMISSION_DOWNLOADS_WATCH, PERMISSION_LIBRARY_READ,
-    PERMISSION_PATCH,           PERMISSION_LIBRARY_WRITE,
+    PERMISSION_HTTP,         PERMISSION_DOWNLOAD,        PERMISSION_OPEN_URL,
+    PERMISSION_BROWSE,       PERMISSION_FILES_IMPORT,    PERMISSION_DOWNLOADS_WATCH,
+    PERMISSION_LIBRARY_READ, PERMISSION_PATCH,           PERMISSION_LIBRARY_WRITE,
 };
 
 bool Contains(const std::vector<std::string>& list, std::string_view item) {
@@ -204,6 +204,16 @@ Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
     if (!access.Has(PERMISSION_OPEN_URL)) {
         access.open_hosts.clear();
     }
+    if (Status hosts = ReadHosts(feature->Find("browse_hosts"), "browse_hosts", access.browse_hosts);
+        !hosts.ok) {
+        return hosts;
+    }
+    if (access.Has(PERMISSION_BROWSE) && access.browse_hosts.empty()) {
+        return Status::Fail("browse needs browse_hosts");
+    }
+    if (!access.Has(PERMISSION_BROWSE)) {
+        access.browse_hosts.clear();
+    }
     if (http != nullptr) {
         manifest.min_interval_ms = std::clamp(
             static_cast<int>(json::Number(*http, "min_interval_ms", 500)), 500, 600'000);
@@ -285,6 +295,8 @@ std::vector<PermissionLine> PermissionLines(const FeatureAccess& access) {
             text = "Download files from: " + Join(access.http_hosts);
         } else if (name == PERMISSION_OPEN_URL) {
             text = "Open pages of " + Join(access.open_hosts) + " in your browser";
+        } else if (name == PERMISSION_BROWSE) {
+            text = "Shows these websites inside EmuDEN: " + Join(access.browse_hosts);
         } else if (name == PERMISSION_FILES_IMPORT) {
             text = "Read files you choose";
         } else if (name == PERMISSION_DOWNLOADS_WATCH) {
@@ -308,6 +320,7 @@ FeatureAccess AccessBeyond(const FeatureAccess& wanted, const FeatureAccess& gra
     out.permissions = Beyond(wanted.permissions, granted.permissions);
     out.http_hosts = Beyond(wanted.http_hosts, granted.http_hosts);
     out.open_hosts = Beyond(wanted.open_hosts, granted.open_hosts);
+    out.browse_hosts = Beyond(wanted.browse_hosts, granted.browse_hosts);
     if (!Contains(granted.systems, "*")) {
         out.systems = Beyond(wanted.systems, granted.systems);
     }
@@ -321,13 +334,14 @@ FeatureAccess AccessBeyond(const FeatureAccess& wanted, const FeatureAccess& gra
     };
     widen(!out.http_hosts.empty(), {PERMISSION_HTTP, PERMISSION_DOWNLOAD});
     widen(!out.open_hosts.empty(), {PERMISSION_OPEN_URL});
+    widen(!out.browse_hosts.empty(), {PERMISSION_BROWSE});
     widen(!out.systems.empty(), {PERMISSION_LIBRARY_READ});
     return out;
 }
 
 bool Empty(const FeatureAccess& access) {
     return access.permissions.empty() && access.http_hosts.empty() &&
-           access.open_hosts.empty() && access.systems.empty();
+           access.open_hosts.empty() && access.browse_hosts.empty() && access.systems.empty();
 }
 
 JsonValue AccessToJson(const FeatureAccess& access) {
@@ -335,6 +349,7 @@ JsonValue AccessToJson(const FeatureAccess& access) {
         {"permissions", json::StringArray(access.permissions)},
         {"http_hosts", json::StringArray(access.http_hosts)},
         {"open_hosts", json::StringArray(access.open_hosts)},
+        {"browse_hosts", json::StringArray(access.browse_hosts)},
         {"systems", json::StringArray(access.systems)},
     });
 }
@@ -344,6 +359,7 @@ FeatureAccess AccessFromJson(const JsonValue& value) {
     access.permissions = json::Strings(value, "permissions", false);
     access.http_hosts = json::Strings(value, "http_hosts", false);
     access.open_hosts = json::Strings(value, "open_hosts", false);
+    access.browse_hosts = json::Strings(value, "browse_hosts", false);
     access.systems = json::Strings(value, "systems", false);
     return access;
 }

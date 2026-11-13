@@ -10,6 +10,7 @@
 #include "den/base/files.h"
 #include "den/base/log.h"
 #include "den/platform/pal.h"
+#include "den/platform/webview.h"
 #include "den/plugins/signature.h"
 #include "den/store/settings.h"
 #include "feature/host_impl.h"
@@ -56,6 +57,7 @@ FeatureAccess AccessOf(const IndexPlugin& offered) {
     access.permissions = offered.permissions;
     access.http_hosts = offered.http_hosts;
     access.open_hosts = offered.open_hosts;
+    access.browse_hosts = offered.browse_hosts;
     access.systems = offered.systems;
     return access;
 }
@@ -88,6 +90,9 @@ RealFeatureHost::RealFeatureHost(const FeatureConfig& config, FeatureDeps deps)
         }
         if (!deps_.services) {
             deps_.services = CreateLibraryServices(config.library);
+        }
+        if (!deps_.web_available) {
+            deps_.web_available = [] { return pal::WebView::Available(); };
         }
         if (deps_.downloads_dir.empty()) {
             // "plugins.downloads_folder": where the user's browser saves, when not the usual one.

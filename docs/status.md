@@ -80,8 +80,19 @@ Design and contract: `docs/feature-plugins.md`. Not merged into main.
   rename, remove, "Update from a file" and "Look for newer patches"; the missing-base page;
   a patch opened with the app; Linux and Android; the real Downloads folder
   (`pal::DownloadsDir`, SDL's user folder; empty on Android, where the file picker is used).
-- **Known:** `den.open_url` shows the address as a toast (the platform layer opens no
-  browser). Pressing the selected tab chip again clears its mark until the tab changes.
+- **In-app browser for plugins:** `den.web.open` (permission `browse`) shows a declared site
+  in the browser page and hands the plugin each patch file the user downloads there; ROM
+  images, files that are no patch and archives holding a game are refused by the host. Run
+  on Windows with a developer-folder plugin: hackdex.app's start page opened once in the
+  page, closing it returned `nil, "closed"` to the script. Not run: a download from a real
+  site (left for the owner to try by hand), the fallback page through a plugin, Linux,
+  Android. The ROM Hacks plugin itself does not use `den.web` yet.
+- **xdelta:** patches packed with LZMA, DJW or FGK apply (unit tests with patches xdelta3
+  3.1.0 wrote; no real hack was tried).
+- **Fixed:** `den.open_url` opens the user's browser (`pal::OpenUrl`) and only after a
+  press; the selected tab chip keeps its mark; the consent page of a developer-folder plugin
+  says "Allow"; the web inbox drops files older than a day at start; the WebView2 and XZ
+  Embedded licences are packaged.
   Builds older than this branch download the plugin's package on every list refresh, refuse
   it ("not a console plugin") and keep the rest of the list.
 

@@ -37,6 +37,7 @@ struct RunnerConfig {
     std::filesystem::path downloads_dir;
     std::string app_version;
     std::string platform;
+    std::function<bool()> web_available; // may be empty: no in-app browser
     HttpGetter http;
     std::shared_ptr<FeatureServices> services; // may be null
     std::function<std::int64_t()> now;
@@ -49,6 +50,20 @@ using Outcome = std::function<int(lua_State*)>;
 using AsyncOp = std::function<Outcome()>;
 /// The screen's answer to an ask, on the worker thread.
 using AnswerFn = std::function<int(lua_State*, bool accepted, const std::string& value)>;
+/// One of the answers to an ask that is answered many times, on the worker thread.
+using StreamFn = std::function<void(bool accepted, const std::string& value)>;
+
+/// The plugin's visit to the in-app browser (den.web): the page that is open and the files
+/// that arrived from it and were not handed to the script yet.
+struct WebVisit {
+    struct File {
+        std::string path, name, host;
+    };
+    bool open = false;
+    std::uint64_t waiting = 0; // the coroutine inside den.web.open
+    std::vector<std::string> extensions;
+    std::deque<File> ready;
+};
 
 class Runner {
 public:
@@ -97,6 +112,20 @@ public:
     /// Suspends the calling coroutine until the screen answered `ask`.
     int SuspendForAsk(lua_State* L, Ask ask, AnswerFn answer);
     void PostAsk(Ask ask);
+    /// Posts an ask the screen answers every time something happens ("accepted") and once
+    /// more when it is over ("not accepted").
+    void PostStream(Ask ask, StreamFn on_answer);
+    /// Whether the calling function runs because the user pressed something on the plugin's
+    /// page (an action), not because the plugin was opened or resumed.
+    bool UserTriggered(lua_State* L);
+    /// The id of the calling coroutine, 0 outside the plugin's own functions.
+    std::uint64_t CoroutineOf(lua_State* L);
+    /// Suspends the calling coroutine until Wake. Does not return.
+    int Park(lua_State* L);
+    void Wake(std::uint64_t coroutine, const Outcome& outcome);
+    WebVisit& Web() {
+        return web_;
+    }
     /// Runs the function `ref` (a registry reference) with a number, for den.download's
     /// on_progress. Posted from a helper thread.
     void CallProgress(int ref, float fraction);
@@ -128,9 +157,14 @@ private:
         std::string name;
         AsyncOp pending;
         bool waits_for_ask = false;
+        bool from_user = false; // started by something the user pressed (plugin.actions.*)
     };
 
     void ThreadMain();
+    /// Needs mutex_: whether the ask is one that is answered many times; `last` ends it.
+    bool IsStream(std::uint64_t ask_id, bool last);
+    /// Hands an answer to the stream's function, on the worker thread.
+    void AnswerStream(std::uint64_t ask_id, bool accepted, const std::string& value);
     void Post(std::function<void()> task);
     void Boot();
     void StartCall(const std::vector<std::string>& path, const std::vector<JsonValue>& args);
@@ -151,6 +185,8 @@ private:
     std::map<std::uint64_t, Coroutine> coroutines_;
     std::uint64_t next_coroutine_ = 1;
     std::map<std::uint64_t, std::pair<std::uint64_t, AnswerFn>> waiting_asks_; // ask -> coroutine
+    std::map<std::uint64_t, StreamFn> streams_;
+    WebVisit web_;
     JsonValue storage_;
     std::map<std::string, std::filesystem::path> inbox_tokens_;
     int failures_ = 0;
@@ -165,6 +201,7 @@ private:
     std::vector<PageModel> pages_;
     std::vector<Ask> asks_;
     std::vector<std::uint64_t> open_asks_;
+    std::vector<std::uint64_t> stream_asks_;
     std::string error_;
     bool stopped_ = false;
     std::deque<std::string> log_;
@@ -187,10 +224,15 @@ void RegisterNetwork(lua_State* L, Runner& runner); // http, download, open_url
 void RegisterFiles(lua_State* L, Runner& runner);   // files
 void RegisterUi(lua_State* L, Runner& runner);      // ui, app
 void RegisterLibrary(lua_State* L, Runner& runner); // patch, library
+void RegisterWeb(lua_State* L, Runner& runner);     // web
 
 /// Sets `name` in the table on top of the stack to the function, with the runner as upvalue.
 void SetFunction(lua_State* L, Runner& runner, const char* name, lua_CFunction function);
 /// The option table argument's string field, "" when absent; raises when it is not text.
 std::string FieldText(lua_State* L, int table, const char* key);
+/// The option table argument's list of texts in lower case, 32 at most.
+std::vector<std::string> FieldList(lua_State* L, int table, const char* key);
+/// A file's extension in lower case without the dot.
+std::string ExtensionOf(const std::filesystem::path& file);
 
 } // namespace den::plugins::feature

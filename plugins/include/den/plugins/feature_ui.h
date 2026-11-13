@@ -52,14 +52,26 @@ struct UiEvent {
     std::string action, arg_json, value; // value: input text, chip ids, search text
 };
 
-enum class AskKind { PickFile, Confirm, Toast, OpenGame, OpenUrl, Pop };
+/// OpenWeb is answered many times: with WebFileAnswer for every file the user downloaded in
+/// the page (accepted), and once with "not accepted" when the page was closed.
+enum class AskKind { PickFile, Confirm, Toast, OpenGame, OpenUrl, Pop, OpenWeb, CloseWeb };
 
 /// Something only the screen can do.
 struct Ask {
     std::uint64_t id = 0;
     AskKind kind = AskKind::Toast;
     std::string title, message, yes, value; // value: game id or URL
-    std::vector<std::string> extensions;
+    std::vector<std::string> extensions;    // PickFile, OpenWeb: the files that are taken
+    std::vector<std::string> hosts;         // OpenWeb: where the page may go
 };
+
+/// A file the user downloaded in the in-app browser page, as the screen hands it to the host.
+struct WebFile {
+    std::string file; // where it is now (the app's web inbox); the host moves it
+    std::string name; // the name the site gave it
+    std::string host; // where it came from
+};
+/// The `value` of an accepted answer to an OpenWeb ask.
+std::string WebFileAnswer(const WebFile& file);
 
 } // namespace den::plugins

@@ -60,7 +60,9 @@ compiled as C with warnings off.
 
 The common fields (`id`, `name`, `version`, `api`, `needs`, `publisher`, `license`, `summary`)
 are those of console plugins. `needs` must contain `kind.feature`; `HostCapabilities()` adds
-`kind.feature` and `feature.lua.1`. The `feature` object:
+`kind.feature`, `feature.lua.1` and `feature.web.1` (`den.web`; a plugin that uses it lists it
+in `needs`, so an app without it refuses the plugin instead of failing in the script). The
+`feature` object:
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
@@ -70,6 +72,7 @@ are those of console plugins. `needs` must contain `kind.feature`; `HostCapabili
 | `http.hosts` | string[] | with `http` or `download` | Exact host names, https only, no wildcards, at most 8 |
 | `http.min_interval_ms` | number | no | Pause between requests to one host; default and minimum 500 |
 | `open_hosts` | string[] | with `open-url` | Hosts `den.open_url` may open in the browser |
+| `browse_hosts` | string[] | with `browse` | Sites `den.web.open` may show inside the app: exact names, at most 8 |
 | `file_types` | string[] | no | Extensions the plugin takes from "open with" and the import picker |
 | `systems` | string[] | with `library.*`, `patch` | System ids the plugin may see; `["*"]` only from the official source |
 | `limits.memory_mb` | number | no | 8 to 64, default 32 |
@@ -82,6 +85,7 @@ Permissions (the sentence is what the install page shows):
 | `http` | `den.http.get` to `http.hosts` | "Connect to: host, host" |
 | `download` | `den.download` into the plugin's folder from `http.hosts` | "Download files from: host, host" |
 | `open-url` | `den.open_url` to `open_hosts` | "Open pages of host in your browser" |
+| `browse` | `den.web.open` on `browse_hosts`: the user browses the site in the in-app browser and the plugin is handed the patch files the user downloads there | "Shows these websites inside EmuDEN: host, host" |
 | `files.import` | `den.files.import` (the user picks a file; it is copied in), `plugin.file` | "Read files you choose" |
 | `downloads.watch` | `den.files.inbox()` lists files of `file_types` in the device's Downloads folder | "See patch files in your Downloads folder" |
 | `library.read` | `den.library.find`, `games` for `systems` | "See which games of these consoles you have" |
@@ -120,7 +124,10 @@ Paths are relative to the plugin's data folder; `..` and absolute paths are erro
 | `den.storage.get(key)` / `set(key, value)` / `remove(key)` / `keys()` | JSON values, 1 MiB in total, written atomically |
 | `den.http.get{url, headers?, cache_seconds?}` (wait) | `{status, body, headers, cached}`; body at most 8 MiB |
 | `den.download{url, name, sha256?, on_progress?}` (wait) | `"downloads/<name>"`; at most 256 MiB; checked against `sha256` when given |
-| `den.open_url(url)` | opens the system browser |
+| `den.open_url(url)` | opens the user's browser (`pal::OpenUrl`). Only inside `plugin.actions.*`, that is after something the user pressed; elsewhere it returns `nil, message` |
+| `den.web.available()` | `true, "in-app"` when the device shows web pages inside the app, else `false, "browser"`. `den.web.open` works either way |
+| `den.web.open{url, hosts?, title?, extensions?}` (wait) | shows the page in the in-app browser and returns the next file the user downloads there: `{path = "inbox/<name>", name, source_host}`. The page stays open; calling it again waits for the next file. `nil, "closed"` once the user closed the page. Section 4.1 |
+| `den.web.close()` | takes the browser page away |
 | `den.files.import{title?, extensions?}` (wait) | `"inbox/<name>"` after the user picked a file, or nil |
 | `den.files.inbox()` | `{ {name, size, modified, token} }` in Downloads (newest first, 50 at most) |
 | `den.files.take(token)` | copies that Downloads file to `"inbox/<name>"`; the original stays |
@@ -171,6 +178,42 @@ return plugin
 `plugin.actions.<name>(arg, value)` gets the element's `arg` and, for inputs, chips and
 search, the current value. Optional: `plugin.close()`, `plugin.resume()` (app back in front).
 
+### 4.1 `den.web`
+
+The page is the app's browser page (route `web`, `docs/in-app-browser.md`): the user browses
+the real site and presses its download button; the app receives the file as a browser's
+download manager would. The plugin never sees the page, its address, its cookies or its
+text, and nothing is requested for it.
+
+```lua
+function plugin.actions.browse()
+  while true do
+    local file = den.web.open{ url = "https://www.example.org/hacks", title = "ROM hacks" }
+    if not file then break end            -- the user closed the page
+    den.web.close()
+    install_patch(file.path)              -- as for a file from den.files.import
+  end
+end
+```
+
+- `url` is https and on `hosts`; `hosts` are some of the manifest's `browse_hosts` (default:
+  all of them). The top-level page stays on those hosts; a download may come from another.
+- `extensions` (default: the manifest's `file_types`, else every patch type) are cut down to
+  `bps ips ups aps ppf xdelta xdelta3 vcdiff zip`. A ROM image type is never on the list,
+  whatever the plugin asks for; a call left with no type is refused.
+- Every file is checked again by the host before the script hears of it: a ROM image by name
+  (`patching::IsRomImageExtension`), a file that is not a patch by its content (a patched
+  game renamed `.bps`), a zip that holds a ROM image or no patch are refused, deleted, and
+  the user is told in a toast. A zip's patch is unpacked: `path` names the patch. 7z cannot
+  be opened here and is not taken.
+- The file is moved from the app's web inbox to the plugin's `inbox/`.
+- Without a web engine the same page is its fallback: it opens the site in the user's
+  browser and offers the patch files that then appear in the Downloads folder. The call and
+  its result are the same, so a plugin needs no special case; `den.web.available()` is only
+  for wording ("Open in your browser").
+- For the screen it is an ask (`AskKind::OpenWeb`) that is answered once per file with
+  `WebFileAnswer` and once more, not accepted, when the page is closed.
+
 Limits: a callback is stopped with an error after 200 million VM instructions (count hook)
 or when the allocator passes `limits.memory_mb`; time spent waiting does not count. A
 plugin whose callback failed shows the message with "Close" and "Try again"; three failures
@@ -211,7 +254,7 @@ Unknown types and fields are ignored, so later API versions can add some.
 
 | Step | What happens |
 |---|---|
-| Listed | Feature plugins come through the same signed index as consoles. The entry's `kind` is `feature`; it also carries `permissions`, `http_hosts`, `open_hosts` and `feature_systems`, so the list shows them before any download |
+| Listed | Feature plugins come through the same signed index as consoles. The entry's `kind` is `feature`; it also carries `permissions`, `http_hosts`, `open_hosts`, `browse_hosts` and `feature_systems`, so the list shows them before any download |
 | Installed | The package is fetched, its SHA-256 and size checked against the index, and unpacked to `<data>/plugins/<id>/<version>/`. A package holds at most 200 files and 8 MiB, only `.json .lua .png .jpg .txt .md`. The granted permissions go to `grant.json` |
 | Started | When the user opens it or a file is routed to it: a Lua state is created, `entry` runs, then `plugin.open`. One state per plugin; it stays while its page is on the stage and 60 s after, then `plugin.close` runs, waits in flight are cancelled and the state is dropped |
 | Updated | A newer version in the index is installed beside the old one and used from the next start; the data stays. An update asking for more permissions, hosts or systems than `grant.json` holds waits until the user accepts the difference on the consent page |
@@ -294,7 +337,17 @@ hackdex.app or its storage hosts, never downloads a ROM and bundles no patches. 
 `plugins/emuden.romhacks` in `Denarmo/emuden-plugins`. The Downloads folder is
 `pal::DownloadsDir()`, or the folder the setting `plugins.downloads_folder` names.
 
-### 8.2 Stage 2 (needs written permission first)
+### 8.2 With the in-app browser
+
+`den.web.open` puts stage 1's browsing inside the app without changing who does what: a
+person browses hackdex.app in the browser page and presses "Download Patch"; the plugin gets
+the file and installs it as before. The manifest then declares `browse` with
+`browse_hosts: ["www.hackdex.app", "hackdex.app"]` and needs `feature.web.1`; it still has
+no `http` host, so the plugin itself can request nothing. The host API is in the app; the
+plugin in `Denarmo/emuden-plugins` does not use it yet. A download and install from the real
+site has not been run: it is for the owner to try by hand.
+
+### 8.3 Stage 2 (needs written permission first)
 
 Adds `http`, `download` and the agreed hosts to the manifest, and a `catalog.lua` adapter the
 pages are written against: `list{query, base, tags, sort, page}` -> `{items = {slug, title,
@@ -428,12 +481,15 @@ struct PageModel {
     bool busy = false;
 };
 struct UiEvent { std::string action, arg_json, value; };   // value: input text, chip ids, search text
-enum class AskKind { PickFile, Confirm, Toast, OpenGame, OpenUrl, Pop };
+enum class AskKind { PickFile, Confirm, Toast, OpenGame, OpenUrl, Pop, OpenWeb, CloseWeb };
 struct Ask {                            // something only the screen can do
     std::uint64_t id = 0; AskKind kind = AskKind::Toast;
     std::string title, message, yes, value;      // value: game id or URL
-    std::vector<std::string> extensions;
+    std::vector<std::string> extensions;         // PickFile, OpenWeb
+    std::vector<std::string> hosts;              // OpenWeb
 };
+struct WebFile { std::string file, name, host; };  // a download of the browser page
+std::string WebFileAnswer(const WebFile& file);    // the value of an accepted OpenWeb answer
 }
 ```
 

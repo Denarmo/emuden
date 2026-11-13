@@ -364,6 +364,9 @@ struct Builder {
             ids->push_back(chip.id);
             node->on_activate = [node, chips, ids, multi = page.chips_multi, send = sink.send,
                                  action = page.chips_action] {
+                if (!multi && node->selected) {
+                    return; // a tab that is already chosen stays chosen
+                }
                 const bool on = !node->selected;
                 if (!multi) {
                     for (FilterChip* other : *chips) {

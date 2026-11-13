@@ -18,7 +18,7 @@
 
 namespace den::pal {
 
-/// Opens an http or https address in the user's browser (xdg-open, the shell, an intent).
+/// pal::OpenUrl under the name the browser page's fallback uses.
 Status OpenInBrowser(const std::string& url);
 
 /// The folders a browser saves to that exist here: XDG_DOWNLOAD_DIR when set, the system's

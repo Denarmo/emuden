@@ -38,6 +38,7 @@ struct IndexPlugin {
     std::vector<std::string> permissions;
     std::vector<std::string> http_hosts;
     std::vector<std::string> open_hosts;
+    std::vector<std::string> browse_hosts;
     std::vector<std::string> systems;
 };
 

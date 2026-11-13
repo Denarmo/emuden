@@ -83,6 +83,18 @@ bool IsPatchExtension(std::string_view extension) {
     return std::find(std::begin(KNOWN), std::end(KNOWN), lower) != std::end(KNOWN);
 }
 
+bool IsRomImageExtension(std::string_view extension) {
+    static constexpr std::string_view IMAGES[] = {
+        "gb",  "gbc", "sgb", "gba", "nds", "dsi", "3ds", "cci", "cia", "3dsx", "nes", "fds", "unf", "unif",
+        "sfc", "smc", "n64", "z64", "v64", "ndd", "gcm", "gcz", "rvz", "wbfs", "wad", "iso", "bin", "cue",
+        "chd", "img", "ccd", "mdf", "mds", "nrg", "ecm", "cso", "pbp", "xci",  "nsp", "nsz", "xcz", "md",
+        "gen", "smd", "32x", "sms", "gg",  "sg",  "pce", "ngp", "ngc", "ws",   "wsc", "vb",  "lnx", "a26",
+        "a78", "j64", "jag", "col", "min", "gdi", "cdi", "rom", "vpk", "pkg",
+    };
+    const std::string lower = ToLower(extension);
+    return std::find(std::begin(IMAGES), std::end(IMAGES), lower) != std::end(IMAGES);
+}
+
 Result<PatchInfo> Inspect(const fs::path& patch) {
     auto data = ReadPatch(patch);
     if (!data) {

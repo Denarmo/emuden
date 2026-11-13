@@ -19,14 +19,6 @@ namespace {
 constexpr std::uint64_t MAX_IMAGE = 8ull << 20;
 constexpr std::uint64_t MAX_ROUTED_FILE = 64ull << 20;
 
-std::string ExtensionOf(const fs::path& file) {
-    std::string extension = ToLower(PathToUtf8(file.extension()));
-    if (!extension.empty() && extension.front() == '.') {
-        extension.erase(0, 1);
-    }
-    return extension;
-}
-
 } // namespace
 
 RealFeatureHost::~RealFeatureHost() {
@@ -106,6 +98,7 @@ Result<std::shared_ptr<Runner>> RealFeatureHost::Start(const std::string& id) {
     }
     config.app_version = config_.app_version;
     config.platform = deps_.platform;
+    config.web_available = deps_.web_available;
     config.http = deps_.http;
     config.services = deps_.services;
     config.now = deps_.now;

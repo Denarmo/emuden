@@ -73,6 +73,10 @@ std::string FieldText(lua_State* L, int table, const char* key) {
     return text;
 }
 
+std::uint64_t NextAskId() {
+    return g_next_ask.fetch_add(1);
+}
+
 Runner::Runner(RunnerConfig config)
     : config_(std::move(config)), http_(HttpSettingsOf(config_, &cancel_)) {
     busy_ = true; // until the script has loaded
@@ -135,6 +139,7 @@ void Runner::ThreadMain() {
     }
     coroutines_.clear();
     waiting_asks_.clear();
+    streams_.clear();
     sandbox_.reset();
 }
 
@@ -164,6 +169,7 @@ void Runner::Boot() {
     RegisterFiles(L, *this);
     RegisterUi(L, *this);
     RegisterLibrary(L, *this);
+    RegisterWeb(L, *this);
     lua_getfield(L, -1, "log");
     lua_setglobal(L, "print");
     lua_setglobal(L, "den");
@@ -244,6 +250,7 @@ void Runner::StartCall(const std::vector<std::string>& path, const std::vector<J
     Coroutine call;
     call.id = next_coroutine_++;
     call.name = name;
+    call.from_user = !path.empty() && path.front() == "actions";
     call.remaining = sandbox_->InstructionLimit();
     call.thread = lua_newthread(L);
     call.ref = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -422,13 +429,19 @@ void Runner::PostAsk(Ask ask) {
 }
 
 bool Runner::Answer(std::uint64_t ask_id, bool accepted, const std::string& value) {
+    bool stream = false;
     {
         std::lock_guard lock(mutex_);
         const auto found = std::find(open_asks_.begin(), open_asks_.end(), ask_id);
-        if (found == open_asks_.end()) {
+        if (found != open_asks_.end()) {
+            open_asks_.erase(found);
+        } else if (!(stream = IsStream(ask_id, !accepted))) {
             return false;
         }
-        open_asks_.erase(found);
+    }
+    if (stream) {
+        AnswerStream(ask_id, accepted, value);
+        return true;
     }
     Post([this, ask_id, accepted, value] {
         const auto waiting = waiting_asks_.find(ask_id);

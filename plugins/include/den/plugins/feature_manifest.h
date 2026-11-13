@@ -19,6 +19,7 @@ namespace den::plugins {
 inline constexpr const char* PERMISSION_HTTP = "http";
 inline constexpr const char* PERMISSION_DOWNLOAD = "download";
 inline constexpr const char* PERMISSION_OPEN_URL = "open-url";
+inline constexpr const char* PERMISSION_BROWSE = "browse";
 inline constexpr const char* PERMISSION_FILES_IMPORT = "files.import";
 inline constexpr const char* PERMISSION_DOWNLOADS_WATCH = "downloads.watch";
 inline constexpr const char* PERMISSION_LIBRARY_READ = "library.read";
@@ -30,6 +31,7 @@ struct FeatureAccess {
     std::vector<std::string> permissions;
     std::vector<std::string> http_hosts;
     std::vector<std::string> open_hosts;
+    std::vector<std::string> browse_hosts; // shown in the in-app browser (den.web.open)
     std::vector<std::string> systems; // system ids, or "*"
 
     bool Has(std::string_view permission) const;

@@ -32,6 +32,9 @@ Result<PatchInfo> Inspect(const std::filesystem::path& patch);
 
 /// The file extensions patches come with, lower case without the dot.
 bool IsPatchExtension(std::string_view extension);
+/// The file extensions of cartridge, disc and card images (gb, gba, nds, iso, chd, ...): what
+/// a patch is applied to, and what the app never takes from a web site.
+bool IsRomImageExtension(std::string_view extension);
 
 struct ApplyOptions {
     bool verify_source = true;                    // refuse a base that fails the patch's check

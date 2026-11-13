@@ -142,6 +142,9 @@ int OpenUrl(lua_State* L) {
     if (const Status allowed = CheckUrl(url, access.open_hosts); !allowed.ok) {
         return Refuse(L, allowed.error);
     }
+    if (!runner.UserTriggered(L)) {
+        return Refuse(L, "a page is opened in the browser only when the user asks for it");
+    }
     Ask ask;
     ask.kind = AskKind::OpenUrl;
     ask.value = url;

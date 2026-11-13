@@ -7,6 +7,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "den/platform/downloads.h"
+#include "den/platform/pal.h"
 
 using namespace den;
 
@@ -62,4 +63,7 @@ TEST_CASE("only web addresses go to the browser") {
     CHECK_FALSE(pal::OpenInBrowser("file:///etc/passwd").ok);
     CHECK_FALSE(pal::OpenInBrowser("steam://run/1").ok);
     CHECK_FALSE(pal::OpenInBrowser("example.com").ok);
+    CHECK_FALSE(pal::OpenUrl("file:///etc/passwd").ok);
+    CHECK_FALSE(pal::OpenUrl("ms-settings:privacy").ok);
+    CHECK_FALSE(pal::OpenUrl("https://").ok);
 }

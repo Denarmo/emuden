@@ -91,6 +91,8 @@ struct FeatureDeps {
     std::filesystem::path bundled_dir;         // default: pal::AssetsDir() / "plugins"
     std::filesystem::path downloads_dir;       // the device's Downloads folder; empty = none
     std::string platform;                      // den.device.platform; default: pal::GetCaps().os
+    /// Whether the device shows web pages inside the app; default: pal::WebView::Available.
+    std::function<bool()> web_available;
     std::function<std::int64_t()> now;         // Unix seconds
     /// The signed index of the plugin source; default: the one the console host verified.
     std::function<std::optional<Index>()> index;
