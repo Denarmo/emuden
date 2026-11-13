@@ -11,6 +11,7 @@
 #include "den/base/files.h"
 #include "den/base/log.h"
 #include "den/gfx/gl.h"
+#include "den/gfx/images.h"
 #include "den/platform/lifecycle.h"
 #include "den/platform/second_display.h"
 #include "den/system/device.h"
@@ -118,6 +119,11 @@ int Run(int argc, char** argv) {
                       (HasArg(argc, argv, "--fullscreen") ||
                        settings.GetBool("window.fullscreen", pal::GetCaps().handheld));
     SizeFromArgs(argc, argv, desc);
+    if (auto icon = gfx::LoadImageFile(pal::AssetsDir() / "branding" / "icon-256.png");
+        icon && icon->width == icon->height) {
+        desc.icon_size = icon->width;
+        desc.icon_rgba = std::move(icon->rgba);
+    }
     auto window = pal::CreateAppWindow(desc);
     if (!window) {
         log::Error("app", "{}", window.error());

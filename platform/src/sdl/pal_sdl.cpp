@@ -195,6 +195,16 @@ Result<std::unique_ptr<Window>> CreateAppWindow(const WindowDesc& desc) {
     if (!window) {
         return Status::Fail(std::string("SDL_CreateWindow: ") + SDL_GetError());
     }
+    if (desc.icon_size > 0 &&
+        desc.icon_rgba.size() == static_cast<std::size_t>(desc.icon_size) * desc.icon_size * 4) {
+        SDL_Surface* icon = SDL_CreateSurfaceFrom(desc.icon_size, desc.icon_size, SDL_PIXELFORMAT_RGBA32,
+                                                  const_cast<std::uint8_t*>(desc.icon_rgba.data()),
+                                                  desc.icon_size * 4);
+        if (icon) {
+            SDL_SetWindowIcon(window, icon);
+            SDL_DestroySurface(icon);
+        }
+    }
     SDL_GLContext context = SDL_GL_CreateContext(window);
     if (!context) {
         const std::string error = SDL_GetError();

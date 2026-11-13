@@ -41,6 +41,9 @@ struct WindowDesc {
     int height = 720;
     bool fullscreen = false;
     bool hidden = false;
+    /// The window's own icon (title bar, task switcher), square RGBA; empty for none.
+    std::vector<std::uint8_t> icon_rgba;
+    int icon_size = 0;
 };
 
 /// A window with its OpenGL (3.3 core) or OpenGL ES 3 context, current on the calling thread.

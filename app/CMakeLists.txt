@@ -22,6 +22,10 @@ target_link_libraries(den_app PRIVATE
     den_system den_player den_engine den_plugins den_library den_store
     den_ui den_input den_gfx den_platform den_base)
 den_warnings(den_app)
+if(WIN32)
+    # The icon Explorer and the taskbar show for emuden.exe.
+    target_sources(den_app PRIVATE "${CMAKE_SOURCE_DIR}/shells/windows/emuden.rc")
+endif()
 if(MSVC)
     # No console window; main stays the entry point.
     target_link_options(den_app PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)

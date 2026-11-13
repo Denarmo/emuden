@@ -44,7 +44,7 @@ cp "$shell/emuden.desktop" "$app/usr/share/applications/emuden.desktop"
 cp "$shell/emuden.svg" "$app/emuden.svg"
 cp "$shell/emuden.svg" "$app/usr/share/icons/hicolor/scalable/apps/emuden.svg"
 ln -s emuden.svg "$app/.DirIcon"
-# Steam library artwork, copied into Steam by install-steamos.sh (tools/make_steam_art.py draws it).
+# Steam library artwork, copied into Steam by install-steamos.sh (tools/make_brand_art.py draws it).
 mkdir -p "$app/usr/share/emuden/steam"
 cp "$shell"/steam/*.png "$app/usr/share/emuden/steam/"
 # Launchers that take no SVG get a PNG when this machine can draw one.
