@@ -11,6 +11,7 @@
 #include <format>
 
 #include "../home/games.h"
+#include "../player/picture_choice.h"
 #include "companion_page.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
@@ -24,6 +25,8 @@ namespace {
 constexpr float BUTTON_HEIGHT = 56;
 constexpr float SLOT_W = 150, SLOT_H = 112;
 constexpr const char* VOLUME_KEY = "player.volume";
+constexpr const char* SLOTS_ID = "companion.slots";
+constexpr const char* PICTURES_ID = "companion.pictures";
 constexpr double EXIT_WAIT = 0.8; // seconds given to the pause menu to show its exit row
 
 bool Playing(const player::Snapshot& snapshot) {
@@ -102,6 +105,8 @@ public:
 
             ui::Node* slots = root.Add(ui::MakeShelf(12));
             slots->height = SLOT_H + 36;
+            slots->id = SLOTS_ID;
+            slots->scroller.Jump(slots_at_);
             for (int slot = 0; slot < player::STATE_SLOTS; ++slot) {
                 const bool used = svc.player->HasState(slot);
                 const std::string image = used ? PathToUtf8(svc.player->StateThumbnail(slot)) : std::string();
@@ -124,11 +129,13 @@ public:
             heading->tone = ui::Tone::Dim;
             ui::Node* pictures = root.Add(ui::MakeShelf(10));
             pictures->height = 48;
+            pictures->id = PICTURES_ID;
+            pictures->scroller.Jump(pictures_at_);
             for (const player::PicturePreset& preset : presets) {
                 auto* button = pictures->Emplace<ui::Button>(preset.name, [this, id = preset.id] {
-                    if (!system_.empty()) {
-                        // Where the player screen keeps the choice for the console.
-                        Svc().settings->SetString("player.picture_for." + system_, id);
+                    // Kept where the pause menu keeps it, for the same games.
+                    if (const auto game = Svc().library->Find(game_id_)) {
+                        SavePicture(*game, PictureScopeOf(*game), id);
                     }
                     Svc().player->SetPicture(id);
                 });
@@ -167,6 +174,13 @@ public:
         }
         if (exit_until_ > 0) {
             TryExit();
+        }
+        // A rebuilt row starts where the finger left it, not at its first entry.
+        if (ui::Node* row = Root().FindById(SLOTS_ID)) {
+            slots_at_ = row->scroller.Position();
+        }
+        if (ui::Node* row = Root().FindById(PICTURES_ID)) {
+            pictures_at_ = row->scroller.Position();
         }
         if (Key(snapshot) != key_) {
             Rebuild();
@@ -265,6 +279,7 @@ private:
     }
 
     std::string key_, game_id_, system_;
+    float slots_at_ = 0, pictures_at_ = 0;
     bool save_mode_ = false;
     bool fast_ = false, rewind_ = false;
     double exit_until_ = 0;
