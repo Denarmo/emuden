@@ -115,6 +115,9 @@ struct PictureParam {
     float min = 0, max = 1, step = 0.05f;
     float fallback = 0; // the preset's own value
     float value = 0;    // the value in use (Session::PictureParams)
+    /// Names for the values of a slider of whole steps (min, min + step, ...); empty for
+    /// a plain number.
+    std::vector<std::string> labels;
 };
 
 /// A picture preset: how the game's picture is drawn (a chain of GLSL passes from

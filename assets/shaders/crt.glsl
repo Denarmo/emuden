@@ -56,24 +56,57 @@ vec3 Row(float x, float row) {
     return mix(a, b, f);
 }
 
-// How much of a row's light reaches a point `d` rows from its middle.
-vec3 Beam(float d, vec3 c) {
-    vec3 width = vec3(mix(0.45, 0.2, p_scanline)) + 0.2 * clamp(c, vec3(0.0), vec3(1.0));
-    vec3 gain = min(1.0 / (width * 2.5066), vec3(1.4));
-    return gain * exp(-d * d / (2.0 * width * width));
+// A beam's width in rows: wider where it is bright.
+vec3 BeamWidth(vec3 c) {
+    return vec3(mix(0.45, 0.2, p_scanline)) + 0.2 * clamp(c, vec3(0.0), vec3(1.0));
 }
 
-vec3 Mask(vec2 pixel) {
+// How bright the middle of a beam is; a thin one does not carry a whole row's light.
+vec3 BeamGain(vec3 width) {
+    return min(1.0 / (width * 2.5066), vec3(1.4));
+}
+
+// How much of a row's light reaches a point `d` rows from its middle. `blur` is what an
+// output pixel adds to the beam's width: a beam thinner than a pixel is spread over it
+// with the same light in all, instead of falling between the pixels.
+vec3 Beam(float d, vec3 c, float blur) {
+    vec3 width = BeamWidth(c);
+    vec3 wide = sqrt(width * width + blur * blur);
+    return BeamGain(width) * (width / wide) * exp(-d * d / (2.0 * wide * wide));
+}
+
+// The light a row gives when its beam is spread evenly over the row.
+vec3 Spread(vec3 c) {
+    vec3 width = BeamWidth(c);
+    return c * min(BeamGain(width) * width * 2.5066, vec3(1.0));
+}
+
+// How much of the stretch `w` around x is open when every whole number starts a closed
+// part `gap` long.
+float Open(float x, float w, float gap) {
+    float a = x - 0.5 * w, b = x + 0.5 * w;
+    float to_a = floor(a) * (1.0 - gap) + clamp(fract(a) - gap, 0.0, 1.0 - gap);
+    float to_b = floor(b) * (1.0 - gap) + clamp(fract(b) - gap, 0.0, 1.0 - gap);
+    return (to_b - to_a) / w;
+}
+
+// `y` is the place in the picture's rows and `row_room` the output pixels a row takes.
+vec3 Mask(vec2 pixel, float y, float row_room) {
     // Wider cells on a dense screen, or they are too fine to see.
-    pixel = floor(pixel / max(1.0, floor(u_output_size.y / 1000.0 + 0.5)));
+    float size = max(1.0, floor(u_output_size.y / 1000.0 + 0.5));
+    pixel = floor(pixel / size);
     vec3 cell;
     if (p_mask_type < 0.5) {
         float i = mod(pixel.x, 3.0);
         cell = vec3(float(i < 0.5), float(i > 0.5 && i < 1.5), float(i > 1.5));
     } else if (p_mask_type < 1.5) {
         float i = mod(pixel.x, 3.0);
-        float row = pixel.y + 2.0 * mod(floor(pixel.x / 3.0), 2.0);
-        float open = float(mod(row, 4.0) > 0.5);
+        // The slots are a whole number to a row of the picture, so that they never beat
+        // against the scan lines, and as near four mask pixels high as that allows.
+        float slots = max(1.0, floor(row_room / (4.0 * size) + 0.5));
+        float high = row_room / slots; // output pixels a slot
+        float open = Open(y * slots + 0.5 * mod(floor(pixel.x / 3.0), 2.0), 1.0 / high, 0.25);
+        open = mix(0.75, open, clamp(high - 2.0, 0.0, 1.0));
         cell = vec3(float(i < 0.5), float(i > 0.5 && i < 1.5), float(i > 1.5)) * open;
     } else {
         float i = mod(pixel.x + pixel.y, 2.0);
@@ -84,23 +117,28 @@ vec3 Mask(vec2 pixel) {
 
 void main() {
     vec2 q = Bulge(v_uv);
+    float rows = ROWS_SIZE.y;
+    // Output pixels a row of the picture takes here (the glass bends them).
+    float row_room = 1.0 / max(fwidth(q.y * rows), 0.0001);
     float inside = Inside(q);
     if (inside <= 0.0 || q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0) {
         o_color = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
-    float rows = ROWS_SIZE.y;
     float y = q.y * rows - 0.5;
     float row = floor(y);
     float f = y - row;
     vec3 a = Row(q.x, row);
     vec3 b = Row(q.x, row + 1.0);
-    vec3 flat_light = mix(a, b, f * f * (3.0 - 2.0 * f));
-    vec3 beams = a * Beam(f, a) + b * Beam(1.0 - f, b);
-    // Under about three output pixels a row the beams cannot be told apart.
-    float room = clamp((u_output_size.y / rows - 2.0) / 1.5, 0.0, 1.0);
-    vec3 c = mix(flat_light, beams, room * min(1.0, p_scanline * 4.0));
-    c *= Mask(floor(v_uv * u_output_size));
+    float lines = min(1.0, p_scanline * 4.0);
+    vec3 flat_light = mix(mix(a, Spread(a), lines), mix(b, Spread(b), lines), f * f * (3.0 - 2.0 * f));
+    float blur = 0.45 / row_room;
+    vec3 beams = a * Beam(f, a, blur) + b * Beam(1.0 - f, b, blur);
+    // Under about three output pixels a row the beams cannot be told apart: they give
+    // way to the same light spread evenly, so the picture is as bright at any size.
+    float room = clamp((row_room - 2.0) / 1.5, 0.0, 1.0);
+    vec3 c = mix(flat_light, beams, room * lines);
+    c *= Mask(floor(v_uv * u_output_size), q.y * rows, row_room);
 #ifdef BLOOM
     vec3 soft = ToLinear(Source(q).rgb);
     // Light is added where there is room for it: bright parts do not wash out.

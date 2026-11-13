@@ -5,6 +5,7 @@
 //   den_player_play --core <core file> --rom <game> [--system gb] [--system-dir <bios folder>]
 //       [--data <folder>] [--frames <n>] [--screenshot <png>] [--tap <button>@<frame>]...
 //       [--save-state <frame>] [--load-state <frame>] [--no-resume]
+//       [--size <w>x<h>] [--picture <preset>] [--param <id>=<value>]...
 // Keyboard: arrows, Z/X/A/S, Q/W, Enter, right Shift; Tab fast-forwards, Backspace rewinds,
 // F5 saves slot 0, F8 loads it, Escape leaves. The first gamepad plays too.
 
@@ -40,6 +41,9 @@ struct Args {
     int load_state_at = -1;
     bool resume = true;
     std::vector<Tap> taps;
+    int width = 960, height = 720;
+    std::string picture;
+    std::vector<std::pair<std::string, float>> params;
 };
 
 input::PadButton ButtonByName(const std::string& name) {
@@ -82,6 +86,22 @@ Args Parse(int argc, char** argv) {
             args.load_state_at = std::atoi(value().c_str());
         } else if (flag == "--no-resume") {
             args.resume = false;
+        } else if (flag == "--size") {
+            const std::string size = value();
+            const std::size_t at = size.find("x");
+            if (at != std::string::npos) {
+                args.width = std::max(160, std::atoi(size.c_str()));
+                args.height = std::max(144, std::atoi(size.c_str() + at + 1));
+            }
+        } else if (flag == "--picture") {
+            args.picture = value();
+        } else if (flag == "--param") {
+            const std::string param = value();
+            const std::size_t at = param.find("=");
+            if (at != std::string::npos) {
+                args.params.emplace_back(param.substr(0, at),
+                                         static_cast<float>(std::atof(param.c_str() + at + 1)));
+            }
         } else if (flag == "--tap") {
             const std::string tap = value();
             const std::size_t at = tap.find('@');
@@ -96,8 +116,8 @@ Args Parse(int argc, char** argv) {
 int Play(const Args& args) {
     pal::WindowDesc desc;
     desc.title = "EmuDEN player";
-    desc.width = 960;
-    desc.height = 720;
+    desc.width = args.width;
+    desc.height = args.height;
     auto window = pal::CreateAppWindow(desc);
     if (!window) {
         log::Error("play", "{}", window.error());
@@ -134,6 +154,12 @@ int Play(const Args& args) {
     request.resume = args.resume;
     if (const Status opened = session->Open(request); !opened) {
         return 2;
+    }
+    if (!args.picture.empty()) {
+        session->SetPicture(args.picture);
+        for (const auto& [id, value] : args.params) {
+            session->SetPictureParam(id, value);
+        }
     }
 
     std::vector<input::Event> events;

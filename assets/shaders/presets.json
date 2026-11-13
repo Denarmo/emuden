@@ -1,5 +1,5 @@
 {
-  "comment": "The player's picture effects. A preset is a list of passes (a .glsl file of this folder each, see den/gfx/effect_chain.h); the last pass draws at the size the picture is shown at. 'params' are sliders, 'fixed' are values the user does not see; both are the uniforms p_<id>. 'auto' names the preset a console gets when the choice is Auto.",
+  "comment": "The player's picture effects. A preset is a list of passes (a .glsl file of this folder each, see den/gfx/effect_chain.h); the last pass draws at the size the picture is shown at. 'params' are sliders, 'fixed' are values the user does not see; both are the uniforms p_<id>. 'integer' keeps the picture at whole multiples of its rows (true), or does when that loses little of the area (\"near\"). 'auto' names the preset a console gets when the choice is Auto.",
   "auto": {
     "gb": "dotmatrix",
     "gbc": "lcd",
@@ -153,37 +153,43 @@
     },
     {
       "id": "dotmatrix", "name": "Dot matrix (green)", "group": "Handheld",
-      "input": "nearest",
+      "input": "nearest", "integer": "near",
       "passes": [
         {"shader": "ghost", "filter": "nearest", "feedback": true},
         {"shader": "dotmatrix"}
       ],
       "params": [
+        {"id": "palette", "name": "Colours", "min": 1, "max": 4, "step": 1, "value": 1,
+         "labels": ["Classic green", "Olive", "Pocket grey", "Light (blue-green)"]},
         {"id": "ghost", "name": "Ghosting", "min": 0, "max": 0.9, "step": 0.05, "value": 0.45},
-        {"id": "grid", "name": "Gaps between dots", "min": 0, "max": 1, "step": 0.05, "value": 0.7},
+        {"id": "grid", "name": "Gaps between dots", "min": 0, "max": 1, "step": 0.05, "value": 0.5},
+        {"id": "round", "name": "Round dots", "min": 0, "max": 1, "step": 0.05, "value": 0.25},
         {"id": "shadow", "name": "Dot shadows", "min": 0, "max": 1, "step": 0.05, "value": 0.6},
+        {"id": "unlit", "name": "Unlit dots", "min": 0, "max": 0.3, "step": 0.02, "value": 0.06},
         {"id": "contrast", "name": "Contrast", "min": 0.5, "max": 1.5, "step": 0.05, "value": 1}
-      ],
-      "fixed": {"light_r": 0.66, "light_g": 0.74, "light_b": 0.26, "dark_r": 0.13, "dark_g": 0.24, "dark_b": 0.16}
+      ]
     },
     {
       "id": "pocket", "name": "Pocket (grey)", "group": "Handheld",
-      "input": "nearest",
+      "input": "nearest", "integer": "near",
       "passes": [
         {"shader": "ghost", "filter": "nearest", "feedback": true},
         {"shader": "dotmatrix"}
       ],
       "params": [
+        {"id": "palette", "name": "Colours", "min": 1, "max": 4, "step": 1, "value": 3,
+         "labels": ["Classic green", "Olive", "Pocket grey", "Light (blue-green)"]},
         {"id": "ghost", "name": "Ghosting", "min": 0, "max": 0.9, "step": 0.05, "value": 0.35},
-        {"id": "grid", "name": "Gaps between dots", "min": 0, "max": 1, "step": 0.05, "value": 0.6},
+        {"id": "grid", "name": "Gaps between dots", "min": 0, "max": 1, "step": 0.05, "value": 0.45},
+        {"id": "round", "name": "Round dots", "min": 0, "max": 1, "step": 0.05, "value": 0.25},
         {"id": "shadow", "name": "Dot shadows", "min": 0, "max": 1, "step": 0.05, "value": 0.5},
+        {"id": "unlit", "name": "Unlit dots", "min": 0, "max": 0.3, "step": 0.02, "value": 0.06},
         {"id": "contrast", "name": "Contrast", "min": 0.5, "max": 1.5, "step": 0.05, "value": 1.1}
-      ],
-      "fixed": {"light_r": 0.78, "light_g": 0.8, "light_b": 0.74, "dark_r": 0.1, "dark_g": 0.11, "dark_b": 0.11}
+      ]
     },
     {
       "id": "lcd", "name": "LCD grid", "group": "Handheld",
-      "input": "nearest",
+      "input": "nearest", "integer": "near",
       "passes": [{"shader": "lcd"}],
       "params": [
         {"id": "grid", "name": "Grid", "min": 0, "max": 1, "step": 0.05, "value": 0.6},
@@ -195,7 +201,7 @@
     },
     {
       "id": "lcd-ghost", "name": "LCD ghosting", "group": "Handheld",
-      "input": "nearest",
+      "input": "nearest", "integer": "near",
       "passes": [
         {"shader": "ghost", "filter": "nearest", "feedback": true},
         {"shader": "lcd"}
@@ -211,7 +217,7 @@
     },
     {
       "id": "backlight", "name": "Backlight bleed", "group": "Handheld",
-      "input": "nearest",
+      "input": "nearest", "integer": "near",
       "passes": [{"shader": "lcd"}],
       "params": [
         {"id": "bleed", "name": "Backlight bleed", "min": 0, "max": 1.5, "step": 0.05, "value": 0.8},

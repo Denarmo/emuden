@@ -8,9 +8,7 @@ void main() {
     vec3 c = ToLinear(Original(SharpCoord(v_uv, u_original_size, u_output_size)).rgb);
     vec3 soft = ToLinear(Source(v_uv).rgb);
     c += p_glow * soft * (0.25 + 1.5 * Luma(soft));
-    float rows = u_original_size.y;
-    float room = clamp((u_output_size.y / rows - 1.5) / 1.5, 0.0, 1.0);
-    c *= mix(1.0, 0.5 - 0.5 * cos(2.0 * PI * v_uv.y * rows), p_lines * room);
+    c *= mix(1.0, RowLight(v_uv.y * u_original_size.y, u_output_size.y / u_original_size.y), p_lines);
     vec2 q = v_uv * 2.0 - 1.0;
     c *= 1.0 - p_vignette * 0.3 * dot(q, q);
     // Bright parts roll off instead of clipping.

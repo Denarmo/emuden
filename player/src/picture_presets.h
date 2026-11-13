@@ -31,6 +31,7 @@ struct PresetPass {
 struct PresetData {
     PicturePreset info;
     bool integer = false;     // shown at whole multiples of the picture's height
+    bool near_integer = false; // the same, when the multiple is close to filling the area
     bool input_linear = true; // how the first pass samples the picture
     std::vector<PresetPass> passes;
     /// Every p_<id> uniform with the preset's value: the sliders first, in the order of
