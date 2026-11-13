@@ -256,6 +256,46 @@ public class EmuDenActivity extends SDLActivity {
         }
     }
 
+    /**
+     * Called from native code (lifecycle_android.cpp). Retroid's dual-screen panel sets each
+     * screen's volume and brightness, which no other app may do; its button opens it.
+     */
+    public static boolean screenControlsAvailable() {
+        EmuDenActivity activity = self;
+        if (activity == null) {
+            return false;
+        }
+        try {
+            activity.getPackageManager().getPackageInfo(RETROID_PANEL, 0);
+            return true;
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Presses that button: the system opens the panel for scan code 194 sent to the focused
+     * window, ours. The key has no key code, so nothing else takes it for Home.
+     */
+    public static void screenControlsOpen() {
+        new Thread(() -> {
+            try {
+                android.app.Instrumentation input = new android.app.Instrumentation();
+                long now = android.os.SystemClock.uptimeMillis();
+                for (int action : new int[] {android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.ACTION_UP}) {
+                    input.sendKeySync(new android.view.KeyEvent(now, now, action, 0, 0, 0,
+                            android.view.KeyCharacterMap.VIRTUAL_KEYBOARD, RETROID_PANEL_SCAN_CODE, 0,
+                            android.view.InputDevice.SOURCE_KEYBOARD));
+                }
+            } catch (RuntimeException e) {
+                Log.w(TAG, "the screen controls did not open: " + e);
+            }
+        }, "screen-controls").start();
+    }
+
+    private static final String RETROID_PANEL = "com.retroidpocket.dualscreen.assistant";
+    private static final int RETROID_PANEL_SCAN_CODE = 194;
+
     private static AudioManager audio() {
         EmuDenActivity activity = self;
         return activity != null ? (AudioManager) activity.getSystemService(AUDIO_SERVICE) : null;

@@ -42,6 +42,12 @@ int SystemVolume() {
 
 void SetSystemVolume(int) {}
 
+bool HasScreenControls() {
+    return false;
+}
+
+void OpenScreenControls() {}
+
 } // namespace audio
 
 } // namespace den::pal

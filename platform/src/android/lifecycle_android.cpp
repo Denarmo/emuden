@@ -152,6 +152,27 @@ void SetSystemVolume(int step) {
     VolumeCall("volumeSet", "(I)V", step, true);
 }
 
+bool HasScreenControls() {
+    static const bool has = [] {
+        const jni::ActivityCall call;
+        const jmethodID method = call.Method("screenControlsAvailable", "()Z");
+        if (!method) {
+            return false;
+        }
+        const jboolean result = call.env->CallStaticBooleanMethod(call.activity_class, method);
+        return !call.Threw() && result != JNI_FALSE;
+    }();
+    return has;
+}
+
+void OpenScreenControls() {
+    const jni::ActivityCall call;
+    if (const jmethodID method = call.Method("screenControlsOpen", "()V")) {
+        call.env->CallStaticVoidMethod(call.activity_class, method);
+        call.Threw();
+    }
+}
+
 } // namespace audio
 
 } // namespace den::pal

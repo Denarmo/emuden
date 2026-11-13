@@ -15,7 +15,9 @@
 
 namespace den::app {
 
-/// The rows, ids `prefix`.volume and `prefix`.volume_other. `other_app` adds the second
+/// Where the device has its own panel for each screen's volume (pal::audio::HasScreenControls),
+/// one row, `prefix`.screen_controls, that opens it. Otherwise the rows, ids `prefix`.volume
+/// and `prefix`.volume_other. `other_app` adds the second
 /// one where the platform has a media volume to set. Each says which screen it belongs to
 /// when there are two. They carry a description, so give them a row height of 64 or more.
 std::vector<ui::RowSpec> VolumeRows(const std::string& prefix, bool other_app);
