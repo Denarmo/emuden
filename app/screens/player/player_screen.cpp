@@ -31,7 +31,8 @@ constexpr float STICK_HOLD = 0.6f;
 constexpr int MAX_PORTS = 4;
 constexpr float MENU_CORNER = 72; // logical units: a tap in the top left corner opens the menu
 constexpr const char* SIZE_KEY = "player.screen_size";
-constexpr const char* FPS_KEY = "player.show_fps";
+constexpr const char* FPS_KEY = "player.fps_overlay";
+constexpr const char* OLD_FPS_KEY = "player.show_fps"; // on or off, before the graph
 
 constexpr std::uint32_t Bit(PadButton button) {
     return 1u << static_cast<std::uint32_t>(button);
@@ -79,7 +80,9 @@ void PlayerScreen::Open() {
     core_ = *core;
     size_ = static_cast<ScreenSize>(std::clamp(ScreenSizeFor(game_), 0,
                                                static_cast<int>(ScreenSizeNames().size()) - 1));
-    show_fps_ = svc.settings->GetBool(FPS_KEY, false);
+    fps_mode_ = std::clamp(static_cast<int>(svc.settings->GetNumber(
+                               FPS_KEY, svc.settings->GetBool(OLD_FPS_KEY, false) ? 1 : 0)),
+                           0, FPS_MODES - 1);
 
     if (game_.archive_member.empty()) {
         return Begin(PathFromUtf8(game_.path));
@@ -307,6 +310,11 @@ void PlayerScreen::ApplySpeed() {
     }
 }
 
+void PlayerScreen::SetFpsMode(int mode) {
+    fps_mode_ = std::clamp(mode, 0, FPS_MODES - 1);
+    Svc().settings->SetNumber(FPS_KEY, fps_mode_);
+}
+
 void PlayerScreen::Update(ui::Context& ctx) {
     Services& svc = Svc();
     if (phase_ == Phase::Preparing && prepare_ && prepare_->Finished()) {
@@ -362,6 +370,25 @@ void PlayerScreen::Update(ui::Context& ctx) {
     }
     ApplySpeed();
     svc.player->Advance(ctx.dt);
+    if (fps_mode_ == 2) {
+        // The time between the game's frames (not the display's), for the overlay's graph.
+        const std::uint64_t frames = svc.player->GetSnapshot().frames;
+        if (frames < graph_frames_ || graph_frames_ == 0) {
+            graph_frames_ = frames;
+            graph_time_ = ctx.time;
+        } else if (frames > graph_frames_) {
+            const std::uint64_t made = std::min<std::uint64_t>(frames - graph_frames_, frame_ms_.size());
+            const float each = static_cast<float>((ctx.time - graph_time_) * 1000.0 / static_cast<double>(made));
+            for (std::uint64_t i = 0; i < made; ++i) {
+                frame_ms_[frame_at_] = each;
+                frame_at_ = (frame_at_ + 1) % frame_ms_.size();
+            }
+            graph_frames_ = frames;
+            graph_time_ = ctx.time;
+        }
+    } else {
+        graph_frames_ = 0;
+    }
     dual_.Update();
     PlaceDisplays();
     ApplyOverlay();
@@ -371,8 +398,7 @@ bool PlayerScreen::OnEvent(const input::Event& event) {
     using Type = input::Event::Type;
     if (event.type == Type::Key) {
         if (event.key == KEY_F3 && event.down && !event.repeat) {
-            show_fps_ = !show_fps_;
-            Svc().settings->SetBool(FPS_KEY, show_fps_);
+            SetFpsMode((fps_mode_ + 1) % FPS_MODES);
         } else if (event.key == KEY_FAST) {
             key_fast_ = event.down;
         } else if (event.key == KEY_REWIND) {

@@ -33,6 +33,8 @@ PlayerScreen* g_overlay = nullptr;
 // The tab that brings the quick settings back over what covers them, where the system lets
 // no handle of ours float over the other app: a small disc on the game's own display.
 constexpr float TAB_SIZE = 44;
+constexpr float FRAME_GRAPH_W = 240, FRAME_GRAPH_H = 80;
+constexpr float FRAME_GRAPH_MS = 50; // the graph's top
 
 gfx::Rect TabRect(const gfx::Rect& area) {
     return gfx::Rect{area.Right() - TAB_SIZE - 8, area.y + area.h * 0.3f, TAB_SIZE, TAB_SIZE};
@@ -145,6 +147,40 @@ void PlayerScreen::StopDisplays() {
     swapped_ = menu_apart_ = menu_second_ = false;
 }
 
+// The last frames' times as a line, under guides at 60 and 30 frames a second, with the
+// average and the slowest frame above it.
+void PlayerScreen::DrawFrameGraph(gfx::Canvas& canvas, const gfx::Rect& box, float text_size) const {
+    const gfx::Color ink = gfx::Color::Rgb(0xffffff);
+    const gfx::Color guide = gfx::Color{255, 255, 255, 60};
+    canvas.FillRect(box, gfx::Color{0, 0, 0, 150}, 8);
+    const gfx::Rect plot{box.x + 10, box.y + text_size + 12, box.w - 20, box.h - text_size - 20};
+    const auto y_of = [&](float ms) {
+        return plot.Bottom() - std::clamp(ms / FRAME_GRAPH_MS, 0.0f, 1.0f) * plot.h;
+    };
+    for (const float ms : {1000.0f / 60.0f, 1000.0f / 30.0f}) {
+        canvas.FillRect({plot.x, y_of(ms), plot.w, 1}, guide);
+    }
+    const std::size_t count = frame_ms_.size();
+    const float step = plot.w / static_cast<float>(count - 1);
+    float sum = 0, slowest = 0;
+    float last_y = 0;
+    for (std::size_t i = 0; i < count; ++i) {
+        const float ms = frame_ms_[(frame_at_ + i) % count];
+        sum += ms;
+        slowest = std::max(slowest, ms);
+        const float x = plot.x + step * static_cast<float>(i);
+        const float y = y_of(ms);
+        if (i > 0) {
+            // A step to the new height, then along to the next sample.
+            canvas.FillRect({x - 1, std::min(last_y, y) - 1, 2, std::fabs(y - last_y) + 2}, ink);
+        }
+        canvas.FillRect({x - 1, y - 1, std::min(step, plot.Right() - x) + 2, 2}, ink);
+        last_y = y;
+    }
+    canvas.DrawText(std::format("{:.1f} ms  ·  slowest {:.1f} ms", sum / static_cast<float>(count), slowest),
+                    box.x + 10, box.y + 6, text_size, ink, gfx::FONT_BOLD);
+}
+
 void PlayerScreen::DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const player::Snapshot& snapshot) {
     gfx::Canvas& canvas = *ctx.canvas;
     const gfx::Color ink = gfx::Color::Rgb(0xffffff);
@@ -156,7 +192,7 @@ void PlayerScreen::DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const p
         canvas.FillRect(box, plate, 8);
         canvas.DrawText(text, box.x + 10, box.y + 5, size, ink, gfx::FONT_BOLD);
     };
-    if (show_fps_) {
+    if (fps_mode_ > 0) {
         // Frame rate, the sound waiting to be played, and how often it ran dry.
         // Each number sits right-aligned in a slot as wide as its widest value, so the box
         // and the words in it stay where they are while the digits change.
@@ -188,6 +224,10 @@ void PlayerScreen::DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const p
                 canvas.DrawText(dot, x, box.y + 5, size, ink, gfx::FONT_BOLD);
                 x += measure(dot);
             }
+        }
+        if (fps_mode_ == 2) {
+            DrawFrameGraph(canvas, gfx::Rect{box.Right() - FRAME_GRAPH_W, box.Bottom() + 8, FRAME_GRAPH_W,
+                                             FRAME_GRAPH_H}, size);
         }
     }
     if (PadWithOtherApp()) {

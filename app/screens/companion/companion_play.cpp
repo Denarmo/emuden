@@ -39,15 +39,15 @@ constexpr float BUTTON_HEIGHT = 56;
 constexpr float COVER_W = 112, COVER_H = 150;
 constexpr float ROW_HEIGHT = 64;
 constexpr float GAP = 12;
-constexpr int SLOT_COLUMNS = 4, PICTURE_COLUMNS = 4, APP_COLUMNS = 3;
-constexpr std::size_t RECENT_APPS = 6;
+constexpr int SLOT_COLUMNS = 4, PICTURE_COLUMNS = 4;
+constexpr const char* FPS_NAMES[] = {"FPS: Off", "FPS: On", "FPS: Graph"};
 
 bool Playing(const player::Snapshot& snapshot) {
     return snapshot.state == player::State::Running || snapshot.state == player::State::Paused;
 }
 
 // The views of the page: the main one, and the sections it opens.
-enum class View { Main, States, Screen, Controls, Apps };
+enum class View { Main, States, Screen, Controls };
 
 class CompanionPlay final : public CompanionPage {
 public:
@@ -104,10 +104,6 @@ public:
         case View::Controls:
             Heading(root, "Controls and core");
             BuildControls(root);
-            break;
-        case View::Apps:
-            Heading(root, "Apps");
-            BuildApps(root);
             break;
         }
     }
@@ -237,18 +233,13 @@ private:
         rows.push_back(ValueRow("companion.section.screen", "Screen and picture",
                                 [screen_value] { return screen_value; }, [this] { Open(View::Screen); }));
         if (screen) {
-            rows.push_back(ValueRow("companion.section.controls", "Controls and core",
-                                    [] { return std::string("Core options, buttons"); },
-                                    [this] { Open(View::Controls); }));
+            rows.push_back(ActionRow("companion.section.controls", "Controls and core",
+                                     [this] { Open(View::Controls); }));
             if (AppsAvailable()) {
                 const std::string beside = other_volume_ ? Beside().App().label : std::string();
                 rows.push_back(ValueRow("companion.section.apps", "Apps", [beside] { return beside; }, [this] {
-                    // Without apps opened before, the section would only hold "All apps".
-                    if (Apps().Recent(RECENT_APPS).empty()) {
-                        GetStage().Push("companion.apps");
-                    } else {
-                        Open(View::Apps);
-                    }
+                    // The list has the apps opened last at its top.
+                    GetStage().Push("companion.apps");
                 }));
             }
         }
@@ -334,16 +325,27 @@ private:
             });
         }
         if (screen) {
-            auto* swap = root.Emplace<CompanionCard>(
-                "Swap screens",
-                [] {
-                    if (PlayerScreen* now = PlayerScreen::Current()) {
-                        now->SwapDisplays();
-                    }
-                },
-                "The game on this screen, these settings on the other");
+            ui::Node* row = root.Add(ui::MakeBox(ui::Axis::Row, GAP));
+            row->grow = 1;
+            auto* swap = row->Emplace<CompanionCard>("Swap screens", [] {
+                if (PlayerScreen* now = PlayerScreen::Current()) {
+                    now->SwapDisplays();
+                }
+            });
             swap->id = "companion.swap";
             swap->grow = 1;
+            swap->width = 0;
+            // Off, the frame rate, the frame rate with a graph of the frame times.
+            const int fps = screen->FpsMode();
+            auto* counter = row->Emplace<CompanionCard>(FPS_NAMES[fps], [fps] {
+                if (PlayerScreen* now = PlayerScreen::Current()) {
+                    now->SetFpsMode((fps + 1) % PlayerScreen::FPS_MODES);
+                }
+            });
+            counter->id = "companion.fps";
+            counter->grow = 1;
+            counter->width = 0;
+            counter->selected = fps != 0;
         }
     }
 
@@ -357,35 +359,14 @@ private:
         };
         ui::Node* row = root.Add(ui::MakeBox(ui::Axis::Row, GAP));
         row->grow = 1;
-        auto* options = row->Emplace<CompanionCard>("Core options", page("options"),
-                                                    "How the system is emulated, for this game");
+        auto* options = row->Emplace<CompanionCard>("Core options", page("options"));
         options->id = "companion.options";
         options->grow = 1;
         options->width = 0;
-        auto* buttons = row->Emplace<CompanionCard>("Buttons", page("buttons"), "Which button does what");
+        auto* buttons = row->Emplace<CompanionCard>("Buttons", page("buttons"));
         buttons->id = "companion.buttons";
         buttons->grow = 1;
         buttons->width = 0;
-    }
-
-    void BuildApps(ui::Node& root) {
-        // The apps opened last, to open one again beside the game with one tap.
-        const std::vector<system::AppItem> recent = Apps().Recent(RECENT_APPS);
-        if (!recent.empty()) {
-            Caption(root, "Opened last");
-            CompanionGrid(root, static_cast<int>(recent.size()), APP_COLUMNS, GAP,
-                          [&](ui::Node& row, int index) -> ui::Node* {
-                const system::AppItem& app = recent[static_cast<std::size_t>(index)];
-                auto* card = row.Emplace<CompanionCard>(
-                    app.label, [this, id = app.id] { OpenApp(id, true, GetStage()); }, std::string(), app.icon);
-                card->id = "companion.recent." + app.id;
-                return card;
-            });
-        }
-        auto* all = root.Emplace<CompanionCard>("All apps", [this] { GetStage().Push("companion.apps"); },
-                                                "Another app on this screen while the game goes on");
-        all->id = "companion.apps";
-        all->grow = 1;
     }
 
     // What the page shows; it is built again when this changes.
@@ -398,12 +379,12 @@ private:
         // The volumes are not in here: their sliders show the value as it changes, and a
         // page built again under a finger would end the drag.
         const system::AppBeside& beside = Beside();
-        return std::format("{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", snapshot.game_id,
+        return std::format("{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", snapshot.game_id,
                            static_cast<int>(snapshot.state), snapshot.fast_forward, snapshot.rewinding,
                            snapshot.can_rewind, snapshot.can_save_states, snapshot.picture, slots,
                            screen ? screen->ScreenSizeIndex() : -1, static_cast<int>(beside.GetStage()),
                            beside.App().id, static_cast<int>(beside.GameScreen()), AppsRevision(),
-                           static_cast<int>(view_));
+                           static_cast<int>(view_), screen ? screen->FpsMode() : -1);
     }
 
     void Save(int slot) {

@@ -13,11 +13,10 @@
 
 namespace den::app {
 
-/// A tap target filling its rect: an optional icon, a title and an optional line below it.
+/// A tap target filling its rect, its title in the middle.
 class CompanionCard final : public ui::Node {
 public:
-    CompanionCard(std::string title, std::function<void()> action, std::string description = {},
-                  std::string icon = {});
+    CompanionCard(std::string title, std::function<void()> action);
     bool selected = false; // the current choice: the stronger tint and bold text
 
 protected:
@@ -25,7 +24,7 @@ protected:
     void DrawContent(ui::Context& ctx) override;
 
 private:
-    std::string title_, description_, icon_;
+    std::string title_;
 };
 
 /// A state slot: its picture fitted in the rect (a panel when empty), its name below.

@@ -11,6 +11,8 @@
 
 #pragma once
 
+#include <array>
+
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -52,6 +54,12 @@ public:
         return static_cast<int>(size_);
     }
     void SetScreenSize(int index);
+    /// The frame rate overlay: 0 off, 1 the numbers, 2 the numbers and a graph of the frame times.
+    static constexpr int FPS_MODES = 3;
+    int FpsMode() const {
+        return fps_mode_;
+    }
+    void SetFpsMode(int mode);
     /// The game is on the second display and the quick settings in the main window.
     bool Swapped() const {
         return swapped_;
@@ -96,6 +104,7 @@ private:
     void DrawSecond(ui::Context& ctx, const gfx::Rect& area);
     void SecondPointer(const input::Event& event);
     void DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const player::Snapshot& snapshot);
+    void DrawFrameGraph(gfx::Canvas& canvas, const gfx::Rect& box, float text_size) const;
     bool TabPressed(const input::Event& event, const gfx::Rect& area, float scale);
 
     // pause_menu.cpp: the menu's pages as rows.
@@ -130,7 +139,11 @@ private:
     DualScreens dual_;               // a console with two screens
     ScreenSize size_ = ScreenSize::Fit;
     float aspect_sent_ = 0;
-    bool show_fps_ = false;
+    int fps_mode_ = 0;
+    std::array<float, 120> frame_ms_{}; // the last frames' times, oldest at frame_at_
+    std::size_t frame_at_ = 0;
+    std::uint64_t graph_frames_ = 0; // the game's frame count when the last one was timed
+    double graph_time_ = 0;
     gfx::Rect area_;                 // the window, as last drawn
     gfx::Rect menu_area_;            // the display the menu is on, as last drawn
     MenuLayout menu_;                // what the menu was built for

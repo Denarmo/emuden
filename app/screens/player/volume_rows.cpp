@@ -45,7 +45,6 @@ std::vector<ui::RowSpec> VolumeRows(const std::string& prefix, bool other_app) {
     if (pal::audio::HasScreenControls()) {
         ui::RowSpec panel = ActionRow(prefix + ".screen_controls", "Volume and brightness",
                                       [] { pal::audio::OpenScreenControls(); });
-        panel.description = "Each screen's, in the device's dual-screen panel";
         return {std::move(panel)};
     }
     const bool system = pal::audio::HasSystemVolume();

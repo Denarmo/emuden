@@ -32,48 +32,21 @@ void CentredText(ui::Context& ctx, const gfx::Rect& rect, float y, const std::st
 
 } // namespace
 
-CompanionCard::CompanionCard(std::string title, std::function<void()> action, std::string description,
-                             std::string icon)
-    : title_(std::move(title)), description_(std::move(description)), icon_(std::move(icon)) {
+CompanionCard::CompanionCard(std::string title, std::function<void()> action) : title_(std::move(title)) {
     focusable = true;
     label = title_;
     on_activate = std::move(action);
 }
 
 ui::Size CompanionCard::MeasureContent(ui::Context& ctx) {
-    const ui::Theme& theme = *ctx.theme;
-    const float text = ctx.Text().Measure(title_, theme.text_body + 2, gfx::FONT_BOLD) + 36;
-    return ui::Size{text, description_.empty() ? 56.0f : 80.0f};
+    return ui::Size{ctx.Text().Measure(title_, ctx.theme->text_body + 2, gfx::FONT_BOLD) + 36, 56.0f};
 }
 
 void CompanionCard::DrawContent(ui::Context& ctx) {
     const ui::Theme& theme = *ctx.theme;
     ctx.canvas->FillRect(rect, selected || focused ? theme.panel_strong : theme.panel, theme.radius);
-    const float title_size = theme.text_body + 2;
-    const float line = theme.text_small + 4;
-    float block = title_size * 1.3f + (description_.empty() ? 0 : line + 4);
-    float icon_side = 0;
-    if (!icon_.empty()) {
-        icon_side = std::clamp(rect.h - block - 48, 0.0f, std::min(96.0f, rect.w - 32));
-        block += icon_side + 12;
-    }
-    float y = rect.CenterY() - block * 0.5f;
-    if (icon_side > 0) {
-        const gfx::Rect icon{rect.CenterX() - icon_side * 0.5f, y, icon_side, icon_side};
-        const gfx::Texture texture = ctx.textures ? ctx.textures->Get(icon_, 256) : gfx::Texture{};
-        if (texture) {
-            ctx.canvas->DrawImage(icon, texture);
-        } else {
-            ctx.canvas->FillRect(icon, theme.page, icon_side * 0.25f);
-        }
-        y += icon_side + 12;
-    }
-    CentredText(ctx, rect, y + title_size * 0.65f, title_, title_size,
-                selected ? gfx::FONT_BOLD : gfx::FONT_REGULAR, theme.fg);
-    if (!description_.empty()) {
-        CentredText(ctx, rect, y + title_size * 1.3f + 4 + line * 0.5f, description_, theme.text_small,
-                    gfx::FONT_REGULAR, theme.text_dim);
-    }
+    CentredText(ctx, rect, rect.CenterY(), title_, theme.text_body + 2, selected ? gfx::FONT_BOLD : gfx::FONT_REGULAR,
+                theme.fg);
 }
 
 CompanionSlot::CompanionSlot(std::string title, std::string image)

@@ -68,7 +68,15 @@ std::vector<ui::RowSpec> PlayerRows() {
                           "With two displays the game and the quick settings change places"));
     rows.push_back(Switch("player.pad_by_label", "Buttons by their label", true,
                           "A is A on every pad; off uses the place of the button"));
-    rows.push_back(Switch("player.show_fps", "Show the frame rate", false, "F3 switches it while playing"));
+    rows.push_back(ChoiceRow(
+        "player.fps_overlay", "Frame rate", {"Off", "On", "With a graph"},
+        [] {
+            const auto& settings = *Svc().settings;
+            return std::clamp(static_cast<int>(settings.GetNumber(
+                                  "player.fps_overlay", settings.GetBool("player.show_fps", false) ? 1 : 0)),
+                              0, 2);
+        },
+        [](int index) { Svc().settings->SetNumber("player.fps_overlay", index); }));
     return rows;
 }
 
