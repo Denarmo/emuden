@@ -7,9 +7,9 @@ host, B: patching and library, C: screens). Header texts in section 9 are normat
 
 ## 1. Hackdex: what was found (2026-11-13)
 
-Sources: the site's own open repository `Hackdex-App/hackdex-website` (MIT, commit `8da2b78`,
-read from GitHub), its `docs/legal/TERMS.md` (version 1.1.0, effective 2026-10-03), and three
-requests to `www.hackdex.app` with a plain client name. No sign-in, no account.
+Sources: the site's open repository `Hackdex-App/hackdex-website` (MIT, commit `8da2b78`), its
+`docs/legal/TERMS.md` (1.1.0, effective 2026-10-03) and three requests to `www.hackdex.app`
+with a plain client name. The live pages could not be read (see below). No sign-in.
 
 | Question | Answer |
 |---|---|
@@ -38,22 +38,17 @@ the checkpoint blocks. So the plugin ships in two stages:
   inside the app, against whatever endpoint Hackdex agrees to (section 8.3). Until then the
   manifest declares no Hackdex host, so the sandbox itself refuses such requests.
 
-The plugin is named "ROM Hacks" (`emuden.romhacks`), not "Hackdex". Open point for the
-owner: ask Hackdex (admin@hackdex.app or an issue on their repository) for permission for
-stage 2 and for the use of the name. The base ROM table is taken from their MIT file with
-its copyright notice.
+The plugin is named "ROM Hacks" (`emuden.romhacks`), not "Hackdex"; its base ROM table comes
+from their MIT file with its notice. Open point for the owner: ask Hackdex
+(admin@hackdex.app, or an issue on their repository) for stage 2 and the use of the name.
 
 ## 2. Overview
 
-```
-signed index (kind: feature) -> package .emuplugin -> <data>/plugins/<id>/<version>/
-        plugin.json, main.lua, *.lua, icon.png, data files
-plugins/  FeatureHost: one Lua 5.4 state per running plugin, on its own worker thread
-            host API (den.*) -> platform HTTP, storage, patching, library, UI model
-patching/ formats and ROM checksums (no dependency but base)
-library/  hacks: find a base ROM by checksum, register a patched file
-app/screens/plugins/  rail entry "Plugins", list, permission page, renderer of the UI model
-```
+A feature plugin is a package from the signed index (`plugin.json`, `main.lua`, other `.lua`,
+`icon.png`, data files). `plugins/` runs it: one Lua 5.4 state per running plugin on its own
+worker thread, with the host API `den.*`. `patching/` holds formats and ROM checksums and
+depends only on base. `library/` finds base ROMs and registers hacks. `app/screens/plugins/`
+is the rail entry, the list, the permission page and the renderer of the UI model.
 
 Directory order in the root `CMakeLists.txt` becomes `base platform patching gfx input ui
 store library plugins ...`; `den_library` gains `den_patching`, `den_plugins` gains
@@ -155,20 +150,12 @@ The script returns a table of entry points; each runs in a fresh coroutine:
 
 ```lua
 local plugin = { actions = {} }
-
-function plugin.open(args)            -- the user opened the plugin from the Plugins section
-  den.ui.set(home_page())
-end
-
-function plugin.file(path)            -- a file of file_types was opened with the app
-  install_patch(path)
-end
-
-function plugin.actions.import()      -- element with action = "import" was activated
+function plugin.open(args) den.ui.set(home_page()) end   -- opened from the Plugins section
+function plugin.file(path) install_patch(path) end       -- a file of file_types was opened
+function plugin.actions.import()                         -- an element with action = "import"
   local path = den.files.import{ title = "Choose a patch", extensions = {"bps", "xdelta"} }
   if path then install_patch(path) end
 end
-
 function install_patch(path)
   local info, err = den.patch.inspect(path)
   if not info then return den.ui.toast(err) end
@@ -178,7 +165,6 @@ function install_patch(path)
   local hack, why = den.patch.apply{ patch = path, game = base.id, title = title_of(path) }
   den.ui.toast(hack and "Installed. It is in your library." or why)
 end
-
 return plugin
 ```
 
@@ -223,29 +209,17 @@ Unknown types and fields are ignored, so later API versions can add some.
 
 ## 6. Lifecycle, updates, removal, trust
 
-1. **Listed.** Feature plugins come through the same signed index as consoles (the index
-   entry's `kind` is `feature`; entries also carry `permissions`, `http_hosts`,
-   `open_hosts`, `systems` so the list can show them before a download).
-2. **Installed.** The package is fetched, its SHA-256 and size checked against the index,
-   unpacked to `<data>/plugins/<id>/<version>/`; a package holds at most 200 files and
-   8 MiB and only `.json .lua .png .jpg .txt .md`. The granted permissions are written to
-   `<data>/plugin-data/<id>/grant.json`.
-3. **Started** when the user opens it (or a file is routed to it): a Lua state is created,
-   `entry` runs, then `plugin.open`. One state per plugin; it stays while its page is on the
-   stage and for 60 s after, then `plugin.close` and the state is dropped. Waits in flight
-   are cancelled.
-4. **Updated.** A newer version in the index is installed beside the old one and used from
-   the next start; data (`storage.json`, `downloads/`, `inbox/`) stays. An update that asks
-   for more permissions, hosts or systems than `grant.json` holds is not applied until the
-   user accepts the difference on the same page as a first install.
-5. **Removed.** The package folders go; the page asks whether to delete the plugin's data
-   too. Hacks it installed stay in the library (they are the user's games) unless the user
-   ticks "also remove the hacks it installed".
-6. **Revoked.** A revocation or blocked hash in a source's index stops the plugin at the
-   next refresh, as for consoles.
+| Step | What happens |
+|---|---|
+| Listed | Feature plugins come through the same signed index as consoles. The entry's `kind` is `feature`; it also carries `permissions`, `http_hosts`, `open_hosts` and `systems`, so the list shows them before any download |
+| Installed | The package is fetched, its SHA-256 and size checked against the index, and unpacked to `<data>/plugins/<id>/<version>/`. A package holds at most 200 files and 8 MiB, only `.json .lua .png .jpg .txt .md`. The granted permissions go to `grant.json` |
+| Started | When the user opens it or a file is routed to it: a Lua state is created, `entry` runs, then `plugin.open`. One state per plugin; it stays while its page is on the stage and 60 s after, then `plugin.close` runs, waits in flight are cancelled and the state is dropped |
+| Updated | A newer version in the index is installed beside the old one and used from the next start; the data stays. An update asking for more permissions, hosts or systems than `grant.json` holds waits until the user accepts the difference on the consent page |
+| Removed | The package folders go. The page asks whether to delete the plugin's data too. Hacks it installed stay in the library (they are the user's games) unless the user ticks "also remove the hacks it installed" |
+| Revoked | A revocation or blocked hash in a source's index stops the plugin at the next refresh, as for consoles |
 
-Data folder: `<data>/plugin-data/<id>/` = `storage.json`, `grant.json`, `downloads/`,
-`inbox/`, `cache/`. Nothing a plugin writes is ever executed or loaded as a script.
+Data folder `<data>/plugin-data/<id>/`: `storage.json`, `grant.json`, `downloads/`, `inbox/`,
+`cache/`. Nothing a plugin writes is ever executed or loaded as a script.
 
 | Source | Installing | Limits |
 |---|---|---|
@@ -309,47 +283,38 @@ The base ROM is only read. A plugin can change and remove only entries whose sid
 
 ### 8.1 Stage 1 pages
 
-- **Home**: `text` explaining the three steps; buttons "Open Hackdex" (`den.open_url
-  "https://www.hackdex.app/discover"`), "Choose a patch file" (`den.files.import`); a shelf
-  "Found in Downloads" (`den.files.inbox()`, a tile per patch file, refreshed on
-  `plugin.resume`); a grid "Installed hacks" (`den.library.hacks()`); a row "Base games"
-  opening the table of the 39 known base ROMs with "In your library" or "Missing" for each
-  (`den.library.find{sha1}`, from the package's `bases.json`).
-- **Install** (after a tile or the picker): `den.patch.inspect`; BPS gives the base CRC32,
-  so the base is found without a question. xdelta has no source checksum: the plugin tries
-  the library's games of the plugin's systems that are in `bases.json`, at most 6, and keeps
-  the one whose target windows verify; with none, a list to choose from. Then a `detail`
-  page: title (from the file name, editable `input`), base game, format, "Install". A
-  missing base ROM gives a page naming the game, region and checksums: "Add your own copy of
-  this game to the library". Nothing offers to download it.
-- **Hack** (a tile of "Installed hacks"): "Play" (`den.app.open_game`), "Update from a
-  file", "Rename", "Remove".
+| Page | Content |
+|---|---|
+| Home | `text` with the three steps; buttons "Open Hackdex" (`den.open_url "https://www.hackdex.app/discover"`) and "Choose a patch file" (`den.files.import`); shelf "Found in Downloads" (`den.files.inbox()`, a tile per patch file, refreshed on `plugin.resume`); grid "Installed hacks" (`den.library.hacks()`); row "Base games": the 39 known base ROMs from the package's `bases.json`, each "In your library" or "Missing" (`den.library.find{sha1}`) |
+| Install | After a tile or the picker: `den.patch.inspect`. BPS carries the base CRC32, so the base is found without a question. xdelta has no source checksum: the plugin tries the library's games that are in `bases.json`, six at most, and keeps the one whose target windows verify; with none, a list to choose from. Then a `detail`: title (from the file name, an editable `input`), base game, format, "Install". A missing base gives a page naming the game, region and checksums: "Add your own copy of this game to the library". Nothing offers to download it |
+| Hack | A tile of "Installed hacks": "Play" (`den.app.open_game`), "Update from a file", "Rename", "Remove" |
 
 On Android, "open with" and share intents for `file_types`, and on desktop a file path on
 the command line, reach `FeatureHost::RouteFile`.
 
-### 8.2 What it never does
-
-Requests to hackdex.app or its storage hosts, reading pages, downloading ROMs, bundling
-patches, using the Hackdex name as its own.
+It never requests anything from hackdex.app or its storage hosts, never downloads a ROM,
+bundles no patches and does not use the Hackdex name as its own.
 
 ### 8.3 Stage 2 (needs written permission first)
 
-Adds `http`, `download` and the agreed hosts to the manifest, and a `catalog.lua` adapter
-with three functions the pages are already written against: `list{query, base, tags, sort,
-page}` -> `{items = {slug, title, summary, cover, base, version, downloads}, next}`,
-`detail(slug)` -> the fields of section 1 plus `patches = {id, version, format, changelog,
-breaks_saves}`, `patch_url(id)`. Rules in the adapter: lists cached 6 h, details 24 h,
-covers 7 days; one request at a time with a 1 s pause; a patch is fetched only when the user
-presses "Install"; no prefetch, no background refresh, no mirror; every detail page shows
-the hack's credits and a link to its Hackdex page; a creator's "no patch download" setting
-is respected by offering only "Open on Hackdex". The checkpoint means Hackdex would have to
-provide an endpoint or allow the client name for this to work at all.
+Adds `http`, `download` and the agreed hosts to the manifest, and a `catalog.lua` adapter the
+pages are written against: `list{query, base, tags, sort, page}` -> `{items = {slug, title,
+summary, cover, base, version, downloads}, next}`, `detail(slug)` -> the fields of section 1
+plus `patches = {id, version, format, changelog, breaks_saves}`, `patch_url(id)`. Its rules:
+lists cached 6 h, details 24 h, covers 7 days; one request at a time, 1 s apart; a patch is
+fetched only on "Install"; no prefetch, background refresh or mirror; a detail page shows the
+credits and a link to the Hackdex page; "no patch download" hacks offer only "Open on
+Hackdex". Because of the checkpoint Hackdex must provide an endpoint or allow the client.
 
 ## 9. Interfaces between the agents
 
-Each header is committed by its owner as the first commit, exactly as below; until it is
-there the others build against a copy in their own tests folder, never in the owner's path.
+Each owner commits its headers first, exactly as below; until then the others build against
+a copy in their own tests folder, never in the owner's path. Done means: A's fixture scripts
+cannot reach `io`, an undeclared host or a path outside the folder, and a runaway loop and
+a memory hog are stopped; B's formats round-trip on generated bytes (no ROM in the
+repository) and NES and N64 forms match known vectors; C's renderer shows every element
+type by pad and touch against a fake host. Together: a BPS and a copy of its base ROM from
+`D:\ROMS` in a scratch library, "Choose a patch file", and the hack starts.
 
 | Agent | Owns | Also edits (one line each) |
 |---|---|---|
@@ -378,7 +343,6 @@ struct ApplyOptions {
 /// Writes `output` (temporary file, then rename). `source` is never written.
 Status Apply(const std::filesystem::path& patch, const std::filesystem::path& source,
              const std::filesystem::path& output, const ApplyOptions& options = {});
-
 struct Checksums { std::uint32_t crc32 = 0; std::string md5, sha1; std::uint64_t size = 0; };
 struct RomForm {
     std::string form;                // "raw", "headerless", "z64"
@@ -496,7 +460,6 @@ public:
     virtual std::uint64_t Revision() const = 0;                  // list changed
     virtual JobPtr Install(const std::string& id, bool consent) = 0;  // fails without consent when needed
     virtual JobPtr Remove(const std::string& id, bool delete_data, bool delete_hacks) = 0;
-
     virtual Status Open(const std::string& id) = 0;              // starts the script, runs plugin.open
     virtual void Close(const std::string& id) = 0;               // the page left the stage
     virtual void Reload(const std::string& id) = 0;              // developer plugins
@@ -504,7 +467,6 @@ public:
     virtual std::vector<PageModel> Pages(const std::string& id, std::uint64_t& revision) const = 0;
     virtual void Send(const std::string& id, UiEvent event) = 0; // never blocks
     virtual void Back(const std::string& id) = 0;                // pops a pushed page
-
     virtual std::vector<Ask> TakeAsks(const std::string& id) = 0;
     virtual void Answer(std::uint64_t ask_id, bool accepted, const std::string& value = {}) = 0;
     /// A local file for an element's image, or empty while it loads (the revision moves when ready).
@@ -524,13 +486,8 @@ std::unique_ptr<FeatureHost> CreateFeatureHost(const FeatureConfig& config);
 }
 ```
 
-Inside A: `feature/manifest.cpp` (the `feature` object), `feature/sandbox.cpp` (state,
-allocator, hook, library set), `feature/api_*.cpp` (one file per `den.` table),
-`feature/ui_model.cpp` (Lua table to `PageModel`), `feature/runner.cpp` (worker thread,
-coroutines, waits), `feature/http.cpp` (host list, pause, cache), `feature/host.cpp`.
-Tests run scripts from `plugins/tests/fixtures/feature/` against a fake library and a
-local HTTP fake: the sandbox (no `io`, instruction and memory stops), host refusal, UI
-model parsing, a full import with a real BPS made in the test.
+A's sources are in `plugins/src/feature/` (sandbox, one `api_*.cpp` per `den.` table, runner,
+http, host); its tests use fixture scripts, a fake library and a local HTTP fake.
 
 ### 9.5 `app/screens/plugins/` (C)
 
@@ -542,19 +499,4 @@ model parsing, a full import with a real BPS made in the test.
 | `plugin_view.cpp` | route `plugin.view` (`id`): `Open` on build, `Close` when popped; rebuilds when the revision moves, keeping focus by element id; Back sends `Back` until one page is left, then pops; serves `TakeAsks` (file browser `app::Pick`, `Stage::Confirm`, `Toast`, push `details`) |
 | `model_render.cpp/.h` | `BuildModel(ui::Node* into, const PageModel&, Sink)`: shelf -> `MakeShelf` of `Tile`s, grid -> rows of tiles sized from the window, detail -> cover left, facts and text right, buttons below; search and input open the on-screen keyboard; progress drawn as a bar in the theme's text colour; `empty` centred |
 
-C tests with a `FeatureHost` fake (`app/screens/plugins/fake_host.h`, used when
-`EMUDEN_FAKE_PLUGINS=1`) that serves fixed models, so it does not wait for A.
-
-## 10. Done means
-
-- A: a fixture script cannot reach `io`, a host it did not declare, or a path outside its
-  folder; a runaway loop and a memory hog are stopped; the bundled `emuden.romhacks` imports
-  a BPS and the hack appears through the library fake.
-- B: every format round-trips against patches made in the tests (no ROM in the
-  repository: the sources are generated bytes); N64 and NES forms match known vectors;
-  `InstallHack` on a scratch library produces an entry with `hack_of`, sidecar and cover.
-- C: with the fake host, the Plugins rail entry opens, a model with every element type is
-  navigable by pad and touch, and the consent page lists permissions.
-- Together: on Windows, a BPS patch copied to a scratch folder, a copy of its base ROM from
-  `D:\ROMS` in a scratch library, "Choose a patch file" -> the hack is in the library and
-  starts.
+C's fake host (`fake_host.h`, used when `EMUDEN_FAKE_PLUGINS=1`) serves fixed models.
