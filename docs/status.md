@@ -21,16 +21,35 @@ listened.
 
 ## Second screen: quick settings and the pause menu (after the fifth round)
 
+Checked on the Retroid Pocket Duo with the release APK at `75fa362`, through `adb` only
+(`input` taps, swipes and Back, `screencap -d` of both displays, every picture looked at),
+after the same on Windows with `EMUDEN_SECOND_WINDOW=1`.
+
 | Item | State | What was run |
 |---|---|---|
-| Quick settings: Swap screens, Screen size, Core options, Buttons | Added beside the old rows; a rebuilt page keeps every scrolling row where it was (`ui::Page`, by node id) | Windows, `EMUDEN_SECOND_WINDOW=1`, Tetris, both windows looked at: Stretch and Fit applied live; a picture preset tapped after dragging its row left the row in place; Core options scrolled by a drag and by the keyboard; Buttons opened |
-| Swap screens | The game goes to the second display, the quick settings to the main window; kept in `player.swap_displays` | Windows: swapped from the quick settings and back from the pause menu; still swapped after a restart; the keyboard pad started Tetris while swapped; taps on the quick settings in the main window |
-| Pause menu on the second display | With two displays the menu opens on the one with the quick settings, the game stays undimmed; `player.overlay_on_second_screen` in Settings > Player turns it off | Windows: Tetris (menu, picture preview live on the game) and Explorers of Skies (menu in place of the touch screen, which came back on Resume); setting off and one display: the menu over the dimmed game as before |
+| Quick settings: Swap screens, Screen size, Core options, Buttons | On the bottom screen beside the old rows; a rebuilt page keeps every scrolling row where it was (`ui::Page`, by node id) | Retroid, Tetris: the four are there; the Picture row was swiped along and "Arcade monitor" tapped, the row stayed and the picture changed; Core options and Buttons opened on the bottom screen with the game undimmed on top, a fling scrolled Core options (Tetris) and Buttons (Explorers of Skies) |
+| Swap screens | The game goes to the second display, the quick settings to the main one; kept in `player.swap_displays` | Retroid: Tetris on the bottom screen, quick settings on top, taps and a fling worked there, Back opened the menu on the top screen; swapped back. Windows: still swapped after a restart |
+| Pause menu on the second display | With two displays the menu opens on the one with the quick settings, the game stays undimmed; `player.overlay_on_second_screen` in Settings > Player turns it off | Retroid: Back in Tetris; Explorers of Skies with "Top on main" and "Top on second": the menu on the bottom screen, the other screen undimmed, the game's screen back after closing, a fling scrolled the menu, "Exit to home" tapped there |
 
-Not run: any of this on Android (the Presentation) or Linux, a real pad or finger, touch on
-the game while it is on the second display, a question ("Reset the game?") while the menu
-is on the second display (it is drawn on the main one), a two-screen game with "Top on
-second" (the menu then stays over the touch screen on the main display).
+Two fixes came out of the check: a two-screen game set to "Top on second" still got the menu
+over the dimmed main display (it now always takes the second display), and the selected
+"Fit" button was cut to "..." in the quick settings on the main display at 125%.
+
+Not run: a real pad or finger, guide and Start+Select with two displays, touch on the game
+while it is on the second display, a 3DS game, "One display" for a two-screen game, the
+"Pause menu on the second screen" switch on Android, any of it on Linux. Known gaps: a
+question ("Reset the game?") is drawn on the main display while the menu is on the second
+one; while swapped the game on the second display is drawn one frame behind and, on the
+1280x960 screen, "Fit" gives Game Boy games 6.67x, so the dot matrix grid is not a whole
+multiple there; nothing tests the kept scroll position.
+
+When the check began somebody was playing Explorers of Skies on the device. The checker
+waited for three minutes without input and pressed Back to leave through the menu; the app
+was swiped away from the recents list at that moment, so that session ended without its
+resume state (the game continued from an earlier one afterwards). A debug build from
+another branch was installed in between and replaced by this release build again. The
+device is left with the release APK, force-stopped, "Top on second" and Tetris on dot matrix
+as they were.
 
 ## The owner's notes
 
@@ -50,14 +69,16 @@ three parallel commits built together without a change. Two small commits came o
 check (`--size`, and the HACK tag moved out from under the tiles' badges); after them the
 Windows and Linux tests ran again (11 of 11 on both) and every package below was rebuilt.
 
+All three were rebuilt at `75fa362` after the second-screen check (11 of 11 tests on Windows
+and Linux again) and put in the same places; the Legion Go S start was repeated (10 s, log
+read), the Windows build of that commit was not started.
+
 - **Windows** (automation port 28467, portable `user` folder): the fifth-round table above.
   The app left no process behind. `dist\windows` (14.5 MB) is mirrored to
   `C:\Users\david\Desktop\EmuDEN`; the Desktop copy was not started.
-- **Android** (Retroid Pocket Duo, app data kept): the debug APK was installed over the old
-  one and driven on port 28517 (home, library, Tetris), then the release APK (debug key),
-  which was started, showed home and the library, and is left installed and force-stopped.
-  It is `dist\android\EmuDEN.apk`. The device had "LCD grid" saved for Game Boy games; dot
-  matrix was chosen for the screenshot and LCD grid put back.
+- **Android** (Retroid Pocket Duo, app data kept): the release APK (debug key) of `75fa362`
+  is installed and force-stopped after the second-screen check above; it is
+  `dist\android\EmuDEN.apk`. `EmuDEN-debug.apk` there is still the fifth round's.
 - **Linux**: built in WSL Debian, 11 of 11 tests, AppImage 5.9 MB in `dist\linux`. Installed
   on the Legion Go S with `install-steamos.sh` and started once for 10 s over ssh: OpenGL
   4.6 on Mesa (radeonsi), the device recognised, closed on the signal. Nothing was looked
