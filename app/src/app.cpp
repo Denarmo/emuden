@@ -254,7 +254,9 @@ int Run(int argc, char** argv) {
             }
             // The screens get the window below the app's own title bar, if it has one: with GL's
             // origin at the bottom left, a shorter canvas leaves the bar's rows free.
-            const int bar = title_bar.PixelHeight(*svc.window, PixelScale(width, height));
+            // The bar keeps its size as the window is resized: it follows the display's scale.
+            const float bar_scale = svc.window->DisplayScale();
+            const int bar = title_bar.PixelHeight(*svc.window, bar_scale);
             svc.title_bar_px = bar;
             const float scale = PixelScale(width, height - bar);
             device.BeginFrame(width, height, svc.theme->page);
@@ -269,7 +271,7 @@ int Run(int argc, char** argv) {
             ctx.time = now;
             stage.Frame(ctx);
             canvas.End();
-            canvas.Begin(width, height, scale);
+            canvas.Begin(width, height, bar_scale);
             title_bar.Draw(ctx, *svc.window, width, bar);
             canvas.End();
             automation.AfterDraw(width, height);

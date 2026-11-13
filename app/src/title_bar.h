@@ -36,6 +36,8 @@ private:
     float scale_ = 1;
     Button hover_ = NONE, pressed_ = NONE;
     bool hit_test_set_ = false;
+    gfx::Color frame_{};
+    bool frame_set_ = false;
 };
 
 } // namespace den::app

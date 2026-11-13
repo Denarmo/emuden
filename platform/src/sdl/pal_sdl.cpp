@@ -8,6 +8,7 @@
 
 #include "den/base/files.h"
 #include "den/base/log.h"
+#include "../frame_native.h"
 #include "../lifecycle_native.h"
 #include "den/platform/pal.h"
 
@@ -90,6 +91,9 @@ public:
         if (was != (height > 0)) {
             SDL_SetWindowHitTest(window_, height > 0 ? &SdlWindowImpl::HitTest : nullptr, this);
         }
+    }
+    void SetFrameColor(std::uint8_t r, std::uint8_t g, std::uint8_t b) override {
+        StyleCustomFrame(window_, r, g, b);
     }
     void Minimize() override {
         SDL_MinimizeWindow(window_);

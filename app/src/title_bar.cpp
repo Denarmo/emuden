@@ -148,6 +148,18 @@ void TitleBar::Draw(ui::Context& ctx, pal::Window& window, int width_px, int bar
     }
     window.SetTitleBar(bar_px, std::move(holes));
     hit_test_set_ = true;
+    // The border: the ink mixed a quarter into the page, so the window stands out from others.
+    const auto mix = [&](int i) {
+        const std::uint8_t* f = &theme.fg.r;
+        const std::uint8_t* p = &theme.page.r;
+        return static_cast<std::uint8_t>((f[i] + 3 * p[i]) / 4);
+    };
+    const gfx::Color border{mix(0), mix(1), mix(2), 255};
+    if (!frame_set_ || border.r != frame_.r || border.g != frame_.g || border.b != frame_.b) {
+        window.SetFrameColor(border.r, border.g, border.b);
+        frame_ = border;
+        frame_set_ = true;
+    }
 }
 
 } // namespace den::app

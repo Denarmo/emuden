@@ -70,6 +70,9 @@ public:
     /// For a window without the system's title bar: the top `height` pixels move the window,
     /// except the `buttons` (x, y, width, height in pixels); the edges resize it. 0: off.
     virtual void SetTitleBar(int height, std::vector<std::array<int, 4>> buttons) {}
+    /// Rounded corners and a border of this colour around such a window, where the system
+    /// draws them.
+    virtual void SetFrameColor(std::uint8_t r, std::uint8_t g, std::uint8_t b) {}
     virtual void Minimize() {}
     virtual void ToggleMaximize() {}
     virtual bool Maximized() const {
