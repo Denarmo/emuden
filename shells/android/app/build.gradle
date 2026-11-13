@@ -35,7 +35,7 @@ android {
         cmake {
             path file("${repo}/CMakeLists.txt")
             version '3.31.5'
-            buildStagingDirectory file("${repo}/build/android/cxx")
+            buildStagingDirectory file("${repo}/build/${rootProject.ext.emudenBuild}/cxx")
         }
     }
 

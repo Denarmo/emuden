@@ -26,7 +26,7 @@ namespace {
 class AndroidSecondDisplay final : public SecondDisplay {
 public:
     bool Present() const override {
-        std::lock_guard lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         return present_;
     }
 
@@ -53,12 +53,12 @@ public:
     }
 
     bool Ready() const override {
-        std::lock_guard lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         return window_ != nullptr && !failed_;
     }
 
     void PixelSize(int& width, int& height) const override {
-        std::lock_guard lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         width = width_;
         height = height_;
     }
@@ -97,14 +97,14 @@ public:
     }
 
     void TakePointer(std::vector<SecondPointer>& out) override {
-        std::lock_guard lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         out.insert(out.end(), pointer_.begin(), pointer_.end());
         pointer_.clear();
     }
 
     // From the UI thread.
     void SetPresent(bool present) {
-        std::lock_guard lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         if (present != present_) {
             log::Info("platform", "second screen {}", present ? "found" : "gone");
         }
@@ -112,7 +112,7 @@ public:
     }
 
     void SetWindow(ANativeWindow* window, int width, int height) {
-        std::lock_guard lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         if (window != window_) {
             DropSurface();
             if (window_) {
@@ -130,7 +130,7 @@ public:
     }
 
     void Touch(SecondPointer::Kind kind, float x, float y) {
-        std::lock_guard lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         if (window_ && pointer_.size() < 256) {
             pointer_.push_back({kind, x, y});
         }
@@ -169,7 +169,7 @@ private:
         }
     }
 
-    mutable std::mutex mutex_;
+    mutable std::recursive_mutex mutex_; // recursive: a drawing client may ask for the size
     bool wanted_ = false;
     bool present_ = false;
     bool failed_ = false;

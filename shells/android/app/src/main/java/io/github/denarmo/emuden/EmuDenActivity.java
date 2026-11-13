@@ -7,9 +7,15 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.res.AssetManager;
+import android.content.res.Configuration;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.system.Os;
 import android.util.Log;
+import android.view.KeyEvent;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 
 import org.libsdl.app.SDLActivity;
 
@@ -27,6 +33,9 @@ public class EmuDenActivity extends SDLActivity {
     private static final String ASSET_ROOT = "emuden";
 
     private StorageAccess storage;
+    private SecondScreen secondScreen;
+    private OnBackInvokedCallback backCallback;
+    private long lastBack;
 
     @Override
     protected String[] getLibraries() {
@@ -40,8 +49,84 @@ public class EmuDenActivity extends SDLActivity {
         storage.setHome();
         automationFromIntent();
         unpackAssets();
+        secondScreen = new SecondScreen(this);
         super.onCreate(savedInstanceState);
+        trapBack();
         storage.askAtStart();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        secondScreen.onStart();
+    }
+
+    @Override
+    protected void onStop() {
+        secondScreen.onStop();
+        super.onStop();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        secondScreen.onConfigurationChanged();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (backCallback != null && Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
+            backCallback = null;
+        }
+        super.onDestroy();
+    }
+
+    // Back is one thing for the app wherever it comes from: the gesture, the navigation bar,
+    // a keyboard, or the Back key of a built-in pad. That last one arrives as KEYCODE_BACK
+    // from a gamepad device (the Retroid's pad: scan code 158), which SDL would hand on as
+    // the pad's Select button. All of them become SDL's Back key instead, which opens the
+    // pause menu in a game and goes back a page elsewhere.
+    private void trapBack() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            // Android 13 and later: with enableOnBackInvokedCallback the system calls this
+            // for the gesture, the bar and Back keys alike.
+            backCallback = this::sendBack;
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback);
+        }
+    }
+
+    private void sendBack() {
+        long now = SystemClock.uptimeMillis();
+        if (mSDLThread == null || now - lastBack < 80) {
+            return; // not running yet, or the same press reported twice
+        }
+        lastBack = now;
+        try {
+            onNativeKeyDown(KeyEvent.KEYCODE_BACK);
+            onNativeKeyUp(KeyEvent.KEYCODE_BACK);
+        } catch (UnsatisfiedLinkError e) {
+            Log.w(TAG, "Back before the native library was loaded");
+        }
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        // Where the system still delivers Back as a key (before Android 13, or a device that
+        // skips the callback), it must not reach SDL's gamepad code.
+        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
+                sendBack();
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    /** Called from native code (platform/src/android): the second screen is wanted or not. */
+    public static void secondScreenWanted(boolean wanted) {
+        SecondScreen.setWanted(wanted);
     }
 
     @Override

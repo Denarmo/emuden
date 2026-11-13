@@ -22,7 +22,7 @@
         android:allowBackup="false"
         android:hardwareAccelerated="true"
         android:isGame="true"
-        android:enableOnBackInvokedCallback="false"
+        android:enableOnBackInvokedCallback="true"
         android:requestLegacyExternalStorage="true"
         android:theme="@style/AppTheme">
 

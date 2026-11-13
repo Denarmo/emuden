@@ -6,13 +6,16 @@
 #   powershell -ExecutionPolicy Bypass -File tools\android\run.ps1 -Device <serial> -Port 5601
 #   python tools/drive.py --port 5601 state
 # -Stop only stops the app and removes the forward. -Apk installs that file instead of the
-# one Gradle writes. Nothing else on the device is touched.
+# one Gradle writes. -BuildName <name> builds in build\<name> instead of build\android. The
+# test endpoints on the two ports after -Port are forwarded as well. Nothing else on the
+# device is touched.
 param(
     [string]$Device = "",
     [int]$Port = 5577,
     [switch]$NoBuild,
     [string]$Apk = "",
     [switch]$GrantStorage,
+    [string]$BuildName = "android",
     [switch]$Stop
 )
 $ErrorActionPreference = "Stop"
@@ -25,15 +28,15 @@ $package = "io.github.denarmo.emuden.next"
 
 if ($Stop) {
     & $adb @target shell am force-stop $package
-    & $adb @target forward --remove "tcp:$Port"
+    foreach ($p in $Port, ($Port + 1), ($Port + 2)) { & $adb @target forward --remove "tcp:$p" }
     exit 0
 }
 if (-not $NoBuild -and -not $Apk) {
     Push-Location (Join-Path $repo "shells\android")
-    try { & .\gradlew.bat :app:assembleDebug --console=plain; if ($LASTEXITCODE) { exit $LASTEXITCODE } }
+    try { & .\gradlew.bat :app:assembleDebug "-PemudenBuild=$BuildName" --console=plain; if ($LASTEXITCODE) { exit $LASTEXITCODE } }
     finally { Pop-Location }
 }
-if (-not $Apk) { $Apk = Join-Path $repo "build\android\gradle\app\outputs\apk\debug\app-debug.apk" }
+if (-not $Apk) { $Apk = Join-Path $repo "build\$BuildName\gradle\app\outputs\apk\debug\app-debug.apk" }
 & $adb @target install -r $Apk
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
 if ($GrantStorage) {
@@ -42,5 +45,5 @@ if ($GrantStorage) {
     & $adb @target shell appops set $package MANAGE_EXTERNAL_STORAGE allow
 }
 & $adb @target shell input keyevent KEYCODE_WAKEUP
-& $adb @target forward "tcp:$Port" "tcp:$Port"
+foreach ($p in $Port, ($Port + 1), ($Port + 2)) { & $adb @target forward "tcp:$p" "tcp:$p" }
 & $adb @target shell am start -n "$package/io.github.denarmo.emuden.EmuDenActivity" --ei automation $Port

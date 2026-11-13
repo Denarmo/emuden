@@ -142,7 +142,7 @@ public:
         auto* text = volume->Emplace<ui::Label>(std::format("Volume {}%", VolumePercent()));
         text->grow = 1;
         const auto step = [&](const char* id, const char* sign, int delta) {
-            auto* button = volume->Emplace<ui::Button>(sign, [this, delta] { SetVolume(VolumePercent() + delta); });
+            auto* button = volume->Emplace<ui::Button>(sign, [delta] { SetVolume(VolumePercent() + delta); });
             button->id = id;
             button->width = 96;
         };

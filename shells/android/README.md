@@ -13,8 +13,8 @@ cd shells\android
 gradlew.bat :app:assembleDebug
 ```
 
-The APK is `build\android\gradle\app\outputs\apk\debug\app-debug.apk`; the native build is
-in `build\android\cxx`. arm64-v8a only, OpenGL ES 3, minSdk 28. The application id is
+The APK is `buildndroid\gradle\app\outputs\apk\debug\app-debug.apk`; the native build is
+in `buildndroid\cxx`. arm64-v8a only, OpenGL ES 3, minSdk 28. The application id is
 `io.github.denarmo.emuden.next`, so it installs beside the previous app.
 
 ## How it fits together
@@ -48,6 +48,38 @@ The device has two displays, so `screencap` needs `-d <id>` (`dumpsys SurfaceFli
 --display-id`) and `uiautomator dump` does not work. The built-in pad is
 `/dev/input/event8`, which the adb shell may write: `sendevent /dev/input/event8 1 545 1`,
 then `0 0 0`, is a real D-pad press.
+
+## Back
+
+Back is one thing for the app wherever it comes from. `EmuDenActivity` registers an
+`OnBackInvokedCallback` (Android 13 and later, `android:enableOnBackInvokedCallback="true"`),
+which the system calls for the gesture, the navigation bar and Back keys alike, and it also
+catches `KEYCODE_BACK` in `dispatchKeyEvent` for older systems. Both send SDL's Back key, so
+the app sees `Nav::Back`: the pause menu in a game, one page back elsewhere.
+
+The Back key of the Retroid's built-in pad is scan code 158 (`KEY_BACK`) on the gamepad
+device (`Vendor_2022_Product_3001.kl`: `key 0x9e BACK`). SDL's gamepad code would hand a
+`KEYCODE_BACK` from a gamepad on as the pad's Select button, which is why that key did
+nothing useful in a game. The pad's own Select (`BTN_SELECT`) is untouched. A real press:
+`sendevent /dev/input/event8 1 158 1`, `0 0 0`, `1 158 0`, `0 0 0`.
+
+## Second screen
+
+`SecondScreen` shows a `Presentation` with one `SurfaceView` on the first presentation
+display the activity is not on itself (display 2 on the Retroid Pocket Duo, 1280x960; it
+cannot host activities). The Surface and the touches go to
+`platform/src/android/second_display_android.cpp`, which makes an EGL window surface with
+the app's own display and config: the one GL context draws both screens, the second without
+waiting for its display. The Presentation exists while the activity is started, the display
+exists and the app wants it (`ui.companion.enabled`, or a claim by the player); it is shown
+again after stop and start and when a display is added. Its window cannot take the focus,
+so keys and the pad stay with the activity. What is drawn there is the app's business
+(`app/screens/companion`, `docs/interfaces.md`).
+
+`screencap -d <id>` shows either screen; `input -d 2 tap <x> <y>` touches the second one.
+The companion's test endpoint is on the automation port + 2 (`state`, `tap`, `screenshot`),
+forwarded by `run.ps1`. `run.ps1 -BuildName <name>` (Gradle: `-PemudenBuild=<name>`) builds in
+`build/<name>` instead of `build/android`.
 
 ## Storage
 
@@ -88,6 +120,7 @@ Android 16, Adreno 722, two screens, on 2026-11-12:
   copied the app does not offer all files access again (allow it in the system settings).
 - **BIOS files:** the BIOS folder is inside the app's private data, where a file manager
   cannot put files.
-- **Second screen:** the app draws on one screen; a DS game shows both of its screens there.
+- **Second screen:** a two-screen console (DS, 3DS) still shows both of its screens on the
+  main display; `ClaimSecondScreen` (below) is there for the player to move one over.
 - Secrets are kept in memory only (no Keystore) and the Switch 2 engine is not available on
   Android.

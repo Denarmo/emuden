@@ -2,7 +2,9 @@ plugins {
     id 'com.android.application' version '8.9.1' apply false
 }
 
-// Everything Gradle writes goes under build/android of the repository.
+// Everything Gradle writes goes under build/android of the repository; -PemudenBuild=<name>
+// picks build/<name> instead, so two builds can run side by side.
+ext.emudenBuild = providers.gradleProperty('emudenBuild').getOrElse('android')
 allprojects {
-    layout.buildDirectory = file("${rootDir}/../../build/android/gradle/${project.name}")
+    layout.buildDirectory = file("${rootDir}/../../build/${rootProject.ext.emudenBuild}/gradle/${project.name}")
 }

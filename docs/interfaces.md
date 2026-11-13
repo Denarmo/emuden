@@ -186,6 +186,32 @@ port, `<port> + 1`; `tools/drive.py` sends these lines there by itself:
 Use your own port when several agents test at once (`--port N`). Give nodes an `id` so
 `state` can tell what is focused. Always end with `quit`.
 
+## Second screen
+
+- `den/platform/second_display.h`: `pal::GetSecondDisplay()` is the other screen of the
+  device, drawn with the app's own GL context (the same textures, shaders and canvas):
+  `Present()`, `SetWanted(bool)`, `Ready()`, `PixelSize`, `BeginFrame()` / `EndFrame()` around
+  the drawing, `TakePointer` (presses in its pixels; they never reach `input::System`).
+  Android: a Presentation on the other display (`shells/android`, `SecondScreen.java`).
+  Desktop: a second window, there when the app is started with `EMUDEN_SECOND_WINDOW=1` or
+  the setting is "on".
+- `app/screens/companion/second_screen.h` drives it every frame, before the main window's
+  frame, with a `ui::Stage` of its own (`CompanionStage()`). Its pages are ordinary screens
+  whose route starts with `companion.`: `companion.browse` (the game the main screen has in
+  focus: cover, records, Play, favourite, Details, Game settings) and `companion.play` (quick
+  settings while a game runs: pause, fast-forward, rewind, exit, save and load slots with
+  their pictures, the picture preset, the volume). Touch only; the pad stays with the main
+  screen. Setting `ui.companion.enabled`: `auto` (on when `Present()`), `on`, `off`.
+- For a console with two screens: `ClaimSecondScreen({draw, pointer})` gives the screen to
+  the player instead of the companion pages until `ReleaseSecondScreen()`. `draw(ctx, area)`
+  runs every frame with the canvas begun for the second screen; `pointer(event)` gets its
+  presses in pixels (`SecondScreenScale()` converts). `SecondScreenReady()` and
+  `SecondScreenPixelSize` say what is there; a claim fails when the device has no second
+  screen.
+- `player::Session::SetVolume(0..1)` changes the running game's volume at once.
+- Test endpoint on the automation port + 2: `state`, `tap <x> <y>` (the second screen is 600
+  units high), `screenshot <png>`.
+
 ## Launcher additions
 
 - Routes: `setup` (four steps; "Run setup again" in Settings), `library_options`,
