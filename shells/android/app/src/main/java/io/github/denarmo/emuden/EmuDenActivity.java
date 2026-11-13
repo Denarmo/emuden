@@ -68,7 +68,6 @@ public class EmuDenActivity extends SDLActivity {
         setVolumeControlStream(AudioManager.STREAM_MUSIC);
         AppList.watch(this);
         AppBeside.watch(this);
-        ScreenVolume.watch(this);
         trapBack();
         storage.askAtStart();
     }
@@ -112,7 +111,6 @@ public class EmuDenActivity extends SDLActivity {
         tellStopped(false); // the loop must see the quit that follows
         AppList.unwatch(this);
         AppBeside.unwatch(this);
-        ScreenVolume.unwatch(this);
         secondScreen.onDestroy();
         if (self == this) {
             self = null;
