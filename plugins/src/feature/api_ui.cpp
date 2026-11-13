@@ -53,6 +53,14 @@ int Pop(lua_State* L) {
     return 0;
 }
 
+// den.ui.depth(): how many pages the plugin shows on top of each other; the user's Back
+// takes one away without telling the script.
+int Depth(lua_State* L) {
+    std::uint64_t revision = 0;
+    lua_pushinteger(L, static_cast<lua_Integer>(Runner::Of(L).Pages(revision).size()));
+    return 1;
+}
+
 int Patch(lua_State* L) {
     const std::string id = luaL_checkstring(L, 1);
     luaL_checktype(L, 2, LUA_TTABLE);
@@ -107,6 +115,7 @@ void RegisterUi(lua_State* L, Runner& runner) {
     SetFunction(L, runner, "set", &Set);
     SetFunction(L, runner, "push", &Push);
     SetFunction(L, runner, "pop", &Pop);
+    SetFunction(L, runner, "depth", &Depth);
     SetFunction(L, runner, "patch", &Patch);
     SetFunction(L, runner, "toast", &Toast);
     SetFunction(L, runner, "confirm", &Confirm);

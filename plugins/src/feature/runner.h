@@ -37,6 +37,7 @@ struct RunnerConfig {
     std::filesystem::path downloads_dir;
     std::string app_version;
     std::string platform;
+    bool developer = false; // from the developer folder: may show a test site of this machine
     std::function<bool()> web_available; // may be empty: no in-app browser
     HttpGetter http;
     std::shared_ptr<FeatureServices> services; // may be null

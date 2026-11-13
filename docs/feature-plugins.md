@@ -38,9 +38,14 @@ the checkpoint blocks. So the plugin ships in two stages:
   inside the app, against whatever endpoint Hackdex agrees to (section 8.3). Until then the
   manifest declares no Hackdex host, so the sandbox itself refuses such requests.
 
-The plugin is named "ROM Hacks" (`emuden.romhacks`), not "Hackdex"; its base ROM table comes
-from their MIT file with its notice. Open point for the owner: ask Hackdex
-(admin@hackdex.app, or an issue on their repository) for stage 2 and the use of the name.
+Since the in-app browser exists, stage 1 happens inside the app (section 8): the user browses
+hackdex.app in the browser page and presses Download there. It is still a person using the
+site with a real browser engine; the plugin requests nothing and never sees the page.
+
+The plugin is named "ROM Hacks: hackdex.app" (`emuden.romhacks`), not "Hackdex", and uses no
+logo of the site; its base ROM table comes from their MIT file with its notice. Open point for
+the owner: ask Hackdex (admin@hackdex.app, or an issue on their repository) for stage 2 and
+the use of the name.
 
 ## 2. Overview
 
@@ -97,16 +102,17 @@ Always there, without a permission: `den.json`, `den.storage`, `den.ui`, `den.lo
 `require`, `dofile`, `loadfile`, `load` with binary chunks, `collectgarbage` with arguments.
 Loaded libraries: base (without those), `string`, `table`, `math`, `utf8`, `coroutine`.
 
-Example (stage 1 of the ROM hack plugin):
+Example (the ROM hack plugin for hackdex.app):
 
 ```json
-{ "id": "emuden.romhacks", "name": "ROM Hacks", "version": "1.0.0", "kind": "feature",
-  "api": 1, "needs": ["kind.feature", "feature.lua.1"], "publisher": "EmuDEN",
-  "license": "GPL-3.0-or-later", "summary": "Install ROM hack patches on your own games.",
+{ "id": "emuden.romhacks", "name": "ROM Hacks: hackdex.app", "version": "2.0.1",
+  "kind": "feature", "api": 1, "needs": ["kind.feature", "feature.lua.1", "feature.web.1"],
+  "publisher": "EmuDEN", "license": "GPL-3.0-or-later",
+  "summary": "Browse hackdex.app inside EmuDEN and install the patches you download on your own games.",
   "feature": { "entry": "main.lua", "icon": "icon.png",
-    "permissions": ["open-url", "files.import", "downloads.watch", "library.read", "patch",
-                    "library.write"],
-    "open_hosts": ["www.hackdex.app"], "file_types": ["bps", "xdelta", "ips", "ups"],
+    "permissions": ["browse", "files.import", "library.read", "patch", "library.write"],
+    "browse_hosts": ["www.hackdex.app", "hackdex.app", "patches.hackdex.app"],
+    "file_types": ["bps", "ips", "ups", "xdelta", "vcdiff", "aps", "ppf"],
     "systems": ["gb", "gbc", "gba", "nds"] } }
 ```
 
@@ -141,6 +147,7 @@ Paths are relative to the plugin's data folder; `..` and absolute paths are erro
 | `den.patch.apply{patch, game, title, version?, description?, cover?, source?, keep_old?}` (wait) | `{game, path}`: the new library entry |
 | `den.library.update(id, {title?, description?, cover?})` / `den.library.remove(id)` | own hacks only; remove deletes the patched file |
 | `den.ui.set(page)` / `push(page)` / `pop()` | replaces or stacks the plugin's page (section 5) |
+| `den.ui.depth()` | how many pages the plugin shows on top of each other (1 = only the first). The user's Back takes one away without telling the script, so a script asks before it pushes or pops |
 | `den.ui.patch(id, fields)` | changes one element by id (progress, text, enabled) without rebuilding |
 | `den.ui.toast(text)`, `den.ui.confirm{title, message, yes}` (wait) | - / boolean |
 | `den.app.open_game(id)` | opens the game's details page |
@@ -198,14 +205,22 @@ end
 
 - `url` is https and on `hosts`; `hosts` are some of the manifest's `browse_hosts` (default:
   all of them). The top-level page stays on those hosts; a download may come from another.
+  A plugin of the developer folder may also name `http://127.0.0.1:<port>/...` when it
+  declared `127.0.0.1`: a test site on the same machine.
+- A link the user follows to another host (a file host, for instance) is not refused
+  silently: the page asks "This link goes to <host>. Open it?". A yes allows that host until
+  the page is closed. The plugin has no part in it and never learns the host's pages; a file
+  downloaded there passes the same checks, and `source_host` names where it came from.
 - `extensions` (default: the manifest's `file_types`, else every patch type) are cut down to
   `bps ips ups aps ppf xdelta xdelta3 vcdiff zip`. A ROM image type is never on the list,
   whatever the plugin asks for; a call left with no type is refused.
 - Every file is checked again by the host before the script hears of it: a ROM image by name
   (`patching::IsRomImageExtension`), a file that is not a patch by its content (a patched
   game renamed `.bps`), a zip that holds a ROM image or no patch are refused, deleted, and
-  the user is told in a toast. A zip's patch is unpacked: `path` names the patch. 7z cannot
-  be opened here and is not taken.
+  the user is told in a toast ("EmuDEN only installs patch files; this is a full game
+  file"). A zip's patch is unpacked: `path` names the patch (the first one, when it holds
+  several). 7z and rar cannot be opened here and are not taken: the page says so and asks
+  the user to unpack the file and choose the patch.
 - The file is moved from the app's web inbox to the plugin's `inbox/`.
 - Without a web engine the same page is its fallback: it opens the site in the user's
   browser and offers the patch files that then appear in the Downloads folder. The call and
@@ -321,31 +336,44 @@ is first renamed `<title> (<old version>)` and stays a separate game. The entry 
 `Entry::hack_of` (the base's id), the sidecar's title and description, and its own cover.
 The base ROM is only read. A plugin can change and remove only entries whose sidecar names it.
 
-## 8. The ROM hack plugin (`emuden.romhacks`)
+## 8. The ROM hack plugins, one per site
 
-### 8.1 Stage 1 pages
+Four plugins from one Lua library. Their source is in `Denarmo/emuden-plugins`: the flow and
+the pages are `shared/romhacks/` (`main.lua`, `pages.lua`), each plugin folder adds
+`plugin.json`, `site.lua` (name, start address, wording), an icon and a README recording what
+was found about the site. `tools/plugin_tool.py` copies the shared library into each package
+(the folder's `.shared` file names it); `plugin_tool.py assemble` writes the same files to a
+folder for `<data>/plugins-dev/<id>`.
+
+| Plugin | Site and start page | Hosts (`browse_hosts`) | What the site offers |
+|---|---|---|---|
+| `emuden.romhacks` "ROM Hacks: hackdex.app" | `https://www.hackdex.app/discover` | `www.hackdex.app`, `hackdex.app`, `patches.hackdex.app` (where patch downloads are redirected) | `bps` and `xdelta` patches of Pokemon hacks; no account needed to download; creators may disable downloads |
+| `emuden.romhacks-whackahack` "ROM Hacks: whackahack.com" | `https://whackahack.com/foro/` | `whackahack.com`, `www.whackahack.com` (forum, attachments and sign-in are on the same host) | A Spanish-language forum; a thread's files are forum attachments or links to file hosts (MediaFire, MEGA, Drive), reached through the "leaving" question; patches (`ips`, `ups`, `bps`) and sometimes patched games, which are refused |
+| `emuden.romhacks-pokeharbor` "ROM Hacks: pokeharbor.com" | `https://www.pokeharbor.com/` | `www.pokeharbor.com`, `pokeharbor.com` | **Pre-patched games, not patches** ("All games are pre-patched"), as zips on MediaFire and MEGA. The user can browse, but those downloads are refused; the plugin's first page and About say so. Only an entry that links to a real patch installs |
+| `emuden.romhacks-romhacking` "ROM Hacks: romhacking.net" | `https://www.romhacking.net/` | `www.romhacking.net`, `romhacking.net`, `archive.org`, `www.archive.org` | Hacks and translations for many consoles, mostly `ips`/`bps`/`xdelta`/`ppf` inside `zip`, `7z` or `rar`. Closed to submissions since August 2024, files also at the Internet Archive; the live site still serves pages (its front page showed news of 2026-11-12). zip works, 7z and rar do not |
+
+### 8.1 Pages (shared by the four)
 
 | Page | Content |
 |---|---|
-| Home | `text` with the three steps; buttons "Open Hackdex" (`den.open_url "https://www.hackdex.app/discover"`) and "Choose a patch file" (`den.files.import`); shelf "Found in Downloads" (`den.files.inbox()`, a tile per patch file, refreshed on `plugin.resume`); grid "Installed hacks" (`den.library.hacks()`); row "Base games": the 39 known base ROMs from the package's `bases.json`, each "In your library" or "Missing" (`den.library.find{sha1}`) |
-| Install | After a tile or the picker: `den.patch.inspect`. BPS carries the base CRC32, so the base is found without a question. xdelta has no source checksum: the plugin tries the library's games that are in `bases.json`, six at most, and keeps the one whose target windows verify; with none, a list to choose from. Then a `detail`: title (from the file name, an editable `input`), base game, format, "Install". A missing base gives a page naming the game, region and checksums: "Add your own copy of this game to the library". Nothing offers to download it |
-| Hack | A tile of "Installed hacks": "Play" (`den.app.open_game`), "Update from a file", "Rename", "Remove" |
+| Browse (first tab) | The three steps; "Browse <site>" (`den.web.open` with the start address, then `den.web.close` once a file arrived); "Choose a patch file" (`den.files.import`); which files are taken; the site's warning when it has one |
+| Install | `den.patch.inspect`. A patch with a base checksum (BPS, UPS): `den.library.find`, then "You have the base game" with the checksum, or the page "Base game missing" with the checksum (and the game's name when the package's `bases.json` knows it). A patch without one (IPS, xdelta, APS, PPF): the user's games it can be for (PPF: disc consoles, APS: GBA, IPS: no disc console and at most 16 MiB; names like the file's first), the choice remembered per file name in `den.storage` and offered again with "Choose another game". Then name (from the file name) and version, "Install" (`den.patch.apply`, no cover given: the library's own lookup for hacks), and "Play" (`den.app.open_game`) |
+| Installed | The plugin's hacks; a hack's page: Play, "Update from <site>" (the browser page again, the file checked against the hack's base), "Update from a file", Rename, Remove |
+| About | What the plugin does and does not do (no reading of the site, patches only, the leaving question, sign-in is the user's), the site's notes, "Not affiliated with <site>" |
 
-On Android "open with" and share intents for `file_types`, and on desktop a file path on the
-command line, reach `FeatureHost::RouteFile`. The plugin never requests anything from
-hackdex.app or its storage hosts, never downloads a ROM and bundles no patches. Its source is
-`plugins/emuden.romhacks` in `Denarmo/emuden-plugins`. The Downloads folder is
-`pal::DownloadsDir()`, or the folder the setting `plugins.downloads_folder` names.
+The plugins have no `http`, `download` or `open-url` permission and no Downloads watching:
+without a web engine `den.web.open` itself falls back to the user's browser and the Downloads
+folder (`docs/in-app-browser.md`). On Android "open with" and share intents for `file_types`,
+and on desktop a file path on the command line, reach `FeatureHost::RouteFile`.
 
-### 8.2 With the in-app browser
+### 8.2 What was run, and what is the owner's to try
 
-`den.web.open` puts stage 1's browsing inside the app without changing who does what: a
-person browses hackdex.app in the browser page and presses "Download Patch"; the plugin gets
-the file and installs it as before. The manifest then declares `browse` with
-`browse_hosts: ["www.hackdex.app", "hackdex.app"]` and needs `feature.web.1`; it still has
-no `http` host, so the plugin itself can request nothing. The host API is in the app; the
-plugin in `Denarmo/emuden-plugins` does not use it yet. A download and install from the real
-site has not been run: it is for the owner to try by hand.
+Windows, 2026-11-13 (`docs/status.md`): the four plugins installed from the live index; each
+start page loaded once in the browser page and rendered (hackdex.app passed its checkpoint);
+the whole path on a test site on `127.0.0.1` from a developer-folder copy of the same code.
+Nothing was clicked or downloaded on the real sites: an agent driving downloads there would
+be the automated use their terms forbid. A real download and install from each site is for
+the owner to try by hand.
 
 ### 8.3 Stage 2 (needs written permission first)
 

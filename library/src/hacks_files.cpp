@@ -151,16 +151,24 @@ void ApplyHackSidecars(std::vector<Entry>& entries) {
             entry.name = sidecar->title;
         }
     }
+    UseBaseCovers(entries);
+}
+
+bool UseBaseCovers(std::vector<Entry>& entries) {
+    bool changed = false;
     for (Entry& entry : entries) {
-        if (entry.hack_of.empty() || !entry.cover.empty()) {
+        if (entry.hack_of.empty() || (!entry.cover.empty() && !entry.placeholder_cover)) {
             continue;
         }
         const auto base = std::find_if(entries.begin(), entries.end(),
                                        [&](const Entry& other) { return other.id == entry.hack_of; });
-        if (base != entries.end() && !base->placeholder_cover) {
+        if (base != entries.end() && !base->cover.empty() && !base->placeholder_cover) {
             entry.cover = base->cover;
+            entry.placeholder_cover = false;
+            changed = true;
         }
     }
+    return changed;
 }
 
 HackPlace PlaceForHack(const Entry& base, const std::vector<Folder>& folders, const SystemTable& systems,

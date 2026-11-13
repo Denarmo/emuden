@@ -98,6 +98,7 @@ Result<std::shared_ptr<Runner>> RealFeatureHost::Start(const std::string& id) {
     }
     config.app_version = config_.app_version;
     config.platform = deps_.platform;
+    config.developer = package.trust == FeaturePlugin::Trust::Developer;
     config.web_available = deps_.web_available;
     config.http = deps_.http;
     config.services = deps_.services;

@@ -117,6 +117,8 @@ struct Stage {
     std::shared_ptr<FakeServices> services = std::make_shared<FakeServices>();
     bool engine = true;
 
+    bool developer = false;
+
     std::unique_ptr<ScriptRunner> Run(const std::string& manifest = BROWSING) {
         scratch.Write("package/main.lua", SCRIPT);
         RunnerConfig config;
@@ -125,6 +127,7 @@ struct Stage {
         config.data_dir = scratch.dir / "data";
         config.app_version = "1.2.3";
         config.platform = "test";
+        config.developer = developer;
         config.services = services;
         config.web_available = [this] { return engine; };
         config.now = [] { return std::int64_t{1794528000}; };
@@ -207,6 +210,29 @@ TEST_CASE("den.web.open is refused without the permission, for other hosts and f
             "only patch files can be taken from a web site, never a game");
 }
 
+TEST_CASE("only a developer plugin shows a test site of this machine over http") {
+    const std::string local = ManifestOf(R"({"entry":"main.lua","permissions":["browse"],
+        "browse_hosts":["127.0.0.1"],"file_types":["bps"]})");
+    const JsonValue request = Request(R"({"url":"http://127.0.0.1:28123/index.html"})");
+    Stage stage;
+    {
+        const auto runner = stage.Run(local);
+        runner->Call({"actions", "try"}, {request});
+        runner->Settle();
+        CHECK(Logged(*runner, "try: nil only https addresses are allowed"));
+        CHECK(runner->TakeAsks().empty());
+    }
+    stage.developer = true;
+    const auto runner = stage.Run(local);
+    runner->Call({"actions", "try"}, {request});
+    runner->Settle();
+    const std::vector<Ask> asks = runner->TakeAsks();
+    REQUIRE(asks.size() == 1);
+    CHECK(asks[0].kind == AskKind::OpenWeb);
+    CHECK(asks[0].value == "http://127.0.0.1:28123/index.html");
+    CHECK(asks[0].hosts == std::vector<std::string>{"127.0.0.1"});
+}
+
 TEST_CASE("every patch the user downloads in the page reaches the script") {
     Stage stage;
     const auto runner = stage.Run();
@@ -269,7 +295,7 @@ TEST_CASE("the host takes no game and nothing that is not a patch, whatever it i
     // A screen that let a game through: the host still refuses it and deletes the file.
     hand("Emerald.gba", "a whole game");
     REQUIRE(screen.toasts.size() == 1);
-    CHECK(screen.toasts[0].find("games are never taken") != std::string::npos);
+    CHECK(screen.toasts[0].find("this is a full game file") != std::string::npos);
     // A patched game under a patch's name.
     hand("Emerald Kaizo.bps", "a whole game, renamed");
     REQUIRE(screen.toasts.size() == 2);
@@ -281,7 +307,7 @@ TEST_CASE("the host takes no game and nothing that is not a patch, whatever it i
     // An archive with a game beside the patch, and one without a patch.
     hand("bundle.zip", StoredZipOf({{"hack.bps", "BPS1 x"}, {"Emerald (patched).gba", "game"}}));
     REQUIRE(screen.toasts.size() == 4);
-    CHECK(screen.toasts[3].find("holds a game") != std::string::npos);
+    CHECK(screen.toasts[3].find("holds a full game file") != std::string::npos);
     hand("notes.zip", StoredZipOf({{"readme.txt", "hello"}}));
     REQUIRE(screen.toasts.size() == 5);
     CHECK(screen.toasts[4].find("no patch file") != std::string::npos);

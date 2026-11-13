@@ -8,11 +8,13 @@
 #include <chrono>
 #include <format>
 #include <map>
+#include <sstream>
 
 #include "den/app/app.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/patching/patch.h"
+#include "den/platform/webview.h"
 #include "web_browser.h"
 
 namespace den::app::web {
@@ -75,6 +77,34 @@ Verdict JudgeDownload(const std::string& file_name, const std::vector<std::strin
     }
     const std::vector<std::string>& list = wanted.empty() ? DefaultExtensions() : wanted;
     return std::find(list.begin(), list.end(), extension) != list.end() ? Verdict::Take : Verdict::NotWanted;
+}
+
+std::string RefusalText(const std::string& file_name, Verdict verdict) {
+    if (verdict == Verdict::RomImage) {
+        return std::format("EmuDEN only installs patch files; this is a full game file ({})", file_name);
+    }
+    if (const std::string extension = ExtensionOf(file_name); extension == "7z" || extension == "rar") {
+        return std::format("{} is a {} archive, which EmuDEN cannot open yet: download it in your browser, unpack it "
+                           "and choose the patch file",
+                           file_name, extension);
+    }
+    return std::format("{} is not a file this page takes", file_name);
+}
+
+bool CanLeaveTo(const std::string& url) {
+    const std::string host = pal::WebUrlHost(url);
+    return !host.empty() && pal::WebUrlAllowed(url, {host});
+}
+
+std::vector<std::string> SplitList(const std::string& text) {
+    std::vector<std::string> out;
+    std::istringstream in(text);
+    for (std::string item; std::getline(in, item, ',');) {
+        if (item = ToLower(Trim(item)); !item.empty()) {
+            out.push_back(item);
+        }
+    }
+    return out;
 }
 
 std::filesystem::path InboxDir() {

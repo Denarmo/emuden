@@ -56,6 +56,13 @@ std::string ExtensionOf(const std::string& file_name);
 bool IsRomImage(const std::string& extension);
 enum class Verdict { Take, NotWanted, RomImage };
 Verdict JudgeDownload(const std::string& file_name, const std::vector<std::string>& wanted);
+/// What the user is told about a download that was not taken.
+std::string RefusalText(const std::string& file_name, Verdict verdict);
+/// Whether the user may be asked to follow a link that leaves the page's hosts: an https
+/// address (http on this machine) with a host.
+bool CanLeaveTo(const std::string& url);
+/// "a, B ,c" -> {"a", "b", "c"}.
+std::vector<std::string> SplitList(const std::string& text);
 /// `<data>/inbox/web`: where downloads arrive.
 std::filesystem::path InboxDir();
 /// A file of `dir` that does not exist yet: "hack.bps", then "hack (2).bps", ...
@@ -82,6 +89,8 @@ struct PageState {
     std::string last_download;
     std::string last_refused_download;
     std::string last_refused_host;
+    std::string leave_asked; // the last host the user was asked about leaving to
+    std::string left_to;     // the last host the user allowed that way
     int downloads = 0, refused_downloads = 0, refused_navigations = 0;
 };
 const PageState& CurrentState();

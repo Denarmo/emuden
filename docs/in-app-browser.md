@@ -23,8 +23,11 @@ These hold for every backend and every opener.
   reports those and nothing more.
 - **Navigation stays on the opener's hosts.** The top-level page may only be on a host of
   the allowed list: exact names, or `*.example.com` for a name and its subdomains; https
-  only, http for loopback addresses. A link elsewhere is refused with a toast. A link that
-  asks for a new window opens in the same view under the same rule. A server redirect to
+  only, http for loopback addresses. A link elsewhere is not followed; the page asks the
+  user "This link goes to <host>. Open it?" (a sheet with Cancel selected), once per press.
+  A yes adds that host to the list until the page is closed and goes there; anything that
+  is not an https address gets a toast instead. A link that asks for a new window opens in
+  the same view under the same rule. A server redirect to
   another host is let through as far as the server's answer, because a download often comes
   from a second host; if the answer is a page and not a file, it is undone before it shows
   and refused like a link. Frames and the files a page loads (pictures, scripts, a
@@ -33,8 +36,10 @@ These hold for every backend and every opener.
   extension. The default list is `bps ips ups xdelta vcdiff aps ppf zip 7z`. Anything else is
   refused with a toast before a byte is written.
 - **Never a ROM.** Cartridge, disc and card images (`gb gbc gba nds 3ds iso bin cue chd nes
-  sfc n64 z64` and the rest of the list in `app/screens/web/web_policy.cpp`) are refused even
-  when an opener lists them. An archive is taken as it is; what is inside is the opener's to
+  sfc n64 z64` and the rest of the list in `patching::IsRomImageExtension`) are refused even
+  when an opener lists them, with "EmuDEN only installs patch files; this is a full game
+  file". A `7z` or `rar` an opener does not take is refused with a sentence of its own (the
+  feature host cannot open them, so plugins never take them). An archive is taken as it is; what is inside is the opener's to
   check.
 - **No sign-in by the app, no saved passwords.** Password saving and form autofill are off.
   Camera, microphone, location, notification and every other permission request is denied.
@@ -240,7 +245,7 @@ line out (`app/screens/web/web_endpoint.cpp`):
 |---|---|
 | `open url=<url> [hosts=a,b] [ext=bps,zip] [title=<text>]` | `ok`; opens the page for a test opener |
 | (`state` without an engine) | also `fallback` (true), `watching` (the folders), `offered` (the last file asked about), `offers` |
-| `state` | JSON: `open`, `available`, `ready`, `view_visible`, `url`, `title`, `loading`, `can_go_back`, `can_go_forward`, `view` (x, y, w, h in logical units), `pointer`, `cursor`, `downloading`, `progress`, `downloads`, `last_download`, `refused_downloads`, `last_refused_download`, `refused_navigations`, `last_refused_host`, and what the test opener was handed (`opener_calls`, `opener_file`, `opener_name`, `opener_host`) |
+| `state` | JSON: `open`, `available`, `ready`, `view_visible`, `url`, `title`, `loading`, `can_go_back`, `can_go_forward`, `view` (x, y, w, h in logical units), `pointer`, `cursor`, `downloading`, `progress`, `downloads`, `last_download`, `refused_downloads`, `last_refused_download`, `refused_navigations`, `last_refused_host`, `leave_asked` (the last host the user was asked about), `left_to` (the last host the user allowed), and what the test opener was handed (`opener_calls`, `opener_file`, `opener_name`, `opener_host`) |
 | `cursor <x> <y>` | `ok`; puts the pad's pointer at a point of the view (logical units) |
 | `close` | `ok`; closes the page |
 

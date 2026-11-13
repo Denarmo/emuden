@@ -16,7 +16,6 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
-#include <sstream>
 
 #include "den/app/app.h"
 #include "den/app/registry.h"
@@ -44,17 +43,6 @@ constexpr float STEP = 28;            // units per D-pad press
 PageState g_state;
 class WebScreen;
 WebScreen* g_screen = nullptr;
-
-std::vector<std::string> Split(const std::string& text) {
-    std::vector<std::string> out;
-    std::istringstream in(text);
-    for (std::string item; std::getline(in, item, ',');) {
-        if (item = ToLower(Trim(item)); !item.empty()) {
-            out.push_back(item);
-        }
-    }
-    return out;
-}
 
 /// The stick with the dead zone taken out and a soft start.
 float Curve(float value) {
@@ -244,7 +232,7 @@ private:
 
     void Start() {
         const std::string url = Param("url");
-        hosts_ = Split(Param("hosts"));
+        hosts_ = SplitList(Param("hosts"));
         if (hosts_.empty()) {
             if (const std::string host = pal::WebUrlHost(url); !host.empty()) {
                 hosts_.push_back(host);
@@ -253,7 +241,7 @@ private:
         if (const Opener* opener = FindOpener(Param("opener"))) {
             opener_ = *opener;
         }
-        wanted_ = Split(Param("ext"));
+        wanted_ = SplitList(Param("ext"));
         std::erase_if(wanted_, [](const std::string& e) { return IsRomImage(e); });
         if (wanted_.empty()) {
             wanted_ = opener_.extensions;
@@ -334,9 +322,7 @@ private:
         if (verdict != Verdict::Take) {
             ++g_state.refused_downloads;
             g_state.last_refused_download = download.file_name;
-            GetStage().Toast(verdict == Verdict::RomImage
-                                 ? std::format("{} is a ROM image: EmuDEN does not download ROMs", download.file_name)
-                                 : std::format("{} is not a file this page takes", download.file_name));
+            GetStage().Toast(RefusalText(download.file_name, verdict), 6.0f);
             return pal::WebDownloadDecision::Refuse();
         }
         std::error_code ec;
@@ -381,17 +367,32 @@ private:
         g_state.progress = item.total > 0 ? static_cast<int>(item.received * 100 / item.total) : -1;
     }
 
+    /// A link to a host outside the page's list: the user is asked, once per press. A yes
+    /// allows that host until the page is closed and goes there.
     void Refused(const pal::WebNavigation& navigation) {
         ++g_state.refused_navigations;
         g_state.last_refused_host = navigation.host;
         const double now = pal::NowSeconds();
         if (navigation.host == refused_host_ && now - refused_at_ < 1.5) {
-            return; // one toast per press
+            return;
         }
         refused_host_ = navigation.host;
         refused_at_ = now;
-        GetStage().Toast(navigation.host.empty() ? std::string("That link is not opened here")
-                                                 : std::format("{} is outside this page: not opened", navigation.host));
+        if (!CanLeaveTo(navigation.url) || GetStage().DialogOpen()) {
+            GetStage().Toast(navigation.host.empty() ? std::string("That link is not opened here")
+                                                     : std::format("{} is outside this page: not opened", navigation.host));
+            return;
+        }
+        g_state.leave_asked = navigation.host;
+        GetStage().Confirm("Leaving this site", std::format("This link goes to {}. Open it?", navigation.host), "Open",
+                           [url = navigation.url, host = navigation.host] {
+                               if (g_screen && g_screen->view_) {
+                                   g_screen->hosts_.push_back(host);
+                                   g_screen->view_->SetAllowedHosts(g_screen->hosts_);
+                                   g_screen->view_->Navigate(url);
+                                   g_state.left_to = host;
+                               }
+                           });
     }
 
     void HandleNav(Nav nav, bool repeat) {

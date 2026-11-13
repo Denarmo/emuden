@@ -71,6 +71,8 @@ std::string StateJson() {
         {"last_refused_download", JsonString(s.last_refused_download)},
         {"refused_navigations", number(s.refused_navigations)},
         {"last_refused_host", JsonString(s.last_refused_host)},
+        {"leave_asked", JsonString(s.leave_asked)},
+        {"left_to", JsonString(s.left_to)},
         {"opener_calls", number(e.opener_calls)},
         {"opener_file", JsonString(e.opener_file)},
         {"opener_name", JsonString(e.opener_name)},

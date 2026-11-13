@@ -74,7 +74,7 @@ Result<fs::path> PatchInZip(const fs::path& archive) {
     for (const ZipEntry& member : *members) {
         const std::string extension = ExtensionOf(PathFromUtf8(member.name));
         if (patching::IsRomImageExtension(extension)) {
-            return Status::Fail("the archive holds a game, not only a patch");
+            return Status::Fail("EmuDEN only installs patch files; this archive holds a full game file");
         }
         if (patch == nullptr && patching::IsPatchExtension(extension) && IsSafeRelativePath(member.name) &&
             CanExtractZipEntry(member) && !member.symlink && member.size <= MAX_PATCH) {
@@ -103,7 +103,7 @@ Result<WebVisit::File> TakeFile(Runner& runner, const WebFile& arrived) {
     fs::path patch = file;
     fs::path unpacked_dir;
     if (patching::IsRomImageExtension(extension) || patching::IsRomImageExtension(ExtensionOf(file))) {
-        result = Status::Fail("games are never taken from a web site, only patches");
+        result = Status::Fail("EmuDEN only installs patch files; this is a full game file");
     } else if (!Takes(extension) || !Has(visit.extensions, extension)) {
         result = Status::Fail("the plugin does not take this kind of file");
     } else {
@@ -137,6 +137,13 @@ Result<WebVisit::File> TakeFile(Runner& runner, const WebFile& arrived) {
         fs::remove_all(unpacked_dir, ec);
     }
     return result;
+}
+
+// A plugin of the developer folder may show a test site of this machine over plain http.
+bool LocalTestSite(Runner& runner, const std::string& url, const std::vector<std::string>& hosts) {
+    const UrlParts parts = ParseUrl(url);
+    return runner.Config().developer && parts.valid && parts.scheme == "http" && parts.host == "127.0.0.1" &&
+           Has(hosts, parts.host);
 }
 
 int PushFile(lua_State* L, const WebVisit::File& file) {
@@ -214,7 +221,7 @@ int Open(lua_State* L) {
                 return Refuse(L, "the plugin did not declare the host " + host);
             }
         }
-        if (const Status allowed = CheckUrl(url, hosts); !allowed.ok) {
+        if (const Status allowed = CheckUrl(url, hosts); !allowed.ok && !LocalTestSite(runner, url, hosts)) {
             return Refuse(L, allowed.error);
         }
         std::vector<std::string> asked = FieldList(L, 1, "extensions");

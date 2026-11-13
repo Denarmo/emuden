@@ -67,8 +67,10 @@ Design and contract: `docs/feature-plugins.md`. Not merged into main.
   patch in their browser; the plugin finds it in the Downloads folder (or a chosen file),
   reads the base checksum, finds that game in the library, patches a copy and registers the
   hack. Name, version, description, cover picture and the hack's Hackdex address are typed or
-  chosen by the user. Updates are a newer patch file, matched by file name. In-app browsing
-  needs Hackdex's written permission first (admin@hackdex.app).
+  chosen by the user. Updates are a newer patch file, matched by file name. An in-app
+  catalogue (the app itself fetching Hackdex) needs Hackdex's written permission first
+  (admin@hackdex.app). (This was version 1.0.0; 2.0 below lets the user browse the site in
+  the app's browser page instead.)
 - **Run on Windows** (automation port 27413, fresh portable `user` folder, scratch library
   with copies of two ROMs): the plugin was installed from the live source with one press,
   found a patch in the Downloads folder (`plugins.downloads_folder` pointed at a scratch
@@ -82,11 +84,49 @@ Design and contract: `docs/feature-plugins.md`. Not merged into main.
   (`pal::DownloadsDir`, SDL's user folder; empty on Android, where the file picker is used).
 - **In-app browser for plugins:** `den.web.open` (permission `browse`) shows a declared site
   in the browser page and hands the plugin each patch file the user downloads there; ROM
-  images, files that are no patch and archives holding a game are refused by the host. Run
-  on Windows with a developer-folder plugin: hackdex.app's start page opened once in the
-  page, closing it returned `nil, "closed"` to the script. Not run: a download from a real
-  site (left for the owner to try by hand), the fallback page through a plugin, Linux,
-  Android. The ROM Hacks plugin itself does not use `den.web` yet.
+  images, files that are no patch and archives holding a game are refused by the host.
+- **Four ROM Hacks plugins, one per site** (index 9 of `Denarmo/emuden-plugins`, one shared
+  Lua library; `docs/feature-plugins.md` section 8): hackdex.app (`emuden.romhacks` 2.0.1,
+  replacing the Downloads-folder version), whackahack.com, pokeharbor.com and
+  romhacking.net (1.0.1 each). Browse tab ("Browse <site>", "Choose a patch file"),
+  Installed (play, update from the site or a file, rename, remove), About.
+  - New in the app for them: a link that leaves the page's hosts asks "This link goes to
+    <host>. Open it?" (allowed for that host until the page is closed); the refusal reads
+    "EmuDEN only installs patch files; this is a full game file"; 7z and rar get their own
+    sentence; `den.ui.depth()`; a developer-folder plugin may show `http://127.0.0.1`; a
+    hack whose own cover lookup finds nothing keeps the box of its base game (before, it
+    fell to a drawn placeholder after the next scan).
+  - **Run on Windows** (automation port 58999, fresh portable `user` folder, scratch library
+    of copies of Tetris, Pokemon Brown and Wario Land 3): the four plugins were installed
+    from the live index with one press each (their page lists the hosts) and later updated
+    to 1.0.1/2.0.1 from it. Each plugin's browser page was opened once and the window
+    captured: all four start pages rendered in WebView2 (hackdex.app past its checkpoint,
+    whackahack.com's forum, pokeharbor.com, romhacking.net with news dated 2026-11-12).
+    Nothing was clicked or downloaded on those sites.
+  - The whole path was run on a test site on `127.0.0.1` with a developer-folder copy of the
+    same Lua: a BPS (base found by checksum, "You have the base game"), a zip holding an IPS
+    and an xdelta with LZMA sections (the game chosen from a list; chosen automatically the
+    second time) each landed as a hack beside its base game's folder (`Hacks`); a `.gba`, a
+    zip holding a game and a `.7z` were refused with their messages; a BPS for a game not
+    in the library gave "Base game missing" with its checksum; a link to another host
+    asked first and, after "Open", a patch downloaded there installed; "Update from the
+    site" replaced a hack with a newer patch; Remove; the Tetris hack ran in mGBA (1517
+    frames, 59.7 fps). The fallback page (`EMUDEN_WEB_FALLBACK=1`) opened through the
+    plugin and showed the Downloads folder it watches.
+  - **Not run:** a download and install from any of the four real sites (**for the owner to
+    try by hand**: on hackdex.app "Download Patch" on a hack's Versions page; on
+    whackahack.com a thread's attachment, with the owner's own sign-in if the forum asks,
+    and a link to a file host through the leaving question; on pokeharbor.com that a
+    pre-patched download is refused; on romhacking.net a zip download, and one from
+    archive.org); Rename (the automation cannot type); "Update from a file"; a file handed
+    over by the fallback page; UPS, APS and PPF through the plugin; pad and touch; Linux
+    (SteamOS has no engine: fallback) and Android.
+  - **Limits:** 7z and rar are not read (most of romhacking.net's files: unpack by hand and
+    use "Choose a patch file"); a zip with several patches gives its first; pokeharbor.com
+    offers pre-patched games, so its plugin is mostly a browser that refuses them; MEGA
+    downloads are made by the page itself (a blob), which Android hands over without the
+    file's name; `library/src/library.cpp` was already over 600 lines after the merge and
+    gained three.
 - **xdelta:** patches packed with LZMA, DJW or FGK apply (unit tests with patches xdelta3
   3.1.0 wrote; no real hack was tried).
 - **Fixed:** `den.open_url` opens the user's browser (`pal::OpenUrl`) and only after a

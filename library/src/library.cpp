@@ -554,7 +554,10 @@ private:
                 {
                     std::lock_guard lock(mutex_);
                     for (Entry& shown : entries_) {
-                        if (shown.id == entry.id &&
+                        // A hack that shows the box of its base game keeps it over a placeholder.
+                        const bool keeps = placeholder && !shown.hack_of.empty() && !shown.cover.empty() &&
+                                           !shown.placeholder_cover;
+                        if (shown.id == entry.id && !keeps &&
                             (shown.cover != cover || shown.placeholder_cover != placeholder)) {
                             shown.cover = cover;
                             shown.placeholder_cover = placeholder;
@@ -585,6 +588,7 @@ private:
         }
         {
             std::lock_guard lock(mutex_);
+            changed_ = UseBaseCovers(entries_) || changed_;
             SaveEntryCache(dir_ / "cache.json", entries_);
         }
         BumpIfChanged();

@@ -8,6 +8,7 @@
 #include "den/base/hash.h"
 #include "den/base/jobs.h"
 #include "den/library/hacks.h"
+#include "../src/hacks_store.h"
 
 using namespace den;
 using namespace den::library;
@@ -252,6 +253,32 @@ TEST_CASE("a hack is installed beside the console's games, updated and removed")
     REQUIRE(ReadFile(f.roms / "gba" / "Emerald Quest (USA).gba") == base);
     f.Scan();
     REQUIRE(f.library->Entries().size() == 3);
+}
+
+TEST_CASE("a hack without art of its own shows the box of its base game") {
+    using den::library::Entry;
+    std::vector<Entry> entries(4);
+    entries[0].id = "gb:base";
+    entries[0].cover = "covers/base.png";
+    entries[1].id = "gb:hack";
+    entries[1].hack_of = "gb:base";
+    entries[1].cover = "placeholders/hack.png";
+    entries[1].placeholder_cover = true;
+    entries[2].id = "gb:own";
+    entries[2].hack_of = "gb:base";
+    entries[2].cover = "covers/own.png";
+    entries[3].id = "gb:orphan";
+    entries[3].hack_of = "gb:gone";
+    CHECK(den::library::UseBaseCovers(entries));
+    CHECK(entries[1].cover == "covers/base.png");
+    CHECK_FALSE(entries[1].placeholder_cover);
+    CHECK(entries[2].cover == "covers/own.png");
+    CHECK(entries[3].cover.empty());
+    CHECK_FALSE(den::library::UseBaseCovers(entries));
+    // A base game that only has a placeholder gives nothing.
+    entries[0].placeholder_cover = true;
+    entries[1].cover.clear();
+    CHECK_FALSE(den::library::UseBaseCovers(entries));
 }
 
 TEST_CASE("a patch made for the ROM without its header is applied under the header") {

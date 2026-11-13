@@ -51,6 +51,9 @@ void AddHackFolders(const std::filesystem::path& library_dir, std::vector<Folder
 /// After a scan: the files with a sidecar become hacks (title, base, and the base's cover
 /// when they have no picture of their own).
 void ApplyHackSidecars(std::vector<Entry>& entries);
+/// A hack without a picture of its own (none, or a drawn placeholder) takes the cover of the
+/// game it was made from, when that game has one. True when a cover changed.
+bool UseBaseCovers(std::vector<Entry>& entries);
 
 /// Where the hacks of a game are written.
 struct HackPlace {
