@@ -152,6 +152,9 @@ void PlayerSession::Close() {
     audio_.Close();
     rewind_.reset();
     ReleasePicture();
+    if (config_.device) {
+        ReleasePreviewFrame(*config_.device);
+    }
     if (texture_ && config_.device) {
         config_.device->DestroyTexture(texture_);
     }

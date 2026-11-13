@@ -29,6 +29,8 @@ private:
 
 /// Previews of `game` are kept; any other game's are let go (on the next card drawn).
 void KeepPicturePreviews(const std::string& game);
+/// Makes every preview again from a new frame of the game.
+void ResetPicturePreviews();
 /// Makes the preset's preview again, after its sliders moved.
 void ForgetPicturePreview(const std::string& preset);
 

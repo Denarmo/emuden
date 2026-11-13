@@ -189,6 +189,8 @@ public:
     virtual std::vector<GameScreen> Screens() const {
         return {};
     }
+    /// The next preview keeps the latest picture as the frame of the previews from then on.
+    virtual void CapturePreviewFrame() {}
     /// Draws one screen of Screens() into exactly `target` of the frame being drawn, through
     /// the picture preset. The canvas may be the second display's; the rules of Draw apply.
     virtual void DrawScreen(gfx::Canvas& /*canvas*/, int /*screen*/, const gfx::Rect& /*target*/) {}
@@ -240,10 +242,11 @@ public:
     virtual void SetPictureParam(const std::string& /*param*/, float /*value*/) {}
     /// Back to the preset's own values.
     virtual void ResetPictureParams() {}
-    /// The latest picture through preset `id` (its saved slider values) as it looks on the
-    /// game's display: the middle of it at its real size, `width` x `height` pixels. The
+    /// The kept preview frame through preset `id` (its saved slider values) as it looks on
+    /// the game's display: the middle of it at its real size, `width` x `height` pixels. The
     /// caller destroys the texture; none before a picture was shown. Compiles the preset,
-    /// so it can take a moment.
+    /// so it can take a moment. The frame is the latest picture when the first preview is
+    /// made, and again after CapturePreviewFrame.
     virtual gfx::Texture PicturePreview(gfx::Canvas& /*canvas*/, const std::string& /*id*/, int /*width*/,
                                         int /*height*/) {
         return {};

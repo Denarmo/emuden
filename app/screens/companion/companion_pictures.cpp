@@ -95,6 +95,13 @@ void KeepPicturePreviews(const std::string& game) {
     }
 }
 
+void ResetPicturePreviews() {
+    Store().drop_all = true;
+    if (Svc().player) {
+        Svc().player->CapturePreviewFrame();
+    }
+}
+
 void ForgetPicturePreview(const std::string& preset) {
     Store().stale.push_back(preset);
 }

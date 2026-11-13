@@ -149,6 +149,10 @@ private:
             ForgetPicturePreview(Svc().player->GetSnapshot().picture);
         }
         reveal_picture_ = view == View::Screen && view_ != View::Screen;
+        if (view == View::Screen && view_ == View::Main) {
+            // The previews show the game as it is now.
+            ResetPicturePreviews();
+        }
         view_ = view;
         Rebuild();
     }
@@ -373,6 +377,10 @@ private:
             swap->id = "companion.swap";
             swap->grow = 1;
             swap->width = 0;
+            auto* frame = row->Emplace<CompanionCard>("New preview frame", [] { ResetPicturePreviews(); });
+            frame->id = "companion.preview_frame";
+            frame->grow = 1;
+            frame->width = 0;
             // Off, the frame rate, the frame rate with a graph of the frame times.
             const int fps = screen->FpsMode();
             auto* counter = row->Emplace<CompanionCard>(FPS_NAMES[fps], [fps] {
