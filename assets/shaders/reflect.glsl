@@ -3,7 +3,7 @@
 // washes towards the backing, the lighter ones the most, and even black lets a little
 // through (p_wash). The backing has broad blotches (p_texture) and its green (p_backing).
 // Each pixel is three colour stripes (p_stripes) with lines between the rows (p_lines),
-// and the pixel layer throws a short shadow to the right on the backing (p_shadows). The
+// and the pixel layer throws a shadow on the backing (p_shadows). The
 // front of the screen can catch a soft band of glare (p_glare).
 //
 // The numbers come from measuring a capture of such a screen against the picture it
@@ -55,31 +55,37 @@ void main() {
     vec2 room = u_output_size / u_source_size; // output pixels per cell
     float least = min(room.x, room.y);
     vec2 w = Footprint(room);
+
+    // Three stripes a cell, red, green and blue from the left; they need about four output
+    // pixels a cell to show. Each colour of a dark pixel ends at its own stripe, which leaves
+    // a blue edge on the left of a dark stroke and a red one on its right.
+    float show = clamp((room.x - 2.5) / 1.5, 0.0, 1.0);
+    float edge = 0.2 * p_stripes * show;
     vec3 c = Picture(t, w);
+    c.r = mix(c.r, Picture(t + vec2(edge, 0.0), w).r, 0.7);
+    c.b = mix(c.b, Picture(t - vec2(edge, 0.0), w).b, 0.7);
     float light = Luma(c);
 
-    // The shadow of the pixel to the left, about a quarter of a cell long and fading, and a
-    // fainter one over the whole pixel below.
-    float near = Luma(Picture(t - vec2(0.12, 0.0), w)), far = Luma(Picture(t - vec2(0.26, 0.02), w));
-    float above = Luma(Picture(t - vec2(0.0, 0.85), w));
-    float shade = 0.22 * (1.0 - 0.5 * (near + far)) + 0.08 * (1.0 - above);
+    // The pixel layer's shadow, as measured: a dark pixel shades the pixel a little over one
+    // row below it. Beside it, the colour edges above already darken as much as measured.
+    float below = Luma(Picture(t - vec2(0.0, 1.05), w)) + Luma(Picture(t - vec2(0.0, 1.25), w));
+    float shade = 0.26 * (1.0 - 0.5 * below);
     c *= 1.0 - p_shadows * shade * clamp(light * 2.0, 0.0, 1.0);
     c *= Backing(t);
-
-    // Three stripes a cell, red, green and blue from the left, as a wave that an output
-    // pixel averages; they need about four output pixels a cell to show. The backing is the
-    // colour of a cell's middle, where green is strongest: a whole cell is less green.
-    float narrow = PI * w.x;
-    float stripes = p_stripes * clamp((room.x - 2.5) / 1.5, 0.0, 1.0) * sin(narrow) / narrow;
-    vec3 phase = 2.0 * PI * (fract(t.x) - vec3(0.2, 0.5, 0.8));
-    c *= vec3(1.03, 0.81, 1.05) + stripes * vec3(0.27, 0.26, 0.27) * cos(phase);
 
     // The lines between rows, a little nearer the bottom of a pixel than its top, and fainter
     // ones between columns, a little over a quarter of a cell wide in all; they fade where
     // there is no room for them.
     float fine = clamp(least - 2.0, 0.0, 1.0);
-    vec2 dark = 1.0 - Lit(t + vec2(0.0, 0.04), w, 0.28);
-    c *= 1.0 - p_lines * fine * (0.17 * dark.y + 0.06 * dark.x);
+    vec2 gap = 1.0 - Lit(t + vec2(0.0, 0.04), w, 0.28);
+    c *= 1.0 - p_lines * fine * (0.17 * gap.y + 0.06 * gap.x);
+
+    // The stripes, as a wave that an output pixel averages. The backing is the colour of a
+    // cell's middle, where green is strongest: a whole cell is less green.
+    float narrow = PI * w.x;
+    float stripes = p_stripes * show * sin(narrow) / narrow;
+    vec3 phase = 2.0 * PI * (fract(t.x) - vec3(0.2, 0.5, 0.8));
+    c *= vec3(1.03, 0.81, 1.05) + stripes * vec3(0.27, 0.26, 0.27) * cos(phase);
 
     // A soft diagonal band of glare with a faint rainbow at its edges.
     float across = (v_uv.x * 0.7 + (1.0 - v_uv.y)) - 0.62;
