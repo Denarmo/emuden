@@ -71,6 +71,13 @@ struct Folder {
     std::string system; // empty = decide per file from its extension and folder name
 };
 
+/// A cover the user may pick for a game ("Find cover").
+struct CoverChoice {
+    std::string source; // "collection", "libretro", "retroachievements", "steamgriddb", "base"
+    std::string title;  // the name at the source
+    std::string image;  // UTF-8 path of the downloaded image
+};
+
 class Library {
 public:
     virtual ~Library() = default;
@@ -102,6 +109,16 @@ public:
     /// holds for another game inside this session (a game opened over this one) is left out.
     virtual void RecordPlay(const std::string& id, std::int64_t started_unix, std::int64_t seconds) = 0;
 
+    /// The covers found for a game at the hack cover sources, downloaded, and the tagged box
+    /// of the game it was made from. Blocks on the network: call it from a job.
+    virtual std::vector<CoverChoice> CoverChoices(const std::string& id,
+                                                  const std::function<bool()>& stopping = {}) = 0;
+    /// Makes an image file the game's cover: it is copied into the library's own covers
+    /// folder, where every later scan finds it first.
+    virtual Status SetCover(const std::string& id, const std::string& image_path) = 0;
+    /// Forgets a cover set with SetCover; the next scan looks one up again.
+    virtual void ResetCover(const std::string& id) = 0;
+
     /// Consoles from plugin manifests (systems.h). They replace the built-in rules of the same
     /// id and add new ones. The plugin host or the app calls this; the next scan uses them.
     virtual void SetSystems(std::vector<SystemDef> systems) = 0;
@@ -129,6 +146,8 @@ struct Config {
     /// Cover downloads. Empty = the platform's HTTP client; with `offline` nothing is fetched.
     HttpFetcher http;
     bool offline = false;
+    /// Milliseconds between two requests to one host of the hack cover sources.
+    int cover_request_interval_ms = 700;
     /// On the first run (no library file yet) the game folders of this old profile are taken
     /// over. Empty = the folder the environment variable EMUDEN_IMPORT_PROFILE names, if any.
     std::filesystem::path import_profile;

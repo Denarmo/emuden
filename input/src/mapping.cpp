@@ -125,6 +125,21 @@ PadFamily FamilyFromName(const std::string& name) {
     return PadFamily::Xbox;
 }
 
+HintChoice StartHints(DeviceKind kind, const PadFamily* pad) {
+    if (pad) {
+        return {*pad, false};
+    }
+    switch (kind) {
+    case DeviceKind::Handheld:
+        // Its own pad may not have reported yet; built-in pads follow the Xbox layout.
+        return {PadFamily::Xbox, false};
+    case DeviceKind::TouchOnly:
+        return {PadFamily::Keyboard, true};
+    default:
+        return {PadFamily::Keyboard, false};
+    }
+}
+
 const char* FamilyName(PadFamily family) {
     switch (family) {
     case PadFamily::Xbox:

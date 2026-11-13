@@ -7,12 +7,14 @@
 //
 // With EMUDEN_AUTOMATION=<port> a test endpoint listens on <port>+2, one line in and one
 // line out:
-//   state                  JSON: present, ready, size, route, claimed, game
+//   state                  JSON: present, ready, size, route, claimed, overlay, game
 //   tap <x> <y>            a press at a point in the second screen's logical units
+//   drag <x1> <y1> <x2> <y2>  a finger dragged between two points over a few frames
 //   screenshot <png path>  the second screen's next frame
 
 #include <algorithm>
 #include <cstdlib>
+#include <deque>
 #include <format>
 #include <memory>
 #include <sstream>
@@ -36,11 +38,14 @@ constexpr const char* MODES[] = {"auto", "on", "off"};
 struct Controller {
     std::unique_ptr<ui::Stage> stage;
     SecondScreenClient client;
+    SecondScreenClient overlay; // drawn instead of the pages or the claim
+    bool overlaid = false;
     bool claimed = false;
     bool ready_logged = false;
     float scale = 1.0f;
     double last_frame = 0;
     std::vector<pal::SecondPointer> pointer;
+    std::deque<pal::SecondPointer> script; // the test endpoint's drag, one event per frame
     // The game the main screen is about.
     std::string game;
     std::string focus_seen;
@@ -123,14 +128,26 @@ void PumpEndpoint(Controller& c) {
             display.PixelSize(w, h);
             const ui::Page* page = c.stage ? c.stage->Top() : nullptr;
             reply = std::format("{{\"present\":{},\"ready\":{},\"width\":{},\"height\":{},\"route\":\"{}\","
-                                "\"claimed\":{},\"game\":\"{}\"}}",
+                                "\"claimed\":{},\"overlay\":{},\"game\":\"{}\"}}",
                                 display.Present(), display.Ready(), w, h, page ? page->Route() : "",
-                                c.claimed, c.game);
+                                c.claimed, c.overlaid, c.game);
         } else if (command == "tap") {
             float x = 0, y = 0;
             in >> x >> y;
             c.pointer.push_back({pal::SecondPointer::Kind::Down, x * c.scale, y * c.scale});
             c.pointer.push_back({pal::SecondPointer::Kind::Up, x * c.scale, y * c.scale});
+        } else if (command == "drag") {
+            // A finger that goes down, moves over some frames and lifts.
+            float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+            in >> x0 >> y0 >> x1 >> y1;
+            constexpr int STEPS = 8;
+            c.script.push_back({pal::SecondPointer::Kind::Down, x0 * c.scale, y0 * c.scale});
+            for (int i = 1; i <= STEPS; ++i) {
+                const float t = static_cast<float>(i) / STEPS;
+                c.script.push_back({pal::SecondPointer::Kind::Move, (x0 + (x1 - x0) * t) * c.scale,
+                                    (y0 + (y1 - y0) * t) * c.scale});
+            }
+            c.script.push_back({pal::SecondPointer::Kind::Up, x1 * c.scale, y1 * c.scale});
         } else if (command == "screenshot") {
             std::string path;
             std::getline(in, path);
@@ -195,6 +212,10 @@ void Frame() {
     c.pointer.clear();
     display.TakePointer(c.pointer);
     PumpEndpoint(c);
+    if (!c.script.empty()) {
+        c.pointer.push_back(c.script.front());
+        c.script.pop_front();
+    }
     if (!wanted || !display.Ready()) {
         c.ready_logged = false;
         return;
@@ -224,7 +245,11 @@ void Frame() {
     }
     for (const pal::SecondPointer& p : c.pointer) {
         const input::Event event = PointerEvent(p);
-        if (!c.claimed) {
+        if (c.overlaid) {
+            if (c.overlay.pointer) {
+                c.overlay.pointer(event);
+            }
+        } else if (!c.claimed) {
             c.stage->HandleEvent(event);
         } else if (c.client.pointer) {
             c.client.pointer(event);
@@ -245,7 +270,11 @@ void Frame() {
     ctx.dt = static_cast<float>(std::clamp(now - c.last_frame, 0.0, 0.1));
     ctx.time = now;
     c.last_frame = now;
-    if (!c.claimed) {
+    if (c.overlaid) {
+        if (c.overlay.draw) {
+            c.overlay.draw(ctx, gfx::Rect{0, 0, svc.canvas->Width(), svc.canvas->Height()});
+        }
+    } else if (!c.claimed) {
         c.stage->Frame(ctx);
     } else if (c.client.draw) {
         c.client.draw(ctx, gfx::Rect{0, 0, svc.canvas->Width(), svc.canvas->Height()});
@@ -297,6 +326,24 @@ void ReleaseSecondScreen() {
 
 bool SecondScreenClaimed() {
     return Get().claimed;
+}
+
+void SetSecondScreenOverlay(SecondScreenClient client) {
+    Controller& c = Get();
+    c.overlay = std::move(client);
+    c.overlaid = true;
+}
+
+void ClearSecondScreenOverlay() {
+    Controller& c = Get();
+    c.overlay = {};
+    c.overlaid = false;
+}
+
+void DrawCompanionStage(ui::Context& ctx) {
+    if (Controller& c = Get(); c.stage) {
+        c.stage->Frame(ctx);
+    }
 }
 
 ui::Stage& CompanionStage() {

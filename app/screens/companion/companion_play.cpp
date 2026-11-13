@@ -2,15 +2,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // The second screen while a game runs on the main one: quick settings by touch. Save and
-// load states with their pictures, fast-forward, rewind, the picture preset, the volume,
-// the pause menu and the way out. Route "companion.play" on the companion stage.
+// load states with their pictures, fast-forward, rewind, the screen size, the picture
+// preset, the volume, the pause menu with its core options and buttons pages, the way out,
+// and "Swap screens", which puts the game on this display and these settings on the other.
+// Route "companion.play" on the companion stage.
 
 #include <algorithm>
 #include <cmath>
-#include <ctime>
 #include <format>
 
 #include "../home/games.h"
+#include "../player/picture_choice.h"
+#include "../player/player_screen.h"
 #include "companion_page.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
@@ -24,7 +27,7 @@ namespace {
 constexpr float BUTTON_HEIGHT = 56;
 constexpr float SLOT_W = 150, SLOT_H = 112;
 constexpr const char* VOLUME_KEY = "player.volume";
-constexpr double EXIT_WAIT = 0.8; // seconds given to the pause menu to show its exit row
+constexpr float CHOICE_HEIGHT = 48, CHOICE_LABEL = 104;
 
 bool Playing(const player::Snapshot& snapshot) {
     return snapshot.state == player::State::Running || snapshot.state == player::State::Paused;
@@ -32,8 +35,6 @@ bool Playing(const player::Snapshot& snapshot) {
 
 class CompanionPlay final : public CompanionPage {
 public:
-    CompanionPlay() : started_unix_(static_cast<std::int64_t>(std::time(nullptr))), started_(pal::NowSeconds()) {}
-
     void Build() override {
         Services& svc = Svc();
         const player::Snapshot snapshot = svc.player->GetSnapshot();
@@ -42,10 +43,11 @@ public:
         const auto game = svc.library->Find(snapshot.game_id);
         system_ = game ? game->system : std::string();
 
-        ui::Node& root = Root();
-        root.axis = ui::Axis::Column;
-        root.gap = 12;
-        root.SetPadding(24, 20);
+        // One list, so a display too low for every row scrolls; a rebuilt page keeps every
+        // scrolling node with an id where it was (ui::Page).
+        Root().SetPadding(24, 16);
+        ui::Node& root = *Root().Add(ui::MakeList(10));
+        root.id = "companion.page";
 
         ui::Node* header = root.Add(ui::MakeBox(ui::Axis::Row, 12));
         header->align = ui::Align::Center;
@@ -84,7 +86,38 @@ public:
                 Svc().player->SetRewind(rewind_);
             });
         }
-        control("companion.exit", "Exit", false, [this] { Exit(); });
+        control("companion.exit", "Exit", false, [] {
+            // The player screen saves the game and books its play time.
+            if (PlayerScreen* screen = PlayerScreen::Current()) {
+                screen->Exit();
+            }
+        });
+
+        PlayerScreen* screen = PlayerScreen::Current();
+        if (screen) {
+            ui::Node* tools = root.Add(ui::MakeBox(ui::Axis::Row, 10));
+            const auto tool = [&](const char* id, const std::string& text, std::function<void()> fn) {
+                auto* button = tools->Emplace<ui::Button>(text, std::move(fn));
+                button->id = id;
+                button->height = CHOICE_HEIGHT;
+                button->grow = 1;
+            };
+            tool("companion.swap", "Swap screens", [] {
+                if (PlayerScreen* now = PlayerScreen::Current()) {
+                    now->SwapDisplays();
+                }
+            });
+            tool("companion.options", "Core options", [] {
+                if (PlayerScreen* now = PlayerScreen::Current()) {
+                    now->OpenPage("options");
+                }
+            });
+            tool("companion.buttons", "Buttons", [] {
+                if (PlayerScreen* now = PlayerScreen::Current()) {
+                    now->OpenPage("buttons");
+                }
+            });
+        }
 
         if (snapshot.can_save_states) {
             ui::Node* modes = root.Add(ui::MakeBox(ui::Axis::Row, 10));
@@ -102,6 +135,7 @@ public:
 
             ui::Node* slots = root.Add(ui::MakeShelf(12));
             slots->height = SLOT_H + 36;
+            slots->id = "companion.slots";
             for (int slot = 0; slot < player::STATE_SLOTS; ++slot) {
                 const bool used = svc.player->HasState(slot);
                 const std::string image = used ? PathToUtf8(svc.player->StateThumbnail(slot)) : std::string();
@@ -118,21 +152,46 @@ public:
             }
         }
 
+        // A row of choices beside its name.
+        const auto choices = [&](const char* id, const char* title) {
+            ui::Node* line = root.Add(ui::MakeBox(ui::Axis::Row, 10));
+            line->align = ui::Align::Center;
+            auto* label = line->Emplace<ui::Label>(title, svc.theme->text_small, gfx::FONT_BOLD);
+            label->tone = ui::Tone::Dim;
+            label->width = CHOICE_LABEL;
+            ui::Node* shelf = line->Add(ui::MakeShelf(10));
+            shelf->id = id;
+            shelf->height = CHOICE_HEIGHT;
+            shelf->grow = 1;
+            return shelf;
+        };
+        if (screen) {
+            ui::Node* sizes = choices("companion.sizes", "Screen size");
+            const auto& names = ScreenSizeNames();
+            for (int index = 0; index < static_cast<int>(names.size()); ++index) {
+                auto* button = sizes->Emplace<ui::Button>(names[static_cast<std::size_t>(index)], [index] {
+                    if (PlayerScreen* now = PlayerScreen::Current()) {
+                        now->SetScreenSize(index);
+                    }
+                });
+                button->id = std::format("companion.size{}", index);
+                button->height = CHOICE_HEIGHT;
+                button->selected = index == screen->ScreenSizeIndex();
+            }
+        }
         const auto& presets = player::PicturePresets();
         if (presets.size() > 1) {
-            auto* heading = root.Emplace<ui::Label>("Picture", svc.theme->text_small, gfx::FONT_BOLD);
-            heading->tone = ui::Tone::Dim;
-            ui::Node* pictures = root.Add(ui::MakeShelf(10));
-            pictures->height = 48;
+            ui::Node* pictures = choices("companion.pictures", "Picture");
             for (const player::PicturePreset& preset : presets) {
                 auto* button = pictures->Emplace<ui::Button>(preset.name, [this, id = preset.id] {
-                    if (!system_.empty()) {
-                        // Where the player screen keeps the choice for the console.
-                        Svc().settings->SetString("player.picture_for." + system_, id);
+                    // Kept where the pause menu keeps it, for the same games.
+                    if (const auto game = Svc().library->Find(game_id_)) {
+                        SavePicture(*game, PictureScopeOf(*game), id);
                     }
                     Svc().player->SetPicture(id);
                 });
                 button->id = "companion.picture." + preset.id;
+                button->height = CHOICE_HEIGHT;
                 button->selected = preset.id == snapshot.picture;
             }
         }
@@ -165,9 +224,6 @@ public:
                 svc.player->SetFastForward(true);
             }
         }
-        if (exit_until_ > 0) {
-            TryExit();
-        }
         if (Key(snapshot) != key_) {
             Rebuild();
         }
@@ -180,9 +236,11 @@ private:
         for (int slot = 0; slot < player::STATE_SLOTS; ++slot) {
             slots |= Svc().player->HasState(slot) ? 1 << slot : 0;
         }
-        return std::format("{}|{}|{}|{}|{}|{}|{}|{}|{}", snapshot.game_id, static_cast<int>(snapshot.state),
+        const PlayerScreen* screen = PlayerScreen::Current();
+        return std::format("{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", snapshot.game_id, static_cast<int>(snapshot.state),
                            snapshot.fast_forward, snapshot.rewinding, snapshot.can_rewind,
-                           snapshot.can_save_states, snapshot.picture, slots, VolumePercent());
+                           snapshot.can_save_states, snapshot.picture, slots, VolumePercent(),
+                           screen ? screen->ScreenSizeIndex() : -1);
     }
 
     static int VolumePercent() {
@@ -227,49 +285,9 @@ private:
                                                 : loaded.error);
     }
 
-    // Leaving goes through the pause menu's own "Exit to home" row, so the game is saved and
-    // its play time booked by the player screen itself.
-    void Exit() {
-        exit_until_ = pal::NowSeconds() + EXIT_WAIT;
-        if (!ExitRow()) {
-            Svc().input->Inject(input::Event::MakeNav(input::Nav::Menu));
-        }
-        TryExit();
-    }
-
-    static ui::Node* ExitRow() {
-        ui::Page* top = Svc().stage->Top();
-        return top && top->Route() == "player" ? top->Root().FindById("menu.exit") : nullptr;
-    }
-
-    void TryExit() {
-        Services& svc = Svc();
-        if (ui::Node* row = ExitRow()) {
-            exit_until_ = 0;
-            if (!row->OnNav(input::Nav::Confirm) && row->on_activate) {
-                row->on_activate();
-            }
-            return;
-        }
-        if (pal::NowSeconds() < exit_until_) {
-            return;
-        }
-        exit_until_ = 0;
-        // The menu is on another of its pages: close the game from here.
-        const ui::Page* top = svc.stage->Top();
-        if (top && top->Route() == "player" && !game_id_.empty()) {
-            svc.library->RecordPlay(game_id_, started_unix_,
-                                    static_cast<std::int64_t>(pal::NowSeconds() - started_));
-            svc.stage->Pop();
-        }
-    }
-
     std::string key_, game_id_, system_;
     bool save_mode_ = false;
     bool fast_ = false, rewind_ = false;
-    double exit_until_ = 0;
-    std::int64_t started_unix_ = 0;
-    double started_ = 0;
 };
 
 } // namespace

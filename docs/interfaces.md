@@ -216,6 +216,22 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
   presses in pixels (`SecondScreenScale()` converts). `SecondScreenReady()` and
   `SecondScreenPixelSize` say what is there; a claim fails when the device has no second
   screen.
+- `SetSecondScreenOverlay({draw, pointer})` draws in place of whatever has the screen (the
+  pages or a claim) until `ClearSecondScreenOverlay()`; `DrawCompanionStage(ctx)` ticks and
+  draws the companion pages on another canvas. The player screen
+  (`app/screens/player/player_displays.cpp`) uses both: with two displays an open pause menu
+  takes the display the quick settings are on and the game stays whole and undimmed on its
+  own (`player.overlay_on_second_screen`, on by default; for a two-screen game the menu takes
+  the second display, over whichever screen is there), and "Swap screens" puts a one-screen game on the
+  second display and the quick settings in the main window (`player.swap_displays`). The
+  pad always goes to the game, or to the menu while it is open; touch works on whichever
+  display shows the menu or the quick settings.
+- Quick settings reach the game through `PlayerScreen::Current()` (`player_screen.h`):
+  `OpenPage("options" | "buttons")` opens that page of the pause menu by itself (Back
+  closes it), `SwapDisplays()`, `SetScreenSize(index)`, `Exit()`.
+- `ui::Page::Pointer(event, scale, time)` gives a page presses from a display its stage
+  does not see. `Rebuild()` keeps every scrolling node that has an id where it was;
+  `Rebuild(false)` is for other content under the same ids.
 - `player::Session::SetVolume(0..1)` changes the running game's volume at once.
 - Consoles with two screens (`den/player/screens.h`): `Session::Screens()` is two
   `GameScreen`s (part of the picture, own pixels, `touch`) while the core's picture is the
@@ -230,7 +246,7 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
   second one. The pause menu has "Swap screens" and "Screens". The player's test endpoint
   answers `screens` with the mode and where each screen is drawn.
 - Test endpoint on the automation port + 2: `state`, `tap <x> <y>` (the second screen is 600
-  units high), `screenshot <png>`.
+  units high), `drag <x1> <y1> <x2> <y2>`, `screenshot <png>`.
 
 ## Launcher additions
 

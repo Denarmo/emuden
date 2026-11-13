@@ -154,7 +154,7 @@ private:
     void Go(int step) {
         step_ = std::clamp(step, 0, 3);
         moved_ = true;
-        Rebuild();
+        Rebuild(false);
     }
 
     void Next() {

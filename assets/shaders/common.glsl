@@ -35,6 +35,27 @@ vec2 SharpCoord(vec2 p, vec2 size, vec2 shown) {
     return (floor(t) + 0.5 + clamp((fract(t) - 0.5) * scale, vec2(-0.5), vec2(0.5))) / size;
 }
 
+// The light of a row of the picture at `y` (in rows), between 0 in the dark line between
+// two rows and 1 in a row's middle, as an output pixel averages it when a row is `room`
+// output pixels high. The average is a half at any size: where there is no room for lines
+// (under about three pixels a row, sooner when rows and pixels do not line up) they fade
+// into it instead of beating against the pixels.
+float RowLight(float y, float room) {
+    float narrow = PI / max(room, 1.0);
+    float uneven = abs(room - floor(room + 0.5)) * 2.0;
+    float fade = clamp((room - 1.5) / 1.5, 0.0, 1.0) * mix(1.0, clamp((room - 2.0) / 2.0, 0.0, 1.0), uneven);
+    return 0.5 - 0.5 * cos(2.0 * PI * y) * fade * sin(narrow) / narrow;
+}
+
+// How wide the stretch of the picture is that an output pixel averages, in the picture's
+// pixels, when one of them takes `room` output pixels. It is the output pixel itself where
+// the two line up; where they do not, up to half as much again, which keeps lines that
+// fall differently on the pixels from looking different.
+vec2 Footprint(vec2 room) {
+    vec2 uneven = abs(room - floor(room + 0.5)) * 2.0;
+    return min((1.0 + 0.5 * uneven) / room, vec2(1.0));
+}
+
 // Colour as a television signal carries it: brightness and two colour differences.
 vec3 ToYiq(vec3 c) {
     return vec3(dot(c, vec3(0.299, 0.587, 0.114)), dot(c, vec3(0.596, -0.274, -0.322)),

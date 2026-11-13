@@ -157,14 +157,14 @@ private:
         button->centered = false;
         button->on_activate = [this, folder] {
             current_ = folder;
-            Rebuild();
+            Rebuild(false);
         };
     }
 
     void Up() {
         const fs::path parent = current_.parent_path();
         current_ = parent == current_ ? fs::path() : parent;
-        Rebuild();
+        Rebuild(false);
     }
 
     void Finish(const fs::path& chosen) {

@@ -22,9 +22,10 @@ std::string PadButtonName(input::PadFamily family, input::PadButton button);
 /// A pad button by position. `ink` is the glyph's colour; filled glyphs knock their letter out
 /// in the theme's page colour. For the keyboard family it is the key that stands for the button.
 float PadGlyphWidth(Context& ctx, input::PadFamily family, input::PadButton button, float height);
-/// Draws with the top left corner at x, y; returns the width.
+/// Draws with the top left corner at x, y; returns the width. `pressed` fills the glyphs
+/// that are outlines otherwise (bumpers), so a held button reads as held.
 float DrawPadGlyph(Context& ctx, input::PadFamily family, input::PadButton button, float x, float y,
-                   float height, gfx::Color ink);
+                   float height, gfx::Color ink, bool pressed = false);
 
 /// The button or key that triggers `nav` on that family.
 float NavGlyphWidth(Context& ctx, input::PadFamily family, input::Nav nav, float height);

@@ -87,6 +87,15 @@ float Score(const gfx::Rect& from, const gfx::Rect& to, Nav direction) {
     return along + across * 4.0f + centre * 0.05f;
 }
 
+void CollectScrolls(const Node& node, std::vector<std::pair<std::string, float>>& out) {
+    if (node.scrollable && !node.id.empty()) {
+        out.emplace_back(node.id, node.scroller.Destination());
+    }
+    for (const auto& child : node.Children()) {
+        CollectScrolls(*child, out);
+    }
+}
+
 } // namespace
 
 Node* FindFocusTarget(Node& root, Node* from, Nav direction) {
@@ -157,10 +166,23 @@ void Page::EnsureVisible(Node* node) {
         }
         const bool row = scroller->axis == Axis::Row;
         const float view = row ? scroller->rect.w : scroller->rect.h;
-        const float start = (row ? node->rect.x - scroller->rect.x : node->rect.y - scroller->rect.y) +
-                            scroller->scroll;
+        float start = (row ? node->rect.x - scroller->rect.x : node->rect.y - scroller->rect.y) +
+                      scroller->scroll;
         const float end = start + (row ? node->rect.w : node->rect.h);
-        const float margin = std::min(scroller->scroll_margin, std::max(0.0f, (view - (end - start)) * 0.5f));
+        float margin = std::min(scroller->scroll_margin, std::max(0.0f, (view - (end - start)) * 0.5f));
+        if (!row) {
+            // What the list holds the node in (a shelf under its heading) is shown from its
+            // start when it fits, so the heading comes with the row below it.
+            const Node* group = node;
+            while (group->Parent() != scroller) {
+                group = group->Parent();
+            }
+            const float group_start = group->rect.y - scroller->rect.y + scroller->scroll;
+            if (group != node && group_start < start && end - group_start <= view) {
+                start = group_start;
+                margin = std::min(margin, std::max(0.0f, (view - (end - start)) * 0.5f));
+            }
+        }
         // From where the node is heading, so held directions do not chase a moving window.
         const float heading = scroller->scroller.Destination();
         if (start - margin < heading) {
@@ -184,6 +206,12 @@ void Page::Prepare() {
         return;
     }
     const std::string keep = focus_ ? focus_->id : std::string();
+    // Where every scrolling node with an id is: the rebuilt one starts there.
+    std::vector<std::pair<std::string, float>> scrolls;
+    if (keep_scroll_) {
+        CollectScrolls(root_, scrolls);
+    }
+    keep_scroll_ = true;
     focus_ = nullptr;
     press_node_ = nullptr;
     drag_node_ = nullptr;
@@ -193,6 +221,11 @@ void Page::Prepare() {
     Build();
     built_ = true;
     rebuild_ = false;
+    for (const auto& [id, position] : scrolls) {
+        if (Node* node = root_.FindById(id); node && node->scrollable) {
+            node->scroller.Jump(position);
+        }
+    }
     Node* target = keep.empty() ? nullptr : root_.FindById(keep);
     if (!target || !target->focusable) {
         std::vector<Node*> all;
@@ -228,8 +261,6 @@ void Page::Dispatch(const input::Event& event, float scale, double time) {
     if (OnEvent(event)) {
         return;
     }
-    const float x = event.x / scale, y = event.y / scale;
-    const auto scrollable = [](const Node& n) { return n.scrollable; };
     switch (event.type) {
     case Type::Nav: {
         if (focus_ && focus_->OnNav(event.nav)) {
@@ -251,6 +282,17 @@ void Page::Dispatch(const input::Event& event, float scale, double time) {
         }
         break;
     }
+    default:
+        Pointer(event, scale, time);
+        break;
+    }
+}
+
+void Page::Pointer(const input::Event& event, float scale, double time) {
+    using Type = input::Event::Type;
+    const float x = event.x / scale, y = event.y / scale;
+    const auto scrollable = [](const Node& n) { return n.scrollable; };
+    switch (event.type) {
     case Type::PointerDown:
         ReleaseScrollers(time);
         pressed_ = true;

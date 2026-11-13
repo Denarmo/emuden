@@ -40,6 +40,7 @@ bool ReadPreset(const JsonValue& json, const std::filesystem::path& dir, PresetD
         out.info.name = out.info.id;
     }
     out.integer = Flag(json, "integer");
+    out.near_integer = json.String("integer") == "near";
     out.input_linear = json.String("input") != "nearest";
     if (const JsonValue* passes = json.Find("passes")) {
         for (const JsonValue& item : passes->items) {
@@ -75,6 +76,11 @@ bool ReadPreset(const JsonValue& json, const std::filesystem::path& dir, PresetD
             param.step = std::max(0.001f, Number(item, "step", 0.05f));
             param.fallback = std::clamp(Number(item, "value", param.min), param.min, param.max);
             param.value = param.fallback;
+            if (const JsonValue* labels = item.Find("labels")) {
+                for (const JsonValue& label : labels->items) {
+                    param.labels.push_back(label.string);
+                }
+            }
             out.uniforms.emplace_back(param.id, param.fallback);
             out.info.params.push_back(std::move(param));
         }

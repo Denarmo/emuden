@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <format>
 
+#include "../companion/second_screen.h"
 #include "den/app/pages.h"
 #include "den/base/files.h"
 #include "glyphs.h"
@@ -25,10 +26,22 @@ constexpr float ROW_HEIGHT = 48;
 void PlayerScreen::BuildMenu() {
     const ui::Theme& theme = *Svc().theme;
     ui::Node& root = Root();
-    root.axis = ui::Axis::Row;
+    // Beside the picture, or under it where the window has no room for both; all of the
+    // display when the game is on the other one.
+    built_apart_ = menu_apart_;
+    menu_ = PlaceMenu(menu_area_.w > 0 ? menu_area_ : area_,
+                      !menu_apart_ && (view_ == View::Picture || view_ == View::PictureAdjust));
+    root.axis = menu_.stacked ? ui::Axis::Column : ui::Axis::Row;
+    if (menu_.stacked) {
+        root.Add(ui::MakeBox(ui::Axis::Column))->height = menu_.room.h;
+    }
     ui::Node* panel = root.Add(ui::MakeBox(ui::Axis::Column, 10));
     panel->id = "menu";
-    panel->width = MENU_PANEL_WIDTH;
+    if (menu_.stacked || menu_apart_) {
+        panel->grow = 1;
+    } else {
+        panel->width = menu_.panel.w;
+    }
     panel->background = theme.dialog;
     panel->SetPadding(24, 26);
 
@@ -75,11 +88,13 @@ void PlayerScreen::BuildMenu() {
     case View::Closed:
         break;
     }
-    // Hints in the glyphs of the pad in use.
-    auto* hints = panel->Emplace<HintLine>(
-        Svc().input->ActiveFamily(),
-        std::vector<HintLine::Item>{{Nav::Confirm, "Select"}, {Nav::Back, main ? "Resume" : "Back"}});
-    hints->pad_top = 6;
+    // Hints in the glyphs of the pad in use; none where there is no button to name.
+    if (!Svc().input->TouchOnly()) {
+        auto* hints = panel->Emplace<HintLine>(
+            Svc().input->ActiveFamily(),
+            std::vector<HintLine::Item>{{Nav::Confirm, "Select"}, {Nav::Back, main ? "Resume" : "Back"}});
+        hints->pad_top = 6;
+    }
 }
 
 void PlayerScreen::BuildMain(ui::Node* list) {
@@ -109,10 +124,7 @@ void PlayerScreen::BuildMain(ui::Node* list) {
     }));
     rows.push_back(ChoiceRow(
         "menu.size", "Screen size", ScreenSizeNames(), [this] { return static_cast<int>(size_); },
-        [this](int index) {
-            size_ = static_cast<ScreenSize>(index);
-            Svc().settings->SetNumber("player.screen_size", index);
-        }));
+        [this](int index) { SetScreenSize(index); }));
     if (dual_.Active()) {
         // Two screens: which display or which place each has.
         rows.push_back(ActionRow("menu.swap", "Swap screens", [this] {
@@ -121,6 +133,9 @@ void PlayerScreen::BuildMain(ui::Node* list) {
         }));
         rows.push_back(ValueRow(
             "menu.screens", "Screens", [this] { return dual_.Summary(); }, [this] { Show(View::Screens); }));
+    } else if (SecondScreenReady()) {
+        // Two displays: the game and the quick settings change places.
+        rows.push_back(ActionRow("menu.swap", "Swap screens", [this] { SwapDisplays(); }));
     }
     rows.push_back(ValueRow(
         "menu.picture", "Picture", [this] { return PictureName(picture_, game_.system); },
@@ -128,9 +143,8 @@ void PlayerScreen::BuildMain(ui::Node* list) {
     rows.push_back(ValueRow(
         "menu.options", "Core options", [this] { return std::format("{}", options_.size()); },
         [this] {
-            options_for_game_ = std::any_of(options_.begin(), options_.end(),
-                                            [](const player::CoreOption& option) { return option.for_game; });
-            Show(View::Options);
+            OpenPage("options");
+            direct_ = false;
         }));
     rows.push_back(ActionRow("menu.buttons", "Buttons", [this] { Show(View::Buttons); }));
     rows.push_back(ValueRow(

@@ -16,8 +16,8 @@
 #include "den/library/library.h"
 #include "den/library/names.h"
 #include "den/library/scan.h"
-#include "den/platform/pal.h"
 #include "den/store/settings.h"
+#include "cover_files.h"
 #include "hacks_store.h"
 #include "state.h"
 
@@ -29,33 +29,6 @@ namespace {
 
 constexpr unsigned ARTWORK_THREADS = 4;
 constexpr std::size_t SESSION_LOG_LIMIT = 5000;
-
-std::int64_t UnixNow() {
-    return std::chrono::duration_cast<std::chrono::seconds>(
-               std::chrono::system_clock::now().time_since_epoch())
-        .count();
-}
-
-// When the file was last written, as unix seconds; 0 when it cannot be told.
-std::int64_t WrittenUnix(const fs::path& file) {
-    std::error_code ec;
-    const auto written = fs::last_write_time(file, ec);
-    if (ec) {
-        return 0;
-    }
-    const auto age = std::chrono::duration_cast<std::chrono::seconds>(
-        fs::file_time_type::clock::now() - written);
-    return UnixNow() - age.count();
-}
-
-HttpAnswer PlatformGet(const std::string& url) {
-    pal::HttpRequest request;
-    request.url = url;
-    request.timeout_seconds = 20;
-    request.max_body = 16u << 20;
-    pal::HttpResponse response = pal::HttpGet(request);
-    return {response.error.empty() ? response.status : 0, std::move(response.body)};
-}
 
 std::string FolderKey(const std::string& path) {
     std::string key = ToLower(PathToUtf8(PathFromUtf8(path).lexically_normal()));
@@ -94,7 +67,9 @@ public:
     explicit RealLibrary(const Config& config)
         : config_(config), dir_(config.data_dir / "library"),
           artwork_(dir_ / "artwork",
-                   config.offline ? HttpFetcher() : config.http ? config.http : HttpFetcher(PlatformGet)) {
+                   config.offline ? HttpFetcher() : config.http ? config.http : HttpFetcher(PlatformGet),
+                   config.offline || config.http ? HeaderFetcher() : HeaderFetcher(PlatformGetWithHeaders),
+                   config.http ? 0 : config.cover_request_interval_ms) {
         const auto saved = LoadSaved(dir_ / "library.json");
         if (saved) {
             saved_ = *saved;
@@ -327,6 +302,54 @@ public:
         RecordChanged(id);
     }
 
+    std::vector<CoverChoice> CoverChoices(const std::string& id,
+                                          const std::function<bool()>& stopping) override {
+        const std::optional<Entry> entry = Find(id);
+        if (!entry) {
+            return {};
+        }
+        SystemTable systems;
+        {
+            std::lock_guard lock(mutex_);
+            systems = systems_;
+        }
+        artwork_.SetHackOptions(ReadHackOptions(config_.settings));
+        return artwork_.Choices(*entry, systems.Find(entry->system), stopping);
+    }
+
+    Status SetCover(const std::string& id, const std::string& image_path) override {
+        std::lock_guard lock(mutex_);
+        for (Entry& entry : entries_) {
+            if (entry.id == id) {
+                fs::path file;
+                if (const Status written = WriteOwnCover(OwnCoverStem(dir_, entry), image_path, file); !written.ok) {
+                    return written;
+                }
+                entry.cover = PathToUtf8(file);
+                entry.placeholder_cover = false;
+                SaveEntryCache(dir_ / "cache.json", entries_);
+                ++revision_;
+                return {};
+            }
+        }
+        return Status::Fail("That game is not in the library");
+    }
+
+    void ResetCover(const std::string& id) override {
+        {
+            std::lock_guard lock(mutex_);
+            for (Entry& entry : entries_) {
+                if (entry.id == id) {
+                    RemoveOwnCover(OwnCoverStem(dir_, entry));
+                    entry.cover.clear();
+                    entry.placeholder_cover = false;
+                }
+            }
+            ++revision_;
+        }
+        Scan();
+    }
+
     void SetSystems(std::vector<SystemDef> systems) override {
         std::lock_guard lock(mutex_);
         systems_.Merge(std::move(systems));
@@ -468,7 +491,10 @@ private:
         ApplyHackSidecars(found);
         SortByName(found);
 
-        // What still needs a cover: looked up after the list is shown.
+        artwork_.SetHackOptions(ReadHackOptions(config_.settings));
+        // What has no cover of its own on disk: looked up after the list is shown. Covers of
+        // earlier scans are asked for again (from the cache when nothing changed), so a hack
+        // that had the box of its original gets its own art once a source has it.
         std::vector<Entry> wanted;
         {
             std::lock_guard lock(mutex_);
@@ -496,9 +522,7 @@ private:
                         entry.cover = old->second->cover;
                         entry.placeholder_cover = old->second->placeholder_cover;
                     }
-                    if (entry.cover.empty() || entry.placeholder_cover) {
-                        wanted.push_back(entry);
-                    }
+                    wanted.push_back(entry);
                 }
             }
             entries_ = std::move(found);
@@ -520,7 +544,6 @@ private:
                     return;
                 }
                 Entry& entry = wanted[i];
-                // A placeholder is asked for again: the collection may have the game by now.
                 Entry lookup = entry;
                 lookup.cover.clear();
                 lookup.placeholder_cover = false;

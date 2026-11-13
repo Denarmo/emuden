@@ -27,6 +27,18 @@ struct Placement {
 Placement Place(ScreenSize size, const gfx::Rect& window, int frame_width, int frame_height,
                 float core_aspect, float scale);
 
+constexpr float MENU_PANEL_WIDTH = 460; // the pause menu, at the left
+
+/// Where the pause menu and the game picture go in the window.
+struct MenuLayout {
+    bool stacked = false; // the picture above the menu: a window too narrow for both side by side
+    gfx::Rect panel;      // the menu
+    gfx::Rect room;       // what the picture may use: beside or above the menu, or the whole window
+};
+/// `preview` keeps the picture clear of the menu (the picture pages); otherwise the menu lies
+/// over it. The menu never gets wider than the window.
+MenuLayout PlaceMenu(const gfx::Rect& area, bool preview);
+
 /// One save-state slot: thumbnail, number and age.
 class SlotRow final : public ui::Node {
 public:

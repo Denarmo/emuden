@@ -117,7 +117,8 @@ Button::Button(std::string text_, std::function<void()> action) : text(std::move
 }
 
 Size Button::MeasureContent(Context& ctx) {
-    return Size{ctx.Text().Measure(text, ctx.theme->text_body, gfx::FONT_BOLD), 24};
+    // A little room: a width rounded to whole pixels must not cut the bold text.
+    return Size{ctx.Text().Measure(text, ctx.theme->text_body, gfx::FONT_BOLD) + 2, 24};
 }
 
 void Button::DrawContent(Context& ctx) {
@@ -179,8 +180,32 @@ void Row::DrawContent(Context& ctx) {
     gfx::Canvas& canvas = *ctx.canvas;
     canvas.FillRect(rect, focused ? theme.panel_strong : theme.panel, theme.radius);
     const float left = rect.x + 20, right = rect.Right() - 20;
-    const float value_width = std::min(rect.w * 0.45f, 360.0f);
-    const gfx::Rect text_area{left, rect.y, rect.w - 40 - value_width - 12, rect.h};
+    // The value takes the width it needs, up to its share; the label gets the rest, and
+    // more than its share only when the label is short. Either is cut with an ellipsis.
+    const float inner = rect.w - 40;
+    float value_width = std::min(rect.w * 0.45f, 360.0f);
+    std::string value_text;
+    if (spec.kind == RowSpec::Kind::Toggle) {
+        value_width = 52;
+    } else if (spec.kind != RowSpec::Kind::Slider) {
+        int value_font = gfx::FONT_REGULAR;
+        if (spec.kind == RowSpec::Kind::Choice) {
+            const int index = spec.get_index ? spec.get_index() : 0;
+            if (index >= 0 && index < static_cast<int>(spec.options.size())) {
+                value_text = spec.options[static_cast<std::size_t>(index)];
+            }
+            value_text = focused ? "\xE2\x80\xB9  " + value_text + "  \xE2\x80\xBA" : value_text;
+            value_font = gfx::FONT_BOLD;
+        } else if (spec.value) {
+            value_text = spec.value();
+        }
+        const float wanted =
+            value_text.empty() ? 0.0f : ctx.Text().Measure(value_text, theme.text_body, value_font) + 2;
+        const float label_width = ctx.Text().Measure(spec.label, theme.text_body) + 2;
+        value_width = std::min(wanted, std::max(value_width, inner - 12 - label_width));
+    }
+    const gfx::Rect text_area{left, rect.y, std::max(0.0f, inner - value_width - (value_width > 0 ? 12 : 0)),
+                              rect.h};
     if (spec.description.empty()) {
         DrawTextIn(ctx, text_area, spec.label, theme.text_body, gfx::FONT_REGULAR, theme.fg, Align::Start);
     } else {
@@ -199,14 +224,9 @@ void Row::DrawContent(Context& ctx) {
         canvas.FillRect(gfx::Rect{knob_x, track.y + 3, 22, 22}, on ? theme.page : theme.fg, 11);
         break;
     }
-    case RowSpec::Kind::Choice: {
-        const int index = spec.get_index ? spec.get_index() : 0;
-        const std::string text =
-            index >= 0 && index < static_cast<int>(spec.options.size()) ? spec.options[index] : "";
-        DrawTextIn(ctx, value_area, focused ? "\xE2\x80\xB9  " + text + "  \xE2\x80\xBA" : text,
-                   theme.text_body, gfx::FONT_BOLD, theme.fg, Align::End);
+    case RowSpec::Kind::Choice:
+        DrawTextIn(ctx, value_area, value_text, theme.text_body, gfx::FONT_BOLD, theme.fg, Align::End);
         break;
-    }
     case RowSpec::Kind::Slider: {
         const float value = spec.get_number ? spec.get_number() : spec.min;
         const float t = spec.max > spec.min ? (value - spec.min) / (spec.max - spec.min) : 0.0f;
@@ -221,8 +241,8 @@ void Row::DrawContent(Context& ctx) {
     }
     case RowSpec::Kind::Value:
     case RowSpec::Kind::Action:
-        if (spec.value) {
-            DrawTextIn(ctx, value_area, spec.value(), theme.text_body, gfx::FONT_REGULAR, theme.text_dim,
+        if (!value_text.empty()) {
+            DrawTextIn(ctx, value_area, value_text, theme.text_body, gfx::FONT_REGULAR, theme.text_dim,
                        Align::End);
         }
         break;
@@ -232,6 +252,7 @@ void Row::DrawContent(Context& ctx) {
 std::unique_ptr<Label> MakeHeading(std::string text) {
     auto label = std::make_unique<Label>(std::move(text), 0.0f, gfx::FONT_BOLD);
     label->size = 22;
+    label->whole = true;
     return label;
 }
 

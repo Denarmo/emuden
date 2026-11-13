@@ -115,6 +115,9 @@ public:
         action("details.favourite", game.favourite ? Tr("details.unfavourite") : Tr("details.favourite"),
                [id, now = game.favourite] { Svc().library->SetFavourite(id, !now); });
         action("details.collect", Tr("details.collect"), [id] { Svc().stage->Push("collect", {{"id", id}}); });
+        if (console_info && console_info->runner == plugins::Runner::Core) {
+            action("details.find_cover", "Find cover", [id] { Svc().stage->Push("find_cover", {{"id", id}}); });
+        }
         action("details.settings", Tr("details.settings"),
                [id] { Svc().stage->Push("game_settings", {{"id", id}}); });
         action("details.hide", Tr("details.hide"), [id, name = game.name] {

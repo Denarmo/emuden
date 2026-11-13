@@ -52,7 +52,7 @@ public:
             button->on_focus = [this, i] {
                 if (current_ != i && focus_after_build_.empty()) {
                     current_ = i;
-                    Rebuild();
+                    Rebuild(false);
                 }
             };
             button->on_activate = [this] { FocusFirstRow(); };

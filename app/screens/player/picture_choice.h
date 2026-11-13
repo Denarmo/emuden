@@ -28,8 +28,8 @@ void SavePicture(const library::Entry& game, PictureScope scope, const std::stri
 
 /// Every choice in menu order: "auto", then the presets.
 std::vector<std::string> PictureIds();
-/// "Auto (Dot matrix (green))" for a console, "Auto (by console)" without one, else the
-/// preset's name.
+/// "Auto: Dot matrix" for a console (the preset's name without its variant), "Auto: by
+/// console" without one, else the preset's name.
 std::string PictureName(const std::string& id, const std::string& system = {});
 
 } // namespace den::app

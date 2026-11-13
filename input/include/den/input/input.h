@@ -141,6 +141,18 @@ std::vector<int> Attached();
 /// the name says nothing.
 PadFamily FamilyFromName(const std::string& name);
 
+/// What the device is, as far as button hints go.
+enum class DeviceKind { Desktop, Handheld, TouchOnly };
+
+/// The hints shown before any button or key was used.
+struct HintChoice {
+    PadFamily family = PadFamily::Keyboard;
+    bool touch_only = false; // no pad and no keys: hints name nothing
+};
+/// From what exists: a connected pad's family (`pad`, null without one); else the built-in
+/// pad of a handheld; no names on a touch-only device; the keyboard on a desktop.
+HintChoice StartHints(DeviceKind kind, const PadFamily* pad);
+
 /// Owns SDL's event queue: gamepads, keyboard, mouse and touch all become Events.
 class System {
 public:
@@ -153,8 +165,14 @@ public:
     /// Queues an event as if a device had produced it (automation).
     void Inject(const Event& event);
 
-    /// The family of the device used last, which decides the button hints shown.
+    /// What the device is (from its profile). Until a button or key is used, the hints
+    /// follow it; without the call the device is a desktop.
+    void SetDeviceKind(DeviceKind kind);
+    /// The family of the device used last, which decides the button hints shown; before any
+    /// use, what StartHints chose.
     PadFamily ActiveFamily() const;
+    /// True while only touch has been used on a device with no pad: hints name no button.
+    bool TouchOnly() const;
     int PadCount() const;
     /// Pads by player: index 0 is player 1. New pads join at the end; a default state for an
     /// index out of range.

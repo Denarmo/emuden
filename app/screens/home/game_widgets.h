@@ -73,6 +73,7 @@ class GameTile final : public ui::Tile {
 public:
     using ui::Tile::Tile;
     bool overlay_title = false;
+    bool hack = false; // the cover is the original game's box: a "HACK" chip is drawn on it
 
 protected:
     void DrawContent(ui::Context& ctx) override;

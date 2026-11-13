@@ -64,10 +64,17 @@ public:
         return focus_;
     }
     void SetFocus(Node* node, bool scroll_to = true);
-    /// Rebuilds the tree before the next frame; focus returns to the node with the same id.
-    void Rebuild() {
+    /// Rebuilds the tree before the next frame; focus returns to the node with the same id
+    /// and every scrolling node that has an id stays where it was. `keep_scroll` false is
+    /// for a rebuild that shows other content under the same ids.
+    void Rebuild(bool keep_scroll = true) {
         rebuild_ = true;
+        keep_scroll_ = keep_scroll_ && keep_scroll;
     }
+    /// A press, move, release or wheel for this page from somewhere the stage does not see
+    /// (a page drawn on another display). `scale` is that display's pixels per unit; OnEvent
+    /// is not asked.
+    void Pointer(const input::Event& event, float scale, double time);
     Stage& GetStage() const {
         return *stage_;
     }
@@ -92,7 +99,7 @@ private:
     Stage* stage_ = nullptr;
     std::string route_;
     Params params_;
-    bool built_ = false, rebuild_ = false, reveal_ = false;
+    bool built_ = false, rebuild_ = false, reveal_ = false, keep_scroll_ = true;
     float enter_ = 0;
     // Pointer state.
     Node* press_node_ = nullptr;

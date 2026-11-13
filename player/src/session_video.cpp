@@ -11,6 +11,7 @@
 #include <cmath>
 
 #include "den/gfx/gl.h"
+#include "picture_fit.h"
 #include "session_impl.h"
 
 namespace den::player {
@@ -24,22 +25,18 @@ gfx::Rect PlayerSession::PictureRect(const gfx::Canvas& canvas, const gfx::Rect&
     if (aspect <= 0 || area.w <= 0 || area.h <= 0) {
         return area;
     }
-    float w = area.w, h = area.w / aspect;
-    if (h > area.h) {
-        h = area.h;
-        w = area.h * aspect;
-    }
-    if ((integer_scale_ || (preset_ && preset_->integer)) && frame.height > 0) {
-        // Whole multiples of the picture's height in device pixels.
-        const float pixels = h * canvas.Scale();
-        const float multiple = std::floor(pixels / static_cast<float>(frame.height));
-        if (multiple >= 1.0f) {
-            h = multiple * static_cast<float>(frame.height) / canvas.Scale();
-            w = h * aspect;
-        }
-    }
-    // On whole device pixels, so nearest filtering stays even.
+    // In device pixels: a whole multiple of the picture's rows when the user or the preset
+    // asks for it, or when the preset draws a cell per pixel and it costs little.
     const float s = canvas.Scale();
+    WholeScale whole = WholeScale::Off;
+    if (integer_scale_ || (preset_ && preset_->integer)) {
+        whole = WholeScale::Always;
+    } else if (preset_ && preset_->near_integer) {
+        whole = WholeScale::Near;
+    }
+    const PictureSize fit = FitPicture(area.w * s, area.h * s, aspect, static_cast<int>(frame.height), whole);
+    const float w = fit.w / s, h = fit.h / s;
+    // On whole device pixels, so nearest filtering stays even.
     const float x = std::round((area.x + (area.w - w) * 0.5f) * s) / s;
     const float y = std::round((area.y + (area.h - h) * 0.5f) * s) / s;
     return gfx::Rect{x, y, std::round(w * s) / s, std::round(h * s) / s};

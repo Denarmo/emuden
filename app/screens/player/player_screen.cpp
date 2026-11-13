@@ -7,11 +7,13 @@
 #include <cmath>
 #include <format>
 
+#include "../companion/second_screen.h"
 #include "../details/game_prefs.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
 #include "den/library/content.h"
+#include "picture_choice.h"
 #include "player_screen.h"
 
 namespace den::app {
@@ -45,7 +47,7 @@ PlayerScreen::~PlayerScreen() {
     if (prepare_) {
         prepare_->Cancel();
     }
-    dual_.Stop();
+    StopDisplays();
     if (phase_ == Phase::Running) {
         Svc().player->Close();
     }
@@ -128,7 +130,7 @@ void PlayerScreen::Begin(const std::filesystem::path& content) {
 
 void PlayerScreen::Fail(const std::string& message) {
     log::Warn("player", "{}", message);
-    dual_.Stop();
+    StopDisplays();
     if (phase_ == Phase::Running) {
         Svc().player->Close();
     }
@@ -143,7 +145,7 @@ void PlayerScreen::Leave() {
     if (prepare_) {
         prepare_->Cancel();
     }
-    dual_.Stop();
+    StopDisplays();
     if (phase_ == Phase::Running) {
         const player::Snapshot snapshot = svc.player->GetSnapshot();
         log::Info("player", "leave {} at frame {} ({}x{})", game_.name, snapshot.frames,
@@ -158,14 +160,41 @@ void PlayerScreen::Leave() {
     GetStage().Pop();
 }
 
-void PlayerScreen::OpenMenu() {
+void PlayerScreen::OpenMenu(View view) {
     if (phase_ != Phase::Running || view_ != View::Closed) {
         return;
     }
     Svc().player->Pause();
     log::Info("player", "paused at frame {}", Svc().player->GetSnapshot().frames);
     Svc().input->SetNavFromPads(true);
-    Show(View::Main);
+    direct_ = false;
+    // The quick settings may have chosen another picture since.
+    picture_ = PictureFor(game_);
+    picture_scope_ = static_cast<int>(PictureScopeOf(game_));
+    Show(view);
+}
+
+void PlayerScreen::OpenPage(const std::string& page) {
+    if (phase_ != Phase::Running || capture_ >= 0) {
+        return;
+    }
+    const View view = page == "buttons" ? View::Buttons : View::Options;
+    if (view == View::Options) {
+        const auto options = Svc().player->Options();
+        options_for_game_ = std::any_of(options.begin(), options.end(),
+                                        [](const player::CoreOption& option) { return option.for_game; });
+    }
+    if (view_ == View::Closed) {
+        OpenMenu(view);
+    } else {
+        Show(view);
+    }
+    direct_ = true;
+}
+
+void PlayerScreen::SetScreenSize(int index) {
+    size_ = static_cast<ScreenSize>(std::clamp(index, 0, static_cast<int>(ScreenSizeNames().size()) - 1));
+    Svc().settings->SetNumber(SIZE_KEY, static_cast<int>(size_));
 }
 
 void PlayerScreen::CloseMenu() {
@@ -176,13 +205,17 @@ void PlayerScreen::CloseMenu() {
     Svc().input->SetNavFromPads(false);
     wait_release_ = true;
     chord_since_ = -1;
+    direct_ = false;
     Show(View::Closed);
 }
 
 void PlayerScreen::Show(View view, std::string focus) {
+    // Another page starts at its top; the same page again stays where it was scrolled to.
+    const bool same = view == view_;
     view_ = view;
     focus_after_build_ = std::move(focus);
-    Rebuild();
+    PlaceDisplays();
+    Rebuild(same);
 }
 
 void PlayerScreen::OnHide() {
@@ -302,7 +335,7 @@ void PlayerScreen::Update(ui::Context& ctx) {
         // saves. Leave quietly, without closing what runs now.
         svc.library->RecordPlay(game_.id, started_unix_,
                                 static_cast<std::int64_t>(pal::NowSeconds() - started_));
-        dual_.Stop();
+        StopDisplays();
         phase_ = Phase::Left;
         svc.input->SetNavFromPads(true);
         GetStage().Pop();
@@ -330,6 +363,8 @@ void PlayerScreen::Update(ui::Context& ctx) {
     ApplySpeed();
     svc.player->Advance(ctx.dt);
     dual_.Update();
+    PlaceDisplays();
+    ApplyOverlay();
 }
 
 bool PlayerScreen::OnEvent(const input::Event& event) {
@@ -359,6 +394,19 @@ bool PlayerScreen::OnEvent(const input::Event& event) {
             Leave();
         }
         return true;
+    }
+    const bool touch = event.type == Type::PointerDown || event.type == Type::PointerMove ||
+                       event.type == Type::PointerUp || event.type == Type::Wheel;
+    if (touch && phase_ == Phase::Running) {
+        const bool menu_here = view_ != View::Closed && !menu_second_;
+        if (swapped_ && !menu_here) {
+            // The game is on the other display: this window shows the quick settings.
+            CompanionStage().HandleEvent(event);
+            return true;
+        }
+        if (view_ != View::Closed && !menu_here) {
+            return true; // the menu is on the other display, and the game is paused
+        }
     }
     if (view_ == View::Closed) {
         // The game has the input: only the way into the menu is left.
@@ -435,10 +483,12 @@ bool PlayerScreen::OnNav(Nav nav) {
         Show(View::Main, "menu.load");
         break;
     case View::Options:
-        Show(View::Main, "menu.options");
-        break;
     case View::Buttons:
-        Show(View::Main, "menu.buttons");
+        if (direct_) {
+            CloseMenu(); // opened from the quick settings: back to them
+        } else {
+            Show(View::Main, view_ == View::Options ? "menu.options" : "menu.buttons");
+        }
         break;
     case View::Players:
         Show(View::Main, "menu.players");
@@ -458,72 +508,6 @@ bool PlayerScreen::OnNav(Nav nav) {
         break;
     }
     return true;
-}
-
-void PlayerScreen::DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const player::Snapshot& snapshot) {
-    gfx::Canvas& canvas = *ctx.canvas;
-    const gfx::Color ink = gfx::Color::Rgb(0xffffff);
-    const gfx::Color plate = gfx::Color{0, 0, 0, 150};
-    const float size = ctx.theme->text_small;
-    const auto badge = [&](const std::string& text, bool right) {
-        const float w = ctx.Text().Measure(text, size, gfx::FONT_BOLD) + 20;
-        const gfx::Rect box{right ? area.Right() - w - 12 : area.x + 12, area.y + 12, w, size + 12};
-        canvas.FillRect(box, plate, 8);
-        canvas.DrawText(text, box.x + 10, box.y + 5, size, ink, gfx::FONT_BOLD);
-    };
-    if (show_fps_) {
-        // Frame rate, the sound waiting to be played, and how often it ran dry.
-        badge(std::format("{:.0f} fps  \xC2\xB7  {:.0f} ms  \xC2\xB7  {} gaps", snapshot.measured_fps,
-                          snapshot.audio_queued_ms, snapshot.audio_underruns),
-              true);
-    }
-    if (snapshot.rewinding) {
-        badge("\xC2\xAB Rewind", false);
-    } else if (snapshot.fast_forward) {
-        badge("Fast-forward \xC2\xBB", false);
-    }
-}
-
-void PlayerScreen::Draw(ui::Context& ctx, const gfx::Rect& area) {
-    Services& svc = Svc();
-    gfx::Canvas& canvas = *ctx.canvas;
-    canvas.FillRect(area, gfx::Color::Rgb(0x000000));
-    if (phase_ == Phase::Running) {
-        const player::Snapshot snapshot = svc.player->GetSnapshot();
-        // The picture pages leave the game as it is, beside the menu: it is what is being
-        // chosen.
-        const bool choosing = view_ == View::Picture || view_ == View::PictureAdjust;
-        gfx::Rect room = area;
-        if (choosing) {
-            room.x += MENU_PANEL_WIDTH;
-            room.w -= MENU_PANEL_WIDTH;
-        }
-        if (dual_.Active()) {
-            // Each screen at its own size; the second display, when there is one, is drawn
-            // by the companion's frame and stays as it is under the pause menu.
-            const bool integer = size_ == ScreenSize::PixelPerfect ||
-                                 svc.settings->GetBool("player.integer_scale", false);
-            dual_.DrawMain(ctx, room, integer, view_ == View::Closed);
-        } else {
-            const Placement placement = Place(size_, room, snapshot.frame_width, snapshot.frame_height,
-                                              snapshot.aspect, canvas.Scale());
-            if (placement.aspect != aspect_sent_) {
-                svc.player->SetAspectOverride(placement.aspect);
-                aspect_sent_ = placement.aspect;
-            }
-            svc.player->Draw(canvas, placement.area);
-        }
-        DrawOverlays(ctx, area, snapshot);
-        if (view_ != View::Closed && !choosing) {
-            canvas.FillRect(area, ctx.theme->scrim);
-        }
-    } else if (phase_ == Phase::Preparing) {
-        const std::string text = "Preparing " + game_.name + "\xE2\x80\xA6";
-        const float size = ctx.theme->text_heading;
-        canvas.DrawText(text, area.CenterX() - ctx.Text().Measure(text, size) * 0.5f, area.CenterY() - size,
-                        size, gfx::Color::Rgb(0xffffff));
-    }
-    ui::Page::Draw(ctx, area);
 }
 
 DEN_REGISTER_SCREEN("player", PlayerScreen);

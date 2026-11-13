@@ -44,6 +44,15 @@ bool ClaimSecondScreen(SecondScreenClient client);
 void ReleaseSecondScreen();
 bool SecondScreenClaimed();
 
+/// Draws on the second screen in place of whatever has it (the companion pages or a claim)
+/// and gets its presses, until ClearSecondScreenOverlay: the pause menu while it is open
+/// there, or the game when the displays are swapped. It does not open the screen by itself.
+void SetSecondScreenOverlay(SecondScreenClient client);
+void ClearSecondScreenOverlay();
+/// The companion pages on another canvas (begun by the caller): the main window while the
+/// game has the second screen. They are ticked and drawn, toasts and questions included.
+void DrawCompanionStage(ui::Context& ctx);
+
 // For the companion pages (this folder).
 /// The stage the companion pages live on.
 ui::Stage& CompanionStage();

@@ -4,6 +4,10 @@
 // The in-game layer of the ROM player: the game drawn full window by den::player, and the
 // pause menu over it. Route "player", parameter "id" (a library entry); "resume=0" starts
 // the game from the beginning instead of where it was left.
+//
+// With a second display (app/screens/companion/second_screen.h) the pause menu opens there
+// and the game stays as it is ("player.overlay_on_second_screen"), and the game and the
+// quick settings can change places ("player.swap_displays").
 
 #pragma once
 
@@ -18,8 +22,6 @@
 #include "player_view.h"
 
 namespace den::app {
-
-constexpr float MENU_PANEL_WIDTH = 460; // the pause menu, at the left
 
 class PlayerScreen final : public ui::Page {
 public:
@@ -38,6 +40,23 @@ public:
         return {};
     }
 
+    // For the quick settings of the second display (companion.play).
+    /// The screen whose game is running; null when there is none.
+    static PlayerScreen* Current();
+    /// Opens one page of the pause menu by itself ("options", "buttons"); Back closes it.
+    void OpenPage(const std::string& page);
+    /// The game goes to the other display and the quick settings come to this one. A game
+    /// with two screens swaps which display has its top screen.
+    void SwapDisplays();
+    int ScreenSizeIndex() const {
+        return static_cast<int>(size_);
+    }
+    void SetScreenSize(int index);
+    /// Saves and leaves the game, as the pause menu's "Exit to home".
+    void Exit() {
+        Leave();
+    }
+
 private:
     enum class Phase { New, Preparing, Running, Left };
     enum class View { Closed, Main, Save, Load, Options, Buttons, Players, Picture, PictureAdjust, Screens };
@@ -47,13 +66,22 @@ private:
     void Begin(const std::filesystem::path& content);
     void Fail(const std::string& message);
     void Leave();
-    void OpenMenu();
+    void OpenMenu(View view = View::Main);
     void CloseMenu();
     void Show(View view, std::string focus = {});
     void FeedPads();
     void ApplySpeed();
-    void DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const player::Snapshot& snapshot);
     bool WrapFocus(input::Nav nav);
+
+    // player_displays.cpp: what is drawn where, on one display or two.
+    void PlaceDisplays();
+    void ApplyOverlay();
+    void StopDisplays();
+    void DrawGameLayer(ui::Context& ctx, const gfx::Rect& area, bool menu_here);
+    void DrawMenu(ui::Context& ctx, const gfx::Rect& area);
+    void DrawSecond(ui::Context& ctx, const gfx::Rect& area);
+    void SecondPointer(const input::Event& event);
+    void DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const player::Snapshot& snapshot);
 
     // pause_menu.cpp: the menu's pages as rows.
     void BuildMenu();
@@ -88,6 +116,17 @@ private:
     ScreenSize size_ = ScreenSize::Fit;
     float aspect_sent_ = 0;
     bool show_fps_ = false;
+    gfx::Rect area_;                 // the window, as last drawn
+    gfx::Rect menu_area_;            // the display the menu is on, as last drawn
+    MenuLayout menu_;                // what the menu was built for
+    bool built_apart_ = false;
+
+    // Two displays.
+    bool swapped_ = false;           // the game is on the second display, the quick settings here
+    bool menu_apart_ = false;        // an open menu has a display to itself, the game the other
+    bool menu_second_ = false;       // an open menu is drawn on the second display
+    bool direct_ = false;            // the menu's page was opened from the quick settings
+    bool second_down_ = false;       // a finger is on the game on the second display
     std::string focus_after_build_;
     std::vector<player::CoreOption> options_;
 

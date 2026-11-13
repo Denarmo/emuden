@@ -80,7 +80,12 @@ std::string PictureName(const std::string& id, const std::string& system) {
     if (id != player::PICTURE_AUTO) {
         return name(id);
     }
-    return system.empty() ? "Auto (by console)" : "Auto (" + name(player::AutoPicture(system)) + ")";
+    if (system.empty()) {
+        return "Auto: by console";
+    }
+    // Short enough for a row: "Dot matrix (green)" is "Auto: Dot matrix".
+    const std::string preset = name(player::AutoPicture(system));
+    return "Auto: " + preset.substr(0, preset.find(" ("));
 }
 
 void PlayerScreen::LoadPicture() {

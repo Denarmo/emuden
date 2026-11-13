@@ -22,6 +22,7 @@ struct Context {
     gfx::TextureCache* textures = nullptr;
     const Theme* theme = nullptr;
     input::PadFamily family = input::PadFamily::Keyboard;
+    bool show_hints = true; // false on a touch-only device: no button to name
     float dt = 0;      // seconds since the last frame
     double time = 0;   // seconds since start
     gfx::Text& Text() const {
@@ -84,6 +85,7 @@ public:
     bool scrollable = false; // along `axis`; children keep their size and the node clips
     bool chrome = false;     // navigation around the content: never the page's first focus
     bool snap = false;       // a scrolling node whose flings come to rest on a child's edge
+    bool whole = false;      // not drawn while a list's edge cuts through it (a heading)
     float scroll_margin = 48; // room kept around the focused child when scrolling to it
     std::function<void()> on_activate;
     std::function<void()> on_focus;

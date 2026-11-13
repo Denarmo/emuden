@@ -33,6 +33,17 @@ float PixelScale(int width, int height) {
     return base * std::min(system::UiScale(), widest);
 }
 
+// What the button hints start from: a handheld has a pad of its own, a tablet has none.
+input::DeviceKind HintDevice() {
+    const system::DeviceProfile& device = system::Device();
+    if (device.info.builtin_pad || device.form == system::FormFactor::HandheldSmall ||
+        device.form == system::FormFactor::HandheldDual) {
+        return input::DeviceKind::Handheld;
+    }
+    return device.form == system::FormFactor::Tablet && device.info.touch ? input::DeviceKind::TouchOnly
+                                                                          : input::DeviceKind::Desktop;
+}
+
 std::string GlText(gl::Enum name) {
     const unsigned char* text = gl::GetString(name);
     return text ? std::string(reinterpret_cast<const char*>(text)) : std::string();
@@ -47,6 +58,20 @@ bool HasArg(int argc, char** argv, const char* name) {
         }
     }
     return false;
+}
+
+// "--size 1920x1080": the window's size for a windowed start (tests of other resolutions).
+void SizeFromArgs(int argc, char** argv, pal::WindowDesc& desc) {
+    for (int i = 1; i + 1 < argc; ++i) {
+        int width = 0;
+        int height = 0;
+        if (std::strcmp(argv[i], "--size") == 0 &&
+            std::sscanf(argv[i + 1], "%dx%d", &width, &height) == 2 && width >= 320 &&
+            height >= 240) {
+            desc.width = width;
+            desc.height = height;
+        }
+    }
 }
 
 } // namespace
@@ -90,6 +115,7 @@ int Run(int argc, char** argv) {
     desc.fullscreen = !HasArg(argc, argv, "--windowed") &&
                       (HasArg(argc, argv, "--fullscreen") ||
                        settings.GetBool("window.fullscreen", pal::GetCaps().handheld));
+    SizeFromArgs(argc, argv, desc);
     auto window = pal::CreateAppWindow(desc);
     if (!window) {
         log::Error("app", "{}", window.error());
@@ -129,6 +155,7 @@ int Run(int argc, char** argv) {
         Jobs jobs;
         gfx::TextureCache textures(device, jobs);
         input::System input(svc.window->SdlWindow());
+        input.SetDeviceKind(HintDevice());
         ui::Stage stage;
         svc.device = &device;
         svc.canvas = &canvas;
@@ -205,6 +232,7 @@ int Run(int argc, char** argv) {
             ctx.textures = &textures;
             ctx.theme = svc.theme;
             ctx.family = input.ActiveFamily();
+            ctx.show_hints = !input.TouchOnly();
             ctx.dt = dt;
             ctx.time = now;
             stage.Frame(ctx);

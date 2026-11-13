@@ -58,8 +58,10 @@ Placement Place(ScreenSize size, const gfx::Rect& window, int frame_width, int f
         // Whole multiples of the core's lines; the width follows the core's aspect ratio.
         const float aspect = core_aspect > 0 ? core_aspect : static_cast<float>(frame_width) / frame_height;
         const float pixel_h = window.h * scale, pixel_w = window.w * scale;
-        const float factor = std::max(
-            1.0f, std::floor(std::min(pixel_h / frame_height, pixel_w / (frame_height * aspect))));
+        const float factor = std::floor(std::min(pixel_h / frame_height, pixel_w / (frame_height * aspect)));
+        if (factor < 1.0f) {
+            break; // smaller than the picture's own pixels: fitted, so it stays inside
+        }
         const float h = frame_height * factor / scale, w = h * aspect;
         placement.area = gfx::Rect{window.x + (window.w - w) * 0.5f, window.y + (window.h - h) * 0.5f, w, h};
         placement.aspect = aspect;
@@ -76,6 +78,29 @@ Placement Place(ScreenSize size, const gfx::Rect& window, int frame_width, int f
         break;
     }
     return placement;
+}
+
+MenuLayout PlaceMenu(const gfx::Rect& area, bool preview) {
+    constexpr float MIN_PANEL = 320, MIN_ROOM = 240;
+    MenuLayout layout;
+    float width = area.w > 0 ? std::min(MENU_PANEL_WIDTH, area.w) : MENU_PANEL_WIDTH;
+    layout.room = area;
+    if (preview && area.w - width < MIN_ROOM) {
+        if (area.w - MIN_PANEL >= MIN_ROOM) {
+            width = area.w - MIN_ROOM; // a narrower menu leaves the picture its room
+        } else {
+            // No room beside the menu: the picture goes above it.
+            layout.stacked = true;
+            layout.room.h = std::round(std::min(area.w * 0.75f, area.h * 0.4f));
+            layout.panel = gfx::Rect{area.x, area.y + layout.room.h, area.w, area.h - layout.room.h};
+            return layout;
+        }
+    }
+    layout.panel = gfx::Rect{area.x, area.y, width, area.h};
+    if (preview) {
+        layout.room = gfx::Rect{area.x + width, area.y, area.w - width, area.h};
+    }
+    return layout;
 }
 
 SlotRow::SlotRow(int slot, bool filled, const fs::path& thumbnail) : filled_(filled) {

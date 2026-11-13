@@ -12,6 +12,7 @@ The games on this device. Screens use `den/library/library.h` only; the player a
 | `names.h` | `ParseGameName`, `CleanDisplayName`, `MatchKey`, `RegionTags` |
 | `artwork.h` | box art matching, `Artwork::Resolve`, `WritePlaceholderCover` |
 | `hacks.h` | `HacksOf(library)`: `FindBase` (a game by CRC-32, MD5 or SHA-1), `InstallHack`, `List`, `Update`, `Remove`; `OpenPatchFile` ("Patch a game") |
+| `hack_covers.h` | `MatchHackName`, `HackSources`, `HackCoverOptions` |
 
 - **Consoles.** `src/systems_data.cpp` holds the `systems[]` of the official plugin manifests,
   so the library works with no plugin installed. The plugin host (or the app) hands the
@@ -29,7 +30,11 @@ The games on this device. Screens use `den/library/library.h` only; the player a
   `<data>/library/covers/<system>/`) named like the ROM file, or like the game without its
   tags (`Pokemon Lazarus.jpg` for `Pokemon - Lazarus (v2.1).gba`: a hack keeps its own picture), the icon inside a Switch 2 package, else the libretro
   thumbnail collection (cached under `<data>/library/artwork`; a miss is not asked again for
-  two weeks), else a drawn placeholder (`Entry::placeholder_cover`).
+  two weeks), else a drawn placeholder (`Entry::placeholder_cover`). A game the collection
+  does not know by name is a hack: its own art from the hack sources (`hack_covers.h`: fan
+  collections on GitHub, libretro's hack entries, RetroAchievements and SteamGridDB with a
+  key), else the box of the game it was made from with a HACK tag. `CoverChoices`,
+  `SetCover` and `ResetCover` are behind "Find cover". See `docs/covers.md`.
 - **Records.** `RecordPlay` adds a session to the log (`Sessions(since)`, the last 5000) and
   to the game's totals; time the log already holds for another game inside the session (a
   game opened over this one) is left out. `Entry::added` is when the library first saw the

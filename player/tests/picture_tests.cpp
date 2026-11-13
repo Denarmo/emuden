@@ -6,6 +6,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "den/base/files.h"
+#include "picture_fit.h"
 #include "picture_presets.h"
 
 using namespace den;
@@ -53,6 +54,47 @@ TEST_CASE("the shipped picture presets load and every pass has its shader") {
     CHECK(Find(catalogue, "pixel")->integer);
     CHECK(Find(catalogue, "pixel")->passes.empty());
     CHECK(Find(catalogue, "dotmatrix")->passes.front().feedback);
+    // The presets that draw a cell per pixel ask for a whole multiple when it is near.
+    for (const char* id : {"dotmatrix", "pocket", "lcd", "lcd-ghost", "backlight"}) {
+        INFO(id);
+        CHECK(Find(catalogue, id)->near_integer);
+        CHECK(!Find(catalogue, id)->integer);
+    }
+    CHECK(!Find(catalogue, "crt")->near_integer);
+    // The two dot matrix presets are one shader with another palette.
+    const PictureParam& green = Find(catalogue, "dotmatrix")->info.params.front();
+    const PictureParam& grey = Find(catalogue, "pocket")->info.params.front();
+    CHECK(green.id == "palette");
+    CHECK(green.labels.size() == 4);
+    CHECK(green.fallback == 1.0f);
+    CHECK(grey.fallback == 3.0f);
+}
+
+TEST_CASE("a picture fills its area, or takes a whole multiple that is asked for or near") {
+    // 160x144 on a 1920x1080 screen: 7.5 times; 7 times loses under a tenth.
+    PictureSize size = FitPicture(1920, 1080, 160.0f / 144.0f, 144, WholeScale::Off);
+    CHECK(size.h == 1080.0f);
+    CHECK(size.w == 1200.0f);
+    size = FitPicture(1920, 1080, 160.0f / 144.0f, 144, WholeScale::Near);
+    CHECK(size.h == 1008.0f);
+    CHECK(size.w == 1120.0f);
+    // 240x160 there: 6.75 times; 6 times would lose more than a tenth.
+    size = FitPicture(1920, 1080, 1.5f, 160, WholeScale::Near);
+    CHECK(size.h == 1080.0f);
+    size = FitPicture(1920, 1080, 1.5f, 160, WholeScale::Always);
+    CHECK(size.h == 960.0f);
+    CHECK(size.w == 1440.0f);
+    // Already whole: 5, 10 and 15 times.
+    for (const float height : {720.0f, 1440.0f, 2160.0f}) {
+        CHECK(FitPicture(height * 16 / 9, height, 160.0f / 144.0f, 144, WholeScale::Near).h == height);
+    }
+    // Smaller than the picture: nothing whole to take.
+    size = FitPicture(200, 100, 160.0f / 144.0f, 144, WholeScale::Always);
+    CHECK(size.h == 100.0f);
+    // A wide picture is bound by the width.
+    size = FitPicture(1000, 1000, 2.0f, 100, WholeScale::Off);
+    CHECK(size.w == 1000.0f);
+    CHECK(size.h == 500.0f);
 }
 
 TEST_CASE("every console's automatic picture is a preset that exists") {

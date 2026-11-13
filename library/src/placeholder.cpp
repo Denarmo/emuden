@@ -7,6 +7,7 @@
 #include <cstdint>
 
 #include "den/base/files.h"
+#include "den/gfx/images.h"
 #include "den/library/artwork.h"
 #include "den/library/names.h"
 
@@ -201,6 +202,22 @@ bool WritePlaceholderCover(const fs::path& file, std::string_view title,
     std::error_code ec;
     fs::create_directories(file.parent_path(), ec);
     return WriteFileAtomic(file, EncodePng(WIDTH, HEIGHT, rows));
+}
+
+bool IsHackBox(std::string_view cover_path) {
+    return cover_path.ends_with(".hackbox.png");
+}
+
+bool WriteHackMarkedCover(const fs::path& image, const fs::path& out) {
+    auto loaded = gfx::LoadImageFile(image);
+    if (!loaded || loaded->width < 64 || loaded->height < 64) {
+        return false;
+    }
+    gfx::ImageData& picture = *loaded;
+    gfx::ShrinkImage(picture, 512);
+    std::error_code ec;
+    fs::create_directories(out.parent_path(), ec);
+    return gfx::SavePng(out, picture.width, picture.height, picture.rgba.data()).ok;
 }
 
 } // namespace den::library

@@ -21,3 +21,9 @@ endif()
 add_executable(den_player_play EXCLUDE_FROM_ALL tools/play.cpp)
 target_link_libraries(den_player_play PRIVATE den_player den_store den_input den_gfx den_platform den_base)
 den_warnings(den_player_play)
+
+# A still picture through a picture preset at any display size (tools/picture_shot.cpp).
+add_executable(den_picture_shot EXCLUDE_FROM_ALL tools/picture_shot.cpp)
+target_include_directories(den_picture_shot PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(den_picture_shot PRIVATE den_player den_gfx den_platform den_base)
+den_warnings(den_picture_shot)

@@ -228,7 +228,7 @@ private:
         if (system != filter_) {
             filter_ = system;
             selected_.clear();
-            Rebuild();
+            Rebuild(false);
         }
     }
 
