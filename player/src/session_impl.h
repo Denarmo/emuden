@@ -51,6 +51,9 @@ public:
     void ClearGameOptions() override;
     void ReloadButtons() override;
     void SetPicture(const std::string& id) override;
+    void SetVolume(float volume) override {
+        audio_.SetVolume(volume);
+    }
     void ResetAudioStats() override {
         audio_.ResetStats();
     }

@@ -181,6 +181,9 @@ public:
     /// Chooses a picture preset by id for the running game; an unknown id is "plain". The
     /// choice is not saved here: the screen keeps it in the settings.
     virtual void SetPicture(const std::string& /*id*/) {}
+    /// The volume of the running game, 0..1, at once. Not saved here ("player.volume" is
+    /// what the next game opens with).
+    virtual void SetVolume(float /*volume*/) {}
 
     /// Starts the audio counters again (the totals and the queue's average, minimum, maximum).
     virtual void ResetAudioStats() {}
