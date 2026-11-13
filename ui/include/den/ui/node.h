@@ -11,6 +11,7 @@
 #include "den/gfx/canvas.h"
 #include "den/gfx/images.h"
 #include "den/input/input.h"
+#include "den/ui/scroller.h"
 #include "den/ui/theme.h"
 
 namespace den::ui {
@@ -82,6 +83,7 @@ public:
     bool focusable = false;
     bool scrollable = false; // along `axis`; children keep their size and the node clips
     bool chrome = false;     // navigation around the content: never the page's first focus
+    bool snap = false;       // a scrolling node whose flings come to rest on a child's edge
     float scroll_margin = 48; // room kept around the focused child when scrolling to it
     std::function<void()> on_activate;
     std::function<void()> on_focus;
@@ -97,7 +99,13 @@ public:
     // Layout results.
     gfx::Rect rect;
     bool focused = false;
-    float scroll = 0, scroll_target = 0, content_extent = 0;
+    float scroll = 0, content_extent = 0; // `scroll` is what the last layout used
+    /// The motion of a scrolling node: drags, flings, wheel and focus moves all go through it.
+    Scroller scroller;
+    /// Where a snapping node's flings may rest (filled by the layout).
+    const std::vector<float>& SnapPoints() const {
+        return snap_points_;
+    }
 
     Size Measure(Context& ctx);
     void Arrange(Context& ctx, const gfx::Rect& area);
@@ -116,7 +124,6 @@ public:
     virtual bool OnNav(input::Nav nav) {
         return false;
     }
-    void ScrollBy(float delta);
 
     Node* FindById(const std::string& wanted);
     /// Every visible focusable node below (and including) this one.
@@ -135,6 +142,7 @@ private:
     Node* parent_ = nullptr;
     std::vector<std::unique_ptr<Node>> children_;
     Size measured_;
+    std::vector<float> snap_points_;
 };
 
 /// A plain container with an axis; shorthand for building trees.

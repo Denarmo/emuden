@@ -21,7 +21,9 @@ Node* Node::Add(std::unique_ptr<Node> child) {
 
 void Node::Clear() {
     children_.clear();
-    scroll = scroll_target = 0;
+    snap_points_.clear();
+    scroller.Jump(0);
+    scroll = 0;
 }
 
 Size Node::MeasureContent(Context& ctx) {
@@ -96,9 +98,20 @@ void Node::Arrange(Context& ctx, const gfx::Rect& area) {
 
     if (scrollable) {
         const float limit = std::max(0.0f, total - main_size);
-        scroll_target = std::clamp(scroll_target, 0.0f, limit);
-        scroll = std::clamp(scroll, 0.0f, limit);
+        scroller.SetBounds(limit, main_size);
+        // Past the ends while the rubber band is stretched, so not clamped here.
+        scroll = scroller.Position();
         cursor -= scroll;
+        snap_points_.clear();
+        if (snap) {
+            float offset = 0;
+            for (auto& child : children_) {
+                if (child->visible) {
+                    snap_points_.push_back(std::min(offset, limit));
+                    offset += (row ? child->measured_.w : child->measured_.h) + gap;
+                }
+            }
+        }
         free_space = 0;
     } else if (total_grow <= 0 && free_space > 0) {
         if (justify == Align::Center) {
@@ -134,7 +147,7 @@ void Node::Arrange(Context& ctx, const gfx::Rect& area) {
 
 void Node::Tick(Context& ctx) {
     if (scrollable) {
-        scroll = Approach(scroll, scroll_target, ctx.dt);
+        scroller.Tick(ctx.dt);
     }
     OnTick(ctx);
     for (auto& child : children_) {
@@ -178,11 +191,6 @@ void Node::Draw(Context& ctx) {
     if (scrollable) {
         ctx.canvas->PopClip();
     }
-}
-
-void Node::ScrollBy(float delta) {
-    scroll_target += delta;
-    scroll += delta;
 }
 
 Node* Node::FindById(const std::string& wanted) {

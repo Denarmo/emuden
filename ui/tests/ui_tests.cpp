@@ -68,11 +68,10 @@ TEST_CASE("a scrolling node clamps its offset to the content") {
     for (int i = 0; i < 10; ++i) {
         AddBox(root, 100, 100);
     }
-    root.scroll_target = 5000;
-    root.scroll = 5000;
+    root.scroller.Jump(5000);
     root.Measure(ctx);
     root.Arrange(ctx, gfx::Rect{0, 0, 300, 100});
-    CHECK(root.scroll_target == Catch::Approx(700));
+    CHECK(root.scroll == Catch::Approx(700));
     CHECK(root.Children().back()->rect.Right() == Catch::Approx(300));
 }
 

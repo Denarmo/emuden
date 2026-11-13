@@ -12,6 +12,8 @@ namespace den::ui {
 namespace {
 
 using input::Nav;
+constexpr float DRAG_THRESHOLD = 10; // units a finger moves before a press becomes a drag
+constexpr float WHEEL_STEP = 90;     // units per wheel line
 
 bool IsDirection(Nav nav) {
     return nav == Nav::Up || nav == Nav::Down || nav == Nav::Left || nav == Nav::Right;
@@ -159,13 +161,22 @@ void Page::EnsureVisible(Node* node) {
                             scroller->scroll;
         const float end = start + (row ? node->rect.w : node->rect.h);
         const float margin = std::min(scroller->scroll_margin, std::max(0.0f, (view - (end - start)) * 0.5f));
-        if (start - margin < scroller->scroll_target) {
-            scroller->scroll_target = start - margin;
-        } else if (end + margin > scroller->scroll_target + view) {
-            scroller->scroll_target = end + margin - view;
+        // From where the node is heading, so held directions do not chase a moving window.
+        const float heading = scroller->scroller.Destination();
+        if (start - margin < heading) {
+            scroller->scroller.ScrollTo(start - margin);
+        } else if (end + margin > heading + view) {
+            scroller->scroller.ScrollTo(end + margin - view);
         }
-        scroller->scroll_target = std::max(0.0f, scroller->scroll_target);
     }
+}
+
+void Page::ReleaseScrollers(double time) {
+    for (Node* node : held_) {
+        node->scroller.EndDrag(time, node->snap ? node->SnapPoints() : std::vector<float>());
+    }
+    held_.clear();
+    drag_node_ = nullptr;
 }
 
 void Page::Prepare() {
@@ -175,6 +186,9 @@ void Page::Prepare() {
     const std::string keep = focus_ ? focus_->id : std::string();
     focus_ = nullptr;
     press_node_ = nullptr;
+    drag_node_ = nullptr;
+    held_.clear();
+    pressed_ = dragging_ = false;
     root_.Clear();
     Build();
     built_ = true;
@@ -208,7 +222,7 @@ void Page::Activate(Node* node) {
     }
 }
 
-void Page::Dispatch(const input::Event& event, float scale) {
+void Page::Dispatch(const input::Event& event, float scale, double time) {
     using Type = input::Event::Type;
     if (OnEvent(event)) {
         return;
@@ -237,11 +251,21 @@ void Page::Dispatch(const input::Event& event, float scale) {
         break;
     }
     case Type::PointerDown:
+        ReleaseScrollers(time);
         pressed_ = true;
         dragging_ = false;
+        stopped_fling_ = false;
         press_x_ = last_x_ = x;
         press_y_ = last_y_ = y;
         press_node_ = root_.HitTest(x, y, [](const Node& n) { return n.focusable; });
+        // A finger on moving content stops it, and that press is not a tap.
+        for (Node* n = root_.HitTest(x, y, scrollable); n; n = n->Parent()) {
+            if (n->scrollable && n->scroller.Kinetic()) {
+                n->scroller.BeginDrag(time);
+                held_.push_back(n);
+                stopped_fling_ = true;
+            }
+        }
         break;
     case Type::PointerMove: {
         if (!pressed_) {
@@ -250,25 +274,41 @@ void Page::Dispatch(const input::Event& event, float scale) {
         const float dx = x - last_x_, dy = y - last_y_;
         last_x_ = x;
         last_y_ = y;
-        if (!dragging_ && std::hypot(x - press_x_, y - press_y_) > 10) {
+        if (!dragging_ && std::hypot(x - press_x_, y - press_y_) > DRAG_THRESHOLD) {
+            // The gesture locks to one axis and one node here: the nearest scrolling node
+            // along the finger's direction (a shelf inside the page), else the nearest that
+            // can move at all.
             dragging_ = true;
-        }
-        if (dragging_) {
             const bool horizontal = std::fabs(x - press_x_) > std::fabs(y - press_y_);
-            for (Node* n = root_.HitTest(press_x_, press_y_, scrollable); n; n = n->Parent()) {
-                if (n->scrollable && (n->axis == Axis::Row) == horizontal) {
-                    n->ScrollBy(horizontal ? -dx : -dy);
-                    break;
+            Node* other = nullptr;
+            for (Node* n = root_.HitTest(press_x_, press_y_, scrollable); n && !drag_node_; n = n->Parent()) {
+                if (!n->scrollable || n->scroller.Max() <= 0) {
+                    continue;
+                }
+                if ((n->axis == Axis::Row) == horizontal) {
+                    drag_node_ = n;
+                } else if (!other) {
+                    other = n;
                 }
             }
+            drag_node_ = drag_node_ ? drag_node_ : other;
+            if (drag_node_ && !drag_node_->scroller.Dragging()) {
+                drag_node_->scroller.BeginDrag(time);
+                held_.push_back(drag_node_);
+            }
+            break; // the content follows the finger from here, without a jump
+        }
+        if (dragging_ && drag_node_) {
+            drag_node_->scroller.DragBy(drag_node_->axis == Axis::Row ? -dx : -dy, time);
         }
         break;
     }
     case Type::PointerUp:
-        if (pressed_ && !dragging_ && press_node_ && press_node_->rect.Contains(x, y)) {
+        if (pressed_ && !dragging_ && !stopped_fling_ && press_node_ && press_node_->rect.Contains(x, y)) {
             SetFocus(press_node_, false);
             Activate(press_node_);
         }
+        ReleaseScrollers(time);
         pressed_ = false;
         dragging_ = false;
         break;
@@ -283,7 +323,7 @@ void Page::Dispatch(const input::Event& event, float scale) {
             }
         }
         if (target) {
-            target->scroll_target -= (event.dy != 0 ? event.dy : -event.dx) * 90.0f;
+            target->scroller.ScrollBy(-(event.dy != 0 ? event.dy : -event.dx) * WHEEL_STEP);
         }
         break;
     }

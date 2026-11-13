@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <algorithm>
+#include <chrono>
 
 #include "den/base/json.h"
 #include "den/base/log.h"
@@ -296,6 +297,12 @@ bool Stage::TextEntryOpen() const {
 }
 
 void Stage::HandleEvent(const input::Event& event) {
+    using Clock = std::chrono::steady_clock;
+    static const Clock::time_point origin = Clock::now();
+    HandleEvent(event, std::chrono::duration<double>(Clock::now() - origin).count());
+}
+
+void Stage::HandleEvent(const input::Event& event, double time) {
     impl_->Apply(*this);
     if (impl_->dialog) {
         impl_->DialogEvent(event);
@@ -309,7 +316,7 @@ void Stage::HandleEvent(const input::Event& event) {
             }
         }
     } else if (Page* page = Top()) {
-        page->Dispatch(event, impl_->scale);
+        page->Dispatch(event, impl_->scale, time);
     }
     impl_->Apply(*this);
 }
@@ -371,6 +378,29 @@ std::string Stage::StateJson() const {
         toasts.push_back(JsonString(toast.text));
     }
     members.emplace_back("toasts", JsonArray(std::move(toasts)));
+    // Every scrolling node of the page: where it is, how far it can go, whether it moves.
+    std::vector<JsonValue> scrollers;
+    const auto collect = [&](const auto& self, const Node& node) -> void {
+        if (!node.visible) {
+            return;
+        }
+        if (node.scrollable) {
+            scrollers.push_back(JsonObject({{"id", JsonString(node.id)},
+                                            {"axis", JsonString(node.axis == Axis::Row ? "row" : "column")},
+                                            {"y", JsonNumber(static_cast<double>(node.rect.y))},
+                                            {"pos", JsonNumber(static_cast<double>(node.scroller.Position()))},
+                                            {"max", JsonNumber(static_cast<double>(node.scroller.Max()))},
+                                            {"speed", JsonNumber(static_cast<double>(node.scroller.Velocity()))},
+                                            {"moving", JsonBool(node.scroller.Moving())}}));
+        }
+        for (const auto& child : node.Children()) {
+            self(self, *child);
+        }
+    };
+    if (page) {
+        collect(collect, const_cast<Page*>(page)->Root());
+    }
+    members.emplace_back("scroll", JsonArray(std::move(scrollers)));
     return WriteJson(JsonObject(std::move(members)));
 }
 

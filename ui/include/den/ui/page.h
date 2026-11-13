@@ -82,7 +82,8 @@ public:
 private:
     friend class Stage;
     void Prepare();
-    void Dispatch(const input::Event& event, float scale);
+    void Dispatch(const input::Event& event, float scale, double time);
+    void ReleaseScrollers(double time);
     void Activate(Node* node);
     void EnsureVisible(Node* node);
 
@@ -95,8 +96,11 @@ private:
     float enter_ = 0;
     // Pointer state.
     Node* press_node_ = nullptr;
+    Node* drag_node_ = nullptr;  // the scrolling node the gesture is locked to
+    std::vector<Node*> held_;    // scrolling nodes the finger holds: stopped flings, the drag
     float press_x_ = 0, press_y_ = 0, last_x_ = 0, last_y_ = 0;
     bool pressed_ = false, dragging_ = false;
+    bool stopped_fling_ = false; // the press stopped a fling, so it is not a tap
 };
 
 /// The router and everything drawn above pages: hint bar, toasts, the confirm dialog.
@@ -130,6 +134,9 @@ public:
     bool TextEntryOpen() const;
 
     void HandleEvent(const input::Event& event);
+    /// The same with the time the event happened (seconds, any steady origin); flings read
+    /// the finger's speed from it.
+    void HandleEvent(const input::Event& event, double time);
     /// Ticks, lays out and draws the top page and the overlays. The canvas must be begun.
     void Frame(Context& ctx);
 

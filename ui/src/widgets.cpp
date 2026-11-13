@@ -245,6 +245,7 @@ std::unique_ptr<Node> MakeList(float gap) {
 std::unique_ptr<Node> MakeShelf(float gap) {
     auto node = MakeBox(Axis::Row, gap);
     node->scrollable = true;
+    node->snap = true; // a flicked shelf rests with a tile at its start
     node->align = Align::Start;
     return node;
 }
