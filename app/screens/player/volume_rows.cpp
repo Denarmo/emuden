@@ -39,8 +39,9 @@ float SystemStep() {
 } // namespace
 
 std::vector<ui::RowSpec> VolumeRows(const std::string& prefix, bool other_app) {
-    // The device's own panel sets each screen's volume (and brightness), which this app may
-    // not: a button opens it instead of sliders that could only set part of it.
+    // The device's own panel (Retroid Pocket Duo, AYN Thor) sets each screen's volume and
+    // brightness, which this app may not: a button opens it instead of sliders that could
+    // only set part of it.
     if (pal::audio::HasScreenControls()) {
         ui::RowSpec panel = ActionRow(prefix + ".screen_controls", "Volume and brightness",
                                       [] { pal::audio::OpenScreenControls(); });

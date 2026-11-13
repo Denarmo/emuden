@@ -257,20 +257,24 @@ public class EmuDenActivity extends SDLActivity {
     }
 
     /**
-     * Called from native code (lifecycle_android.cpp). Retroid's dual-screen panel sets each
-     * screen's volume and brightness, which no other app may do; its button opens it.
+     * Called from native code (lifecycle_android.cpp). The dual-screen panel of the Retroid
+     * Pocket Duo and the AYN Thor (one firmware lineage) sets each screen's volume and
+     * brightness, which no other app may do; the device's dual-screen button opens it.
      */
     public static boolean screenControlsAvailable() {
         EmuDenActivity activity = self;
         if (activity == null) {
             return false;
         }
-        try {
-            activity.getPackageManager().getPackageInfo(RETROID_PANEL, 0);
-            return true;
-        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
-            return false;
+        for (String panel : SCREEN_PANELS) {
+            try {
+                activity.getPackageManager().getPackageInfo(panel, 0);
+                return true;
+            } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+                // not this one
+            }
         }
+        return false;
     }
 
     /**
@@ -284,7 +288,7 @@ public class EmuDenActivity extends SDLActivity {
                 long now = android.os.SystemClock.uptimeMillis();
                 for (int action : new int[] {android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.ACTION_UP}) {
                     input.sendKeySync(new android.view.KeyEvent(now, now, action, 0, 0, 0,
-                            android.view.KeyCharacterMap.VIRTUAL_KEYBOARD, RETROID_PANEL_SCAN_CODE, 0,
+                            android.view.KeyCharacterMap.VIRTUAL_KEYBOARD, SCREEN_PANEL_SCAN_CODE, 0,
                             android.view.InputDevice.SOURCE_KEYBOARD));
                 }
             } catch (RuntimeException e) {
@@ -293,8 +297,11 @@ public class EmuDenActivity extends SDLActivity {
         }, "screen-controls").start();
     }
 
-    private static final String RETROID_PANEL = "com.retroidpocket.dualscreen.assistant";
-    private static final int RETROID_PANEL_SCAN_CODE = 194;
+    private static final String[] SCREEN_PANELS = {
+        "com.retroidpocket.dualscreen.assistant", // Retroid Pocket Duo
+        "com.odin.dualscreen.assistant",          // AYN Thor
+    };
+    private static final int SCREEN_PANEL_SCAN_CODE = 194; // KEY_F24, the dual-screen button on both
 
     private static AudioManager audio() {
         EmuDenActivity activity = self;

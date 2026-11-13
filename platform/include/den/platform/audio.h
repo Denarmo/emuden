@@ -18,7 +18,8 @@ int SystemVolume();
 void SetSystemVolume(int step);
 
 /// The device's own panel for each screen's volume and brightness, where an app may not set
-/// them itself (Retroid's dual-screen panel). Constant for the life of the process.
+/// them itself (the dual-screen panel of the Retroid Pocket Duo and the AYN Thor). Constant
+/// for the life of the process.
 bool HasScreenControls();
 /// Opens that panel (on the second screen).
 void OpenScreenControls();
