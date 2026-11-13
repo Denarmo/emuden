@@ -20,6 +20,7 @@
 #include "den/plugins/manifest.h"
 #include "den/plugins/signature.h"
 #include "den/store/settings.h"
+#include "feature/index_source.h"
 #include "json_util.h"
 
 namespace den::plugins {
@@ -76,8 +77,21 @@ inline std::vector<std::string> MissingBios(const fs::path& dir, const Console& 
     return missing;
 }
 
-class RealHost final : public Host {
+class RealHost final : public Host, public IndexSource {
 public:
+    std::optional<Index> OfferedIndex(bool& expired) const override {
+        std::lock_guard lock(mutex_);
+        expired = index_expired_;
+        return index_;
+    }
+    std::string IndexUrl() const override {
+        const Result<SourceLocation> location = ParseSourceUrl(deps_.source);
+        return location ? location.value().index_url : std::string();
+    }
+    std::string SourceText() const override {
+        return deps_.source;
+    }
+
     RealHost(const Config& config, HostDeps deps)
         : config_(config), deps_(std::move(deps)), plugins_dir_(config.data_dir / "plugins"),
           bios_dir_(config.data_dir / "bios"), ledger_(config.data_dir / "cores") {

@@ -31,6 +31,14 @@ struct IndexPlugin {
     std::string name;
     Version version;
     FileRef package;
+    std::string kind; // "console" (also when the entry names none) or "feature"
+    /// Feature plugins: what the package will ask for, shown before any download.
+    std::string publisher;
+    std::string summary;
+    std::vector<std::string> permissions;
+    std::vector<std::string> http_hosts;
+    std::vector<std::string> open_hosts;
+    std::vector<std::string> systems;
 };
 
 struct Revocation {

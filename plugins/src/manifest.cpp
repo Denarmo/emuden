@@ -361,6 +361,7 @@ const std::vector<std::string>& HostCapabilities() {
     static const std::vector<std::string> capabilities = {
         "engine.libretro",    "engine.switch2", "settings.v1",
         "content.multi_file", "content.magic",  "presentation.buttons",
+        "kind.feature",       "feature.lua.1",
     };
     return capabilities;
 }

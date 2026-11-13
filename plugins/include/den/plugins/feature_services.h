@@ -82,7 +82,7 @@ public:
     virtual Status RemoveHack(const std::string& id, const std::string& plugin) = 0;
 };
 
-/// The services over the app's library, or null while the build has no patching module.
+/// The services over the app's library (den::patching and den::library::Hacks); null without one.
 std::shared_ptr<FeatureServices> CreateLibraryServices(library::Library* library);
 
 struct FeatureDeps {

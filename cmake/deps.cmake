@@ -47,3 +47,17 @@ target_include_directories(den_stb SYSTEM INTERFACE "${stb_SOURCE_DIR}")
 if(DEN_BUILD_TESTS)
     den_fetch(catch2 https://github.com/catchorg/Catch2.git v3.8.1 GIT_SHALLOW ON)
 endif()
+
+# Lua 5.4 runs feature plugins (plugins/src/feature). It is built as C++ so that a script
+# error unwinds the host's frames as an exception instead of jumping over them.
+den_fetch(lua https://github.com/lua/lua.git v5.4.8 GIT_SHALLOW ON)
+file(GLOB den_lua_sources "${lua_SOURCE_DIR}/l*.c")
+list(FILTER den_lua_sources EXCLUDE REGEX "/(lua|ltests|onelua)\.c$")
+add_library(den_lua STATIC ${den_lua_sources})
+set_source_files_properties(${den_lua_sources} PROPERTIES LANGUAGE CXX)
+target_include_directories(den_lua SYSTEM PUBLIC "${lua_SOURCE_DIR}")
+if(MSVC)
+    target_compile_options(den_lua PRIVATE /w /EHsc)
+else()
+    target_compile_options(den_lua PRIVATE -w)
+endif()
