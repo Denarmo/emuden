@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <map>
 #include <mutex>
 
 #include "den/base/files.h"
@@ -13,9 +14,15 @@ struct Settings::Impl {
     std::filesystem::path file;
     mutable std::mutex mutex;
     JsonValue root = JsonObject();
+    std::map<std::string, JsonValue> defaults;
 
+    // The value in effect: the stored one, else the default.
     const JsonValue* Find(const std::string& key) const {
-        return root.Find(key);
+        if (const JsonValue* stored = root.Find(key)) {
+            return stored;
+        }
+        const auto fallback = defaults.find(key);
+        return fallback == defaults.end() ? nullptr : &fallback->second;
     }
 
     void Set(const std::string& key, JsonValue value) {
@@ -52,6 +59,33 @@ Settings::~Settings() = default;
 bool Settings::Has(const std::string& key) const {
     std::lock_guard lock(impl_->mutex);
     return impl_->Find(key) != nullptr;
+}
+
+bool Settings::Stored(const std::string& key) const {
+    std::lock_guard lock(impl_->mutex);
+    return impl_->root.Find(key) != nullptr;
+}
+
+void Settings::SetDefaults(std::vector<std::pair<std::string, JsonValue>> defaults) {
+    std::lock_guard lock(impl_->mutex);
+    impl_->defaults.clear();
+    for (auto& [key, value] : defaults) {
+        impl_->defaults[key] = std::move(value);
+    }
+}
+
+bool Settings::HasDefault(const std::string& key) const {
+    std::lock_guard lock(impl_->mutex);
+    return impl_->defaults.contains(key);
+}
+
+std::vector<std::string> Settings::DefaultKeys() const {
+    std::lock_guard lock(impl_->mutex);
+    std::vector<std::string> keys;
+    for (const auto& [key, value] : impl_->defaults) {
+        keys.push_back(key);
+    }
+    return keys;
 }
 
 std::string Settings::GetString(const std::string& key, const std::string& fallback) const {

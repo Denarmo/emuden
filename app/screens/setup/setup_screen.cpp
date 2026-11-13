@@ -17,6 +17,7 @@
 #include "den/app/pages.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
+#include "den/system/device.h"
 #include "den/system/first_run.h"
 
 namespace den::app {
@@ -64,7 +65,9 @@ public:
         Services& svc = Svc();
         signature_ = Signature();
         static const char* const TITLES[] = {"setup.welcome", "setup.games", "setup.consoles", "setup.done"};
-        ui::Node* content = BuildPlainFrame(*this, Tr(TITLES[step_]));
+        // The first step says what was set up for this device; nothing is asked.
+        ui::Node* content =
+            BuildPlainFrame(*this, step_ == 0 ? "Set up for " + system::Device().name : Tr(TITLES[step_]));
         content->pad_right = svc.theme->margin;
         auto* progress = content->Emplace<ui::Label>(TrF("setup.step", step_ + 1, 4));
         progress->tone = ui::Tone::Dim;
@@ -75,8 +78,10 @@ public:
         std::vector<ui::RowSpec> rows;
         switch (step_) {
         case 0:
-            text(Tr("setup.welcome_1"));
-            text(Tr("setup.welcome_2"));
+            text("EmuDEN chose these settings for this device. Settings > Device changes them.");
+            for (const std::string& line : system::DescribeDefaults(system::Device())) {
+                list->Emplace<ui::Label>(line);
+            }
             break;
         case 1:
             text(Tr("setup.games_help"));

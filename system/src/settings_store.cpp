@@ -134,7 +134,8 @@ struct SettingsStore::Impl {
             return Layer::Console;
         }
         if (Global(info, key, out)) {
-            return Layer::Global;
+            // A value of the device defaults layer counts as a default: nobody chose it.
+            return global->Stored(key) ? Layer::Global : Layer::Default;
         }
         out = info ? info->fallback : JsonValue();
         return Layer::Default;
@@ -223,7 +224,7 @@ bool SettingsStore::IsSet(const std::string& key, const Scope& scope) const {
     case Layer::Console:
         return impl_->InLayer(impl_->consoles, scope.system, key) != nullptr;
     default:
-        return impl_->global && impl_->global->Has(key);
+        return impl_->global && impl_->global->Stored(key);
     }
 }
 

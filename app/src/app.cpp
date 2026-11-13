@@ -10,6 +10,8 @@
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
+#include "den/gfx/gl.h"
+#include "den/system/device.h"
 #include "den/system/first_run.h"
 #include "den/system/info.h"
 #include "den/system/settings.h"
@@ -20,7 +22,21 @@ namespace {
 
 // The UI is laid out for a window 720 units high; the scale follows the real height.
 constexpr float LOGICAL_HEIGHT = 720.0f;
+constexpr float MIN_LOGICAL_WIDTH = 760.0f;
 constexpr int KEY_F11 = 0x40000044; // SDLK_F11
+
+// Pixels per logical unit: the window's height over the layout's, times the interface size
+// (bigger on small screens), held back where a narrow window would get too few units across.
+float PixelScale(int width, int height) {
+    const float base = static_cast<float>(height) / LOGICAL_HEIGHT;
+    const float widest = std::max(1.0f, static_cast<float>(width) / (MIN_LOGICAL_WIDTH * base));
+    return base * std::min(system::UiScale(), widest);
+}
+
+std::string GlText(gl::Enum name) {
+    const unsigned char* text = gl::GetString(name);
+    return text ? std::string(reinterpret_cast<const char*>(text)) : std::string();
+}
 
 Services g_services;
 
@@ -66,6 +82,8 @@ int Run(int argc, char** argv) {
     svc.settings = &settings;
     system::InitSettings(&settings, svc.data_dir);
     system::NoteStart(settings);
+    // The device's defaults sit below every setting read from here on.
+    system::InitDevice(settings);
     svc.theme = &ui::ThemeByName(settings.GetString("ui.theme", "Light"));
 
     pal::WindowDesc desc;
@@ -87,6 +105,7 @@ int Run(int argc, char** argv) {
         gfx::Canvas canvas;
         Status ready = device.Init(pal::GlProcAddress, pal::GetCaps().gles);
         if (ready) {
+            system::NoteGpu(GlText(gl::RENDERER), GlText(gl::VERSION));
             ready = text.Init(device);
         }
         if (ready) {
@@ -180,7 +199,7 @@ int Run(int argc, char** argv) {
                 continue;
             }
             device.BeginFrame(width, height, svc.theme->page);
-            canvas.Begin(width, height, static_cast<float>(height) / LOGICAL_HEIGHT);
+            canvas.Begin(width, height, PixelScale(width, height));
             ui::Context ctx;
             ctx.canvas = &canvas;
             ctx.textures = &textures;
@@ -206,6 +225,7 @@ int Run(int argc, char** argv) {
         svc.stage = nullptr;
     }
     svc = Services{};
+    system::ShutdownDevice();
     window->reset();
     pal::Shutdown();
     return exit_code;

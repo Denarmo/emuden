@@ -6,7 +6,10 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
+
+#include "den/base/json.h"
 
 namespace den::store {
 
@@ -19,7 +22,10 @@ public:
     explicit Settings(std::filesystem::path file);
     ~Settings();
 
+    /// Whether the key has a value in effect: stored, or given by the defaults layer.
     bool Has(const std::string& key) const;
+    /// Whether the file itself holds the key (the user's own choice).
+    bool Stored(const std::string& key) const;
     std::string GetString(const std::string& key, const std::string& fallback = {}) const;
     bool GetBool(const std::string& key, bool fallback = false) const;
     double GetNumber(const std::string& key, double fallback = 0) const;
@@ -29,7 +35,14 @@ public:
     void SetBool(const std::string& key, bool value);
     void SetNumber(const std::string& key, double value);
     void SetList(const std::string& key, const std::vector<std::string>& values);
+    /// Removes the stored value; a default of the key shows through again.
     void Remove(const std::string& key);
+
+    /// The defaults layer: values in effect for keys the file does not hold (what suits this
+    /// device). Never written to disk; a stored value always wins. Replaces the whole layer.
+    void SetDefaults(std::vector<std::pair<std::string, JsonValue>> defaults);
+    bool HasDefault(const std::string& key) const;
+    std::vector<std::string> DefaultKeys() const;
 
 private:
     struct Impl;
