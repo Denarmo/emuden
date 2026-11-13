@@ -22,7 +22,7 @@ powershell -ExecutionPolicy Bypass -File tools\build.ps1 -Preset win -Test
 The result is `build/win/bin/emuden.exe`. Linux: `cmake --preset linux && cmake --build build/linux`.
 Android: `cmake --preset android` with `ANDROID_NDK_HOME` set (the Gradle shell is not there yet).
 
-Third-party sources (SDL3, FreeType, zlib, stb, Catch2) are fetched once into `.deps/` at
+Third-party sources (SDL3, FreeType, zlib, stb, glslang, SPIRV-Cross, Catch2) are fetched once into `.deps/` at
 pinned versions and shared by every build directory.
 
 ## Layout

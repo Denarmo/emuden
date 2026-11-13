@@ -158,17 +158,27 @@ const PresetData* FindPreset(const std::string& id) {
             return &preset;
         }
     }
+    for (const auto& preset : ImportedPresets()) {
+        if (preset->info.id == id) {
+            return preset.get();
+        }
+    }
     return nullptr;
 }
 
 const std::vector<PicturePreset>& PicturePresets() {
-    static const std::vector<PicturePreset> list = [] {
-        std::vector<PicturePreset> out;
+    static std::vector<PicturePreset> list;
+    static unsigned generation = 0;
+    if (list.empty() || generation != ImportedGeneration()) {
+        generation = ImportedGeneration();
+        list.clear();
         for (const PresetData& preset : Presets().presets) {
-            out.push_back(preset.info);
+            list.push_back(preset.info);
         }
-        return out;
-    }();
+        for (const auto& preset : ImportedPresets()) {
+            list.push_back(preset->info);
+        }
+    }
     return list;
 }
 

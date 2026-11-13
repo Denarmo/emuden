@@ -39,6 +39,8 @@ $third = [ordered]@{
     'WebView2.txt'      = '.deps\webview2-src\LICENSE.txt'
     'XZ-Embedded.txt'   = '.deps\xzembedded-src\COPYING'
     'LZMA-SDK.txt'      = '.deps\lzma-sdk-src\DOC\lzma-sdk.txt'
+    'glslang.txt'       = '.deps\glslang-src\LICENSE.txt'
+    'SPIRV-Cross.txt'   = '.deps\spirvcross-src\LICENSE'
     'Google-Sans-OFL.txt' = 'assets\fonts\OFL.txt'
 }
 foreach ($name in $third.Keys) {

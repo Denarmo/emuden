@@ -8,6 +8,7 @@
 
 #include "den/base/log.h"
 #include "den/store/settings.h"
+#include "retro_preset.h"
 #include "session_impl.h"
 
 namespace den::player {
@@ -73,6 +74,7 @@ void PlayerSession::SetPictureParam(const std::string& id, float value) {
         value = std::clamp(value, param.min, param.max);
         picture_values_[i] = value;
         chain_.SetParam(i, value);
+        retro_.SetParam(i, value);
         if (config_.settings) {
             // Only what differs from the preset is kept, so a changed preset shows through.
             if (std::fabs(value - param.fallback) < param.step * 0.25f) {
@@ -95,16 +97,25 @@ void PlayerSession::ResetPictureParams() {
 }
 
 bool PlayerSession::ReadyChain(gfx::Device& device) {
-    if (!preset_ || preset_->passes.empty()) {
+    const bool retro = preset_ && !preset_->retro.empty();
+    if (!preset_ || (preset_->passes.empty() && !retro)) {
         return false;
     }
     if (chain_stale_) {
         chain_stale_ = false;
         chain_.Release();
-        const auto spec = BuildEffect(*preset_, ShaderDir());
-        if (!spec || !chain_.Load(device, spec.value())) {
+        retro_.Release();
+        Status status;
+        if (retro) {
+            const auto spec = LoadRetroPreset(preset_->retro);
+            status = spec ? retro_.Load(device, spec.value()) : spec.status();
+        } else {
+            const auto spec = BuildEffect(*preset_, ShaderDir());
+            status = !spec ? spec.status() : chain_.Load(device, spec.value()) ? Status{} : Status::Fail("");
+        }
+        if (!status) {
             log::Warn("player", "the {} picture is not available on this device{}{}", picture_,
-                      spec ? "" : ": ", spec ? "" : spec.error());
+                      status.error.empty() ? "" : ": ", status.error);
             // Plain from here on; the screen sees it in the snapshot.
             preset_ = nullptr;
             picture_ = "plain";
@@ -113,13 +124,15 @@ bool PlayerSession::ReadyChain(gfx::Device& device) {
         }
         for (std::size_t i = 0; i < picture_values_.size(); ++i) {
             chain_.SetParam(i, picture_values_[i]);
+            retro_.SetParam(i, picture_values_[i]);
         }
     }
-    return chain_.Loaded();
+    return retro ? retro_.Loaded() : chain_.Loaded();
 }
 
 void PlayerSession::ReleasePicture() {
     chain_.Release();
+    retro_.Release();
     chain_stale_ = true;
     preset_ = nullptr;
     picture_values_.clear();

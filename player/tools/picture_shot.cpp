@@ -6,6 +6,7 @@
 //   den_picture_shot --image <frame.png> --preset <id> --size <w>x<h> --out <png>
 //       [--shaders <folder>] [--aspect <w/h>] [--fill] [--param <id>=<value>]...
 //       [--frames <n>] [--bench <n>]
+//   den_picture_shot --image <frame.png> --retro <file.slangp|.glslp> --size ... (the same)
 // The picture is placed the way the player places it (picture_fit.h); --fill turns the
 // preset's wish for a whole multiple off. --bench prints the GPU time of a frame.
 
@@ -20,17 +21,19 @@
 #include "den/base/log.h"
 #include "den/gfx/effect_chain.h"
 #include "den/gfx/gl.h"
+#include "den/gfx/retro_chain.h"
 #include "den/gfx/images.h"
 #include "den/platform/pal.h"
 #include "picture_fit.h"
 #include "picture_presets.h"
+#include "retro_preset.h"
 
 using namespace den;
 
 namespace {
 
 struct Args {
-    std::filesystem::path image, out, shaders;
+    std::filesystem::path image, out, shaders, retro;
     std::string preset = "dotmatrix";
     int width = 1280, height = 720;
     float aspect = 0;
@@ -50,6 +53,8 @@ Args Parse(int argc, char** argv) {
             args.out = PathFromUtf8(value());
         } else if (flag == "--shaders") {
             args.shaders = PathFromUtf8(value());
+        } else if (flag == "--retro") {
+            args.retro = PathFromUtf8(value());
         } else if (flag == "--preset") {
             args.preset = value();
         } else if (flag == "--size") {
@@ -97,24 +102,42 @@ int Shoot(const Args& args) {
         return 1;
     }
     const std::filesystem::path dir = args.shaders.empty() ? player::ShaderDir() : args.shaders;
-    const player::Catalogue catalogue = player::LoadCatalogue(dir);
-    const auto found = std::find_if(catalogue.presets.begin(), catalogue.presets.end(),
-                                    [&](const player::PresetData& p) { return p.info.id == args.preset; });
-    if (found == catalogue.presets.end() || found->passes.empty()) {
-        log::Error("shot", "no preset {} with passes in {}", args.preset, PathToUtf8(dir));
-        return 2;
+    player::PresetData preset;
+    gfx::EffectChain chain;
+    gfx::RetroChain retro;
+    if (!args.retro.empty()) {
+        auto spec = player::LoadRetroPreset(args.retro);
+        if (!spec) {
+            log::Error("shot", "{}", spec.error());
+            return 2;
+        }
+        if (const Status loaded = retro.Load(device, spec.value()); !loaded) {
+            log::Error("shot", "{}", loaded.error);
+            return 3;
+        }
+        preset.input_linear = false;
+        for (std::size_t i = 0; i < spec.value().params.size(); ++i) {
+            preset.uniforms.emplace_back(spec.value().params[i].id, spec.value().values[i]);
+        }
+    } else {
+        const player::Catalogue catalogue = player::LoadCatalogue(dir);
+        const auto found = std::find_if(catalogue.presets.begin(), catalogue.presets.end(),
+                                        [&](const player::PresetData& p) { return p.info.id == args.preset; });
+        if (found == catalogue.presets.end() || found->passes.empty()) {
+            log::Error("shot", "no preset {} with passes in {}", args.preset, PathToUtf8(dir));
+            return 2;
+        }
+        preset = *found;
+        const auto spec = player::BuildEffect(preset, dir);
+        if (!spec || !chain.Load(device, spec.value())) {
+            log::Error("shot", "the preset does not compile");
+            return 3;
+        }
     }
-    const player::PresetData& preset = *found;
     const auto image = gfx::LoadImageFile(args.image);
     if (!image) {
         log::Error("shot", "{}", image.error());
         return 2;
-    }
-    const auto spec = player::BuildEffect(preset, dir);
-    gfx::EffectChain chain;
-    if (!spec || !chain.Load(device, spec.value())) {
-        log::Error("shot", "the preset does not compile");
-        return 3;
     }
     for (std::size_t i = 0; i < preset.uniforms.size(); ++i) {
         float value = preset.uniforms[i].second;
@@ -124,6 +147,7 @@ int Shoot(const Args& args) {
             }
         }
         chain.SetParam(i, value);
+        retro.SetParam(i, value);
     }
 
     const gfx::ImageData& frame = image.value();
@@ -166,7 +190,11 @@ int Shoot(const Args& args) {
     const auto draw = [&] {
         input.serial = ++serial;
         input.frame = serial;
-        chain.Draw(device, input, output);
+        if (retro.Loaded()) {
+            retro.Draw(device, input, output);
+        } else {
+            chain.Draw(device, input, output);
+        }
     };
     for (int i = 0; i < args.frames; ++i) {
         draw();
@@ -196,6 +224,7 @@ int Shoot(const Args& args) {
                   args.height);
     }
     chain.Release();
+    retro.Release();
     gl::DeleteFramebuffers(1, &framebuffer);
     device.DestroyTexture(target);
     device.DestroyTexture(source);

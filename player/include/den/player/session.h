@@ -136,7 +136,12 @@ struct PicturePreset {
     std::vector<PictureParam> params;
     std::vector<PictureLook> looks; // none, or two and more
 };
+/// The app's presets, then the imported ones (group "Imported").
 const std::vector<PicturePreset>& PicturePresets();
+/// Where imported RetroArch presets (.slangp, .glslp) are kept, in folders of their own.
+std::filesystem::path ImportedShaderDir();
+/// Reads the imported presets again, after an import or a removal.
+void RefreshImportedPresets();
 /// The id that means "the console's own default" wherever a preset id is taken.
 constexpr const char* PICTURE_AUTO = "auto";
 /// The preset Auto stands for on a console ("gb" gives "dotmatrix"); "plain" when none.

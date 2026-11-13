@@ -132,7 +132,8 @@ void PlayerSession::DrawRegion(gfx::Canvas& canvas, const PictureSource& source,
         output.view_width = static_cast<int>(std::lround(canvas.Width() * s));
         output.view_height = static_cast<int>(std::lround(canvas.Height() * s));
         canvas.Flush();
-        const bool drawn = chain_.Draw(device, input, output, slot);
+        const bool drawn = retro_.Loaded() ? retro_.Draw(device, input, output, slot)
+                                           : chain_.Draw(device, input, output, slot);
         canvas.RestoreState();
         if (drawn) {
             return;

@@ -16,6 +16,7 @@
 #include "game_files.h"
 #include "hw_context.h"
 #include "pad_map.h"
+#include "den/gfx/retro_chain.h"
 #include "picture_presets.h"
 #include "rewind_buffer.h"
 
@@ -136,6 +137,7 @@ private:
     const PresetData* preset_ = nullptr;   // null for "plain"
     std::vector<float> picture_values_;    // per PresetData::uniforms
     gfx::EffectChain chain_;
+    gfx::RetroChain retro_; // an imported preset's, in place of chain_
     bool chain_stale_ = true;
     std::uint64_t picture_frame_ = 0;
     int frame_owner_ = -1;          // the screen whose DrawScreen counts the frames

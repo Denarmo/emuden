@@ -58,6 +58,7 @@ using Intptr = std::ptrdiff_t;
     X(void, EnableVertexAttribArray, (UInt index)) \
     X(void, DisableVertexAttribArray, (UInt index)) \
     X(void, VertexAttribPointer, (UInt index, Int size, Enum type, Boolean normalized, Sizei stride, const void* offset)) \
+    X(void, VertexAttrib4f, (UInt index, Float x, Float y, Float z, Float w)) \
     X(UInt, CreateShader, (Enum type)) \
     X(void, ShaderSource, (UInt shader, Sizei count, const Char* const* text, const Int* length)) \
     X(void, CompileShader, (UInt shader)) \
@@ -75,6 +76,8 @@ using Intptr = std::ptrdiff_t;
     X(Int, GetUniformLocation, (UInt program, const Char* name)) \
     X(Int, GetAttribLocation, (UInt program, const Char* name)) \
     X(void, Uniform1i, (Int location, Int v)) \
+    X(void, Uniform1ui, (Int location, UInt v)) \
+    X(void, GetActiveUniform, (UInt program, UInt index, Sizei size, Sizei* length, Int* count, Enum* type, Char* name)) \
     X(void, Uniform1f, (Int location, Float v)) \
     X(void, Uniform2f, (Int location, Float a, Float b)) \
     X(void, Uniform3f, (Int location, Float a, Float b, Float c)) \
@@ -87,6 +90,7 @@ using Intptr = std::ptrdiff_t;
     X(void, ReadBuffer, (Enum source)) \
     X(Enum, GetError, (void)) \
     X(const unsigned char*, GetString, (Enum name)) \
+    X(const unsigned char*, GetStringi, (Enum name, UInt index)) \
     X(void, GetIntegerv, (Enum name, Int* out)) \
     X(void, GenFramebuffers, (Sizei n, UInt* out)) \
     X(void, DeleteFramebuffers, (Sizei n, const UInt* ids)) \
@@ -143,6 +147,13 @@ constexpr Enum FRAMEBUFFER = 0x8D40, READ_FRAMEBUFFER = 0x8CA8, DRAW_FRAMEBUFFER
                FRAMEBUFFER_BINDING = 0x8CA6;
 constexpr Enum VENDOR = 0x1F00, RENDERER = 0x1F01, VERSION = 0x1F02, MAX_TEXTURE_SIZE = 0x0D33;
 constexpr Enum BACK = 0x0405, MAP_READ_BIT = 0x0001;
+constexpr Enum ACTIVE_UNIFORMS = 0x8B86, INT = 0x1404, FLOAT_VEC2 = 0x8B50, FLOAT_VEC3 = 0x8B51,
+               FLOAT_VEC4 = 0x8B52, FLOAT_MAT4 = 0x8B5C, SAMPLER_2D = 0x8B5E;
+constexpr Enum MIRRORED_REPEAT = 0x8370, CLAMP_TO_BORDER = 0x812D, NEAREST_MIPMAP_NEAREST = 0x2700,
+               LINEAR_MIPMAP_NEAREST = 0x2701, NEAREST_MIPMAP_LINEAR = 0x2702;
+constexpr Enum FRAMEBUFFER_SRGB = 0x8DB9;
+constexpr Enum RGBA32F = 0x8814, RGBA16F = 0x881A, HALF_FLOAT = 0x140B, SRGB8_ALPHA8 = 0x8C43;
+constexpr Enum EXTENSIONS = 0x1F03, NUM_EXTENSIONS = 0x821D;
 constexpr Boolean FALSE_ = 0, TRUE_ = 1;
 
 } // namespace den::gl

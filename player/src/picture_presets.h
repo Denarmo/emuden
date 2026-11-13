@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -34,6 +35,8 @@ struct PresetData {
     bool near_integer = false; // the same, when the multiple is close to filling the area
     bool input_linear = true; // how the first pass samples the picture
     std::vector<PresetPass> passes;
+    /// An imported RetroArch preset (gfx::RetroChain) instead of passes.
+    std::filesystem::path retro;
     /// Every p_<id> uniform with the preset's value: the sliders first, in the order of
     /// info.params, then the fixed ones.
     std::vector<std::pair<std::string, float>> uniforms;
@@ -53,6 +56,11 @@ const PresetData* FindPreset(const std::string& id);
 /// The chain of a preset, with the GLSL of its passes read from the shader folder.
 Result<gfx::EffectSpec> BuildEffect(const PresetData& preset, const std::filesystem::path& shader_dir);
 std::filesystem::path ShaderDir();
+
+/// Imported presets (imported_presets.cpp), scanned at first use and by
+/// RefreshImportedPresets; each scan's generation is one more.
+const std::vector<std::unique_ptr<PresetData>>& ImportedPresets();
+unsigned ImportedGeneration();
 
 /// The core's latest picture as a texture. `uv` places the picture in the texture (h is
 /// negative when the texture's first row is the picture's last).
