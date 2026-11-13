@@ -234,6 +234,10 @@
         {"shader": "ghost", "filter": "nearest", "feedback": true},
         {"shader": "reflect"}
       ],
+      "looks": [
+        {"name": "Measured", "values": {}},
+        {"name": "Lively colours", "values": {"wash": 0.55, "backing": 0.45, "texture": 0.7, "shadows": 0.8, "bright": 1.1}}
+      ],
       "params": [
         {"id": "wash", "name": "See-through pixels", "min": 0, "max": 1.2, "step": 0.05, "value": 1},
         {"id": "backing", "name": "Green backing", "min": 0, "max": 1.2, "step": 0.05, "value": 1},

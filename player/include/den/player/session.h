@@ -120,6 +120,13 @@ struct PictureParam {
     std::vector<std::string> labels;
 };
 
+/// A named set of a preset's slider values ("Lively colours"); the sliders it leaves out
+/// take the preset's own values. The first look of a preset is the preset as it comes.
+struct PictureLook {
+    std::string name;
+    std::vector<std::pair<std::string, float>> values;
+};
+
 /// A picture preset: how the game's picture is drawn (a chain of GLSL passes from
 /// <assets>/shaders, see den/gfx/effect_chain.h). "plain" is always there and comes first.
 struct PicturePreset {
@@ -127,6 +134,7 @@ struct PicturePreset {
     std::string name;  // "Plain", "CRT", "Dot matrix (green)"
     std::string group; // "Clean", "Television", "Handheld"
     std::vector<PictureParam> params;
+    std::vector<PictureLook> looks; // none, or two and more
 };
 const std::vector<PicturePreset>& PicturePresets();
 /// The id that means "the console's own default" wherever a preset id is taken.

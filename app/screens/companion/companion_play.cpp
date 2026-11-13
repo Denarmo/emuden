@@ -362,6 +362,21 @@ private:
 
     // The sliders of the picture shown now, as the pause menu has them.
     void BuildPicture(ui::Node& root) {
+        if (const auto& looks = PictureLooks(); !looks.empty()) {
+            ui::Node* row = root.Add(ui::MakeBox(ui::Axis::Row, GAP));
+            row->height = BUTTON_HEIGHT;
+            const int current = CurrentLook();
+            for (std::size_t i = 0; i < looks.size(); ++i) {
+                auto* card = row->Emplace<CompanionCard>(looks[i].name, [this, i] {
+                    ApplyLook(static_cast<int>(i));
+                    Rebuild();
+                });
+                card->id = std::format("companion.look{}", i);
+                card->grow = 1;
+                card->width = 0;
+                card->selected = current == static_cast<int>(i);
+            }
+        }
         ui::Node* list = root.Add(ui::MakeList(10));
         list->id = "companion.picture_settings";
         list->grow = 1;

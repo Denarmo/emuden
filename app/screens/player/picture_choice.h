@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "den/library/library.h"
+#include "den/player/session.h"
 #include "den/system/settings.h"
 
 namespace den::app {
@@ -31,5 +32,12 @@ std::vector<std::string> PictureIds();
 /// "Auto: Dot matrix" for a console (the preset's name without its variant), "Auto: by
 /// console" without one, else the preset's name.
 std::string PictureName(const std::string& id, const std::string& system = {});
+
+/// The looks of the picture shown now (player::PictureLook), none when it has none.
+const std::vector<player::PictureLook>& PictureLooks();
+/// Which look its sliders are at now; -1 when they were moved away from every look.
+int CurrentLook();
+/// Sets every slider of the picture shown now to a look's values.
+void ApplyLook(int index);
 
 } // namespace den::app

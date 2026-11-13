@@ -68,6 +68,11 @@ TEST_CASE("the shipped picture presets load and every pass has its shader") {
     CHECK(green.labels.size() == 4);
     CHECK(green.fallback == 1.0f);
     CHECK(grey.fallback == 3.0f);
+    // A preset may have named looks; the first is the preset as it comes.
+    const auto& looks = Find(catalogue, "reflective")->info.looks;
+    REQUIRE(looks.size() >= 2);
+    CHECK(looks.front().values.empty());
+    CHECK(Find(catalogue, "crt")->info.looks.empty());
 }
 
 TEST_CASE("a picture fills its area, or takes a whole multiple that is asked for or near") {

@@ -85,6 +85,25 @@ bool ReadPreset(const JsonValue& json, const std::filesystem::path& dir, PresetD
             out.info.params.push_back(std::move(param));
         }
     }
+    if (const JsonValue* looks = json.Find("looks")) {
+        for (const JsonValue& item : looks->items) {
+            PictureLook look;
+            look.name = item.String("name");
+            if (const JsonValue* values = item.Find("values")) {
+                for (const auto& [id, value] : values->members) {
+                    if (value.kind == JsonValue::Kind::Number) {
+                        look.values.emplace_back(id, static_cast<float>(value.number));
+                    }
+                }
+            }
+            if (!look.name.empty()) {
+                out.info.looks.push_back(std::move(look));
+            }
+        }
+        if (out.info.looks.size() < 2) {
+            out.info.looks.clear();
+        }
+    }
     if (const JsonValue* fixed = json.Find("fixed")) {
         for (const auto& [id, value] : fixed->members) {
             if (value.kind == JsonValue::Kind::Number) {

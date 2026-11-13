@@ -4,6 +4,7 @@
 // The pause menu's picture pages: the presets, shown on the game behind the menu as the
 // selection moves over them, and the sliders of the one in use.
 
+#include <algorithm>
 #include <cmath>
 #include <format>
 
@@ -88,6 +89,55 @@ std::string PictureName(const std::string& id, const std::string& system) {
     return "Auto: " + preset.substr(0, preset.find(" ("));
 }
 
+const std::vector<player::PictureLook>& PictureLooks() {
+    static const std::vector<player::PictureLook> none;
+    const std::string id = Svc().player->GetSnapshot().picture;
+    for (const player::PicturePreset& preset : player::PicturePresets()) {
+        if (preset.id == id) {
+            return preset.looks;
+        }
+    }
+    return none;
+}
+
+namespace {
+
+// A slider's value in a look: the look's own, else the preset's.
+float LookValue(const player::PictureLook& look, const player::PictureParam& param) {
+    for (const auto& [id, value] : look.values) {
+        if (id == param.id) {
+            return std::clamp(value, param.min, param.max);
+        }
+    }
+    return param.fallback;
+}
+
+} // namespace
+
+int CurrentLook() {
+    const auto& looks = PictureLooks();
+    const std::vector<player::PictureParam> params = Svc().player->PictureParams();
+    for (std::size_t i = 0; i < looks.size(); ++i) {
+        const bool same = std::all_of(params.begin(), params.end(), [&](const player::PictureParam& param) {
+            return std::fabs(param.value - LookValue(looks[i], param)) < param.step * 0.5f;
+        });
+        if (same) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
+void ApplyLook(int index) {
+    const auto& looks = PictureLooks();
+    if (index < 0 || static_cast<std::size_t>(index) >= looks.size()) {
+        return;
+    }
+    for (const player::PictureParam& param : Svc().player->PictureParams()) {
+        Svc().player->SetPictureParam(param.id, LookValue(looks[static_cast<std::size_t>(index)], param));
+    }
+}
+
 void PlayerScreen::LoadPicture() {
     picture_ = PictureFor(game_);
     picture_scope_ = static_cast<int>(PictureScopeOf(game_));
@@ -148,6 +198,27 @@ void PlayerScreen::BuildPicture(ui::Node* list) {
 
 void PlayerScreen::BuildPictureAdjust(ui::Node* list) {
     std::vector<ui::RowSpec> rows;
+    if (const auto& looks = PictureLooks(); !looks.empty()) {
+        // The looks, and "Custom" once a slider has moved away from all of them.
+        std::vector<std::string> names;
+        for (const player::PictureLook& look : looks) {
+            names.push_back(look.name);
+        }
+        names.push_back("Custom");
+        const int custom = static_cast<int>(looks.size());
+        rows.push_back(ChoiceRow(
+            "adjust.look", "Look", std::move(names),
+            [custom] {
+                const int look = CurrentLook();
+                return look < 0 ? custom : look;
+            },
+            [this, custom](int index) {
+                if (index < custom) {
+                    ApplyLook(index);
+                    Rebuild();
+                }
+            }));
+    }
     for (const player::PictureParam& param : Svc().player->PictureParams()) {
         const std::string id = param.id;
         rows.push_back(SliderRow(

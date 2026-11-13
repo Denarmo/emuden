@@ -44,7 +44,8 @@ float Noise(vec2 p) {
 
 // The backing in display values: grey-green, with broad blotches mostly in its red and blue.
 vec3 Backing(vec2 t) {
-    vec3 green = mix(vec3(0.66), vec3(0.569, 0.773, 0.537), p_backing);
+    // Without its green it is a plain grey once the stripes have taken their share.
+    vec3 green = mix(vec3(0.66) / vec3(1.03, 0.81, 1.05), vec3(0.569, 0.773, 0.537), p_backing);
     vec3 blot = vec3(Noise(t * 0.04 + 1.0), Noise(t * 0.04 + 23.0), Noise(t * 0.04 + 57.0)) +
                 0.5 * vec3(Noise(t * 0.12 + 5.0), Noise(t * 0.12 + 31.0), Noise(t * 0.12 + 77.0));
     return green * (1.0 + p_texture * vec3(0.24, 0.08, 0.18) * (blot / 1.5 - 0.5));
