@@ -1,35 +1,51 @@
 # Status
 
-State of the rebuild after the third round of the first night (2026-11-13). The Windows
-app starts every game in the test library, PSP text shows, and a Switch 2 game stops
-cleanly. Pads, sound and rewind were checked through virtual pads and counters; nobody held
-a pad or listened. Android played PSP, NDS and GBC on the Retroid with the storage dialog
-and a release build. Linux builds and passes its tests in WSL; the AppImage was still never
-run on the Legion Go S (its sshd refused the connection again).
+State of the rebuild after the fourth round (2026-11-13), which took the owner's six notes:
+more picture shaders, Back on Android, a bigger default interface, two screens, touch
+scrolling with weight, and settings chosen for the device. All six are in, were driven on
+Windows and on the Retroid Pocket Duo, and the AppImage started for the first time on the
+Legion Go S. Everything was driven through automation, adb and screenshots: nobody held a
+device, dragged a real finger or listened.
 
-## Release check (Windows, last thing done)
+## The owner's notes
 
-`win` preset built from an empty build directory with everything committed (`bfedae6`); 11
-of 11 unit test programs pass, and nothing broke between the three parallel changes. Then
-one driven run (automation port 33917) with a fresh portable `user` folder holding only the
-game folder and the engine path; cores were downloaded from the official plugin source on
-first Play.
+| Note | State | What was run |
+|---|---|---|
+| More shaders, written here | 16 presets on a multi-pass chain (CRT, CRT bloom, arcade monitor, composite, S-Video, VHS, TV at night, dot matrix green, pocket grey, LCD grid, ghosting, backlight bleed, scanlines, smooth edges, sharp, pixel perfect), Auto per console, a choice per game / console / everywhere, live preview and sliders in the pause menu | Windows: Tetris opens in dot matrix by Auto; CRT bloom chosen on Gran Turismo 2 from the pause menu. Retroid (GLES 3): Tetris in dot matrix. The other presets were looked at on Windows by their author only; none of them on GLES or Linux |
+| Android Back opens the pause menu | Fixed: Back from every source (key, gesture, the pad's Back key) reaches the app | Retroid, debug and release APK: `input keyevent 4` in Tetris paused with the menu; in the DS game too |
+| Bigger interface on Android | The size comes from the screen: 125% on the Retroid Pocket Duo (it was 100%), up to 155% on a 5.5 inch screen | Retroid: setup, the folder browser, home, pause menu, details and both companion pages looked at. Two things were cut and are fixed: the selection border of a list's first row, and the details page, which ran off the top and bottom |
+| Two screens | DS games put one screen on each display; one-screen games get quick settings on the second display, and browsing shows the focused game there | Retroid: Explorers of Skies with the top screen on the main display and the touch screen on the second; game details while browsing; quick settings during Tetris. Touch on the second display was run by the feature's author, not in this check. No 3DS game is in the test library |
+| Scrolling with weight | Flings with friction, a rubber band at the ends, snapping shelves, no Qt | Windows: an injected fling on the library grid overshot the end and came back. Retroid: an `input swipe` (a real touch event) on the library grid ran on, overshot 835 to 870 and settled in about a second. No real finger |
+| Settings chosen for the device | The device is recognised and its defaults sit below the user's settings; setup lists them; Settings > Device shows and overrides them | Retroid, after clearing the app's data: the first step is titled "Set up for Retroid Pocket Duo" and lists its choices (two screens, 125%, PSP 3x, 120 Hz, rewind on). Windows: Settings > Device shows the real PC (desktop, very high, 100%). Legion Go S: the log names it (handheld, mid) |
 
-| Game | Result |
-|---|---|
-| Tetris (Game Boy, mGBA) | core downloaded, title screen, 974 frames, 0 sound underruns, "Exit to home" from the pause menu |
-| PoPoLoCrois (PSP, PPSSPP) | core and its assets downloaded, title screen with its menu text at 28 s, 1715 frames at 59.9 fps, exit from the pause menu |
-| Gran Turismo 2 (PlayStation, PCSX-ReARMed) | core downloaded, intro picture, 729 frames at 50 fps, exit from the pause menu |
-| Ocarina of Time (Switch 2) | engine process for 29 s, "Stop the game" ended it in about 5 s with exit code 0, no engine process left |
+## Release check (last thing done)
 
-PoPoLoCrois and Gran Turismo 2 each counted one sound underrun and one refill; the counters
-were not reset after the start, so that is most likely the first second. The app left with
-exit code 0. The three core pictures were looked at; the engine's window was not.
+`win` preset from an empty build directory at `3e202f5`: 11 of 11 test programs pass and the
+seven parallel commits built together without a change. Two fixes came out of the device
+check (`964602f`, `410665a`); after them the Windows and Linux tests ran again (11 of 11 on
+both) and every package below was rebuilt.
+
+- **Windows** (automation port 34712, portable `user` folder): Tetris by Auto in dot matrix,
+  pause menu, exit; Gran Turismo 2 with CRT bloom chosen on the Picture page; a fling on the
+  library grid; Settings > Device; the details page at 100% and with a simulated handheld.
+  The app left no process behind. `dist\windows` (14.3 MB) is mirrored to
+  `C:\Users\david\Desktop\EmuDEN`; the Desktop copy was not started.
+- **Android** (Retroid Pocket Duo; the debug APK with automation on port 34722, then the
+  release APK driven by adb touches): everything in the table above, from cleared app data.
+  The Game Boy and DS cores were downloaded on Play. The release APK (debug key) is
+  installed and force-stopped; it is `dist\android\EmuDEN.apk`. The fling, the first-run
+  setup and the DS game were run on the debug APK of the commit before the two fixes; the
+  final release APK was started, opened the details page and Tetris, and paused on Back.
+- **Linux**: built in WSL Debian, 11 of 11 tests, AppImage 5.8 MB in `dist\linux`. Installed
+  on the Legion Go S with `install-steamos.sh` and started once for 10 s over ssh: OpenGL
+  4.6 on Mesa (radeonsi), the device recognised, closed on the signal. Nothing was looked
+  at or played there.
 
 ## Games (Windows)
 
 All 17 ROMs in the test library start, show a picture and advance frames; each ran about
-10 s from the beginning, unpacked (second round, not repeated). "Picture" comes from
+10 s from the beginning, unpacked (second round, not repeated; everything from here to
+"Platforms" is from the earlier rounds). "Picture" comes from
 screenshot statistics (colour spread, two shots differing); only the PSP, Gran Turismo 2 and
 Racing Lagoon pictures were looked at.
 
@@ -83,14 +99,31 @@ screenshots show the picture going back.
 
 | Platform | State |
 |---|---|
-| Windows | Everything above. `tools/package.ps1` writes `dist\windows` (13.9 MB); the same files are in `C:\Users\david\Desktop\EmuDEN` (mirrored after the release check, a `user` folder there is left alone). |
-| Linux | `linux` preset builds in WSL Debian (clang) from the same commit and 11 of 11 test programs pass there. `tools/linux/package.sh` writes the AppImage (5.7 MB, copy in `dist\linux`). The AppImage from before the pad and sound commit ran once under WSLg in portable mode: the Game Boy core downloaded, Tetris ran 707 frames, exit to home, quit. The final AppImage was built but not started. `tools/linux/install-steamos.sh` ran twice against a throwaway home only. Never run on the Legion Go S: its sshd refused the connection, so the AppImage was not copied. |
-| Android | On the Retroid Pocket Duo (Android 16, Adreno 722), a build of `236d6f7` plus the Android changes (without the pad and sound commit). The storage dialog offers "Allow access", "Choose a folder" and "Not now"; all files access granted from the app works, and a picked folder (`ROMS/GB`, 2 files) is copied into the app's `Games` folder. PoPoLoCrois (PPSSPP and its assets downloaded on Play, intro text and title), Explorers of Skies (melonDS) and Mario Golf run. Save and load state report success in all three; only the NDS picture clearly returned. Built-in pad through its real input device: D-pad, Start and A in games; every button, stick and trigger on the test page. Home and back, rotation, and moving to the bottom screen and back did not crash. The release APK (signed with the debug key) installs over the debug build. From the earlier round: setup found 18 games on 7 consoles; Tetris, Pokemon - Lazarus and Gran Turismo 2 played; touch taps and Back worked. See `shells/android/README.md`. |
+| Windows | The release check above and the earlier tables. `tools/package.ps1` writes `dist\windows`; the same files are in `C:\Users\david\Desktop\EmuDEN` (a `user` folder there is left alone). |
+| Linux | `linux` preset builds in WSL Debian (clang), 11 of 11 test programs pass. The AppImage is installed on the Legion Go S in `~/Games/EmuDEN` with a menu and desktop entry, and started there once (10 s, log read). An earlier AppImage played Tetris under WSLg. No game, pad or sound on the handheld yet. |
+| Android | Retroid Pocket Duo (Android 16, Adreno 722): the release check above. From earlier rounds: the storage dialog and folder copy, PoPoLoCrois, Mario Golf, Pokemon - Lazarus and Gran Turismo 2, save and load state, the built-in pad in games, rotation and home/back. See `shells/android/README.md`. |
 
 Plugin source (Denarmo/emuden-plugins, index sequence 6): every core except `fake08` has
 `android-arm64` and `linux-x86_64` downloads (26 Android cores; N64 on Android is the
 `mupen64plus_next_gles3` build), and `emuden.psp` carries PPSSPP's assets as a
 `system-files` component that the app unpacks into the system folder with the core.
+
+## What the fourth round added
+
+- **Picture**: `gfx::EffectChain` (passes, render targets, previous-frame history) and the
+  presets in `assets/shaders`; `player.picture` defaults to `auto`.
+- **Scrolling**: one motion model per scrolling node (`ui/src/scroller.cpp`) for fingers,
+  flings, the wheel and focus moves; automation has `drag`, `fling`, `touch`, `wheel`.
+- **Device**: `pal::GetDeviceFacts()`, classification with a table of 16 known devices, a
+  defaults layer in the settings store, `EMUDEN_FAKE_DEVICE=<id>` to simulate one.
+- **Second screen**: `pal::GetSecondDisplay()` (a Presentation on Android, a second window
+  on the desktop with `EMUDEN_SECOND_WINDOW=1`), the companion pages, `ClaimSecondScreen`
+  for two-screen consoles, and layouts for one display (stacked, side by side, large and
+  small, one screen with Swap).
+- **Back on Android** from the key, the gesture and the pad's Back key.
+- **From the release check**: a list's first and last row keep their whole selection
+  border; the details page scrolls under its title when it does not fit; a rebuilt page
+  shows its focused row at once.
 
 ## What the third round added
 
@@ -133,7 +166,12 @@ per pad family, system files of a core, and Back trapped on Android.
 - Linux on real hardware (GPU drivers, gamescope, the handheld), `install-steamos.sh` on
   real SteamOS and its `--steam` option, the PNG icon (`rsvg-convert` is not in WSL), any
   start of the final AppImage, and pads and sound on Linux.
-- Android: the pad and sound commit (the APKs in `dist\android` predate it), sticks inside
+- This round: a real finger on any scrolling page; the shaders other than dot matrix on
+  GLES and all of them on Linux; a 3DS game; the AYN Thor and every device of the table
+  other than the Retroid, the Legion Go S and this PC (their defaults are unit-tested
+  only); the performance defaults themselves (nobody measured that PSP 3x holds its speed
+  on the Retroid); the second window on Linux; two screens with the display rotated.
+- Android: sticks inside
   a game (the left stick did not move the PoPoLoCrois title menu; no other game was
   tried), the Home/Mode button, touch in a game, the Android 10 permission path, a large
   folder copy or cancelling one, the first storage dialog in the final build (its garbled
@@ -160,10 +198,12 @@ per pad family, system files of a core, and Back trapped on Android.
 - The engine's executable name is written in `engine/src/host/locate.cpp` and its test,
   which the naming rule forbids; it goes when the engine becomes a plugin.
 - Android: a picked folder is copied, not read in place, so it takes its space twice; once
-  a folder has been copied the app stops offering all files access. The app draws on one
-  screen only (a DS game shows both its screens there). A game ended by force-stop is
+  a folder has been copied the app stops offering all files access. A game ended by force-stop is
   missing from "Continue playing". On the test page LB and RB are outlined while other
   pressed buttons are filled. Secrets are kept in memory only; no Switch 2 engine.
+- The hint bar shows keyboard names (Enter, Esc) on a handheld until a pad button is
+  pressed, and on the home screen it lies over the heading of the next shelf.
+- The picture drawn beside the pause menu runs past the right edge for 4:3 games.
 - ROM hacks without an image beside them still get the cover of the game they are based on
   (Pokemon - Lazarus shows Emerald's).
 - Gran Turismo 2 shows the game's border colour left and right of the picture.
@@ -188,9 +228,9 @@ per pad family, system files of a core, and Back trapped on Android.
 
 ## Next, from the build plan
 
-1. Run the AppImage on the Legion Go S with a real pad (its sshd has to be on first).
+1. Play a game on the Legion Go S with its pad (the AppImage is installed there).
 2. A real pad and listening to sound on every platform.
-3. Android: read a picked folder in place, the second screen, sticks in games.
+3. Android: read a picked folder in place, sticks in games, a 3DS game on two screens.
 4. Stage 3, full player: hardware-rendered cores on GLES, libretro shader presets, pacing,
    disc swap, capture.
 5. Stage 4: manuals, appearance, languages.

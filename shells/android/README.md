@@ -120,7 +120,5 @@ Android 16, Adreno 722, two screens, on 2026-11-12:
   copied the app does not offer all files access again (allow it in the system settings).
 - **BIOS files:** the BIOS folder is inside the app's private data, where a file manager
   cannot put files.
-- **Second screen:** a two-screen console (DS, 3DS) still shows both of its screens on the
-  main display; `ClaimSecondScreen` (below) is there for the player to move one over.
 - Secrets are kept in memory only (no Keystore) and the Switch 2 engine is not available on
   Android.
