@@ -43,7 +43,7 @@ The chain (`Artwork::Resolve`, `library/src/artwork.cpp`):
 3. Sources with a key, only when one is entered and step 2 was not sure: RetroAchievements,
    then SteamGridDB.
 4. The box of the game it was made from (`MatchBaseGame`: the ROM header or a table of
-   known hacks), with a dark "HACK" tag drawn into its top left corner
+   known hacks), with a dark "HACK" tag drawn into its bottom left corner
    (`WriteHackMarkedCover`), so it is not taken for the original.
 5. The drawn placeholder (a colour per console, the initials); tiles print the game's name
    over it. This step is unchanged.

@@ -211,7 +211,8 @@ bool WriteHackMarkedCover(const fs::path& image, const fs::path& out) {
     }
     gfx::ImageData& picture = *loaded;
     gfx::ShrinkImage(picture, 512);
-    // A dark tag in the top left corner that says HACK, sized with the picture.
+    // A dark tag in the bottom left corner that says HACK, sized with the picture. The top
+    // corners are where tiles put their own badges.
     static constexpr std::string_view TEXT = "HACK";
     const int cell = std::max(2, picture.width / 80);
     const int columns = static_cast<int>(TEXT.size()) * 6 - 1;
@@ -225,7 +226,8 @@ bool WriteHackMarkedCover(const fs::path& image, const fs::path& out) {
                 const int index = GlyphIndex(TEXT[static_cast<std::size_t>(column / 6)]);
                 lit = index >= 0 && ((FONT[index][row] >> (4 - column % 6)) & 1);
             }
-            std::uint8_t* pixel = &picture.rgba[(static_cast<std::size_t>(y) * picture.width + x) * 4];
+            const auto line = static_cast<std::size_t>(picture.height - tag_h + y);
+            std::uint8_t* pixel = &picture.rgba[(line * picture.width + x) * 4];
             for (int channel = 0; channel < 3; ++channel) {
                 // The tag is 85% opaque, so the box still shows through a little.
                 pixel[channel] = lit ? 0xF4 : static_cast<std::uint8_t>(pixel[channel] * 15 / 100 + 16);
