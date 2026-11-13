@@ -47,7 +47,7 @@ bool Playing(const player::Snapshot& snapshot) {
 }
 
 // The views of the page: the main one, and the sections it opens.
-enum class View { Main, States, Screen, Controls };
+enum class View { Main, States, Screen, Picture, Controls };
 
 class CompanionPlay final : public CompanionPage {
 public:
@@ -101,6 +101,10 @@ public:
             Heading(root, "Screen and picture");
             BuildScreen(root, snapshot);
             break;
+        case View::Picture:
+            Heading(root, PictureName(snapshot.picture, system_), View::Screen);
+            BuildPicture(root);
+            break;
         case View::Controls:
             Heading(root, "Controls and core");
             BuildControls(root);
@@ -135,10 +139,10 @@ private:
     }
 
     // A section's title with the way back to the main view.
-    void Heading(ui::Node& root, const char* title) {
+    void Heading(ui::Node& root, const std::string& title, View back_to = View::Main) {
         ui::Node* line = root.Add(ui::MakeBox(ui::Axis::Row, 12));
         line->align = ui::Align::Center;
-        auto* back = line->Emplace<ui::Button>("Back", [this] { Open(View::Main); });
+        auto* back = line->Emplace<ui::Button>("Back", [this, back_to] { Open(back_to); });
         back->id = "companion.section_back";
         back->height = BUTTON_HEIGHT;
         back->SetPadding(22, 0);
@@ -313,6 +317,13 @@ private:
                           [&](ui::Node& row, int index) -> ui::Node* {
                 const player::PicturePreset& preset = presets[static_cast<std::size_t>(index)];
                 auto* card = row.Emplace<CompanionCard>(preset.name, [this, id = preset.id] {
+                    // The picture shown now opens its settings.
+                    if (Svc().player->GetSnapshot().picture == id) {
+                        if (!Svc().player->PictureParams().empty()) {
+                            Open(View::Picture);
+                        }
+                        return;
+                    }
                     // Kept where the pause menu keeps it, for the same games.
                     if (const auto game = Svc().library->Find(game_id_)) {
                         SavePicture(*game, PictureScopeOf(*game), id);
@@ -347,6 +358,41 @@ private:
             counter->width = 0;
             counter->selected = fps != 0;
         }
+    }
+
+    // The sliders of the picture shown now, as the pause menu has them.
+    void BuildPicture(ui::Node& root) {
+        ui::Node* list = root.Add(ui::MakeList(10));
+        list->id = "companion.picture_settings";
+        list->grow = 1;
+        std::vector<ui::RowSpec> rows;
+        for (const player::PictureParam& param : Svc().player->PictureParams()) {
+            const std::string id = param.id;
+            rows.push_back(SliderRow(
+                "companion.adjust." + id, param.name, param.min, param.max, param.step,
+                [id] {
+                    for (const player::PictureParam& now : Svc().player->PictureParams()) {
+                        if (now.id == id) {
+                            return now.value;
+                        }
+                    }
+                    return 0.0f;
+                },
+                [id](float value) { Svc().player->SetPictureParam(id, value); },
+                [labels = param.labels, min = param.min, step = param.step](float value) {
+                    const auto index = static_cast<std::size_t>(std::max(0.0f, std::round((value - min) / step)));
+                    if (index < labels.size()) {
+                        return labels[index];
+                    }
+                    return step >= 1.0f ? std::format("{:.0f}", value)
+                                        : std::format("{:.0f}%", std::round(value * 100.0f));
+                }));
+        }
+        rows.push_back(ActionRow("companion.adjust.reset", "Reset", [this] {
+            Svc().player->ResetPictureParams();
+            Rebuild();
+        }));
+        AddRows(list, std::move(rows), ROW_HEIGHT);
     }
 
     void BuildControls(ui::Node& root) {

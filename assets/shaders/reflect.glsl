@@ -1,13 +1,15 @@
 // A colour handheld screen with no light of its own: the room's light goes through each
-// pixel's colour filter, off a reflective backing and back out. No filter stops all of it,
-// so the darkest pixels stay grey (p_clear) and every pixel shows the backing: its colour
-// (p_tint), its blotches and grain (p_grain). The pixel layer lies a little above the
-// backing and throws a shadow on it (p_shadow); the front of the screen catches a soft band
-// of glare (p_glare).
+// pixel's colour filter, off a reflective backing and back out. The lighter a pixel, the
+// more of the backing comes through it (p_clear), so pale colours look washed over the
+// backing while black stays black. The backing has a colour (p_tint), broad blotches and a
+// grain (p_grain). The pixel layer lies a little above it and throws a soft shadow on it
+// (p_shadow); every pixel is three colour stripes (p_subpixel) with lines around it
+// (p_grid); the front of the screen catches a soft band of glare (p_glare).
 //
-// Like the LCD grid, everything is measured in cells and averaged over each output pixel,
-// so it looks the same at any size and fades out where there is no room for detail.
+// Everything is measured in cells and averaged over each output pixel, so it looks the same
+// at any size and fades out where there is no room for detail.
 uniform float p_grid;
+uniform float p_subpixel;
 uniform float p_clear;
 uniform float p_grain;
 uniform float p_tint;
@@ -15,10 +17,11 @@ uniform float p_shadow;
 uniform float p_glare;
 uniform float p_bright;
 
-// What the filters make of a colour: paler than the picture asks for.
+// A pixel's colour as its filter passes it: the backing shows through the lighter ones.
 vec3 Cell(vec2 cell) {
-    vec3 c = ToLinear(Source((cell + 0.5) / u_source_size).rgb);
-    return mix(c, vec3(Luma(c)), 0.3);
+    vec3 g = Source((cell + 0.5) / u_source_size).rgb;
+    float through = p_clear * pow(max(Luma(g), 0.0), 0.5);
+    return ToLinear(mix(g, vec3(1.0), through));
 }
 
 // The colour an output pixel sees at `t` (in cells), the cells it lies across by their share.
@@ -36,14 +39,14 @@ float Noise(vec2 p) {
                mix(Hash(i + vec2(0.0, 1.0)), Hash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 
-// The backing around 1: broad pale blotches of colour, and a fine grain that gives way
-// where a cell has too few output pixels.
+// The backing, grey-green and darker than white: broad pale blotches of colour, and a fine grain that
+// gives way where a cell has too few output pixels.
 vec3 Backing(vec2 t, float least) {
-    vec3 blot = vec3(Noise(t * 0.07 + 1.0), Noise(t * 0.07 + 23.0), Noise(t * 0.07 + 57.0)) +
+    vec3 blot = vec3(Noise(t * 0.04 + 1.0), Noise(t * 0.04 + 23.0), Noise(t * 0.04 + 57.0)) +
                 0.5 * vec3(Noise(t * 0.2 + 5.0), Noise(t * 0.2 + 31.0), Noise(t * 0.2 + 77.0));
     float fine = clamp((least - 2.0) / 3.0, 0.0, 1.0) * (Noise(t * 2.5 + 11.0) - 0.5);
-    vec3 tint = mix(vec3(1.0), vec3(1.0, 0.96, 0.86), p_tint);
-    return tint * (1.0 + p_grain * (0.35 * (blot / 1.5 - 0.5) + 0.18 * fine));
+    vec3 tint = mix(vec3(1.0), vec3(0.88, 1.0, 0.9), p_tint);
+    return 0.58 * tint * (1.0 + p_grain * (0.4 * (blot / 1.5 - 0.5) + 0.08 * fine));
 }
 
 void main() {
@@ -54,32 +57,29 @@ void main() {
     vec3 c = Picture(t, w);
     float light = Luma(c);
 
-    // No filter stops all the light.
-    float least_light = 0.07 * p_clear;
-    c = least_light + (1.0 - least_light) * c;
+    // The shadow of the pixel layer, soft, down and to the right, on the lighter pixels.
+    float lifted = 0.5 * (Luma(Picture(t - vec2(0.4, 0.5), w)) + Luma(Picture(t - vec2(0.75, 0.85), w)));
+    c *= 1.0 - 0.7 * p_shadow * (1.0 - lifted) * clamp(light * 2.0, 0.0, 1.0);
+    c *= Backing(t, least);
 
-    // The shadow of the pixel layer, a little down and to the right, on the backing that
-    // the lighter pixels show.
-    float lifted = Luma(Picture(t - vec2(0.3, 0.35), w));
-    c *= 1.0 - 0.75 * p_shadow * (1.0 - lifted) * clamp(light * 2.0, 0.0, 1.0);
-    c *= 0.9 * Backing(t, least);
+    // Three stripes a cell, as a wave that an output pixel averages; they need about five
+    // output pixels a cell to show.
+    float narrow = PI * w.x;
+    float stripes = 0.8 * p_subpixel * clamp((room.x - 3.0) / 2.0, 0.0, 1.0) * sin(narrow) / narrow;
+    c *= 1.0 + stripes * cos(2.0 * PI * (fract(t.x) - vec3(1.0, 3.0, 5.0) / 6.0));
 
-    // The lines between cells, as the LCD grid draws them.
+    // The lines around each cell, at least an output pixel wide; they fade where there is
+    // no room for them.
     float fine = clamp(least - 2.0, 0.0, 1.0);
-    float gap = 0.16 * p_grid;
-    float drawn = max(gap, min(1.0 / least, 0.4));
-    float lit_asked = (1.0 - gap) * (1.0 - gap), lit_drawn = (1.0 - drawn) * (1.0 - drawn);
-    float strength = fine * (1.0 - lit_asked) / max(1.0 - lit_drawn, 0.001);
-    vec2 lit = Lit(t, w, drawn);
-    float open = lit_asked + strength * (lit.x * lit.y - lit_drawn);
-    c *= 1.0 - 0.6 * (1.0 - open);
+    vec2 dark = 1.0 - Lit(t, w, max(0.12, 1.0 / least));
+    c *= 1.0 - 0.4 * p_grid * fine * (dark.x + dark.y);
 
     // A soft diagonal band of glare with a faint rainbow at its edges, brighter over the
     // bright parts, where the backing gives it back.
     float across = (v_uv.x * 0.7 + (1.0 - v_uv.y)) - 0.62;
     float band = exp(-across * across / 0.03);
     vec3 rainbow = 0.5 + 0.5 * cos(2.0 * PI * (across * 2.5 + vec3(0.0, 0.33, 0.67)));
-    c += p_glare * 0.09 * band * mix(vec3(1.0), rainbow, 0.35 * (1.0 - band)) * (0.35 + 0.65 * light);
+    c += p_glare * 0.06 * band * mix(vec3(1.0), rainbow, 0.35 * (1.0 - band)) * (0.35 + 0.65 * light);
 
     o_color = vec4(ToGamma(c * p_bright), 1.0);
 }
