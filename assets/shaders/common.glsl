@@ -56,6 +56,15 @@ vec2 Footprint(vec2 room) {
     return min((1.0 + 0.5 * uneven) / room, vec2(1.0));
 }
 
+// How much of the stretch `w` around x is lit when every cell is dark for `gap` of its
+// width, half at each side.
+vec2 Lit(vec2 x, vec2 w, float gap) {
+    vec2 a = x - 0.5 * w, b = x + 0.5 * w;
+    vec2 to_a = floor(a) * (1.0 - gap) + clamp(fract(a) - 0.5 * gap, 0.0, 1.0 - gap);
+    vec2 to_b = floor(b) * (1.0 - gap) + clamp(fract(b) - 0.5 * gap, 0.0, 1.0 - gap);
+    return (to_b - to_a) / w;
+}
+
 // Colour as a television signal carries it: brightness and two colour differences.
 vec3 ToYiq(vec3 c) {
     return vec3(dot(c, vec3(0.299, 0.587, 0.114)), dot(c, vec3(0.596, -0.274, -0.322)),

@@ -28,7 +28,7 @@ TEST_CASE("the shipped picture presets load and every pass has its shader") {
     REQUIRE(!catalogue.presets.empty());
     CHECK(catalogue.presets.front().info.id == "plain");
     for (const char* id : {"pixel", "sharp", "smooth", "scanlines", "crt", "crt-bloom", "arcade", "composite",
-                           "svideo", "vhs", "tv-night", "dotmatrix", "pocket", "lcd", "lcd-ghost", "backlight"}) {
+                           "svideo", "vhs", "tv-night", "dotmatrix", "pocket", "lcd", "lcd-ghost", "backlight", "reflective"}) {
         INFO(id);
         const PresetData* preset = Find(catalogue, id);
         REQUIRE(preset);
@@ -55,7 +55,7 @@ TEST_CASE("the shipped picture presets load and every pass has its shader") {
     CHECK(Find(catalogue, "pixel")->passes.empty());
     CHECK(Find(catalogue, "dotmatrix")->passes.front().feedback);
     // The presets that draw a cell per pixel ask for a whole multiple when it is near.
-    for (const char* id : {"dotmatrix", "pocket", "lcd", "lcd-ghost", "backlight"}) {
+    for (const char* id : {"dotmatrix", "pocket", "lcd", "lcd-ghost", "backlight", "reflective"}) {
         INFO(id);
         CHECK(Find(catalogue, id)->near_integer);
         CHECK(!Find(catalogue, id)->integer);

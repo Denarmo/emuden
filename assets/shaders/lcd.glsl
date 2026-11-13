@@ -25,15 +25,6 @@ vec3 Cell(vec2 cell) {
     return mix(c, Panel(c), p_color);
 }
 
-// How much of the stretch `w` around x is lit when every cell is dark for `gap` of its
-// width, half at each side.
-vec2 Lit(vec2 x, vec2 w, float gap) {
-    vec2 a = x - 0.5 * w, b = x + 0.5 * w;
-    vec2 to_a = floor(a) * (1.0 - gap) + clamp(fract(a) - 0.5 * gap, 0.0, 1.0 - gap);
-    vec2 to_b = floor(b) * (1.0 - gap) + clamp(fract(b) - 0.5 * gap, 0.0, 1.0 - gap);
-    return (to_b - to_a) / w;
-}
-
 void main() {
     vec2 t = v_uv * u_source_size;
     vec2 room = u_output_size / u_source_size; // output pixels per cell
