@@ -2,8 +2,8 @@
 
     python -I tools/make_brand_art.py
 
-The mark is a D whose counter is a d-pad, with a dot at its baseline ("D."). It is defined
-once below in a 96-unit square and written out as:
+The mark is a lowercase d with a d-pad in its bowl and two face buttons cut into its lower
+right corner. It is defined once below in a 96-unit square and written out as:
   assets/branding/mark-white.png   the mark in white on transparent, tinted by the app's theme
   assets/branding/icon-256.png     the app icon: white mark on a blue tile (window icon)
   shells/linux/emuden.svg          the same icon as SVG (desktop entry, AppImage)
@@ -12,6 +12,7 @@ once below in a 96-unit square and written out as:
   shells/linux/steam/*.png         Steam's cover, capsule, banner, logo and icon
 The look follows the app: white page, #0000ff ink, soft blue tints, Google Sans.
 """
+import math
 import pathlib
 
 from PIL import Image, ImageDraw, ImageFont
@@ -24,27 +25,117 @@ TINT = (234, 236, 255, 255)
 TINT_DEEP = (214, 218, 255, 255)
 SS = 4  # drawn this many times larger, then reduced, for smooth edges
 
-# The mark in a 96-unit square: the D, the d-pad cut out of it, and the dot.
-D_PATH = "M8 14h28a34 34 0 0 1 0 68H8z"
-PAD_PATH = "M31 33h10v10h10v10H41v10H31V53H21V43h10z"
-PAD_ROUND = 1.5  # the d-pad's corners are rounded by this much
-DOT = (84, 74, 8)  # centre x, centre y, radius
+# The mark in a 96-unit square: a lowercase d (a round bowl and a rounded stem) with a d-pad
+# in the bowl and two face buttons outside its lower right corner, in a rounded cut.
+BOWL = (38, 58, 28)  # centre x, centre y, radius
+BUTTONS = ((66.66, 67.34), (55.34, 78.66))
+BUTTON_R = 6
+CUT_R, FILLET = 10.5, 3  # the cut keeps CUT_R from each button's centre; its edges are rounded
+PAD = (38, 58, 0.78)  # centre and scale of the d-pad (arms 12 wide, 30 long before scaling)
+OFFSET = (6.7, 1)  # moves the mark's box to the middle of the square
 TILE_RADIUS = 22
 TILE_INSET, TILE_SCALE = 15, 0.69  # where the mark sits on an icon tile
+
+
+def _outline():
+    """The d's outline (the stem spans x 52..70 from y 8): (svg path data, list of points)."""
+    bx, by, br = BOWL
+    (e1, e2), r = BUTTONS, CUT_R
+    k = 1 / math.sqrt(2)
+    t1 = (e1[0] - r * k, e1[1] - r * k)  # the cut's straight side
+    t2 = (e2[0] - r * k, e2[1] - r * k)
+    p1 = (70, e1[1] - math.sqrt(r * r - (70 - e1[0]) ** 2))  # the cut meets the stem's side
+    # ... and the bowl, at the left one of the two points where the circles cross.
+    dx, dy = e2[0] - bx, e2[1] - by
+    d = math.hypot(dx, dy)
+    a = (br * br - r * r + d * d) / (2 * d)
+    h = math.sqrt(br * br - a * a)
+    mx, my = bx + a * dx / d, by + a * dy / d
+    p2 = min((mx - h * dy / d, my + h * dx / d), (mx + h * dy / d, my - h * dx / d))
+
+    def ang(c, p):
+        return math.atan2(p[1] - c[1], p[0] - c[0])
+
+    def on(c, rr, t):
+        return (c[0] + rr * math.cos(t), c[1] + rr * math.sin(t))
+
+    a1 = ang(e1, p1) - FILLET / r
+    q1 = on(e1, r, a1)
+    a2 = ang(e2, p2) + FILLET / r
+    if a2 > -3 * math.pi / 4:
+        a2 -= 2 * math.pi  # the cut runs clockwise from its straight side to the bowl
+    q2 = on(e2, r, a2)
+    a3 = ang((bx, by), p2) + FILLET / br
+    q3 = on((bx, by), br, a3)
+    top = by - math.sqrt(br * br - (52 - bx) ** 2)  # where the bowl meets the stem's left side
+
+    def f(v):
+        return f"{v:.2f}"
+
+    path = (f"M52 17a9 9 0 0 1 18 0V{f(p1[1] - FILLET)}Q70 {f(p1[1])} {f(q1[0])} {f(q1[1])}"
+            f"A{r} {r} 0 0 0 {f(t1[0])} {f(t1[1])}L{f(t2[0])} {f(t2[1])}"
+            f"A{r} {r} 0 0 0 {f(q2[0])} {f(q2[1])}Q{f(p2[0])} {f(p2[1])} {f(q3[0])} {f(q3[1])}"
+            f"A{br} {br} 0 1 1 52 {f(top)}z")
+
+    def arc(c, rr, s, e, n=48):
+        return [on(c, rr, s + (e - s) * i / n) for i in range(n + 1)]
+
+    def quad(p0, c, p3, n=12):
+        return [((1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * c[0] + t * t * p3[0],
+                 (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * c[1] + t * t * p3[1])
+                for t in (i / n for i in range(n + 1))]
+
+    pts = arc((61, 17), 9, math.pi, 2 * math.pi)
+    pts += quad((70, p1[1] - FILLET), p1, q1)
+    pts += arc(e1, r, a1, -3 * math.pi / 4)
+    pts += arc(e2, r, -3 * math.pi / 4, a2)
+    pts += quad(q2, p2, q3)
+    pts += arc((bx, by), br, a3, ang((bx, by), (52, top)) + 2 * math.pi, 160)
+    return path, pts
+
+
+def _pad_arms():
+    """The d-pad's two arms as (left, top, right, bottom), and their corner radius."""
+    cx, cy, s = PAD
+
+    def m(x, y):
+        return (cx + (x - 36) * s, cy + (y - 48) * s)
+
+    return [m(30, 33) + m(42, 63), m(21, 42) + m(51, 54)], 2.5 * s
+
+
+def _pad_path():
+    """The d-pad as svg path data, outer corners rounded."""
+    (v, hz), q = _pad_arms()
+    l, t, r, b = v
+    hl, ht, hr, hb = hz
+
+    def f(x):
+        return f"{x:.2f}"
+
+    c = f"a{f(q)} {f(q)} 0 0 1"
+    return (f"M{f(l)} {f(t + q)}{c} {f(q)} {f(-q)}H{f(r - q)}{c} {f(q)} {f(q)}V{f(ht)}"
+            f"H{f(hr - q)}{c} {f(q)} {f(q)}V{f(hb - q)}{c} {f(-q)} {f(q)}H{f(r)}"
+            f"V{f(b - q)}{c} {f(-q)} {f(q)}H{f(l + q)}{c} {f(-q)} {f(-q)}V{f(hb)}"
+            f"H{f(hl + q)}{c} {f(-q)} {f(-q)}V{f(ht + q)}{c} {f(q)} {f(-q)}H{f(l)}z")
 
 
 def mark_mask(px):
     """The mark as an L mask `px` pixels square (255 = mark)."""
     s = px * SS / 96
+    ox, oy = OFFSET
+
+    def tr(x, y):
+        return ((x + ox) * s, (y + oy) * s)
+
     m = Image.new("L", (px * SS, px * SS), 0)
     d = ImageDraw.Draw(m)
-    d.rectangle([8 * s, 14 * s, 36 * s, 82 * s], fill=255)
-    d.pieslice([2 * s, 14 * s, 70 * s, 82 * s], -90, 90, fill=255)
-    r = PAD_ROUND * s
-    d.rounded_rectangle([21 * s - r, 43 * s - r, 51 * s + r, 53 * s + r], radius=2 * r, fill=0)
-    d.rounded_rectangle([31 * s - r, 33 * s - r, 41 * s + r, 63 * s + r], radius=2 * r, fill=0)
-    cx, cy, cr = DOT
-    d.ellipse([(cx - cr) * s, (cy - cr) * s, (cx + cr) * s, (cy + cr) * s], fill=255)
+    d.polygon([tr(x, y) for x, y in _outline()[1]], fill=255)
+    arms, q = _pad_arms()
+    for l, t, r, b in arms:
+        d.rounded_rectangle([*tr(l, t), *tr(r, b)], radius=q * s, fill=0)
+    for x, y in BUTTONS:
+        d.ellipse([*tr(x - BUTTON_R, y - BUTTON_R), *tr(x + BUTTON_R, y + BUTTON_R)], fill=255)
     return m.resize((px, px), Image.LANCZOS)
 
 
@@ -151,28 +242,31 @@ def steam(out):
     tile(256).save(out / "icon.png", optimize=True)
 
 
+def _mark_svg(ink, hole):
+    """The mark's shapes as svg elements in the 96-unit square."""
+    ox, oy = OFFSET
+    dots = "".join(f'<circle cx="{x}" cy="{y}" r="{BUTTON_R}" fill="{ink}"/>' for x, y in BUTTONS)
+    return (f'<g transform="translate({ox} {oy})"><path d="{_outline()[0]}" fill="{ink}"/>'
+            f'<path d="{_pad_path()}" fill="{hole}"/>{dots}</g>')
+
+
 def icon_svg():
-    """The app icon as SVG: the d-pad is drawn in the tile's blue over the white D."""
+    """The app icon as SVG: the mark in white on the blue tile."""
     s, t = TILE_SCALE, TILE_INSET
-    cx, cy, r = DOT
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 96 96">
   <rect width="96" height="96" rx="{TILE_RADIUS}" fill="#0000ff"/>
-  <g transform="translate({t} {t}) scale({s})">
-    <path d="{D_PATH}" fill="#ffffff"/>
-    <path d="{PAD_PATH}" fill="#0000ff" stroke="#0000ff" stroke-width="{PAD_ROUND * 2}" stroke-linejoin="round"/>
-    <circle cx="{cx}" cy="{cy}" r="{r}" fill="#ffffff"/>
-  </g>
+  <g transform="translate({t} {t}) scale({s})">{_mark_svg("#ffffff", "#0000ff")}</g>
 </svg>
 """
 
 
 def android(res):
     """Adaptive icon: a blue background and the white mark in the 66 dp safe circle."""
-    cx, cy, r = DOT
-    dot = f"M{cx - r},{cy}a{r},{r} 0,1 0,{2 * r},0a{r},{r} 0,1 0,{-2 * r},0z"
-    d = "M8,14h28a34,34 0,0 1,0 68H8z"
-    pad = "M31,33h10v10h10v10H41v10H31V53H21V43h10z"
-    scale, tx, ty = 0.62, 54 - 50 * 0.62, 54 - 48 * 0.62
+    outline, pad = _outline()[0], _pad_path()
+    dots = " ".join(f"M{x - BUTTON_R:.2f},{y}a{BUTTON_R},{BUTTON_R} 0,1 0,{2 * BUTTON_R},0"
+                    f"a{BUTTON_R},{BUTTON_R} 0,1 0,{-2 * BUTTON_R},0z" for x, y in BUTTONS)
+    scale = 0.7
+    tx, ty = 54 - (48 - OFFSET[0]) * scale, 54 - (48 - OFFSET[1]) * scale
     head = ('<?xml version="1.0" encoding="utf-8"?>\n'
             '<vector xmlns:android="http://schemas.android.com/apk/res/android"\n'
             '    android:width="108dp"\n    android:height="108dp"\n'
@@ -181,15 +275,13 @@ def android(res):
             f'        android:translateX="{tx:.2f}" android:translateY="{ty:.2f}">\n')
     tail = "    </group>\n</vector>\n"
     fg = (head +
-          f'        <path android:fillColor="#FFFFFF" android:pathData="{d}" />\n'
-          f'        <path android:fillColor="#0000FF" android:strokeColor="#0000FF"\n'
-          f'            android:strokeWidth="{PAD_ROUND * 2}" android:strokeLineJoin="round"\n'
-          f'            android:pathData="{pad}" />\n'
-          f'        <path android:fillColor="#FFFFFF" android:pathData="{dot}" />\n' + tail)
+          f'        <path android:fillColor="#FFFFFF" android:pathData="{outline}" />\n'
+          f'        <path android:fillColor="#0000FF" android:pathData="{pad}" />\n'
+          f'        <path android:fillColor="#FFFFFF" android:pathData="{dots}" />\n' + tail)
     # Themed icons tint every opaque pixel alike: the d-pad must be a hole here.
     mono = (head +
             f'        <path android:fillColor="#FFFFFF" android:fillType="evenOdd"\n'
-            f'            android:pathData="{d} {pad} {dot}" />\n' + tail)
+            f'            android:pathData="{outline} {pad} {dots}" />\n' + tail)
     (res / "drawable" / "ic_launcher_foreground.xml").write_text(fg, encoding="utf-8", newline="\n")
     (res / "drawable" / "ic_launcher_monochrome.xml").write_text(mono, encoding="utf-8", newline="\n")
     (res / "mipmap-anydpi-v26" / "ic_launcher.xml").write_text(
