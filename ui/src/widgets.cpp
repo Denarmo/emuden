@@ -117,7 +117,8 @@ Button::Button(std::string text_, std::function<void()> action) : text(std::move
 }
 
 Size Button::MeasureContent(Context& ctx) {
-    return Size{ctx.Text().Measure(text, ctx.theme->text_body, gfx::FONT_BOLD), 24};
+    // A little room: a width rounded to whole pixels must not cut the bold text.
+    return Size{ctx.Text().Measure(text, ctx.theme->text_body, gfx::FONT_BOLD) + 2, 24};
 }
 
 void Button::DrawContent(Context& ctx) {

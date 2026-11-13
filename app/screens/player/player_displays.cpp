@@ -108,7 +108,7 @@ void PlayerScreen::DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const p
             {std::format("{:.0f}", snapshot.audio_queued_ms), "888", " ms"},
             {gaps, std::string(std::max<std::size_t>(2, gaps.size()), '8'), " gaps"},
         };
-        const std::string dot = "  Â·  ";
+        const std::string dot = "  ·  ";
         const auto measure = [&](const std::string& text) { return ctx.Text().Measure(text, size, gfx::FONT_BOLD); };
         float w = 20 + 2 * measure(dot);
         for (const Field& field : fields) {

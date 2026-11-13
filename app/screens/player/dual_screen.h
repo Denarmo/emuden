@@ -40,8 +40,6 @@ public:
     bool Split() const {
         return split_;
     }
-    /// One screen is on each display and the second display has the touch screen.
-    bool TouchOnSecond() const;
     /// The main display's part. `button` shows the swap button of the one-screen layout.
     void DrawMain(ui::Context& ctx, const gfx::Rect& room, bool integer, bool button);
     /// A press on the main display, in the canvas's units. True when it was for the swap

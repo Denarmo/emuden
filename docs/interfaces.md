@@ -222,7 +222,7 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
   (`app/screens/player/player_displays.cpp`) uses both: with two displays an open pause menu
   takes the display the quick settings are on and the game stays whole and undimmed on its
   own (`player.overlay_on_second_screen`, on by default; for a two-screen game the menu takes
-  the display with the touch screen), and "Swap screens" puts a one-screen game on the
+  the second display, over whichever screen is there), and "Swap screens" puts a one-screen game on the
   second display and the quick settings in the main window (`player.swap_displays`). The
   pad always goes to the game, or to the menu while it is open; touch works on whichever
   display shows the menu or the quick settings.

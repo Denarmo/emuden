@@ -172,10 +172,6 @@ void DualScreens::Note() {
     }
 }
 
-bool DualScreens::TouchOnSecond() const {
-    return split_ && Mode() != MODE_TOP_ON_SECOND;
-}
-
 std::string DualScreens::Summary() const {
     if (!Active()) {
         return "One screen";
