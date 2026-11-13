@@ -33,7 +33,7 @@ void PlayerScreen::BuildMenu() {
     panel->SetPadding(24, 26);
 
     const char* titles[] = {"",        "",        "Save state", "Load state", "Core options",
-                            "Buttons", "Players", "Picture",    "Adjust the picture"};
+                            "Buttons", "Players", "Picture",    "Adjust the picture", "Screens"};
     const bool main = view_ == View::Main;
     panel->Emplace<ui::Label>(main ? game_.name : titles[static_cast<int>(view_)], theme.text_heading,
                               gfx::FONT_BOLD);
@@ -68,6 +68,9 @@ void PlayerScreen::BuildMenu() {
         break;
     case View::PictureAdjust:
         BuildPictureAdjust(list);
+        break;
+    case View::Screens:
+        AddRows(list, dual_.Rows(), ROW_HEIGHT);
         break;
     case View::Closed:
         break;
@@ -110,6 +113,15 @@ void PlayerScreen::BuildMain(ui::Node* list) {
             size_ = static_cast<ScreenSize>(index);
             Svc().settings->SetNumber("player.screen_size", index);
         }));
+    if (dual_.Active()) {
+        // Two screens: which display or which place each has.
+        rows.push_back(ActionRow("menu.swap", "Swap screens", [this] {
+            dual_.Swap();
+            Rebuild();
+        }));
+        rows.push_back(ValueRow(
+            "menu.screens", "Screens", [this] { return dual_.Summary(); }, [this] { Show(View::Screens); }));
+    }
     rows.push_back(ValueRow(
         "menu.picture", "Picture", [this] { return PictureName(picture_, game_.system); },
         [this] { Show(View::Picture, "picture." + picture_); }));

@@ -75,6 +75,9 @@ Status PlayerSession::Start(const OpenRequest& request) {
     params.core = request.core;
     params.system_dir = request.system_dir;
     params.save_dir = paths_.save_dir;
+    for (const auto& [key, value] : ScreenOptionHints(request.system)) {
+        params.options[key] = value;
+    }
     for (const auto& [key, value] : request.option_hints) {
         params.options[key] = value;
     }
@@ -319,6 +322,25 @@ void PlayerSession::SetPointer(float x, float y, bool pressed) {
         return static_cast<std::int16_t>(std::clamp(t * 2.0f - 1.0f, -1.0f, 1.0f) * 32767.0f);
     };
     core_->SetPointer(axis((x - r.x) / r.w), axis((y - r.y) / r.h), true);
+}
+
+void PlayerSession::SetScreenPointer(int screen, float u, float v, bool pressed) {
+    if (!core_) {
+        return;
+    }
+    const std::vector<GameScreen> screens = Screens();
+    if (!pressed || screen < 0 || screen >= static_cast<int>(screens.size()) ||
+        !screens[static_cast<std::size_t>(screen)].touch) {
+        core_->SetPointer(0, 0, false);
+        return;
+    }
+    // The core takes the pointer across its whole picture.
+    const gfx::Rect& part = screens[static_cast<std::size_t>(screen)].part;
+    const auto axis = [](float t) {
+        return static_cast<std::int16_t>(std::clamp(t * 2.0f - 1.0f, -1.0f, 1.0f) * 32767.0f);
+    };
+    core_->SetPointer(axis(part.x + std::clamp(u, 0.0f, 1.0f) * part.w),
+                      axis(part.y + std::clamp(v, 0.0f, 1.0f) * part.h), true);
 }
 
 void PlayerSession::SetFastForward(bool on) {

@@ -45,6 +45,7 @@ PlayerScreen::~PlayerScreen() {
     if (prepare_) {
         prepare_->Cancel();
     }
+    dual_.Stop();
     if (phase_ == Phase::Running) {
         Svc().player->Close();
     }
@@ -127,6 +128,7 @@ void PlayerScreen::Begin(const std::filesystem::path& content) {
 
 void PlayerScreen::Fail(const std::string& message) {
     log::Warn("player", "{}", message);
+    dual_.Stop();
     if (phase_ == Phase::Running) {
         Svc().player->Close();
     }
@@ -141,6 +143,7 @@ void PlayerScreen::Leave() {
     if (prepare_) {
         prepare_->Cancel();
     }
+    dual_.Stop();
     if (phase_ == Phase::Running) {
         const player::Snapshot snapshot = svc.player->GetSnapshot();
         log::Info("player", "leave {} at frame {} ({}x{})", game_.name, snapshot.frames,
@@ -299,6 +302,7 @@ void PlayerScreen::Update(ui::Context& ctx) {
         // saves. Leave quietly, without closing what runs now.
         svc.library->RecordPlay(game_.id, started_unix_,
                                 static_cast<std::int64_t>(pal::NowSeconds() - started_));
+        dual_.Stop();
         phase_ = Phase::Left;
         svc.input->SetNavFromPads(true);
         GetStage().Pop();
@@ -325,6 +329,7 @@ void PlayerScreen::Update(ui::Context& ctx) {
     }
     ApplySpeed();
     svc.player->Advance(ctx.dt);
+    dual_.Update();
 }
 
 bool PlayerScreen::OnEvent(const input::Event& event) {
@@ -369,6 +374,11 @@ bool PlayerScreen::OnEvent(const input::Event& event) {
             if (event.type == Type::PointerDown && x < MENU_CORNER && y < MENU_CORNER) {
                 pointer_down_ = false;
                 OpenMenu();
+                return true;
+            }
+            if (dual_.Active()) {
+                // Two screens: the touch goes to wherever the touch screen is drawn.
+                dual_.Pointer(event, x, y);
                 return true;
             }
             if (event.type != Type::PointerMove) {
@@ -441,6 +451,9 @@ bool PlayerScreen::OnNav(Nav nav) {
     case View::PictureAdjust:
         Show(View::Picture, "picture.adjust");
         break;
+    case View::Screens:
+        Show(View::Main, "menu.screens");
+        break;
     case View::Closed:
         break;
     }
@@ -485,13 +498,21 @@ void PlayerScreen::Draw(ui::Context& ctx, const gfx::Rect& area) {
             room.x += MENU_PANEL_WIDTH;
             room.w -= MENU_PANEL_WIDTH;
         }
-        const Placement placement = Place(size_, room, snapshot.frame_width, snapshot.frame_height,
-                                          snapshot.aspect, canvas.Scale());
-        if (placement.aspect != aspect_sent_) {
-            svc.player->SetAspectOverride(placement.aspect);
-            aspect_sent_ = placement.aspect;
+        if (dual_.Active()) {
+            // Each screen at its own size; the second display, when there is one, is drawn
+            // by the companion's frame and stays as it is under the pause menu.
+            const bool integer = size_ == ScreenSize::PixelPerfect ||
+                                 svc.settings->GetBool("player.integer_scale", false);
+            dual_.DrawMain(ctx, room, integer, view_ == View::Closed);
+        } else {
+            const Placement placement = Place(size_, room, snapshot.frame_width, snapshot.frame_height,
+                                              snapshot.aspect, canvas.Scale());
+            if (placement.aspect != aspect_sent_) {
+                svc.player->SetAspectOverride(placement.aspect);
+                aspect_sent_ = placement.aspect;
+            }
+            svc.player->Draw(canvas, placement.area);
         }
-        svc.player->Draw(canvas, placement.area);
         DrawOverlays(ctx, area, snapshot);
         if (view_ != View::Closed && !choosing) {
             canvas.FillRect(area, ctx.theme->scrim);

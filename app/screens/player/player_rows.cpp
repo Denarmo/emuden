@@ -9,6 +9,7 @@
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
+#include "dual_screen.h"
 #include "picture_choice.h"
 
 namespace den::app {
@@ -57,6 +58,9 @@ std::vector<ui::RowSpec> PlayerRows() {
             });
         picture.description = "Auto gives every console its own; a console or a game can have another in the pause menu";
         rows.push_back(std::move(picture));
+    }
+    for (ui::RowSpec& row : DualScreenSettingRows()) {
+        rows.push_back(std::move(row));
     }
     rows.push_back(Switch("player.pad_by_label", "Buttons by their label", true,
                           "A is A on every pad; off uses the place of the button"));

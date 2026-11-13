@@ -18,6 +18,7 @@
 #include "den/base/result.h"
 #include "den/gfx/canvas.h"
 #include "den/input/input.h"
+#include "den/player/screens.h"
 
 namespace den::store {
 class Settings;
@@ -165,6 +166,19 @@ public:
     /// core's aspect ratio). The session may call canvas.Flush(), use its own GL, and must
     /// leave the canvas usable (canvas.RestoreState()).
     virtual void Draw(gfx::Canvas& canvas, const gfx::Rect& area) = 0;
+
+    /// The console's screens when its picture holds two (den/player/screens.h); empty when
+    /// the picture is one screen, which Draw and SetPointer are for. It can change while the
+    /// game runs (a core option that lays the screens out differently).
+    virtual std::vector<GameScreen> Screens() const {
+        return {};
+    }
+    /// Draws one screen of Screens() into exactly `target` of the frame being drawn, through
+    /// the picture preset. The canvas may be the second display's; the rules of Draw apply.
+    virtual void DrawScreen(gfx::Canvas& /*canvas*/, int /*screen*/, const gfx::Rect& /*target*/) {}
+    /// A finger on a screen of Screens(): `u` and `v` are 0..1 across it. Only a screen with
+    /// `touch` reaches the game; anything else counts as lifted.
+    virtual void SetScreenPointer(int /*screen*/, float /*u*/, float /*v*/, bool /*pressed*/) {}
 
     /// Forces the picture's width / height in Draw (the screen size choice); 0 returns to the
     /// core's own aspect ratio.

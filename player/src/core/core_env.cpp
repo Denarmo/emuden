@@ -15,6 +15,19 @@ namespace den::player {
 
 LibretroCore::Impl* g_core = nullptr;
 
+namespace {
+
+// A core may show the same message every frame; the log keeps it once.
+void LogMessage(const char* text) {
+    static std::string last;
+    if (last != text) {
+        last = text;
+        log::Info("core", "{}", text);
+    }
+}
+
+} // namespace
+
 bool LibretroCore::Impl::ResizeHwTarget(const retro_game_geometry& announced) {
     unsigned width = std::max(announced.max_width, announced.base_width);
     unsigned height = std::max(announced.max_height, announced.base_height);
@@ -418,13 +431,13 @@ bool RETRO_CALLCONV EnvironmentCallback(unsigned command, void* data) {
     case RETRO_ENVIRONMENT_SET_MESSAGE:
         if (const auto* message = static_cast<const retro_message*>(data);
             message && message->msg) {
-            log::Info("core", "{}", message->msg);
+            LogMessage(message->msg);
         }
         return true;
     case RETRO_ENVIRONMENT_SET_MESSAGE_EXT:
         if (const auto* message = static_cast<const retro_message_ext*>(data);
             message && message->msg) {
-            log::Info("core", "{}", message->msg);
+            LogMessage(message->msg);
         }
         return true;
     case RETRO_ENVIRONMENT_GET_FASTFORWARDING:

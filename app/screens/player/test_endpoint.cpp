@@ -30,6 +30,7 @@
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
+#include "dual_screen.h"
 
 namespace den::app {
 
@@ -253,6 +254,8 @@ void Pump() {
             reply = VirtualPad(in, endpoint);
         } else if (command == "player") {
             reply = PlayerJson();
+        } else if (command == "screens") {
+            reply = DualScreenJson();
         } else if (command == "audio") {
             svc.player->ResetAudioStats();
         } else if (command == "wav") {

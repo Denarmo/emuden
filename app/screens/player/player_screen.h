@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "den/app/app.h"
+#include "dual_screen.h"
 #include "player_view.h"
 
 namespace den::app {
@@ -39,7 +40,7 @@ public:
 
 private:
     enum class Phase { New, Preparing, Running, Left };
-    enum class View { Closed, Main, Save, Load, Options, Buttons, Players, Picture, PictureAdjust };
+    enum class View { Closed, Main, Save, Load, Options, Buttons, Players, Picture, PictureAdjust, Screens };
 
     // player_screen.cpp: the session.
     void Open();
@@ -83,6 +84,7 @@ private:
     std::int64_t started_unix_ = 0;
     double started_ = 0;
 
+    DualScreens dual_;               // a console with two screens
     ScreenSize size_ = ScreenSize::Fit;
     float aspect_sent_ = 0;
     bool show_fps_ = false;

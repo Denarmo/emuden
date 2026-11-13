@@ -4,8 +4,8 @@
 // Showing the core's picture inside the rectangle the UI gives. The path has three steps:
 // PreparePicture makes the core's latest frame a texture (a PictureSource), Draw decides
 // where it goes, and DrawRegion sends a part of it through the picture preset's chain to
-// its place. Draw uses one region for the whole picture; a layout with several screens
-// calls DrawRegion once per screen with its own part, target and slot.
+// its place. Draw uses one region for the whole picture; DrawScreen is one screen of a
+// console with two, with its own part, target and slot.
 
 #include <algorithm>
 #include <cmath>
@@ -155,6 +155,36 @@ void PlayerSession::Draw(gfx::Canvas& canvas, const gfx::Rect& area) {
     picture_rect_ = PictureRect(canvas, area);
     ++picture_frame_;
     DrawRegion(canvas, source, PictureRegion{gfx::Rect{0, 0, 1, 1}, picture_rect_}, 0);
+}
+
+std::vector<GameScreen> PlayerSession::Screens() const {
+    if (!core_) {
+        return {};
+    }
+    const VideoFrame& frame = core_->Frame();
+    return ScreensOf(system_, static_cast<int>(frame.width), static_cast<int>(frame.height));
+}
+
+void PlayerSession::DrawScreen(gfx::Canvas& canvas, int screen, const gfx::Rect& target) {
+    PictureSource source;
+    if (!core_ || target.w <= 0 || target.h <= 0 || !PreparePicture(canvas, source)) {
+        return;
+    }
+    const std::vector<GameScreen> screens = Screens();
+    if (screen < 0 || screen >= static_cast<int>(screens.size())) {
+        return;
+    }
+    // The frame counter moves once per frame, whichever screens are shown.
+    if (frame_owner_ == screen || frame_owner_ < 0 || frame_other_seen_) {
+        ++picture_frame_;
+        frame_owner_ = screen;
+        frame_other_seen_ = false;
+    } else {
+        frame_other_seen_ = true;
+    }
+    // Slot 0 is the whole picture's (Draw); each screen keeps its own targets and history.
+    DrawRegion(canvas, source, PictureRegion{screens[static_cast<std::size_t>(screen)].part, target},
+               screen + 1);
 }
 
 } // namespace den::player

@@ -217,6 +217,18 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
   `SecondScreenPixelSize` say what is there; a claim fails when the device has no second
   screen.
 - `player::Session::SetVolume(0..1)` changes the running game's volume at once.
+- Consoles with two screens (`den/player/screens.h`): `Session::Screens()` is two
+  `GameScreen`s (part of the picture, own pixels, `touch`) while the core's picture is the
+  stacked shape `ScreensOf(system, w, h)` knows (NDS 2:3, 3DS 5:6), else empty and the
+  picture is one screen. `DrawScreen(canvas, screen, target)` draws one through the picture
+  preset on either display, `SetScreenPointer(screen, u, v, pressed)` is its touch.
+  `LayoutScreens` / `FitScreen` are the geometry of one display (stacked, side by side,
+  large and small, one screen; fit or whole multiples). `app/screens/player/dual_screen.h`
+  (`DualScreens`) uses them: it claims the second display while such a game runs and
+  `player.dual_screen.mode` is not `single`, puts one screen on each display, and falls back
+  to the layouts of one display (`player.dual_screen.layout`, `.swap`) when there is no
+  second one. The pause menu has "Swap screens" and "Screens". The player's test endpoint
+  answers `screens` with the mode and where each screen is drawn.
 - Test endpoint on the automation port + 2: `state`, `tap <x> <y>` (the second screen is 600
   units high), `screenshot <png>`.
 

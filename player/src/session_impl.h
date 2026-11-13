@@ -35,6 +35,9 @@ public:
     void SetAspectOverride(float aspect) override {
         aspect_override_ = aspect;
     }
+    std::vector<GameScreen> Screens() const override;
+    void DrawScreen(gfx::Canvas& canvas, int screen, const gfx::Rect& target) override;
+    void SetScreenPointer(int screen, float u, float v, bool pressed) override;
     void Advance(double seconds) override;
     void Draw(gfx::Canvas& canvas, const gfx::Rect& area) override;
     Status SaveState(int slot) override;
@@ -134,6 +137,8 @@ private:
     gfx::EffectChain chain_;
     bool chain_stale_ = true;
     std::uint64_t picture_frame_ = 0;
+    int frame_owner_ = -1;          // the screen whose DrawScreen counts the frames
+    bool frame_other_seen_ = false;
 
     // Input: the button map per pad family, with the user's remap.
     std::array<ButtonMap, 4> button_maps_{};
