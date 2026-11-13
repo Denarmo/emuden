@@ -45,6 +45,8 @@ struct Entry {
     bool placeholder_cover = false;
     /// Files of the same game in other regions, hidden behind this entry.
     std::vector<std::string> other_versions;
+    /// For a ROM hack (hacks.h): the id of the game it was patched from.
+    std::string hack_of;
 };
 
 struct SystemInfo {
@@ -55,6 +57,7 @@ struct SystemInfo {
 };
 
 struct SystemDef;
+class Hacks;
 
 /// One time a game was played, as RecordPlay booked it.
 struct Session {
@@ -105,6 +108,11 @@ public:
     /// Adds the host folders an earlier app's profile lists as game folders (its
     /// config/qt-config.ini, read only). Fails when there is no such profile.
     virtual Status ImportFolders(const std::filesystem::path& old_profile) = 0;
+
+    /// The ROM hacks of this library; use HacksOf (hacks.h). Null for a library without any.
+    virtual Hacks* HackStore() {
+        return nullptr;
+    }
 };
 
 /// An answer to a GET: status 0 when the request never got one.

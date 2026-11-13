@@ -118,6 +118,7 @@ std::vector<Entry> LoadEntryCache(const std::filesystem::path& file) {
         entry.archive_member = item.String("archive_member");
         entry.disc = static_cast<int>(Number(item, "disc"));
         entry.placeholder_cover = Flag(item, "placeholder_cover");
+        entry.hack_of = item.String("hack_of");
         if (const JsonValue* versions = item.Find("other_versions"); versions != nullptr) {
             for (const JsonValue& version : versions->items) {
                 entry.other_versions.push_back(version.string);
@@ -146,6 +147,7 @@ bool SaveEntryCache(const std::filesystem::path& file, const std::vector<Entry>&
             {"archive_member", JsonString(entry.archive_member)},
             {"disc", JsonNumber(entry.disc)},
             {"placeholder_cover", JsonBool(entry.placeholder_cover)},
+            {"hack_of", JsonString(entry.hack_of)},
             {"other_versions", std::move(versions)},
         }));
     }
