@@ -7,6 +7,8 @@ endif()
 if(ANDROID)
     # HTTP comes from the platform through JNI (src/android).
     list(APPEND platform_exclude "/src/posix/http_curl.cpp")
+    # The second screen is a Presentation (src/android), not a second window.
+    list(APPEND platform_exclude "/src/sdl/second_display_sdl.cpp")
 else()
     list(APPEND platform_exclude "/src/android/")
 endif()
@@ -15,7 +17,9 @@ den_module(platform DEPS den_base PRIVATE_DEPS SDL3::SDL3-static EXCLUDE ${platf
 
 if(WIN32)
     target_link_libraries(den_platform PRIVATE winhttp ws2_32)
-elseif(NOT ANDROID)
+elseif(ANDROID)
+    target_link_libraries(den_platform PRIVATE EGL android)
+else()
     find_package(CURL QUIET)
     if(CURL_FOUND)
         target_link_libraries(den_platform PRIVATE CURL::libcurl)
