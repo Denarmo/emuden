@@ -25,7 +25,7 @@ Status Launch(const std::string&, Display) {
 
 void Raise(Display) {}
 
-void Lower(Display) {}
+void Lower(Display, const std::string&) {}
 
 bool ShowHandle(Display) {
     return false;

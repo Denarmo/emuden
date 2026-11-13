@@ -135,7 +135,7 @@ BesideActions AppBeside::BackToApp() {
     stage_ = Stage::AppFront;
     lower_pending_ = true;
     raise_pending_ = false;
-    out.push_back({Kind::Lower, app_screen_, {}});
+    out.push_back({Kind::Lower, app_screen_, app_.id});
     out.push_back({Kind::ShowHandle, app_screen_, {}});
     return out;
 }

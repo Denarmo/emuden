@@ -81,7 +81,7 @@ void Run(const BesideActions& actions, ui::Stage* stage) {
             break;
         case Kind::Lower:
             if (!AppsFake()) {
-                pal::apps::Lower(DisplayOf(action.screen));
+                pal::apps::Lower(DisplayOf(action.screen), action.app);
             } else {
                 svc.stage->Toast("Would go back to " + machine.App().label);
                 then = machine.PullSettings();

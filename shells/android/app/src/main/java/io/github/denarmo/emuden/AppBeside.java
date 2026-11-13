@@ -120,9 +120,17 @@ final class AppBeside {
         });
     }
 
-    /** From the native side: our window on that display behind the app under it. */
-    static void lower(Activity main, int display) {
+    /**
+     * From the native side: the app under our window on that display is in front again. Its
+     * task is brought forward the way a launcher does, which leaves our window right under
+     * it: the app left with Back shows the quick settings. Sending our own task to the back
+     * would put it behind the launcher as well.
+     */
+    static void lower(Activity main, int display, String app) {
         main.runOnUiThread(() -> {
+            if (AppList.toFront(main, app, display)) {
+                return;
+            }
             if (display == SECOND) {
                 SecondScreen.lower();
             } else {
@@ -210,6 +218,11 @@ final class AppBeside {
             getDisplay().getRealSize(screen);
             View tab = new Tab(context, dp);
             tab.setOnTouchListener(this);
+            if (Build.VERSION.SDK_INT >= 29) {
+                // It rests on an edge, where a drag would otherwise be the system's Back gesture.
+                tab.setSystemGestureExclusionRects(
+                        java.util.Collections.singletonList(new android.graphics.Rect(0, 0, size, size)));
+            }
             setContentView(tab, new android.view.ViewGroup.LayoutParams(size, size));
             Window window = getWindow();
             if (window == null) {

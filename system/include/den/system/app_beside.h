@@ -30,7 +30,7 @@ struct BesideAction {
     enum class Kind {
         Launch,      // open `app` on `screen`
         Raise,       // this app's own window on `screen` comes to the front of it
-        Lower,       // this app's own window on `screen` goes behind the app under it
+        Lower,       // `app` on `screen` is in front again, this app's own window under it
         ShowHandle,  // the small tab over the other app on `screen`
         HideHandle,
         OpenMenu,    // pause the game with its menu (the app takes the game's only display)

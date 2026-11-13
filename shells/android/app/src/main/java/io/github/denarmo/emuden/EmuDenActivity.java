@@ -203,10 +203,10 @@ public class EmuDenActivity extends SDLActivity {
         }
     }
 
-    public static void besideLower(int display) {
+    public static void besideLower(int display, String app) {
         EmuDenActivity activity = self;
         if (activity != null) {
-            AppBeside.lower(activity, display);
+            AppBeside.lower(activity, display, app);
         }
     }
 

@@ -111,8 +111,16 @@ void Raise(Display display) {
     DisplayCall("besideRaise", "(I)V", display, false);
 }
 
-void Lower(Display display) {
-    DisplayCall("besideLower", "(I)V", display, false);
+void Lower(Display display, const std::string& app) {
+    const jni::ActivityCall call;
+    const jmethodID method = call.Method("besideLower", "(ILjava/lang/String;)V");
+    if (!method) {
+        return;
+    }
+    jstring name = call.env->NewStringUTF(app.c_str());
+    call.env->CallStaticVoidMethod(call.activity_class, method, Where(display), name);
+    call.Threw();
+    call.env->DeleteLocalRef(name);
 }
 
 bool ShowHandle(Display display) {

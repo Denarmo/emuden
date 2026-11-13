@@ -41,9 +41,10 @@ Status Launch(const std::string& id, Display display);
 /// This app's own window on a display comes to the front of that display, over an app
 /// opened there, and takes the keys. The other app stays as it is underneath.
 void Raise(Display display);
-/// This app's own window on a display goes behind the app under it, which has the display
-/// and the keys again without being started anew.
-void Lower(Display display);
+/// The app under this app's own window on a display has the display and the keys again,
+/// without being started anew; this app's window stays right under it, so leaving the app
+/// shows it again.
+void Lower(Display display, const std::string& app);
 /// A small round tab over the other app on that display, which the user can drag along the
 /// edges; a tap on it is an Event::Handle. False when the platform cannot draw over other
 /// apps on that display (nothing is shown then).

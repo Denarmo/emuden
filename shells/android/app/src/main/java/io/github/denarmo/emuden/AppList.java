@@ -208,6 +208,34 @@ final class AppList {
         }
     }
 
+    /**
+     * An app that is already open comes to the front of its display as it is, the way a
+     * launcher brings it back. False when it could not be asked for.
+     */
+    static boolean toFront(Activity activity, String id, int display) {
+        int slash = id == null ? -1 : id.indexOf('/');
+        if (slash <= 0) {
+            return false;
+        }
+        Intent intent = new Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_LAUNCHER)
+                .setComponent(new ComponentName(id.substring(0, slash), id.substring(slash + 1)))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        int target = display == DISPLAY_SECOND ? SecondScreen.otherDisplayId(activity)
+                : SecondScreen.ownDisplayId(activity);
+        try {
+            ActivityOptions options = ActivityOptions.makeBasic();
+            if (target >= 0) {
+                options.setLaunchDisplayId(target);
+            }
+            activity.startActivity(intent, options.toBundle());
+            return true;
+        } catch (RuntimeException e) {
+            Log.w(TAG, "the app could not be brought back", e);
+            return false;
+        }
+    }
+
     private static native void nativeChanged();
 
     /** The activity's window has the input focus, or lost it to another window. */

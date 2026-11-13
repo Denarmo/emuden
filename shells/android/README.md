@@ -146,15 +146,19 @@ is where is decided by `system::AppBeside` (unit-tested); `AppBeside.java` only 
 is asked:
 
 - **Raise** brings our own activity of a display to the front of it, over the other app,
-  which stays as it is underneath: the quick settings over the app. **Lower**
-  (`moveTaskToBack`) puts it behind again: "Back to <app>" in the quick settings, and the
-  system's Back on that display while they are over an app (`nativeBack`), give the display
-  and the keys back to the app without starting it anew.
+  which stays as it is underneath: the quick settings over the app. **Lower** brings the
+  app's task forward again with its launcher intent (`AppList.toFront`), as a launcher
+  does for an app that is already open: "Back to <app>" in the quick settings, and the
+  system's Back on that display while they are over an app (`nativeBack`). The task and
+  its activity stay the same, and our activity is right under it, so leaving the app with
+  Back shows the quick settings. `moveTaskToBack` was tried first and put our task behind
+  the launcher too; it is only the fallback now.
 - **The handle** is a 44 dp round tab over the other app (a Presentation holding nothing
   else; that is the one window an app may put over other apps without a permission, and
   only on a presentation display). A tap pulls the quick settings over the app. It can be
   dragged anywhere, comes to rest on the nearest edge, is found there again
-  (`SharedPreferences` "beside") and is 45% opaque until touched. The main display is no
+  (`SharedPreferences` "beside") and is 45% opaque until touched. Its square is excluded
+  from the system gestures: resting on an edge, a drag on it was the Back gesture. The main display is no
   presentation display: with the app there the game's own display shows a small tab at its
   right edge instead, which does the same.
 - **The app left with Back**: our activity under it is shown again, which the native side
@@ -180,9 +184,15 @@ The media volume (`AudioManager.STREAM_MUSIC`) is read and set for `pal::audio`
 stream the hardware keys change. Android has no volume for one other app: the game's own
 gain is a share of the system volume, the other app plays at the system volume.
 
-Seen on the Retroid Pocket Duo with the Presentation of before (release APK, `adb` only):
-Settings beside a running Tetris, the game drawing on and its AAudio stream started. Nothing
-of the above with `PanelActivity` has been run on a device yet; see `docs/status.md`.
+Seen on the Retroid Pocket Duo (Android 16, gesture navigation, release APK, `adb` only),
+with Settings as the other app: `PanelActivity` starts on display 2 and the focus comes
+back to the main activity; Tetris swapped to the second display goes on (picture, 59 fps,
+AAudio stream started, same pid) with Settings over the stopped main activity, and the
+process is `TOP (resumed-multi-display-activity)`; "Back to Settings" and Back on either
+display leave the same task and activity record in front; the handle dragged to another
+edge is found there again; both volume sliders; Home on the second display. Not run: an
+app that plays sound, the Presentation fallback, a GPU core, one display. See
+`docs/status.md`.
 
 ## System keyboard
 

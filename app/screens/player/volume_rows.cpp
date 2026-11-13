@@ -73,7 +73,7 @@ std::vector<ui::RowSpec> VolumeRows(const std::string& prefix, bool other_app) {
             },
             [steps](float step) { return Percent(step, steps); });
         other.description = (two ? ScreenName(beside.SettingsScreen()) + "  \xC2\xB7  " : std::string()) +
-                            "An app beside the game follows the system volume";
+                            "The system volume";
         rows.push_back(std::move(other));
     }
     return rows;

@@ -19,48 +19,69 @@ listened.
 
 `emuden --windowed --size 3840x2160` opens a window of that size (new, for such checks).
 
-## An app beside the game, second round (not yet on a device)
+## An app beside the game, second round (checked on the Retroid)
 
 Three notes from the owner after using the Apps button on the Retroid, and three leftovers
-of the last report. Built and unit-tested; the Windows build was driven with a second
-window and the made-up apps; **nothing of it has run on the Retroid** (the device was not
-touched in this step), so every Android line below is from reading the code.
+of the report before. Checked on the Retroid Pocket Duo with the release APK through `adb`
+only (`input` on a named display, `sendevent` on the built-in pad, `screencap` of both
+displays, every picture looked at, `dumpsys activity` / `audio`, logcat), after the device
+had been idle for 25 minutes with both launchers in front. The system Settings app was the
+other app; YouTube was not opened. Nobody held the device or listened.
 
-| Note | What was wrong | What is built |
-|---|---|---|
-| "With the game on the second screen, opening YouTube closes EmuDEN" | The app opened on the main display over the main activity. Android stopped that activity; SDL blocked the native thread and paused the sound in `onStop`, and the Presentation with the game was dismissed with it. Nothing crashed: the game was frozen and gone from both screens, and the process sat cached | The second display is an activity of its own (`PanelActivity`), which stays resumed; the native loop, the sound and the GL context go on while the main activity is stopped (`shells/android/README.md`). Either arrangement: the game keeps playing on its display with an app on the other. A game whose own display is covered is held (resume state written) and goes on when it is back |
-| "The volume settings should set each screen's volume" | One row with - and + | Two sliders in the quick settings and the pause menu: "Game" (its own gain, a share of the system volume) and "Other app" (the system's media volume through `pal::audio`; Android has none per app), each with its screen under the label, following the swap. Dragged by touch, stepped with left and right. The hardware keys move the system volume as before |
-| "No way back to YouTube after opening the quick settings over it" | The handle only ever brought the quick settings back for good | Quick settings pulled over an app start with "Back to <app>" (its icon; the app gets its display and the keys back, not started anew) and "Close <app>"; the system's Back on that display does the same as the first. The handle is a 44 dp round tab that can be dragged, rests on the nearest edge, is remembered and is half transparent until touched. "Recent apps" (three) in the quick settings |
-| After Home on the second display the quick settings came back only with the handle | | They come back by themselves after 0.4 s when no app of ours is there; with an app in front, when the system's Home broadcast arrives |
-| "1 games" on the Search page | | "1 game for ..." |
-| The Apps page kept the last game on the second screen | | A plain page there (`companion.idle`) |
+| Note | What was wrong | What is built | Seen on the Retroid |
+|---|---|---|---|
+| "With the game on the second screen, opening YouTube closes EmuDEN" | The app opened on the main display over the main activity. Android stopped that activity; SDL blocked the native thread and paused the sound in `onStop`, and the Presentation with the game was dismissed with it. Nothing crashed: the game was frozen and gone from both screens | The second display is an activity of its own (`PanelActivity`), which stays resumed; the native loop, the sound and the GL context go on while the main activity is stopped | Tetris swapped to the bottom screen, quick settings (top) > Apps > Settings: same pid, pieces keep falling (two pictures a second apart differ in the playfield), 59 fps, AAudio stream `started`. The system: `START ... result code=0`, `EmuDenActivity` `state=STOPPED`, the process stays `vis` / `TOP (resumed-multi-display-activity)` |
+| "The volume settings should set each screen's volume" | One row with - and + | Two sliders in the quick settings and the pause menu: "Game" (its own gain) and "Other app" (the system's media volume; shown while an app is beside the game), each with its screen under the label | "Other app" tapped to the middle: `STREAM_MUSIC` 0 to 7 of 15, "Game" still 20%. "Game" tapped to 60%: `STREAM_MUSIC` still 7. Both put back |
+| "No way back to YouTube after opening the quick settings over it" | The handle only ever brought the quick settings back for good | "Back to <app>" and "Close <app>" first in quick settings pulled over an app; the system's Back does the same as the first; a 44 dp round handle that can be dragged | On both displays: the button and Back put Settings in front again, same task and activity record in `dumpsys activity` (no relaunch). The handle dragged from the right edge to the top edge stayed there after the quick settings were opened and left again |
+| After Home on the second display the quick settings came back only with the handle | | They come back by themselves | `input -d 2 keyevent 3`: the launcher for a moment, `PanelActivity` in front again within 3 s |
 
-Run: `win` preset, 11 of 11 test programs (22 new cases for `system::AppBeside`: launch on
-either display, handle, back to the app, close, Back, Home, surfaces going and coming, one
-display, a failed launch, swap). Windows, port 43590, `EMUDEN_SECOND_WINDOW=1`,
-`EMUDEN_FAKE_APPS=1`, `EMUDEN_FAKE_DEVICE=retroid-pocket-duo`, Tetris: the quick settings
-with the Game slider and "Top screen"; an app chosen, then "Back to Settings" / "Close
-Settings" first and "Recent apps" below; the slider dragged from 100% to 40%, tapped to 15%,
-stepped to 25% with the pad in the pause menu. The Android debug APK compiles
-(`-PemudenBuild=beside-android`).
+The same run with the game on the main display and Settings on the second: the game goes
+on, the stream stays started, the built-in pad's Start (through `/dev/input/event8`) reached
+the game after a tap on it. A game left for an app beside it was continued after the app
+was replaced by a new build: it came back at the picture of that moment (the resume state
+written when the app opens).
 
-Not run: everything on Android. In particular: `PanelActivity` starting on display 2 and
-the focus coming back to the main activity; the game going on on the second display under
-an app on the main one (picture, sound, 60 fps paced by the second display); the pixel
-buffer context while the main window is hidden; the hold and release of a game whose
-display is covered, and its resume state; the handle (drag, edges, memory) and that the
-main display refuses one; the tab on the game's display; Back over an app; the Home
-broadcast on this device; "Other app" moving the media volume; a core that draws with the
-GPU while the main window is hidden; the Presentation fallback; one display. On Windows:
-the idle page was not looked at, nor "Close" tapped.
+Two things failed in the check and are fixed (run again after the fix):
 
-Known: the main display takes no handle over another app, so with the game on the second
-display the way to the quick settings is the tab on the game or leaving the app. A game
-cannot be opened with a GPU core while the main window is hidden. While the app is covered
-on both displays its loop idles at 10 Hz instead of sleeping. Home pressed on the main
-display with an app beside on the second gives the second display up; coming back puts the
-quick settings over that app. "Close" does not end the other app, it only stops treating it
-as beside the game.
+- After "Back to <app>" this app's window was sent to the back of its display, behind the
+  launcher too, so leaving the app with Back showed the launcher instead of the quick
+  settings. The app's own task is now brought forward the way a launcher does, which
+  leaves this app's window right under it.
+- The device uses gesture navigation: a drag that begins on the handle at a screen edge
+  was the system's Back gesture and closed the app under it. The handle now excludes its
+  own square from the system gestures.
+
+Also: "Other app" said "An app beside the game follows the sy..." (cut); it says "The
+system volume".
+
+What cannot work on Android, and why:
+
+- **A volume per app or per screen.** Android has one media volume for everything that
+  plays; an app cannot set another app's. "Game" is therefore a share of the system
+  volume: with "Other app" at 0 the game is silent too, and the game can never be louder
+  than the other app, only quieter.
+- **A handle over an app on the main display.** A window over other apps needs no
+  permission only on a presentation display, and the main one is none. With the game
+  swapped to the second display the way to the quick settings is the small tab drawn on
+  the game, or leaving the app.
+- **The pad for the game while the other app is in front.** Keys and the built-in pad go
+  to the focused display; a tap on the game takes them back (the game says so).
+- **Ending the other app.** "Close <app>" only stops treating it as beside the game.
+- **Home on the main display** is not undone: the user asked to leave. A game on the
+  second display goes on.
+
+Not run: YouTube or any app that plays sound beside the game (so nobody knows how two
+sounds mix, only that the stream stays open); a real finger on the handle; the handle's
+fade; "Close <app>" after the fix; the pause menu's sliders on the device; the Home
+broadcast with an app in front; the hold and release of a game whose own display is
+covered by an app; a GPU core; the Presentation fallback; one display; a long session (the
+sound counted 2 refills in about three minutes of switching, nobody listened). "Back to
+<app>" brings the app forward like its launcher icon: an app whose first screen is
+`singleTask` may close screens it had opened above it (Settings and its task were
+unchanged). Tetris was left at "Game over" in its resume state; the swap, both volumes
+(Game 20%, media 0) and the handle's place are as they were found.
+
+Run on the PC: `win` preset in `build/verify8`, 11 of 11 test programs.
 
 ## Second screen: quick settings and the pause menu (after the fifth round)
 
@@ -156,6 +177,11 @@ After the Apps and keyboard check Windows and Android were built again from `mai
 11 of 11 tests): `dist\windows` is mirrored to the Desktop folder and was started once from
 a copy, `dist\android\EmuDEN.apk` is the APK left on the Retroid, force-stopped. Linux was
 not rebuilt and the Legion Go S not touched: its AppImage is still `75fa362`.
+
+After the check of an app beside the game (above) Windows and Android were built again
+from `main` (Windows 11 of 11 tests): `dist\windows` is mirrored to the Desktop folder (not
+started), `dist\android\EmuDEN.apk` is the release APK left on the Retroid, force-stopped.
+Linux was not rebuilt and the Legion Go S not touched.
 
 - **Windows** (automation port 28467, portable `user` folder): the fifth-round table above.
   The app left no process behind. `dist\windows` (14.5 MB) is mirrored to
