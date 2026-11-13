@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <format>
 
+#include "../companion/second_screen.h"
 #include "den/app/pages.h"
 #include "den/base/files.h"
 #include "glyphs.h"
@@ -25,15 +26,18 @@ constexpr float ROW_HEIGHT = 48;
 void PlayerScreen::BuildMenu() {
     const ui::Theme& theme = *Svc().theme;
     ui::Node& root = Root();
-    // Beside the picture, or under it where the window has no room for both.
-    menu_ = PlaceMenu(area_, view_ == View::Picture || view_ == View::PictureAdjust);
+    // Beside the picture, or under it where the window has no room for both; all of the
+    // display when the game is on the other one.
+    built_apart_ = menu_apart_;
+    menu_ = PlaceMenu(menu_area_.w > 0 ? menu_area_ : area_,
+                      !menu_apart_ && (view_ == View::Picture || view_ == View::PictureAdjust));
     root.axis = menu_.stacked ? ui::Axis::Column : ui::Axis::Row;
     if (menu_.stacked) {
         root.Add(ui::MakeBox(ui::Axis::Column))->height = menu_.room.h;
     }
     ui::Node* panel = root.Add(ui::MakeBox(ui::Axis::Column, 10));
     panel->id = "menu";
-    if (menu_.stacked) {
+    if (menu_.stacked || menu_apart_) {
         panel->grow = 1;
     } else {
         panel->width = menu_.panel.w;
@@ -120,10 +124,7 @@ void PlayerScreen::BuildMain(ui::Node* list) {
     }));
     rows.push_back(ChoiceRow(
         "menu.size", "Screen size", ScreenSizeNames(), [this] { return static_cast<int>(size_); },
-        [this](int index) {
-            size_ = static_cast<ScreenSize>(index);
-            Svc().settings->SetNumber("player.screen_size", index);
-        }));
+        [this](int index) { SetScreenSize(index); }));
     if (dual_.Active()) {
         // Two screens: which display or which place each has.
         rows.push_back(ActionRow("menu.swap", "Swap screens", [this] {
@@ -132,6 +133,9 @@ void PlayerScreen::BuildMain(ui::Node* list) {
         }));
         rows.push_back(ValueRow(
             "menu.screens", "Screens", [this] { return dual_.Summary(); }, [this] { Show(View::Screens); }));
+    } else if (SecondScreenReady()) {
+        // Two displays: the game and the quick settings change places.
+        rows.push_back(ActionRow("menu.swap", "Swap screens", [this] { SwapDisplays(); }));
     }
     rows.push_back(ValueRow(
         "menu.picture", "Picture", [this] { return PictureName(picture_, game_.system); },
@@ -139,9 +143,8 @@ void PlayerScreen::BuildMain(ui::Node* list) {
     rows.push_back(ValueRow(
         "menu.options", "Core options", [this] { return std::format("{}", options_.size()); },
         [this] {
-            options_for_game_ = std::any_of(options_.begin(), options_.end(),
-                                            [](const player::CoreOption& option) { return option.for_game; });
-            Show(View::Options);
+            OpenPage("options");
+            direct_ = false;
         }));
     rows.push_back(ActionRow("menu.buttons", "Buttons", [this] { Show(View::Buttons); }));
     rows.push_back(ValueRow(

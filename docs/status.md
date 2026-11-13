@@ -19,6 +19,19 @@ listened.
 
 `emuden --windowed --size 3840x2160` opens a window of that size (new, for such checks).
 
+## Second screen: quick settings and the pause menu (after the fifth round)
+
+| Item | State | What was run |
+|---|---|---|
+| Quick settings: Swap screens, Screen size, Core options, Buttons | Added beside the old rows; a rebuilt page keeps every scrolling row where it was (`ui::Page`, by node id) | Windows, `EMUDEN_SECOND_WINDOW=1`, Tetris, both windows looked at: Stretch and Fit applied live; a picture preset tapped after dragging its row left the row in place; Core options scrolled by a drag and by the keyboard; Buttons opened |
+| Swap screens | The game goes to the second display, the quick settings to the main window; kept in `player.swap_displays` | Windows: swapped from the quick settings and back from the pause menu; still swapped after a restart; the keyboard pad started Tetris while swapped; taps on the quick settings in the main window |
+| Pause menu on the second display | With two displays the menu opens on the one with the quick settings, the game stays undimmed; `player.overlay_on_second_screen` in Settings > Player turns it off | Windows: Tetris (menu, picture preview live on the game) and Explorers of Skies (menu in place of the touch screen, which came back on Resume); setting off and one display: the menu over the dimmed game as before |
+
+Not run: any of this on Android (the Presentation) or Linux, a real pad or finger, touch on
+the game while it is on the second display, a question ("Reset the game?") while the menu
+is on the second display (it is drawn on the main one), a two-screen game with "Top on
+second" (the menu then stays over the touch screen on the main display).
+
 ## The owner's notes
 
 | Note | State | What was run |

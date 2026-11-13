@@ -62,6 +62,10 @@ std::vector<ui::RowSpec> PlayerRows() {
     for (ui::RowSpec& row : DualScreenSettingRows()) {
         rows.push_back(std::move(row));
     }
+    rows.push_back(Switch("player.overlay_on_second_screen", "Pause menu on the second screen", true,
+                          "With two displays the menu opens beside the game, not over it"));
+    rows.push_back(Switch("player.swap_displays", "Game on the second screen", false,
+                          "With two displays the game and the quick settings change places"));
     rows.push_back(Switch("player.pad_by_label", "Buttons by their label", true,
                           "A is A on every pad; off uses the place of the button"));
     rows.push_back(Switch("player.show_fps", "Show the frame rate", false, "F3 switches it while playing"));
