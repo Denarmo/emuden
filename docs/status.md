@@ -293,12 +293,75 @@ Design and contract: `docs/feature-plugins.md`; the browser page: `docs/in-app-b
     section and a plugin's pages are open; the consent page of the developer plugin showed
     two of its permission sentences above the buttons.
 - **Not run:** a 7z download from any real site (for the owner by hand, as the list
-  above); Linux build and run; the web page's text entry (X) with the system keyboard on
+  above); Linux in that step (built and run afterwards, see the release section
+  below); the web page's text entry (X) with the system keyboard on
   the Retroid; pad input in the web page there; a 7z over a few megabytes; BCJ2, delta and
   PPMd outside the unit tests.
 - **Limits:** a solid 7z block is unpacked in memory (refused over 1 GiB, so a large disc
   image in a solid 7z does not play); 7z with a password is not asked for one; a console
   whose rule is "pass" gets a zip as it is but a 7z unpacked.
+
+## Release of the plugins round (2026-11-13)
+
+What this round holds: feature plugins and the Plugins section, the in-app browser, the
+four ROM hack site plugins (index 10 of `Denarmo/emuden-plugins`) and 7z. All three
+packages were built from `main` at `98033bd`; the code is `192cf16` plus the Steam artwork
+in the AppImage and the SteamOS installer.
+
+| Platform | Built and tested | Run in this release step | Where it is |
+|---|---|---|---|
+| Windows | `win` preset from an empty directory (`build\release7`), `ctest` 12 of 12 | `tools\package.ps1`; a copy of the package with an empty portable `user` folder was started once (automation port 48005): setup first, then the Plugins section listed the four plugins from the live index (picture looked at), `quit`, no process left | `dist\windows` (17.8 MB), mirrored to `C:\Users\david\Desktop\EmuDEN` (the Desktop copy itself was not started) |
+| Android | The release APK (debug key) the Retroid check built at `192cf16`; no Android code changed after it, so it was not rebuilt | Nothing: the APK on the Retroid Pocket Duo has the same SHA-256 as `dist\android\EmuDEN.apk` (read with `adb`, no input sent). What was run on the device is in the section above | `dist\android\EmuDEN.apk`, installed, force-stopped. `EmuDEN-debug.apk` is still the fifth round's |
+| Linux | WSL Debian, clang, own directory, `ctest` 12 of 12; AppImage 6.8 MB (5.9 MB before the merge) | Legion Go S (no emulator or game running there): `install-steamos.sh` over ssh, the artwork set for the existing Steam shortcut, one start for 10 s: OpenGL 4.6 on Mesa 26.1.2 (radeonsi), device recognised, closed on the signal, nothing else in the log | `dist\linux\EmuDEN-x86_64.AppImage`, same SHA-256 as `~/Games/EmuDEN/` on the handheld |
+
+The first install on the Legion Go S in this step sent the old AppImage again by mistake (a
+failed copy out of WSL was not noticed); the second one put the new file there. The two
+`/tmp` files were removed each time.
+
+**Linux before this step** (WSL Debian under WSLg at `192cf16`, scratch home, automation port
+46728, a copy of Tetris; no code change was needed):
+
+- The AppImage needs no WebKitGTK: only `libm`, `libc` and the loader are linked, the
+  highest glibc symbol is 2.38.
+- The Plugins section listed the four plugins; romhacking.net (1.0.2) and hackdex.app
+  (2.0.2) were installed. The romhacking.net start page was loaded once in the embedded
+  view; nothing was clicked.
+- Embedded mode (the system has `libwebkit2gtk-4.1`, X11): the page is a child window of the
+  app's. On a `127.0.0.1` test site with a developer-folder plugin a `.gba` was refused
+  ("EmuDEN only installs patch files; this is a full game file") and a `.7z` holding a BPS
+  gave "You have the base game" and installed as a hack.
+- Fallback mode (the same AppImage with the WebKitGTK libraries hidden): Browse shows the
+  fallback page with "WebKitGTK 4.1 is not installed" and watches the Downloads folder. A
+  `.gba` put there was not offered; a BPS and a `.7z` holding a BPS were offered and
+  installed; the BPS hack ran (625 frames, mGBA, 59.5 fps).
+
+**Not run by anyone:**
+
+- A download from hackdex.app, whackahack.com, pokeharbor.com or romhacking.net. On every
+  platform only a start page was loaded, at most once per plugin and check; the whole
+  download path was run on test sites on `127.0.0.1` only. The real sites are for the owner
+  to try by hand (the list is in "Feature plugins and ROM Hacks" above).
+- On the Legion Go S: the Plugins section, a plugin's fallback page, a game. Only the
+  10 s start. SteamOS has no WebKitGTK, so the browser there is the fallback page (the
+  user's own browser plus the Downloads folder); that was only seen in WSL.
+- The "Open in your browser" button of the fallback page; Wayland for the embedded view.
+- On the Retroid: the web page's text entry with the system keyboard, pad input in the web
+  page. The test site there was run with a debug build, not the release APK.
+- The Windows Desktop copy; pad and touch in the Plugins section and the browser on
+  Windows; a real pad or a finger anywhere.
+
+**Known limits:**
+
+- pokeharbor.com offers only pre-patched ROMs, so every download there is refused; its
+  plugin is a browser that says so.
+- rar is not read: unpack by hand and use "Choose a patch file". 7z with a password, PPMd
+  or a solid block over 1 GiB is refused with a sentence.
+- Only patch files are installed. A ROM image, and a zip or 7z holding one, is refused.
+- An archive with several patches gives its first. MEGA downloads reach Android without
+  the file's name.
+- On a two-screen Android device the second display keeps the last game's page while the
+  Plugins section or a plugin's pages are open.
+- Linux without WebKitGTK 4.1 (SteamOS) has no page inside the app.
 
 ## The owner's notes
 
@@ -311,7 +374,9 @@ Design and contract: `docs/feature-plugins.md`; the browser page: `docs/in-app-b
 | Scrolling with weight | Flings with friction, a rubber band at the ends, snapping shelves, no Qt | Windows: an injected fling on the library grid overshot the end and came back. Retroid: an `input swipe` (a real touch event) on the library grid ran on, overshot 835 to 870 and settled in about a second. No real finger |
 | Settings chosen for the device | The device is recognised and its defaults sit below the user's settings; setup lists them; Settings > Device shows and overrides them | Retroid, after clearing the app's data: the first step is titled "Set up for Retroid Pocket Duo" and lists its choices (two screens, 125%, PSP 3x, 120 Hz, rewind on). Windows: Settings > Device shows the real PC (desktop, very high, 100%). Legion Go S: the log names it (handheld, mid) |
 
-## Release check (last thing done)
+## Release check (earlier rounds)
+
+The newest release step is "Release of the plugins round" above.
 
 `win` preset from an empty build directory at `e82045d`: 11 of 11 test programs pass and the
 three parallel commits built together without a change. Two small commits came out of the
