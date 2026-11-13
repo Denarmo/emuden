@@ -13,7 +13,8 @@ if(TARGET den_player_tests)
     target_link_libraries(den_player_tests PRIVATE SDL3::SDL3-static)
     add_dependencies(den_player_tests den_player_testcore)
     target_compile_definitions(den_player_tests PRIVATE
-        DEN_TESTCORE_PATH="$<TARGET_FILE:den_player_testcore>")
+        DEN_TESTCORE_PATH="$<TARGET_FILE:den_player_testcore>"
+        DEN_SHADER_DIR="${CMAKE_SOURCE_DIR}/assets/shaders")
 endif()
 
 # A window that plays one game, to try the player without the app (tools/play.cpp).

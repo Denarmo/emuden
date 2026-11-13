@@ -152,7 +152,7 @@ void PlayerSession::Close() {
     hw_.reset();
     audio_.Close();
     rewind_.reset();
-    shader_.Release();
+    ReleasePicture();
     if (texture_ && config_.device) {
         config_.device->DestroyTexture(texture_);
     }
@@ -163,7 +163,6 @@ void PlayerSession::Close() {
         content_cache_.clear();
     }
     snapshot_ = Snapshot{};
-    picture_ = "plain";
 }
 
 void PlayerSession::ReadAvInfo() {
@@ -274,11 +273,6 @@ void PlayerSession::ReloadButtons() {
         button_maps_[family] = LoadButtons(config_.settings, system_,
                                            static_cast<input::PadFamily>(family), pad_by_label_);
     }
-}
-
-void PlayerSession::SetPicture(const std::string& id) {
-    picture_ = PictureShader::Has(id) ? id : "plain";
-    snapshot_.picture = picture_;
 }
 
 void PlayerSession::Pause() {

@@ -9,6 +9,7 @@
 #include "den/app/pages.h"
 #include "den/base/files.h"
 #include "glyphs.h"
+#include "picture_choice.h"
 #include "player_screen.h"
 
 namespace den::app {
@@ -17,7 +18,6 @@ namespace {
 
 using input::Nav;
 
-constexpr float PANEL_WIDTH = 460;
 constexpr float ROW_HEIGHT = 48;
 
 } // namespace
@@ -28,11 +28,12 @@ void PlayerScreen::BuildMenu() {
     root.axis = ui::Axis::Row;
     ui::Node* panel = root.Add(ui::MakeBox(ui::Axis::Column, 10));
     panel->id = "menu";
-    panel->width = PANEL_WIDTH;
+    panel->width = MENU_PANEL_WIDTH;
     panel->background = theme.dialog;
     panel->SetPadding(24, 26);
 
-    const char* titles[] = {"", "", "Save state", "Load state", "Core options", "Buttons", "Players"};
+    const char* titles[] = {"",        "",        "Save state", "Load state", "Core options",
+                            "Buttons", "Players", "Picture",    "Adjust the picture"};
     const bool main = view_ == View::Main;
     panel->Emplace<ui::Label>(main ? game_.name : titles[static_cast<int>(view_)], theme.text_heading,
                               gfx::FONT_BOLD);
@@ -61,6 +62,12 @@ void PlayerScreen::BuildMenu() {
         break;
     case View::Players:
         BuildPlayers(list);
+        break;
+    case View::Picture:
+        BuildPicture(list);
+        break;
+    case View::PictureAdjust:
+        BuildPictureAdjust(list);
         break;
     case View::Closed:
         break;
@@ -103,15 +110,9 @@ void PlayerScreen::BuildMain(ui::Node* list) {
             size_ = static_cast<ScreenSize>(index);
             Svc().settings->SetNumber("player.screen_size", index);
         }));
-    {
-        std::vector<std::string> names;
-        for (const player::PicturePreset& preset : player::PicturePresets()) {
-            names.push_back(preset.name);
-        }
-        rows.push_back(ChoiceRow(
-            "menu.picture", "Picture", std::move(names), [this] { return picture_; },
-            [this](int index) { SetPicture(index); }));
-    }
+    rows.push_back(ValueRow(
+        "menu.picture", "Picture", [this] { return PictureName(picture_, game_.system); },
+        [this] { Show(View::Picture, "picture." + picture_); }));
     rows.push_back(ValueRow(
         "menu.options", "Core options", [this] { return std::format("{}", options_.size()); },
         [this] {

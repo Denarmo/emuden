@@ -87,7 +87,7 @@ struct Snapshot {
     bool resumed = false;           // this session continued from the state Close wrote
     double audio_queued_ms = 0.0;   // sound waiting to be played
     int audio_underruns = 0;        // times the sound ran dry (audible gaps) since Open
-    std::string picture;            // the picture preset in use ("plain", "crt", "lcd")
+    std::string picture;            // the picture preset in use ("plain", "crt", ...), never "auto"
     AudioStats audio;
     /// The buttons the game was last given per port, as RetroPad bits (B, Y, Select, Start,
     /// Up, Down, Left, Right, A, X, L, R, L2, R2, L3, R3 from bit 0).
@@ -107,12 +107,28 @@ struct CoreOption {
 /// Whose value SetOption writes: every game of the console (the core), or this game only.
 enum class OptionScope { Console, Game };
 
-/// A built-in picture preset (a GLSL pass over the game's picture).
+/// A slider of a picture preset.
+struct PictureParam {
+    std::string id;
+    std::string name;
+    float min = 0, max = 1, step = 0.05f;
+    float fallback = 0; // the preset's own value
+    float value = 0;    // the value in use (Session::PictureParams)
+};
+
+/// A picture preset: how the game's picture is drawn (a chain of GLSL passes from
+/// <assets>/shaders, see den/gfx/effect_chain.h). "plain" is always there and comes first.
 struct PicturePreset {
-    std::string id;   // "plain", "crt", "lcd"
-    std::string name; // "Plain", "CRT", "LCD"
+    std::string id;    // "plain", "crt", "dotmatrix", ...
+    std::string name;  // "Plain", "CRT", "Dot matrix (green)"
+    std::string group; // "Clean", "Television", "Handheld"
+    std::vector<PictureParam> params;
 };
 const std::vector<PicturePreset>& PicturePresets();
+/// The id that means "the console's own default" wherever a preset id is taken.
+constexpr const char* PICTURE_AUTO = "auto";
+/// The preset Auto stands for on a console ("gb" gives "dotmatrix"); "plain" when none.
+std::string AutoPicture(const std::string& system);
 
 constexpr int STATE_SLOTS = 10;
 
@@ -178,9 +194,19 @@ public:
     virtual void ClearGameOptions() {}
     /// Reads the remapped buttons from the settings again (after the remap page changed them).
     virtual void ReloadButtons() {}
-    /// Chooses a picture preset by id for the running game; an unknown id is "plain". The
-    /// choice is not saved here: the screen keeps it in the settings.
+    /// Chooses a picture preset by id for the running game: "auto" is the console's default,
+    /// an unknown id is "plain". Its sliders start at the user's values
+    /// (player.shader.<preset>.<param>). The choice itself is not saved here: the screen
+    /// keeps it in the settings.
     virtual void SetPicture(const std::string& /*id*/) {}
+    /// The sliders of the preset in use, with their values.
+    virtual std::vector<PictureParam> PictureParams() const {
+        return {};
+    }
+    /// Moves a slider of the preset in use, at once, and remembers the value.
+    virtual void SetPictureParam(const std::string& /*param*/, float /*value*/) {}
+    /// Back to the preset's own values.
+    virtual void ResetPictureParams() {}
     /// The volume of the running game, 0..1, at once. Not saved here ("player.volume" is
     /// what the next game opens with).
     virtual void SetVolume(float /*volume*/) {}

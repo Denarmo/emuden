@@ -9,6 +9,7 @@
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
+#include "picture_choice.h"
 
 namespace den::app {
 
@@ -39,27 +40,22 @@ std::vector<ui::RowSpec> PlayerRows() {
         [](int index) { Svc().settings->SetNumber("player.fast_forward_speed", SPEEDS[index]); }));
     rows.push_back(Switch("player.smooth", "Smooth picture", true, "Off shows sharp pixels"));
     {
+        const std::vector<std::string> ids = PictureIds();
         std::vector<std::string> names;
-        for (const player::PicturePreset& preset : player::PicturePresets()) {
-            names.push_back(preset.name);
+        for (const std::string& id : ids) {
+            names.push_back(PictureName(id));
         }
         ui::RowSpec picture = ChoiceRow(
             "player.picture", "Picture", std::move(names),
-            [] {
-                const std::string id = Svc().settings->GetString("player.picture", "plain");
-                const auto& presets = player::PicturePresets();
-                for (std::size_t i = 0; i < presets.size(); ++i) {
-                    if (presets[i].id == id) {
-                        return static_cast<int>(i);
-                    }
-                }
-                return 0;
+            [ids] {
+                const std::string id = Svc().settings->GetString(PICTURE_KEY.name(), PICTURE_KEY.fallback());
+                const auto it = std::find(ids.begin(), ids.end(), id);
+                return it == ids.end() ? 0 : static_cast<int>(it - ids.begin());
             },
-            [](int index) {
-                Svc().settings->SetString("player.picture",
-                                          player::PicturePresets()[static_cast<std::size_t>(index)].id);
+            [ids](int index) {
+                Svc().settings->SetString(PICTURE_KEY.name(), ids[static_cast<std::size_t>(index)]);
             });
-        picture.description = "For consoles without a choice of their own in the pause menu";
+        picture.description = "Auto gives every console its own; a console or a game can have another in the pause menu";
         rows.push_back(std::move(picture));
     }
     rows.push_back(Switch("player.pad_by_label", "Buttons by their label", true,

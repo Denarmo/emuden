@@ -133,9 +133,17 @@ A runnable folder: `powershell -ExecutionPolicy Bypass -File tools\package.ps1` 
   console's), `ClearGameOptions()` drops them; `CoreOption::for_game` tells which is shown.
   Buttons: `den/player/buttons.h` (`LoadButtons`, `SaveButton`, `ResetButtons`; settings
   `player.buttons.<system>.<game button>` = a pad button by position), then
-  `Session::ReloadButtons()`. Picture presets: `PicturePresets()` (plain, crt, lcd; one
-  built-in GLSL pass, GL 3.3 and GLES 3) and `Session::SetPicture(id)`; the screen keeps the
-  choice in `player.picture_for.<system>`, default `player.picture`. The snapshot also has
+  `Session::ReloadButtons()`. Picture presets: `PicturePresets()` (id, name, group, sliders),
+  read from `assets/shaders/presets.json`; each is a chain of GLSL passes of that folder run
+  by `gfx::EffectChain` (`den/gfx/effect_chain.h`: render targets, a previous-frame history,
+  `p_<id>` parameters; one source for GL 3.3 and GLES 3). `Session::SetPicture(id)` takes a
+  preset id or `"auto"` (`AutoPicture(system)`: the console's default), `PictureParams`,
+  `SetPictureParam` and `ResetPictureParams` its sliders (`player.shader.<preset>.<param>`).
+  The screen keeps the choice in the layered key `player.picture` (game, console, global;
+  `app/screens/player/picture_choice.h`). The presentation path in `player/src/session_video.cpp`
+  is `PreparePicture` (the core's frame as a `PictureSource`), then `DrawRegion` per
+  `PictureRegion` (a part of the picture, its target, and a slot that keeps the chain's
+  targets apart): a two-screen layout calls it once per screen. The snapshot also has
   `audio_queued_ms`, `audio_underruns` and `picture`. While playing, Select + R1 holds
   fast-forward and Select + L1 rewind on every pad; button glyphs per pad family are drawn
   by `app/screens/player/glyphs.h` (`DrawGlyph`, `HintLine`).

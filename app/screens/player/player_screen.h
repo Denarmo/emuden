@@ -18,6 +18,8 @@
 
 namespace den::app {
 
+constexpr float MENU_PANEL_WIDTH = 460; // the pause menu, at the left
+
 class PlayerScreen final : public ui::Page {
 public:
     ~PlayerScreen() override;
@@ -37,7 +39,7 @@ public:
 
 private:
     enum class Phase { New, Preparing, Running, Left };
-    enum class View { Closed, Main, Save, Load, Options, Buttons, Players };
+    enum class View { Closed, Main, Save, Load, Options, Buttons, Players, Picture, PictureAdjust };
 
     // player_screen.cpp: the session.
     void Open();
@@ -59,7 +61,11 @@ private:
     void BuildOptions(ui::Node* list);
     void BuildButtons(ui::Node* list);
     void BuildPlayers(ui::Node* list);
-    void SetPicture(int index);
+    // picture_pages.cpp: the picture preset and its sliders.
+    void BuildPicture(ui::Node* list);
+    void BuildPictureAdjust(ui::Node* list);
+    void LoadPicture();
+    void ChoosePicture(const std::string& id);
     void StartCapture(int game_button);
     void TickCapture();
     std::uint32_t HeldButtons() const;
@@ -97,7 +103,8 @@ private:
     bool chord_fast_ = false, chord_rewind_ = false;
 
     // The pause menu's pages.
-    int picture_ = 0;                // index into player::PicturePresets()
+    std::string picture_ = "auto";   // the kept choice: a preset id of den::player, or "auto"
+    int picture_scope_ = 1;          // "Apply to": a PictureScope
     bool options_for_game_ = false;  // "Apply to": this game, or every game of the console
     int capture_ = -1;               // the game button waiting for a pad button; -1 = none
     bool capture_armed_ = false;     // every button was released since the capture started

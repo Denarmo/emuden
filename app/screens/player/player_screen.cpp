@@ -116,17 +116,7 @@ void PlayerScreen::Begin(const std::filesystem::path& content) {
                         .count();
     aspect_sent_ = 0;
     svc.player->SetAspectOverride(0);
-    // The picture preset: the console's own choice, else the default for every console.
-    const std::string picture = svc.settings->GetString(
-        "player.picture_for." + game_.system, svc.settings->GetString("player.picture", "plain"));
-    const auto& presets = player::PicturePresets();
-    picture_ = 0;
-    for (std::size_t i = 0; i < presets.size(); ++i) {
-        if (presets[i].id == picture) {
-            picture_ = static_cast<int>(i);
-        }
-    }
-    svc.player->SetPicture(presets[static_cast<std::size_t>(picture_)].id);
+    LoadPicture();
     capture_ = -1;
     swallow_nav_ = false;
     resume_told_ = false;
@@ -443,6 +433,14 @@ bool PlayerScreen::OnNav(Nav nav) {
     case View::Players:
         Show(View::Main, "menu.players");
         break;
+    case View::Picture:
+        // A picture that was only looked at goes; the kept one comes back.
+        Svc().player->SetPicture(picture_);
+        Show(View::Main, "menu.picture");
+        break;
+    case View::PictureAdjust:
+        Show(View::Picture, "picture.adjust");
+        break;
     case View::Closed:
         break;
     }
@@ -479,7 +477,15 @@ void PlayerScreen::Draw(ui::Context& ctx, const gfx::Rect& area) {
     canvas.FillRect(area, gfx::Color::Rgb(0x000000));
     if (phase_ == Phase::Running) {
         const player::Snapshot snapshot = svc.player->GetSnapshot();
-        const Placement placement = Place(size_, area, snapshot.frame_width, snapshot.frame_height,
+        // The picture pages leave the game as it is, beside the menu: it is what is being
+        // chosen.
+        const bool choosing = view_ == View::Picture || view_ == View::PictureAdjust;
+        gfx::Rect room = area;
+        if (choosing) {
+            room.x += MENU_PANEL_WIDTH;
+            room.w -= MENU_PANEL_WIDTH;
+        }
+        const Placement placement = Place(size_, room, snapshot.frame_width, snapshot.frame_height,
                                           snapshot.aspect, canvas.Scale());
         if (placement.aspect != aspect_sent_) {
             svc.player->SetAspectOverride(placement.aspect);
@@ -487,7 +493,7 @@ void PlayerScreen::Draw(ui::Context& ctx, const gfx::Rect& area) {
         }
         svc.player->Draw(canvas, placement.area);
         DrawOverlays(ctx, area, snapshot);
-        if (view_ != View::Closed) {
+        if (view_ != View::Closed && !choosing) {
             canvas.FillRect(area, ctx.theme->scrim);
         }
     } else if (phase_ == Phase::Preparing) {

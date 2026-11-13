@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Pages of the pause menu: core options (for the console or for this game), the buttons with
-// their remap, the players, and the picture preset.
+// their remap, and the players.
 
 #include <algorithm>
 #include <format>
@@ -38,18 +38,6 @@ std::string Upper(std::string text) {
 
 PadFamily PlayerScreen::PadFamilyShown() const {
     return Svc().input->ActiveFamily();
-}
-
-void PlayerScreen::SetPicture(int index) {
-    const auto& presets = player::PicturePresets();
-    if (index < 0 || index >= static_cast<int>(presets.size())) {
-        return;
-    }
-    picture_ = index;
-    const std::string& id = presets[static_cast<std::size_t>(index)].id;
-    // Remembered for the console: a handheld and a home console want different pictures.
-    Svc().settings->SetString("player.picture_for." + game_.system, id);
-    Svc().player->SetPicture(id);
 }
 
 void PlayerScreen::BuildOptions(ui::Node* list) {

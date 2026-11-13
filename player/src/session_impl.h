@@ -16,7 +16,7 @@
 #include "game_files.h"
 #include "hw_context.h"
 #include "pad_map.h"
-#include "picture_shader.h"
+#include "picture_presets.h"
 #include "rewind_buffer.h"
 
 namespace den::player {
@@ -51,6 +51,9 @@ public:
     void ClearGameOptions() override;
     void ReloadButtons() override;
     void SetPicture(const std::string& id) override;
+    std::vector<PictureParam> PictureParams() const override;
+    void SetPictureParam(const std::string& param, float value) override;
+    void ResetPictureParams() override;
     void SetVolume(float volume) override {
         audio_.SetVolume(volume);
     }
@@ -78,6 +81,11 @@ private:
     void WriteThumbnail(const std::filesystem::path& file);
     void MeasureFps(double seconds);
     gfx::Rect PictureRect(const gfx::Canvas& canvas, const gfx::Rect& area) const;
+    bool PreparePicture(gfx::Canvas& canvas, PictureSource& source);
+    void DrawRegion(gfx::Canvas& canvas, const PictureSource& source, const PictureRegion& region,
+                    int slot);
+    bool ReadyChain(gfx::Device& device);
+    void ReleasePicture();
 
     Config config_;
     // Destroyed after the core: the core frees what it drew with while it unloads.
@@ -119,8 +127,13 @@ private:
     unsigned filtered_texture_ = 0;
     gfx::Rect picture_rect_;
     float aspect_override_ = 0.0f;
-    PictureShader shader_;
+    // The picture preset: its passes are compiled when it is first drawn.
     std::string picture_ = "plain";
+    const PresetData* preset_ = nullptr;   // null for "plain"
+    std::vector<float> picture_values_;    // per PresetData::uniforms
+    gfx::EffectChain chain_;
+    bool chain_stale_ = true;
+    std::uint64_t picture_frame_ = 0;
 
     // Input: the button map per pad family, with the user's remap.
     std::array<ButtonMap, 4> button_maps_{};

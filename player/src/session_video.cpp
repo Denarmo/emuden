@@ -1,7 +1,11 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Showing the core's picture inside the rectangle the UI gives.
+// Showing the core's picture inside the rectangle the UI gives. The path has three steps:
+// PreparePicture makes the core's latest frame a texture (a PictureSource), Draw decides
+// where it goes, and DrawRegion sends a part of it through the picture preset's chain to
+// its place. Draw uses one region for the whole picture; a layout with several screens
+// calls DrawRegion once per screen with its own part, target and slot.
 
 #include <algorithm>
 #include <cmath>
@@ -25,7 +29,7 @@ gfx::Rect PlayerSession::PictureRect(const gfx::Canvas& canvas, const gfx::Rect&
         h = area.h;
         w = area.h * aspect;
     }
-    if (integer_scale_ && frame.height > 0) {
+    if ((integer_scale_ || (preset_ && preset_->integer)) && frame.height > 0) {
         // Whole multiples of the picture's height in device pixels.
         const float pixels = h * canvas.Scale();
         const float multiple = std::floor(pixels / static_cast<float>(frame.height));
@@ -41,92 +45,116 @@ gfx::Rect PlayerSession::PictureRect(const gfx::Canvas& canvas, const gfx::Rect&
     return gfx::Rect{x, y, std::round(w * s) / s, std::round(h * s) / s};
 }
 
-void PlayerSession::Draw(gfx::Canvas& canvas, const gfx::Rect& area) {
-    canvas.FillRect(area, gfx::Color::Rgb(0x000000));
-    if (!core_) {
-        return;
-    }
+bool PlayerSession::PreparePicture(gfx::Canvas& canvas, PictureSource& source) {
     const VideoFrame& frame = core_->Frame();
     if (frame.width == 0 || frame.height == 0) {
-        return;
+        return false;
     }
     gfx::Device& device = canvas.GetDevice();
-    gfx::Texture texture;
-    gfx::Rect uv{0, 0, 1, 1};
+    source.serial = frame.serial;
+    source.hardware = frame.hardware;
     if (frame.hardware) {
-        if (!hw_) {
-            return;
+        if (!hw_ || !hw_->Target()) {
+            return false;
         }
-        texture = hw_->Target();
-        if (!texture) {
-            return;
-        }
-        const float u = static_cast<float>(hw_->PictureWidth()) / static_cast<float>(texture.width);
-        const float v =
-            static_cast<float>(hw_->PictureHeight()) / static_cast<float>(texture.height);
+        source.texture = hw_->Target();
+        source.width = static_cast<float>(hw_->PictureWidth());
+        source.height = static_cast<float>(hw_->PictureHeight());
+        const float u = source.width / static_cast<float>(source.texture.width);
+        const float v = source.height / static_cast<float>(source.texture.height);
         // The picture is the lower left of the target; GL's row 0 is its bottom row.
-        uv = hw_->BottomLeftOrigin() ? gfx::Rect{0, v, u, -v} : gfx::Rect{0, 0, u, v};
-    } else {
-        const int width = static_cast<int>(frame.width), height = static_cast<int>(frame.height);
-        if (!texture_ || texture_.width != width || texture_.height != height) {
-            canvas.Flush();
-            if (texture_) {
-                device.DestroyTexture(texture_);
-            }
-            texture_ = device.CreateTexture(width, height, gfx::PixelFormat::Rgba8,
-                                            frame.rgba.data(), smooth_);
-            uploaded_serial_ = frame.serial;
-            canvas.RestoreState();
-        } else if (uploaded_serial_ != frame.serial) {
-            canvas.Flush();
-            device.UpdateTexture(texture_, 0, 0, width, height, gfx::PixelFormat::Rgba8,
-                                 frame.rgba.data());
-            uploaded_serial_ = frame.serial;
-            canvas.RestoreState();
-        }
-        texture = texture_;
+        source.uv = hw_->BottomLeftOrigin() ? gfx::Rect{0, v, u, -v} : gfx::Rect{0, 0, u, v};
+        return true;
     }
-    picture_rect_ = PictureRect(canvas, area);
-
-    // Pixel art at a whole multiple stays sharp; anything else is smoothed when asked.
-    const bool whole = !frame.hardware && frame.height > 0 &&
-                       std::fabs(std::fmod(picture_rect_.h * canvas.Scale(),
-                                           static_cast<float>(frame.height))) < 0.5f;
-    const bool shaded = PictureShader::Has(picture_);
-    const int filter = shaded || (smooth_ && !whole) ? gl::LINEAR : gl::NEAREST;
-    if (filter != texture_filter_ || texture.id != filtered_texture_) {
+    const int width = static_cast<int>(frame.width), height = static_cast<int>(frame.height);
+    if (!texture_ || texture_.width != width || texture_.height != height) {
         canvas.Flush();
-        gl::BindTexture(gl::TEXTURE_2D, texture.id);
+        if (texture_) {
+            device.DestroyTexture(texture_);
+        }
+        texture_ = device.CreateTexture(width, height, gfx::PixelFormat::Rgba8, frame.rgba.data(),
+                                        smooth_);
+        texture_filter_ = -1;
+        uploaded_serial_ = frame.serial;
+        canvas.RestoreState();
+    } else if (uploaded_serial_ != frame.serial) {
+        canvas.Flush();
+        device.UpdateTexture(texture_, 0, 0, width, height, gfx::PixelFormat::Rgba8, frame.rgba.data());
+        uploaded_serial_ = frame.serial;
+        canvas.RestoreState();
+    }
+    source.texture = texture_;
+    source.width = static_cast<float>(width);
+    source.height = static_cast<float>(height);
+    source.uv = gfx::Rect{0, 0, 1, 1};
+    return true;
+}
+
+void PlayerSession::DrawRegion(gfx::Canvas& canvas, const PictureSource& source,
+                               const PictureRegion& region, int slot) {
+    gfx::Device& device = canvas.GetDevice();
+    const float s = canvas.Scale();
+    const gfx::Rect uv{source.uv.x + region.part.x * source.uv.w, source.uv.y + region.part.y * source.uv.h,
+                       region.part.w * source.uv.w, region.part.h * source.uv.h};
+    const float rows = source.height * region.part.h;
+    if (chain_stale_) {
+        // Compiling the preset's passes uses GL behind the canvas's back.
+        canvas.Flush();
+        ReadyChain(device);
+        canvas.RestoreState();
+    }
+    const bool chained = ReadyChain(device);
+
+    // Pixel art at a whole multiple stays sharp; anything else is smoothed when asked. A
+    // preset says itself how its first pass reads the picture.
+    const bool whole = !source.hardware && rows > 0 &&
+                       std::fabs(std::fmod(region.target.h * s, rows)) < 0.5f;
+    const bool linear = preset_ ? preset_->input_linear : smooth_ && !whole;
+    const int filter = linear ? gl::LINEAR : gl::NEAREST;
+    if (filter != texture_filter_ || source.texture.id != filtered_texture_) {
+        canvas.Flush();
+        gl::BindTexture(gl::TEXTURE_2D, source.texture.id);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, filter);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, filter);
         gl::BindTexture(gl::TEXTURE_2D, 0);
         canvas.RestoreState();
         texture_filter_ = filter;
-        filtered_texture_ = texture.id;
+        filtered_texture_ = source.texture.id;
     }
-    if (shaded) {
-        const float s = canvas.Scale();
-        PictureShader::Quad quad;
-        quad.texture = texture.id;
-        quad.target = gfx::Rect{picture_rect_.x * s, picture_rect_.y * s, picture_rect_.w * s,
-                                picture_rect_.h * s};
-        quad.uv = uv;
-        quad.source_width = static_cast<float>(frame.hardware ? hw_->PictureWidth() : frame.width);
-        quad.source_height = static_cast<float>(frame.hardware ? hw_->PictureHeight() : frame.height);
-        quad.view_width = static_cast<int>(std::lround(canvas.Width() * s));
-        quad.view_height = static_cast<int>(std::lround(canvas.Height() * s));
+    if (chained) {
+        gfx::EffectChain::Input input;
+        input.texture = source.texture.id;
+        input.uv = uv;
+        input.width = source.width * region.part.w;
+        input.height = rows;
+        input.serial = source.serial;
+        input.frame = picture_frame_;
+        gfx::EffectChain::Output output;
+        output.target = gfx::Rect{region.target.x * s, region.target.y * s, region.target.w * s,
+                                  region.target.h * s};
+        output.view_width = static_cast<int>(std::lround(canvas.Width() * s));
+        output.view_height = static_cast<int>(std::lround(canvas.Height() * s));
         canvas.Flush();
-        const bool drawn = shader_.Draw(device, picture_, quad);
+        const bool drawn = chain_.Draw(device, input, output, slot);
         canvas.RestoreState();
         if (drawn) {
             return;
         }
-        picture_ = "plain";
-        snapshot_.picture = picture_;
     }
-    canvas.DrawImage(picture_rect_, texture, gfx::Color{255, 255, 255, 255}, 0, uv);
+    canvas.DrawImage(region.target, source.texture, gfx::Color{255, 255, 255, 255}, 0, uv);
     // The texture changes before the canvas would draw it at the end of the frame.
     canvas.Flush();
+}
+
+void PlayerSession::Draw(gfx::Canvas& canvas, const gfx::Rect& area) {
+    canvas.FillRect(area, gfx::Color::Rgb(0x000000));
+    PictureSource source;
+    if (!core_ || !PreparePicture(canvas, source)) {
+        return;
+    }
+    picture_rect_ = PictureRect(canvas, area);
+    ++picture_frame_;
+    DrawRegion(canvas, source, PictureRegion{gfx::Rect{0, 0, 1, 1}, picture_rect_}, 0);
 }
 
 } // namespace den::player
