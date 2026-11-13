@@ -60,6 +60,20 @@ bool HasArg(int argc, char** argv, const char* name) {
     return false;
 }
 
+// "--size 1920x1080": the window's size for a windowed start (tests of other resolutions).
+void SizeFromArgs(int argc, char** argv, pal::WindowDesc& desc) {
+    for (int i = 1; i + 1 < argc; ++i) {
+        int width = 0;
+        int height = 0;
+        if (std::strcmp(argv[i], "--size") == 0 &&
+            std::sscanf(argv[i + 1], "%dx%d", &width, &height) == 2 && width >= 320 &&
+            height >= 240) {
+            desc.width = width;
+            desc.height = height;
+        }
+    }
+}
+
 } // namespace
 
 Services& Svc() {
@@ -101,6 +115,7 @@ int Run(int argc, char** argv) {
     desc.fullscreen = !HasArg(argc, argv, "--windowed") &&
                       (HasArg(argc, argv, "--fullscreen") ||
                        settings.GetBool("window.fullscreen", pal::GetCaps().handheld));
+    SizeFromArgs(argc, argv, desc);
     auto window = pal::CreateAppWindow(desc);
     if (!window) {
         log::Error("app", "{}", window.error());
