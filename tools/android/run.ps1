@@ -7,7 +7,7 @@
 #   python tools/drive.py --port 5601 state
 # -Stop only stops the app and removes the forward. -Apk installs that file instead of the
 # one Gradle writes. -BuildName <name> builds in build\<name> instead of build\android. The
-# test endpoints on the two ports after -Port are forwarded as well. Nothing else on the
+# test endpoints on the three ports after -Port are forwarded as well. Nothing else on the
 # device is touched.
 param(
     [string]$Device = "",
@@ -28,7 +28,7 @@ $package = "io.github.denarmo.emuden.next"
 
 if ($Stop) {
     & $adb @target shell am force-stop $package
-    foreach ($p in $Port, ($Port + 1), ($Port + 2)) { & $adb @target forward --remove "tcp:$p" }
+    foreach ($p in $Port, ($Port + 1), ($Port + 2), ($Port + 3)) { & $adb @target forward --remove "tcp:$p" }
     exit 0
 }
 if (-not $NoBuild -and -not $Apk) {
@@ -45,5 +45,5 @@ if ($GrantStorage) {
     & $adb @target shell appops set $package MANAGE_EXTERNAL_STORAGE allow
 }
 & $adb @target shell input keyevent KEYCODE_WAKEUP
-foreach ($p in $Port, ($Port + 1), ($Port + 2)) { & $adb @target forward "tcp:$p" "tcp:$p" }
+foreach ($p in $Port, ($Port + 1), ($Port + 2), ($Port + 3)) { & $adb @target forward "tcp:$p" "tcp:$p" }
 & $adb @target shell am start -n "$package/io.github.denarmo.emuden.EmuDenActivity" --ei automation $Port

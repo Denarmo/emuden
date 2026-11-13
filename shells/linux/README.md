@@ -11,6 +11,10 @@ wraps it into `EmuDEN-x86_64.AppImage`.
   that integrate AppImages show the name and icon.
 - HTTP uses the system's libcurl, loaded at run time (`libcurl.so.4`, else
   `libcurl-gnutls.so.4`). libstdc++ is linked statically; the binary needs glibc 2.38.
+- The in-app browser uses the system's WebKitGTK (`libwebkit2gtk-4.1.so.0`), loaded at run
+  time on X11 only; it is never a dependency of the binary. Where it is missing (SteamOS)
+  the page opens the site in the user's browser and picks up the download from the
+  Downloads folder instead (`docs/in-app-browser.md`).
 - SteamOS: `tools/linux/install-steamos.sh <AppImage>` (run on the device, no root) copies
   the AppImage to `~/Games/EmuDEN/`, adds a desktop entry with the icon to the menu and the
   desktop, and with `--portable` creates the `user` folder there; `--steam` also adds it to
