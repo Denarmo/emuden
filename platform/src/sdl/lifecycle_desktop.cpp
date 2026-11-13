@@ -48,6 +48,8 @@ bool HasScreenControls() {
 
 void OpenScreenControls() {}
 
+void HoldGameFocus(bool) {}
+
 } // namespace audio
 
 } // namespace den::pal

@@ -173,6 +173,14 @@ void OpenScreenControls() {
     }
 }
 
+void HoldGameFocus(bool hold) {
+    const jni::ActivityCall call;
+    if (const jmethodID method = call.Method("gameFocus", "(Z)V")) {
+        call.env->CallStaticVoidMethod(call.activity_class, method, static_cast<jboolean>(hold));
+        call.Threw();
+    }
+}
+
 } // namespace audio
 
 } // namespace den::pal

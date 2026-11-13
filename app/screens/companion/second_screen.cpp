@@ -25,6 +25,7 @@
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
+#include "../apps/beside.h"
 #include "../player/player_screen.h"
 #include "den/platform/lifecycle.h"
 #include "den/platform/second_display.h"
@@ -217,6 +218,14 @@ void Frame() {
         // game that plays there; otherwise the app is left and gives it up as well.
         const PlayerScreen* playing = PlayerScreen::Current();
         wanted = wanted && playing && playing->WantsSecond();
+    }
+    if (const system::AppBeside& beside = Beside();
+        beside.GetStage() == system::AppBeside::Stage::AppFront &&
+        beside.AppScreen() == system::BesideScreen::Second && beside.GameScreen() == system::BesideScreen::Main) {
+        // An app beside a game on the main display covers this one. The quick settings are
+        // not shown, and a task of this app here would have the Retroid give the game this
+        // display's volume: they go until the app's handle brings them back.
+        wanted = false;
     }
     display.SetWanted(wanted);
     c.pointer.clear();

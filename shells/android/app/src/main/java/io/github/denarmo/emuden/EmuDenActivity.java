@@ -193,6 +193,7 @@ public class EmuDenActivity extends SDLActivity {
         super.onWindowFocusChanged(hasFocus);
         windowFocus = hasFocus;
         tellFocus();
+        askGameFocus();
     }
 
     @Override
@@ -200,6 +201,10 @@ public class EmuDenActivity extends SDLActivity {
         super.onTopResumedActivityChanged(isTopResumedActivity);
         topResumed = isTopResumedActivity;
         tellFocus();
+        if (isTopResumedActivity && gameFocusHop) {
+            gameFocusHop = false;
+            getWindow().getDecorView().postDelayed(this::askGameFocus, 200);
+        }
     }
 
     private void tellFocus() {
@@ -295,6 +300,60 @@ public class EmuDenActivity extends SDLActivity {
                 Log.w(TAG, "the screen controls did not open: " + e);
             }
         }, "screen-controls").start();
+    }
+
+    private static android.media.AudioFocusRequest gameFocus;
+    private static boolean gameFocusWanted;
+    private static boolean gameFocusHop;
+
+    /**
+     * Called from native code: hold the audio focus for a game on the main display, or let it
+     * go. On the Retroid Pocket Duo the window the device last noted as focused when it is asked
+     * for decides which screen's volume the sound follows: this one, not the quick settings on
+     * the other display. The game goes on when another app takes it.
+     */
+    public static void gameFocus(boolean hold) {
+        EmuDenActivity activity = self;
+        if (activity == null) {
+            return;
+        }
+        activity.runOnUiThread(() -> {
+            gameFocusWanted = hold;
+            if (!hold) {
+                gameFocusHop = false;
+            }
+            AudioManager audio = (AudioManager) activity.getSystemService(AUDIO_SERVICE);
+            if (!hold && gameFocus != null && audio != null) {
+                audio.abandonAudioFocusRequest(gameFocus);
+                gameFocus = null;
+                // The device sorts the apps by screen again only when the activities change.
+                FocusHop.to(activity, activity.getDisplay().getDisplayId(), null);
+            }
+            if (hold && gameFocus == null && !gameFocusHop) {
+                // The device notes the window only when a display's focused activity changes:
+                // one that ends at once on this display makes it note this window again.
+                gameFocusHop = FocusHop.to(activity, activity.getDisplay().getDisplayId(), () -> { });
+            }
+            activity.askGameFocus();
+        });
+    }
+
+    private void askGameFocus() {
+        if (!gameFocusWanted || gameFocus != null || gameFocusHop || !windowFocus || !topResumed) {
+            return;
+        }
+        AudioManager audio = (AudioManager) getSystemService(AUDIO_SERVICE);
+        if (audio == null) {
+            return;
+        }
+        gameFocus = new android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(new android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_GAME)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build())
+                .setOnAudioFocusChangeListener(change -> { })
+                .build();
+        audio.requestAudioFocus(gameFocus);
     }
 
     private static final String[] SCREEN_PANELS = {

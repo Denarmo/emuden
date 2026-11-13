@@ -23,5 +23,8 @@ void SetSystemVolume(int step);
 bool HasScreenControls();
 /// Opens that panel (on the second screen).
 void OpenScreenControls();
+/// Holds the audio focus for a game played on the main display, or lets it go. On those
+/// devices the focus holder's display decides which screen's volume its sound follows.
+void HoldGameFocus(bool hold);
 
 } // namespace den::pal::audio
