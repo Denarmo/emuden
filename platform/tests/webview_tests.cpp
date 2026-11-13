@@ -6,6 +6,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "den/base/files.h"
+#include "../src/webview_download_names.h"
 #include "den/platform/webview.h"
 
 using namespace den;
@@ -84,4 +85,23 @@ TEST_CASE("the fake web view filters navigation and hands over downloads") {
     CHECK(view->Input() == std::vector<std::string>{"move 10 20", "click 10 20", "key Enter"});
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
+}
+
+TEST_CASE("a download without a suggested name gets a browser's") {
+    CHECK(pal::WebDownloadName("attachment; filename=\"My Hack v1.2.bps\"", "https://x.test/get?id=4") == "My Hack v1.2.bps");
+    CHECK(pal::WebDownloadName("attachment; filename=plain.zip; size=3", "https://x.test/a") == "plain.zip");
+    CHECK(pal::WebDownloadName("attachment; filename=\"old.bps\"; filename*=UTF-8''caf%C3%A9%20hack.bps", "") ==
+          "caf\xC3\xA9 hack.bps");
+    CHECK(pal::WebDownloadName("attachment; filename=\"..\\..\\evil.bps\"", "") == "evil.bps");
+    CHECK(pal::WebDownloadName("", "https://x.test/files/Hack%20One.bps?token=abc#top") == "Hack One.bps");
+    CHECK(pal::WebDownloadName("inline", "https://x.test/files/game.gba") == "game.gba");
+    CHECK(pal::WebDownloadName("", "https://x.test/") == "download");
+    CHECK(pal::WebDownloadName("", "https://x.test") == "download");
+}
+
+TEST_CASE("a file the page made is named after its first bytes") {
+    CHECK(pal::WebPatchExtension(std::string_view("BPS1\0\0\0\0", 8)) == ".bps");
+    CHECK(pal::WebPatchExtension("PATCH\x01\x02\x03") == ".ips");
+    CHECK(pal::WebPatchExtension("PK\x03\x04rest") == ".zip");
+    CHECK(pal::WebPatchExtension(std::string_view("\x00\x00\x00\xC0\x00\x00\x00\xEA", 8)).empty());
 }

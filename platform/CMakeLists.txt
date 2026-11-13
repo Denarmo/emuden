@@ -9,6 +9,8 @@ if(ANDROID)
     list(APPEND platform_exclude "/src/posix/http_curl.cpp")
     # The second screen is a Presentation (src/android), not a second window.
     list(APPEND platform_exclude "/src/sdl/second_display_sdl.cpp")
+    # The web view is android.webkit.WebView (src/android).
+    list(APPEND platform_exclude "/src/posix/webview_posix.cpp")
 else()
     list(APPEND platform_exclude "/src/android/")
 endif()

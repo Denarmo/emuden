@@ -16,7 +16,8 @@ These hold for every backend and every opener.
   is run in the page; cookies and site storage are not touched (they live in the engine's
   profile folder `<data>/webview`, which the app never opens). `pal::WebView` has no method
   for any of it, and the Windows backend switches off host objects and web messages, the two
-  ways a page and an app could talk.
+  ways a page and an app could talk. (Android needs one narrow exception for files a page
+  makes itself; see the Android backend below.)
 - **What the app does know** is what a browser shows around a page: the address, the
   document's title, whether it is loading, whether there is history. The automation endpoint
   reports those and nothing more.
@@ -133,9 +134,40 @@ Backends:
 - **Fake** (`platform/src/webview_fake.cpp`): the filter, the history and the download
   decision without an engine. `CreateFakeWebView` for tests (`SimulateLink`,
   `SimulateDownload`, `Input()`); `EMUDEN_FAKE_WEBVIEW=1` makes `Create` return it.
-- **Linux, macOS, Android**: none yet; `Available()` is false with a reason
-  (`platform/src/posix/webview_posix.cpp`). WebKitGTK, WKWebView and `android.webkit.WebView`
-  are the engines to wrap.
+- **Android**: `android.webkit.WebView` (`platform/src/android/webview_android.cpp`, and
+  `WebPage.java` and `WebDownloads.java` in `shells/android`). The view is added to the
+  activity's layout above the app's surface, so it is on the display the activity is on (the
+  main one on a two-screen device). It lives on Android's UI thread; calls are posted there
+  and what it reports comes back through the event pump. Differences from Windows:
+  - *Navigation* is answered on the UI thread from the allowed hosts. With an `on_navigate`
+    callback the UI thread waits up to 300 ms for the app's thread; without an answer the
+    allowed hosts decide.
+  - *Downloads*: the engine only reports that the user started one. When the app takes it,
+    the address is requested once more with `HttpURLConnection`, carrying the view's user
+    agent and the cookies the view holds for that address (a signed or signed-in download
+    needs them); they go into that request's headers and nowhere else. A download that
+    answers only once, or only to a POST, fails. The file name comes from
+    `Content-Disposition` or the address (`platform/src/webview_download_names.cpp`).
+  - *Files the page makes itself* (`blob:` and `data:` addresses): a `data:` address is
+    decoded by the app; for a blob, a short script asks the page for the bytes of exactly
+    that address and hands them to the app in pieces. This is the one script the app runs
+    in a page, and it reads nothing else. The engine does not pass on the name the page
+    gave such a file, so it is called `download` with the extension its first bytes stand
+    for (`.bps`, `.ips`, `.ups`, `.xdelta`, `.aps`, `.ppf`, `.zip`, `.7z`); anything else is
+    refused by the page's rule. A site whose content policy forbids the script's `fetch`
+    cannot hand over a blob.
+  - *Settings*: JavaScript and DOM storage on; file and content access, mixed content,
+    geolocation, form data and new windows off; Safe Browsing on; permission requests and
+    file choosers answered with no. The profile is the one Android keeps for the app
+    (`user_data_dir` is ignored). Plain http works for `127.0.0.1` and `localhost` only
+    (`res/xml/network_security.xml`).
+  - *Pad input*: A is a touch (down and up) at the pointer, the right stick is a mouse
+    wheel, typed text and keys are key events, all dispatched to the view. The pointer is a
+    small view above the page that touches pass through. While a page shows, pad keys and
+    sticks go to the app even when the page has the focus. Back (key, gesture or pad) is the
+    app's Back: back in the page's history first, then the page closes.
+- **Linux, macOS**: none yet; `Available()` is false with a reason
+  (`platform/src/posix/webview_posix.cpp`). WebKitGTK and WKWebView are the engines to wrap.
 
 ## Test endpoint
 
