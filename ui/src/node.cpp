@@ -177,6 +177,10 @@ void Node::Draw(Context& ctx) {
         rect.Bottom() + 40 < clip.y) {
         return;
     }
+    // Half a heading at the edge of a list reads as lying under what is drawn there.
+    if (whole && (rect.y < clip.y - 0.5f || rect.Bottom() > clip.Bottom() + 0.5f)) {
+        return;
+    }
     if (background.a > 0) {
         ctx.canvas->FillRect(rect, background, radius);
     }

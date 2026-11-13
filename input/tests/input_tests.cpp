@@ -37,6 +37,17 @@ TEST_CASE("a pad SDL does not know is sorted by its name") {
     CHECK(FamilyFromName("Generic USB Joystick") == PadFamily::Xbox);
 }
 
+TEST_CASE("the hints at start follow what exists") {
+    const PadFamily sony = PadFamily::PlayStation;
+    CHECK(StartHints(DeviceKind::Desktop, nullptr).family == PadFamily::Keyboard);
+    CHECK(!StartHints(DeviceKind::Desktop, nullptr).touch_only);
+    CHECK(StartHints(DeviceKind::Desktop, &sony).family == PadFamily::PlayStation);
+    CHECK(StartHints(DeviceKind::Handheld, nullptr).family == PadFamily::Xbox);
+    CHECK(StartHints(DeviceKind::Handheld, &sony).family == PadFamily::PlayStation);
+    CHECK(StartHints(DeviceKind::TouchOnly, nullptr).touch_only);
+    CHECK(!StartHints(DeviceKind::TouchOnly, &sony).touch_only);
+}
+
 TEST_CASE("the face buttons follow their letters on every family") {
     // Xbox and PlayStation: the bottom button confirms, the right one goes back.
     for (const PadFamily family : {PadFamily::Xbox, PadFamily::PlayStation}) {

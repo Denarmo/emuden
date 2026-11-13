@@ -331,7 +331,8 @@ void Stage::Frame(Context& ctx) {
         impl_->Apply(*this);
         page = Top();
         page->Prepare();
-        const bool immersive = page->Immersive();
+        // Without buttons to name (a touch-only device) there is no bar either.
+        const bool immersive = page->Immersive() || !ctx.show_hints;
         const gfx::Rect area{0, 0, canvas.Width(), canvas.Height() - (immersive ? 0 : HINT_BAR_HEIGHT)};
         page->Draw(ctx, area);
         if (!immersive) {

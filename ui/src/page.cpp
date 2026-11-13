@@ -157,10 +157,23 @@ void Page::EnsureVisible(Node* node) {
         }
         const bool row = scroller->axis == Axis::Row;
         const float view = row ? scroller->rect.w : scroller->rect.h;
-        const float start = (row ? node->rect.x - scroller->rect.x : node->rect.y - scroller->rect.y) +
-                            scroller->scroll;
+        float start = (row ? node->rect.x - scroller->rect.x : node->rect.y - scroller->rect.y) +
+                      scroller->scroll;
         const float end = start + (row ? node->rect.w : node->rect.h);
-        const float margin = std::min(scroller->scroll_margin, std::max(0.0f, (view - (end - start)) * 0.5f));
+        float margin = std::min(scroller->scroll_margin, std::max(0.0f, (view - (end - start)) * 0.5f));
+        if (!row) {
+            // What the list holds the node in (a shelf under its heading) is shown from its
+            // start when it fits, so the heading comes with the row below it.
+            const Node* group = node;
+            while (group->Parent() != scroller) {
+                group = group->Parent();
+            }
+            const float group_start = group->rect.y - scroller->rect.y + scroller->scroll;
+            if (group != node && group_start < start && end - group_start <= view) {
+                start = group_start;
+                margin = std::min(margin, std::max(0.0f, (view - (end - start)) * 0.5f));
+            }
+        }
         // From where the node is heading, so held directions do not chase a moving window.
         const float heading = scroller->scroller.Destination();
         if (start - margin < heading) {

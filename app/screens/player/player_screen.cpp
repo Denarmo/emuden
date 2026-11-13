@@ -487,16 +487,18 @@ void PlayerScreen::DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const p
 void PlayerScreen::Draw(ui::Context& ctx, const gfx::Rect& area) {
     Services& svc = Svc();
     gfx::Canvas& canvas = *ctx.canvas;
+    area_ = area;
     canvas.FillRect(area, gfx::Color::Rgb(0x000000));
     if (phase_ == Phase::Running) {
         const player::Snapshot snapshot = svc.player->GetSnapshot();
         // The picture pages leave the game as it is, beside the menu: it is what is being
         // chosen.
         const bool choosing = view_ == View::Picture || view_ == View::PictureAdjust;
-        gfx::Rect room = area;
-        if (choosing) {
-            room.x += MENU_PANEL_WIDTH;
-            room.w -= MENU_PANEL_WIDTH;
+        const MenuLayout layout = PlaceMenu(area, choosing);
+        const gfx::Rect room = choosing ? layout.room : area;
+        if (view_ != View::Closed && (layout.stacked != menu_.stacked || layout.panel.w != menu_.panel.w ||
+                                      layout.room.h != menu_.room.h)) {
+            Rebuild(); // the window changed under the menu
         }
         if (dual_.Active()) {
             // Each screen at its own size; the second display, when there is one, is drawn

@@ -33,6 +33,17 @@ float PixelScale(int width, int height) {
     return base * std::min(system::UiScale(), widest);
 }
 
+// What the button hints start from: a handheld has a pad of its own, a tablet has none.
+input::DeviceKind HintDevice() {
+    const system::DeviceProfile& device = system::Device();
+    if (device.info.builtin_pad || device.form == system::FormFactor::HandheldSmall ||
+        device.form == system::FormFactor::HandheldDual) {
+        return input::DeviceKind::Handheld;
+    }
+    return device.form == system::FormFactor::Tablet && device.info.touch ? input::DeviceKind::TouchOnly
+                                                                          : input::DeviceKind::Desktop;
+}
+
 std::string GlText(gl::Enum name) {
     const unsigned char* text = gl::GetString(name);
     return text ? std::string(reinterpret_cast<const char*>(text)) : std::string();
@@ -129,6 +140,7 @@ int Run(int argc, char** argv) {
         Jobs jobs;
         gfx::TextureCache textures(device, jobs);
         input::System input(svc.window->SdlWindow());
+        input.SetDeviceKind(HintDevice());
         ui::Stage stage;
         svc.device = &device;
         svc.canvas = &canvas;
@@ -205,6 +217,7 @@ int Run(int argc, char** argv) {
             ctx.textures = &textures;
             ctx.theme = svc.theme;
             ctx.family = input.ActiveFamily();
+            ctx.show_hints = !input.TouchOnly();
             ctx.dt = dt;
             ctx.time = now;
             stage.Frame(ctx);

@@ -25,10 +25,19 @@ constexpr float ROW_HEIGHT = 48;
 void PlayerScreen::BuildMenu() {
     const ui::Theme& theme = *Svc().theme;
     ui::Node& root = Root();
-    root.axis = ui::Axis::Row;
+    // Beside the picture, or under it where the window has no room for both.
+    menu_ = PlaceMenu(area_, view_ == View::Picture || view_ == View::PictureAdjust);
+    root.axis = menu_.stacked ? ui::Axis::Column : ui::Axis::Row;
+    if (menu_.stacked) {
+        root.Add(ui::MakeBox(ui::Axis::Column))->height = menu_.room.h;
+    }
     ui::Node* panel = root.Add(ui::MakeBox(ui::Axis::Column, 10));
     panel->id = "menu";
-    panel->width = MENU_PANEL_WIDTH;
+    if (menu_.stacked) {
+        panel->grow = 1;
+    } else {
+        panel->width = menu_.panel.w;
+    }
     panel->background = theme.dialog;
     panel->SetPadding(24, 26);
 
@@ -75,11 +84,13 @@ void PlayerScreen::BuildMenu() {
     case View::Closed:
         break;
     }
-    // Hints in the glyphs of the pad in use.
-    auto* hints = panel->Emplace<HintLine>(
-        Svc().input->ActiveFamily(),
-        std::vector<HintLine::Item>{{Nav::Confirm, "Select"}, {Nav::Back, main ? "Resume" : "Back"}});
-    hints->pad_top = 6;
+    // Hints in the glyphs of the pad in use; none where there is no button to name.
+    if (!Svc().input->TouchOnly()) {
+        auto* hints = panel->Emplace<HintLine>(
+            Svc().input->ActiveFamily(),
+            std::vector<HintLine::Item>{{Nav::Confirm, "Select"}, {Nav::Back, main ? "Resume" : "Back"}});
+        hints->pad_top = 6;
+    }
 }
 
 void PlayerScreen::BuildMain(ui::Node* list) {

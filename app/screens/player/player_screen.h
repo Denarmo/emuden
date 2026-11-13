@@ -19,8 +19,6 @@
 
 namespace den::app {
 
-constexpr float MENU_PANEL_WIDTH = 460; // the pause menu, at the left
-
 class PlayerScreen final : public ui::Page {
 public:
     ~PlayerScreen() override;
@@ -88,6 +86,8 @@ private:
     ScreenSize size_ = ScreenSize::Fit;
     float aspect_sent_ = 0;
     bool show_fps_ = false;
+    gfx::Rect area_;                 // the window, as last drawn
+    MenuLayout menu_;                // what the menu was built for
     std::string focus_after_build_;
     std::vector<player::CoreOption> options_;
 

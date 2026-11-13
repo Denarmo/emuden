@@ -270,7 +270,7 @@ float PadGlyphWidth(Context& ctx, PadFamily family, PadButton button, float heig
 }
 
 float DrawPadGlyph(Context& ctx, PadFamily family, PadButton button, float x, float y, float height,
-                   gfx::Color ink) {
+                   gfx::Color ink, bool pressed) {
     const std::string name = Name(family, button);
     if (name.empty()) {
         return 0;
@@ -307,7 +307,7 @@ float DrawPadGlyph(Context& ctx, PadFamily family, PadButton button, float x, fl
     // Bumpers are outlined caps, triggers filled ones.
     const float width = PadGlyphWidth(ctx, family, button, height);
     const gfx::Rect cap{x, y + height * 0.1f, width, height * 0.8f};
-    if (IsTrigger(button)) {
+    if (IsTrigger(button) || pressed) {
         ctx.canvas->FillRect(cap, ink, height * 0.3f);
         Centered(ctx, name, x + width * 0.5f, y, height, height * 0.5f, ctx.theme->page.WithAlpha(ink.a / 255.0f));
     } else {

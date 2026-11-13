@@ -133,7 +133,8 @@ protected:
             if (held) {
                 canvas.FillRect(gfx::Rect{x - 6, y - 6, w + 12, g + 12}, theme.panel_strong, (g + 12) * 0.5f);
             }
-            ui::DrawPadGlyph(ctx, pad.family, which, x, y, g, held ? theme.fg : theme.text_dim.WithAlpha(0.55f));
+            ui::DrawPadGlyph(ctx, pad.family, which, x, y, g, held ? theme.fg : theme.text_dim.WithAlpha(0.55f),
+                             held);
         };
         button(PadButton::L2, -4.6f, -4.2f);
         button(PadButton::R2, 4.6f, -4.2f);

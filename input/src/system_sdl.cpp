@@ -139,6 +139,9 @@ struct System::Impl {
     std::vector<OpenPad> pads;
     std::deque<Event> injected;
     PadFamily active = PadFamily::Keyboard;
+    DeviceKind kind = DeviceKind::Desktop;
+    bool touch_only = false;
+    bool used = false; // a button or key was pressed: the hints follow the device used last
     bool nav_from_pads = true;
     bool pointer_down = false;
     // The direction or button held for auto-repeat.
@@ -156,6 +159,20 @@ struct System::Impl {
             }
         }
         return nullptr;
+    }
+
+    // The hints for what exists, while nothing has been used.
+    void ChooseStartHints() {
+        const HintChoice choice = StartHints(kind, pads.empty() ? nullptr : &pads.front().state.family);
+        active = choice.family;
+        touch_only = choice.touch_only;
+        used = false;
+    }
+
+    void Used(PadFamily family) {
+        active = family;
+        touch_only = false;
+        used = true;
     }
 
     void Open(SDL_JoystickID id) {
@@ -203,6 +220,7 @@ struct System::Impl {
             return;
         }
         out.push_back(Event::MakeNav(nav, family));
+        Used(family);
         if (nav == Nav::Up || nav == Nav::Down || nav == Nav::Left || nav == Nav::Right) {
             held = nav;
             held_family = family;
@@ -254,6 +272,10 @@ struct System::Impl {
             } else {
                 Close(e.gdevice.which);
             }
+            // Nothing used yet, or the pad in use left: the hints follow what exists now.
+            if (!used || (pads.empty() && active != PadFamily::Keyboard)) {
+                ChooseStartHints();
+            }
             Event event;
             event.type = Event::Type::PadsChanged;
             out.push_back(event);
@@ -270,7 +292,7 @@ struct System::Impl {
             const Nav nav = NavForButton(pad->state.family, button);
             if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
                 pad->state.buttons |= bit;
-                active = pad->state.family;
+                Used(pad->state.family);
                 Press(nav, pad->state.family, out);
             } else {
                 pad->state.buttons &= ~bit;
@@ -322,8 +344,11 @@ struct System::Impl {
             key.down = e.type == SDL_EVENT_KEY_DOWN;
             key.repeat = e.key.repeat;
             out.push_back(key);
+            // Android's Back is a system gesture, not a keyboard.
+            if (key.down && e.key.key != SDLK_AC_BACK) {
+                Used(PadFamily::Keyboard);
+            }
             if (key.down) {
-                active = PadFamily::Keyboard;
                 const Nav nav = NavForKey(e.key.key);
                 if (nav != Nav::None) {
                     Event event = Event::MakeNav(nav, PadFamily::Keyboard);
@@ -368,6 +393,11 @@ struct System::Impl {
             out.push_back(event);
             break;
         }
+        case SDL_EVENT_FINGER_DOWN:
+            if (kind == DeviceKind::TouchOnly && pads.empty()) {
+                ChooseStartHints();
+            }
+            break;
         case SDL_EVENT_MOUSE_WHEEL: {
             Event event;
             event.type = Event::Type::Wheel;
@@ -393,6 +423,7 @@ System::System(void* sdl_window) : impl_(std::make_unique<Impl>()) {
         }
         SDL_free(ids);
     }
+    impl_->ChooseStartHints();
 }
 
 System::~System() {
@@ -434,8 +465,19 @@ void System::Inject(const Event& event) {
     impl_->injected.push_back(event);
 }
 
+void System::SetDeviceKind(DeviceKind kind) {
+    impl_->kind = kind;
+    if (!impl_->used) {
+        impl_->ChooseStartHints();
+    }
+}
+
 PadFamily System::ActiveFamily() const {
     return impl_->active;
+}
+
+bool System::TouchOnly() const {
+    return impl_->touch_only;
 }
 
 int System::PadCount() const {
