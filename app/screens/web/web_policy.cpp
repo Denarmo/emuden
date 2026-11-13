@@ -5,6 +5,7 @@
 // ROM images nobody gets.
 
 #include <algorithm>
+#include <format>
 #include <map>
 
 #include "den/app/app.h"
@@ -63,6 +64,16 @@ Verdict JudgeDownload(const std::string& file_name, const std::vector<std::strin
 
 std::filesystem::path InboxDir() {
     return Svc().data_dir / "inbox" / "web";
+}
+
+std::filesystem::path FreeFile(const std::filesystem::path& dir, const std::string& name) {
+    const std::filesystem::path wanted = PathFromUtf8(name);
+    std::filesystem::path file = dir / wanted;
+    std::error_code ec;
+    for (int n = 2; std::filesystem::exists(file, ec) && n < 1000; ++n) {
+        file = dir / PathFromUtf8(std::format("{} ({}){}", PathToUtf8(wanted.stem()), n, PathToUtf8(wanted.extension())));
+    }
+    return file;
 }
 
 void RegisterOpener(const std::string& name, Opener opener) {

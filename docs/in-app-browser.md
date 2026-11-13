@@ -166,8 +166,64 @@ Backends:
     small view above the page that touches pass through. While a page shows, pad keys and
     sticks go to the app even when the page has the focus. Back (key, gesture or pad) is the
     app's Back: back in the page's history first, then the page closes.
-- **Linux, macOS**: none yet; `Available()` is false with a reason
-  (`platform/src/posix/webview_posix.cpp`). WebKitGTK and WKWebView are the engines to wrap.
+- **Linux**: WebKitGTK when the system has it (`platform/src/linux/`).
+  - *Found at run time.* `libwebkit2gtk-4.1.so.0` (else `libwebkit2gtk-4.0.so.37`) is opened
+    with `dlopen`, and every function is looked up by name; the declarations the backend
+    needs are written out in `gtk_api.h`, so a build needs no GTK or WebKit headers and the
+    binary has no link dependency on either (`tools/linux/package.sh` refuses to package one
+    that does). SteamOS ships no WebKitGTK: there `Available()` is false and the page is the
+    fallback below. WebKitGTK 6.0 is GTK 4, which cannot sit inside another program's
+    window, so it is not used.
+  - *X11 only.* The engine's widget lives in a frameless GTK window that is made a child of
+    the app's X11 window, so under gamescope it is part of the app's one window. On a
+    Wayland session `Available()` is false (start the app with `SDL_VIDEODRIVER=x11` to get
+    the browser there). GTK runs on the main thread: its pending work is done from SDL's
+    event pump, 125 times a second while a view exists. GTK is started without changing the
+    app's locale and with `GDK_SCALE=1`; the page's size follows the display's scale through
+    the zoom level.
+  - *Navigation.* A link the user clicks to a host outside the list is refused before any
+    request. Everything else is decided on the server's answer for the top-level document:
+    an attachment or a type the engine cannot show becomes a download, a page on a host
+    outside the list is dropped before it shows. Addresses that are not http or https are
+    refused, except the `about:`, `data:` and `blob:` documents a page makes for its frames.
+  - *Downloads*: `download-started` and `decide-destination`; a refused download is
+    cancelled before a byte is written.
+  - *Off*: permission requests are denied; the engine's context menu, script dialogs, file
+    chooser, notifications, printing, colour chooser and full screen are swallowed, since
+    each would be a window outside the app's.
+  - *Pad input*: the GDK motion, button, smooth-scroll and key events a mouse and a
+    keyboard produce, handed to GTK; typed text through the editing command `InsertText`.
+    The pointer is a small round window above the page that takes no input. The keyboard's
+    focus stays with the app's window (the pad needs it there) and GTK is told the page's
+    window is active; a real mouse click in the page moves the keyboard to the page until
+    the view is hidden.
+- **macOS**: none yet; `Available()` is false with a reason
+  (`platform/src/posix/webview_posix.cpp`). WKWebView is the engine to wrap.
+
+## Without a web engine
+
+`app/screens/web/web_fallback.cpp`. When `Available()` is false, or the view cannot be made,
+the same route shows the fallback instead, so an opener needs no special case:
+
+- The page reads "Open <site> in your browser", says why there is no in-app browser, and has
+  one button (A, Enter, a tap): the address is handed to the user's browser
+  (`pal::OpenInBrowser`: `xdg-open`, the Windows shell, an Android intent), and only when it
+  is on the opener's hosts. The user browses and downloads there; the app has no part in it.
+- From the moment the page opens the app lists the user's Downloads folders about once a
+  second (`pal::DownloadFolders`: `XDG_DOWNLOAD_DIR` when set, the system's Downloads folder,
+  `~/Downloads`; `pal::DownloadWatch` in `den/platform/downloads.h`). Only names, sizes and
+  times are looked at; no file is opened.
+- A file is offered when it is new since the page opened (or was written again since), has
+  an extension the opener takes, and its size held still between two looks. Files that were
+  already there are never offered, and a ROM image never is.
+- The offer is a question, "Install <file>?". On yes the file is copied into the inbox (the
+  download stays where it is) and the opener's `on_download` runs as for a download in the
+  page; `Download::host` is the host the page was opened for. On no the file is not offered
+  again.
+- Where no Downloads folder can be listed (Android without a storage permission) the page
+  says so and only opens the browser.
+
+`EMUDEN_WEB_FALLBACK=1` shows the fallback where an engine exists (tests).
 
 ## Test endpoint
 
@@ -177,6 +233,7 @@ line out (`app/screens/web/web_endpoint.cpp`):
 | Line | Reply |
 |---|---|
 | `open url=<url> [hosts=a,b] [ext=bps,zip] [title=<text>]` | `ok`; opens the page for a test opener |
+| (`state` without an engine) | also `fallback` (true), `watching` (the folders), `offered` (the last file asked about), `offers` |
 | `state` | JSON: `open`, `available`, `ready`, `view_visible`, `url`, `title`, `loading`, `can_go_back`, `can_go_forward`, `view` (x, y, w, h in logical units), `pointer`, `cursor`, `downloading`, `progress`, `downloads`, `last_download`, `refused_downloads`, `last_refused_download`, `refused_navigations`, `last_refused_host`, and what the test opener was handed (`opener_calls`, `opener_file`, `opener_name`, `opener_host`) |
 | `cursor <x> <y>` | `ok`; puts the pad's pointer at a point of the view (logical units) |
 | `close` | `ok`; closes the page |

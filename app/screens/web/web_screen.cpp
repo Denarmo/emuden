@@ -9,6 +9,9 @@
 // goes back in the page's history or closes the page, X types text into the page, View
 // presses Enter, LB and RB go back and forward, Y reloads, Start closes. Mouse and touch go
 // straight to the page.
+//
+// Without a web engine the page is the fallback of web_fallback.h: the user's own browser
+// and the Downloads folder. EMUDEN_WEB_FALLBACK=1 asks for it where an engine exists.
 
 #include <algorithm>
 #include <cmath>
@@ -23,6 +26,7 @@
 #include "den/platform/webview.h"
 #include "den/ui/glyphs.h"
 #include "web_browser.h"
+#include "web_fallback.h"
 
 namespace den::app::web {
 
@@ -50,17 +54,6 @@ std::vector<std::string> Split(const std::string& text) {
         }
     }
     return out;
-}
-
-/// A file of the inbox that does not exist yet: "hack.bps", then "hack (2).bps", ...
-std::filesystem::path FreeFile(const std::filesystem::path& dir, const std::string& name) {
-    const std::filesystem::path wanted = PathFromUtf8(name);
-    std::filesystem::path file = dir / wanted;
-    std::error_code ec;
-    for (int n = 2; std::filesystem::exists(file, ec) && n < 1000; ++n) {
-        file = dir / PathFromUtf8(std::format("{} ({}){}", PathToUtf8(wanted.stem()), n, PathToUtf8(wanted.extension())));
-    }
-    return file;
 }
 
 /// The stick with the dead zone taken out and a soft start.
@@ -119,6 +112,9 @@ public:
             ShowPointer(false);
             return true;
         case Type::PointerUp:
+            if (fallback_ && fallback_->Tap(event.x / scale, event.y / scale, GetStage())) {
+                return true;
+            }
             for (const BarButton& button : buttons_) {
                 if (button.enabled && button.rect.Contains(event.x / scale, event.y / scale)) {
                     button.action();
@@ -132,6 +128,14 @@ public:
     }
 
     void Update(ui::Context& ctx) override {
+        if (fallback_) {
+            fallback_->Update(GetStage());
+            for (Download& download : fallback_->TakeAccepted()) {
+                finished_.push_back(std::move(download));
+            }
+            g_state.offered = fallback_->Offered();
+            g_state.offers = fallback_->Offers();
+        }
         Deliver();
         if (!view_ || !view_->Visible()) {
             return;
@@ -168,7 +172,7 @@ public:
 
     std::vector<ui::Hint> Hints() const override {
         if (!view_) {
-            return {{Nav::Back, "Close"}};
+            return {{Nav::Confirm, "Open in browser"}, {Nav::Back, "Close"}};
         }
         return {{Nav::Confirm, "Click"}, {Nav::Option, "Type"}, {Nav::Extra, "Reload"},
                 {Nav::Back, state_.can_go_back ? "Back" : "Close"}, {Nav::Menu, "Close"}};
@@ -183,7 +187,7 @@ public:
         view_rect_ = gfx::Rect{area.x, top, area.w, std::max(0.0f, area.h - top)};
         DrawBar(ctx, area);
         if (!view_) {
-            DrawMessage(ctx, "The in-app browser is not available", reason_);
+            fallback_->Draw(ctx, view_rect_, !GetStage().DialogOpen());
             return;
         }
         if (!state_.ready) {
@@ -254,9 +258,9 @@ private:
         if (wanted_.empty()) {
             wanted_ = opener_.extensions;
         }
-        g_state.available = pal::WebView::Available();
+        g_state.available = pal::WebView::Available() && pal::GetEnv("EMUDEN_WEB_FALLBACK") != "1";
         if (!g_state.available) {
-            reason_ = pal::WebView::UnavailableReason();
+            StartFallback(url, pal::WebView::UnavailableReason());
             return;
         }
         pal::WebViewConfig config;
@@ -264,8 +268,8 @@ private:
         config.allowed_hosts = hosts_;
         auto view = pal::WebView::Create(*Svc().window, pal::WebRect{}, std::move(config));
         if (!view) {
-            reason_ = view.error();
             g_state.available = false;
+            StartFallback(url, view.error());
             return;
         }
         view_ = view.take();
@@ -315,6 +319,13 @@ private:
         };
         view_->SetCallbacks(std::move(callbacks));
         view_->Navigate(url);
+    }
+
+    void StartFallback(const std::string& url, const std::string& reason) {
+        fallback_ = std::make_unique<Fallback>(url, hosts_, reason, wanted_);
+        g_state.fallback = true;
+        g_state.watching = fallback_->Watching();
+        g_state.url = url;
     }
 
     /// Takes the files the opener asked for and nothing else; never a ROM.
@@ -397,7 +408,9 @@ private:
             }
             break;
         case Nav::Confirm:
-            if (usable && !repeat) {
+            if (fallback_ && !repeat) {
+                fallback_->OpenBrowser(GetStage());
+            } else if (usable && !repeat) {
                 ShowPointer(true);
                 view_->Click(CursorPx(cursor_x_), CursorPx(cursor_y_));
             }
@@ -520,6 +533,9 @@ private:
 
         const float text_x = 192, text_w = std::max(0.0f, area.Right() - 16 - BUTTON - 16 - text_x);
         const std::string title = !state_.title.empty() ? state_.title : Param("title");
+        if (fallback_) {
+            state_.url = Param("url"); // the bar names the site the page was opened for
+        }
         canvas.DrawText(ctx.Text().Elide(title, theme.text_body, text_w, gfx::FONT_BOLD), text_x, 12, theme.text_body,
                         theme.fg, gfx::FONT_BOLD);
         std::string line = pal::WebUrlHost(state_.url);
@@ -538,13 +554,14 @@ private:
     }
 
     std::unique_ptr<pal::WebView> view_;
+    std::unique_ptr<Fallback> fallback_; // set instead of view_ when there is no engine
     pal::WebState state_;
     Opener opener_;
     std::vector<std::string> hosts_, wanted_;
     std::vector<Arriving> arriving_;
     std::vector<Download> finished_;
     std::vector<BarButton> buttons_;
-    std::string reason_, refused_host_;
+    std::string refused_host_;
     gfx::Rect view_rect_;
     double refused_at_ = 0;
     float cursor_x_ = -1, cursor_y_ = -1; // units inside the view

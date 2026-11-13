@@ -9,6 +9,11 @@ build="${1:-$root/build/linux}"
 out="${2:-$build/package}"
 exe="$build/bin/emuden"
 [ -x "$exe" ] || { echo "no $exe: run tools/linux/build.sh first" >&2; exit 1; }
+# GTK and WebKitGTK are only ever found at run time: a binary that needs them would not start
+# on SteamOS.
+if ldd "$exe" | grep -qiE 'webkit|libgtk|libgdk|libsoup'; then
+    echo "$exe links against GTK or WebKitGTK; they must stay run-time lookups" >&2; exit 1
+fi
 command -v mksquashfs >/dev/null || { echo "mksquashfs is missing (apt install squashfs-tools)" >&2; exit 1; }
 
 runtime_tag=20251108

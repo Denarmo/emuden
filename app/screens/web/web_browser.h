@@ -58,11 +58,17 @@ enum class Verdict { Take, NotWanted, RomImage };
 Verdict JudgeDownload(const std::string& file_name, const std::vector<std::string>& wanted);
 /// `<data>/inbox/web`: where downloads arrive.
 std::filesystem::path InboxDir();
+/// A file of `dir` that does not exist yet: "hack.bps", then "hack (2).bps", ...
+std::filesystem::path FreeFile(const std::filesystem::path& dir, const std::string& name);
 
 /// What the page is doing, for the automation endpoint. Never anything of the page's content.
 struct PageState {
     bool open = false;
-    bool available = false;
+    bool available = false; // the platform's web engine shows the page
+    bool fallback = false;  // no engine: the user's browser and the Downloads folder instead
+    std::string watching;   // the folders the fallback watches
+    std::string offered;    // the last file the fallback asked about
+    int offers = 0;
     bool ready = false;
     bool view_visible = false;
     bool loading = false;

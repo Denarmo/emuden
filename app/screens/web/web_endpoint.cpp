@@ -7,7 +7,8 @@
 //   open url=<url> [hosts=a.com,b.com] [ext=bps,zip] [title=<text>]
 //                         opens the page for a test opener that notes what it is handed
 //   state                 JSON: address, title, loading, history, the view's place, the pad's
-//                         pointer, downloads taken and refused, what the opener was handed
+//                         pointer, downloads taken and refused, what the opener was handed;
+//                         without an engine also the folders watched and the file asked about
 //   cursor <x> <y>        puts the pad's pointer at a point of the view (logical units)
 //   close                 closes the page
 //
@@ -48,6 +49,10 @@ std::string StateJson() {
     std::string text = WriteJson(JsonObject({
         {"open", JsonBool(s.open)},
         {"available", JsonBool(s.available)},
+        {"fallback", JsonBool(s.fallback)},
+        {"watching", JsonString(s.watching)},
+        {"offered", JsonString(s.offered)},
+        {"offers", number(s.offers)},
         {"ready", JsonBool(s.ready)},
         {"view_visible", JsonBool(s.view_visible)},
         {"url", JsonString(s.url)},
