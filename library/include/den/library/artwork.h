@@ -3,7 +3,9 @@
 
 // Cover art for every library entry. Local art wins (an image next to a ROM, the icon a
 // Switch 2 game carries); otherwise the cover is downloaded once from the libretro thumbnail
-// collection and kept on disk. When nothing is found a placeholder is drawn.
+// collection and kept on disk. A game the collection does not know by name (a hack) gets its
+// own art from the hack sources (hack_covers.h), else the box of the game it was made from
+// with a "HACK" tag in its corner. When nothing is found a placeholder is drawn.
 
 #pragma once
 
@@ -15,6 +17,7 @@
 #include <string_view>
 #include <vector>
 
+#include "den/library/hack_covers.h"
 #include "den/library/library.h"
 #include "den/library/systems.h"
 
@@ -54,10 +57,16 @@ std::string UrlDecode(std::string_view text);
 bool WritePlaceholderCover(const std::filesystem::path& file, std::string_view title,
                            std::string_view system_id);
 
+/// A copy of `image` (at most 512 pixels a side) with a "HACK" tag in its top left corner, as
+/// a PNG: the box of the original game on a hack. False when the image cannot be read.
+bool WriteHackMarkedCover(const std::filesystem::path& image, const std::filesystem::path& out);
+
 enum class ArtworkSource {
     Local,       // the entry already had a cover on this machine
     Cache,       // downloaded in an earlier run
     Downloaded,  // downloaded just now
+    HackArt,     // a hack's own art, from a hack source
+    BaseGame,    // a hack with the box of the game it was made from, tagged
     Placeholder, // nothing was found: a generated image
 };
 
@@ -66,28 +75,47 @@ struct ArtworkResult {
     ArtworkSource source = ArtworkSource::Placeholder;
 };
 
-/// Resolves covers. Resolve blocks on the disk and the network: call it from a job. It is
-/// safe from several threads at once.
+/// Resolves covers. Resolve and Choices block on the disk and the network: call them from a
+/// job. Safe from several threads at once.
 class Artwork {
 public:
-    /// `cache_dir` is created on demand. With an empty `fetcher` nothing is downloaded.
-    Artwork(std::filesystem::path cache_dir, HttpFetcher fetcher);
+    /// `cache_dir` is created on demand. With an empty `fetcher` nothing is downloaded. The
+    /// hack sources use `header_fetcher` (`fetcher` without headers when it is empty), with
+    /// `interval_ms` between two requests to one host.
+    Artwork(std::filesystem::path cache_dir, HttpFetcher fetcher, HeaderFetcher header_fetcher = {},
+            int interval_ms = 0);
+
+    void SetHackOptions(HackCoverOptions options);
 
     /// Every entry ends with a path, a placeholder at worst. A lookup that found nothing is
-    /// not repeated for two weeks; a failed connection is retried on the next run. Nothing new
-    /// is fetched once `stopping` returns true.
+    /// not repeated for two weeks (a hack's own art: one week); a failed connection is
+    /// retried on the next run. Nothing new is fetched once `stopping` returns true.
     ArtworkResult Resolve(const Entry& entry, const SystemDef* system,
                           const std::function<bool()>& stopping = {});
+
+    /// For the user to pick from: what the hack sources have for this game, downloaded, and
+    /// the tagged box of the game it was made from. Asks again whatever was cached as missing.
+    std::vector<CoverChoice> Choices(const Entry& entry, const SystemDef* system,
+                                     const std::function<bool()>& stopping = {});
 
 private:
     const ThumbnailIndex& IndexFor(const SystemDef& system);
     bool Download(const std::string& url, const std::filesystem::path& file_stem,
-                  std::filesystem::path& out, bool& answered);
+                  std::filesystem::path& out, bool& answered, bool polite = false);
+    bool ResolveHack(const Entry& entry, const SystemDef& system, const ThumbnailIndex& index,
+                     const std::string& original, const std::function<bool()>& stopping,
+                     ArtworkResult& result);
+    HackQuery QueryFor(const Entry& entry, const SystemDef& system, const ThumbnailIndex& index,
+                       const std::string& original);
+    HackCoverOptions HackOptions();
 
     std::filesystem::path cache_dir_;
     HttpFetcher fetcher_;
+    HackSources sources_;
     std::mutex index_mutex_;
     std::map<std::string, ThumbnailIndex> indexes_;
+    std::mutex options_mutex_;
+    HackCoverOptions hack_options_;
 };
 
 } // namespace den::library
