@@ -269,7 +269,18 @@ final class SecondScreen implements DisplayManager.DisplayListener {
         }
     }
 
-    static void surface(Surface surface, int width, int height) {
+    /** The view whose surface the native side draws on (UI thread only). */
+    private static PanelSurface surfaceOwner;
+
+    /**
+     * From the UI thread: a panel's surface changed, or is going (null). A panel replaced by a
+     * new one may lose its surface after the new one has handed its own over: that one stays.
+     */
+    static void surface(PanelSurface from, Surface surface, int width, int height) {
+        if (surface == null && surfaceOwner != null && surfaceOwner != from) {
+            return;
+        }
+        surfaceOwner = surface == null ? null : from;
         try {
             nativeSurface(surface, width, height);
         } catch (UnsatisfiedLinkError e) {

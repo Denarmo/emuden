@@ -29,13 +29,13 @@ final class PanelSurface extends SurfaceView implements SurfaceHolder.Callback, 
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        SecondScreen.surface(holder.getSurface(), width, height);
+        SecondScreen.surface(this, holder.getSurface(), width, height);
     }
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
         // Returns once the native side has let go of the surface.
-        SecondScreen.surface(null, 0, 0);
+        SecondScreen.surface(this, null, 0, 0);
     }
 
     @Override
