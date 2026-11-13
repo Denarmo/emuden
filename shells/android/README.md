@@ -1,7 +1,8 @@
 # Android shell
 
-One activity (`EmuDenActivity`, SDL's `SDLActivity`) around the same C++ app as the desktop
-builds. Gradle only wraps the root CMake project; there are no screens or logic here.
+The main activity (`EmuDenActivity`, SDL's `SDLActivity`) around the same C++ app as the
+desktop builds, and `PanelActivity` for the second display, drawn by the same native loop.
+Gradle only wraps the root CMake project; there are no screens or logic here.
 
 ## Building
 
@@ -65,21 +66,69 @@ nothing useful in a game. The pad's own Select (`BTN_SELECT`) is untouched. A re
 
 ## Second screen
 
-`SecondScreen` shows a `Presentation` with one `SurfaceView` on the first presentation
-display the activity is not on itself (display 2 on the Retroid Pocket Duo, 1280x960). The Surface and the touches go to
-`platform/src/android/second_display_android.cpp`, which makes an EGL window surface with
-the app's own display and config: the one GL context draws both screens, the second without
-waiting for its display. The Presentation exists while the activity is started, the display
-exists and the app wants it (`ui.companion.enabled`, or a claim by the player); it is shown
-again after stop and start and when a display is added. Its window cannot take the focus,
-so keys and the pad stay with the activity, and it lies over every activity on that display
-(a Presentation is a layer above the apps). What is drawn there is the app's business
+`SecondScreen` puts one `PanelSurface` (a `SurfaceView`) on the first presentation display
+the main activity is not on itself (display 2 on the Retroid Pocket Duo, 1280x960). The
+Surface and the touches go to `platform/src/android/second_display_android.cpp`, which makes
+an EGL window surface with the app's own display and config: the one GL context draws both
+screens, the second without waiting for its display (it does wait while the main window is
+hidden, as it paces the loop then). What is drawn there is the app's business
 (`app/screens/companion`, `docs/interfaces.md`).
 
-`screencap -d <id>` shows either screen; `input -d 2 tap <x> <y>` touches the second one.
-The companion's test endpoint is on the automation port + 2 (`state`, `tap`, `screenshot`),
-forwarded by `run.ps1`. `run.ps1 -BuildName <name>` (Gradle: `-PemudenBuild=<name>`) builds in
-`build/<name>` instead of `build/android`.
+The surface lives in `PanelActivity`: an activity in a task of its own (`singleInstance`,
+its own affinity, not in the recents), started on that display with
+`ActivityOptions.setLaunchDisplayId`, in the same process. It replaces the Presentation of
+before, for three reasons:
+
+- A Presentation is a window of the main activity's context and was dismissed in `onStop`;
+  a stopped activity also leaves the process "cached", which Android may freeze. From
+  Android 10 every display has a resumed activity of its own, so `PanelActivity` stays
+  resumed while another app covers the main display, keeps the process in the foreground
+  (no foreground service, no notification) and keeps showing the game.
+- A Presentation is a layer above every app of its display, so an app opened there was
+  hidden under it and the quick settings had to be taken away. An app now simply opens over
+  `PanelActivity`, which is shown again by itself when the app is left with Back.
+- A Presentation cannot take the focus. `PanelActivity` can: keys and the pad that arrive
+  there are handed to SDL (`SDLActivity.handleKeyEvent`,
+  `SDLControllerManager.handleJoystickMotionEvent`), and Back is the app's Back.
+
+Where the system does not let an activity start on that display
+(`isActivityStartAllowedOnDisplay`, or Android 9) the Presentation is used as before: it
+exists while the main activity is started, lies over every app there, and an app asked for
+on that display opens on the main one with the game paused.
+
+`PanelActivity` exists while the display exists and the app wants it (`ui.companion.enabled`,
+or a claim by the player). Starting it moves the input focus to its display, so the main
+activity is brought to the front again right after (`FocusHop.home`). While the main
+activity is stopped the app gives the second display up, unless a game plays on it.
+
+## The app goes on while the main activity is stopped
+
+Before, `onStop` of the main activity ended everything the user saw: SDL blocked the native
+thread and paused the sound, and the Presentation was dismissed. With the game swapped to
+the second display, an app opened on the main one (from the quick settings there, or from
+the launcher) therefore looked like EmuDEN closing. Now:
+
+- `SDL_HINT_ANDROID_BLOCK_ON_PAUSE` is off (`platform/src/android/lifecycle_android.cpp`):
+  SDL still pauses its window (the surface is gone, it takes the GL context off the thread),
+  but the loop and the sound carry on. `pal::MainWindowHidden()` is true from SDL's
+  "did enter background" to "did enter foreground".
+- SDL's event pump waits 100 ms per call while its window is paused. `EmuDenActivity` tells
+  the native side when it is stopped (`nativeStopped`); while it is, `den::input` takes the
+  events without the pump (`pal::EventPumpHeld()`); pad and key events are queued by SDL's
+  Java side directly. From `onStart` (and in `onDestroy`) the pump runs again, so resume and
+  quit are seen.
+- `pal::PrepareFrame()` makes the app's GL context current again without the window, on a
+  1x1 pixel buffer (or with no surface where the window's config has none), so the frame,
+  texture uploads and the second display's EGL surface work as always. The main window's
+  frame is drawn for nobody and not swapped.
+- The app (`app/screens/apps/beside.cpp`, `system::AppBeside`) holds the game when the
+  display it is on is covered (paused, battery save and resume state written) and lets it go
+  on when the display is back. With nothing of the app shown anywhere the loop idles at
+  10 Hz, as the process may be ended there without a word.
+
+Not handled: a game whose core draws with the GPU cannot be *opened* while the main window
+is hidden (SDL waits for the window when it creates a context); HID pads SDL opens itself
+(USB, some Bluetooth) are frozen by SDL in `onPause`, the built-in pad is not one of them.
 
 ## Apps
 
@@ -88,43 +137,52 @@ the manifest's `<queries>` element makes them visible, there is no `QUERY_ALL_PA
 except the app's own. Icons, adaptive ones included, are drawn into 192 pixel PNGs in
 `<cache>/app_icons` and drawn again when the package was updated; a receiver for package
 added, removed, changed and replaced makes the native side list again. An app is opened
-with its launcher intent and `FLAG_ACTIVITY_NEW_TASK`.
+with its launcher intent, `FLAG_ACTIVITY_NEW_TASK` and the display it is wanted on.
 
-From the quick settings the app opens on the other display (`AppBeside`, after
-`isActivityStartAllowedOnDisplay`). The Presentation with the quick settings would cover it,
-so it is taken away for that time (`SecondScreen.lend`) and a small handle, "Quick
-settings", hangs from the top edge of that display over the other app. The quick settings
-come back
+While a game runs the app opens on the display the quick settings are on, whichever that is:
+the second one over `PanelActivity`, or, with the game swapped to the second display, the
+main one over `EmuDenActivity`, which is then stopped while the game goes on (above). What
+is where is decided by `system::AppBeside` (unit-tested); `AppBeside.java` only does what it
+is asked:
 
-- when the app is left with Back: `AppHost`, an empty activity of ours started under the
-  app on that display, comes up again, which is the only sign Android gives;
-- when the handle is tapped, with the app still open under them or after Home, which
-  `AppHost` does not notice;
-- when the activity is stopped.
+- **Raise** brings our own activity of a display to the front of it, over the other app,
+  which stays as it is underneath: the quick settings over the app. **Lower**
+  (`moveTaskToBack`) puts it behind again: "Back to <app>" in the quick settings, and the
+  system's Back on that display while they are over an app (`nativeBack`), give the display
+  and the keys back to the app without starting it anew.
+- **The handle** is a 44 dp round tab over the other app (a Presentation holding nothing
+  else; that is the one window an app may put over other apps without a permission, and
+  only on a presentation display). A tap pulls the quick settings over the app. It can be
+  dragged anywhere, comes to rest on the nearest edge, is found there again
+  (`SharedPreferences` "beside") and is 45% opaque until touched. The main display is no
+  presentation display: with the app there the game's own display shows a small tab at its
+  right edge instead, which does the same.
+- **The app left with Back**: our activity under it is shown again, which the native side
+  sees as its surface coming back; the plain quick settings are there.
+- **Home** is told to nobody. On the second display with no app of ours there, the quick
+  settings' surface goes and nothing was asked for: they are raised again after 0.4 s (three
+  tries). With an app in front the system's `ACTION_CLOSE_SYSTEM_DIALOGS` broadcast with the
+  reason `homekey` is used: when the game is still shown half a second later, Home was on
+  the app's display, and the quick settings are raised there. Devices that do not send that
+  broadcast (gesture navigation may not) keep the handle as the way back. On the main
+  display nothing is raised by itself: Home there leaves EmuDEN's window as the user asked,
+  and a game on the second display goes on.
 
-Coming back also gives the keys and the pad back to the game (`FocusHop.home`: the main
-activity is brought to the front on its own display). When the system does not allow
-activities on that display the app opens on the main one instead, a toast says so, and the
-game is paused.
-
-While the app is on the other display the activity stays resumed (only "top resumed" moves
-on), so SDL keeps running: SDL 3 pauses its thread in `onStop`, not on a lost focus or
-`onPause`, and nothing in the app pauses a game for a lost focus. Picture and sound go on.
 The keys and the built-in pad go to the focused window of the focused display, which is the
-other app now, and Android has no way to keep them: the game shows "The pad is with the app
-on the other screen. Tap the game to take it back", because a touch on a display moves the
-focus there. Each display keeps a focused window of its own, so the activity's window does
-not lose its focus then; `onTopResumedActivityChanged` is what tells (`AppList.nativeFocus`).
-With the game swapped to the second display, or with one display, the app takes the
-activity's own display: the activity is stopped, SDL pauses, and the game waits paused with
-its saves written until the user comes back.
+other app while it is in front, and Android has no way to keep them: the game shows "The pad
+is with the app on the other screen. Tap the game to take it back", because a touch on a
+display moves the focus there. `onTopResumedActivityChanged` of both activities is what
+tells (`AppBeside.focus`). With one display the app takes it: the game waits in its pause
+menu with its saves written.
 
-Seen on the Retroid Pocket Duo (release APK, `adb` only): Settings beside a running Tetris
-with the handle over it, the game drawing on and its AAudio stream started; Start on the
-built-in pad did not reach the game while Settings had the focus and did after a tap on the
-game; Back on that display, the handle with the app open, and the handle after Home each
-brought the quick settings back, and Start reached the game again without a tap. Not run:
-the game swapped to the second display, one display, an app that plays sound.
+The media volume (`AudioManager.STREAM_MUSIC`) is read and set for `pal::audio`
+(`EmuDenActivity.volumeGet`, `volumeSet`, `volumeSteps`); both activities name it as the
+stream the hardware keys change. Android has no volume for one other app: the game's own
+gain is a share of the system volume, the other app plays at the system volume.
+
+Seen on the Retroid Pocket Duo with the Presentation of before (release APK, `adb` only):
+Settings beside a running Tetris, the game drawing on and its AAudio stream started. Nothing
+of the above with `PanelActivity` has been run on a device yet; see `docs/status.md`.
 
 ## System keyboard
 

@@ -200,6 +200,7 @@ void Page::ReleaseScrollers(double time) {
     }
     held_.clear();
     drag_node_ = nullptr;
+    value_node_ = nullptr;
 }
 
 void Page::Prepare() {
@@ -216,6 +217,7 @@ void Page::Prepare() {
     focus_ = nullptr;
     press_node_ = nullptr;
     drag_node_ = nullptr;
+    value_node_ = nullptr;
     held_.clear();
     pressed_ = dragging_ = false;
     root_.Clear();
@@ -326,6 +328,13 @@ void Page::Pointer(const input::Event& event, float scale, double time) {
             // can move at all.
             dragging_ = true;
             const bool horizontal = std::fabs(x - press_x_) > std::fabs(y - press_y_);
+            if (horizontal && press_node_ && press_node_->WantsDrag(press_x_, press_y_)) {
+                // A slider taken by its track: the value follows the finger, nothing scrolls.
+                value_node_ = press_node_;
+                SetFocus(press_node_, false);
+                value_node_->DragTo(x, y);
+                break;
+            }
             Node* other = nullptr;
             for (Node* n = root_.HitTest(press_x_, press_y_, scrollable); n && !drag_node_; n = n->Parent()) {
                 if (!n->scrollable || n->scroller.Max() <= 0) {
@@ -344,7 +353,9 @@ void Page::Pointer(const input::Event& event, float scale, double time) {
             }
             break; // the content follows the finger from here, without a jump
         }
-        if (dragging_ && drag_node_) {
+        if (dragging_ && value_node_) {
+            value_node_->DragTo(x, y); // may rebuild the page, which ends the drag
+        } else if (dragging_ && drag_node_) {
             drag_node_->scroller.DragBy(drag_node_->axis == Axis::Row ? -dx : -dy, time);
         }
         break;
@@ -353,7 +364,11 @@ void Page::Pointer(const input::Event& event, float scale, double time) {
         if (pressed_ && !dragging_ && !stopped_fling_ && !hold_fired_ && press_node_ &&
             press_node_->rect.Contains(x, y)) {
             SetFocus(press_node_, false);
-            Activate(press_node_);
+            if (press_node_->WantsDrag(x, y)) {
+                press_node_->DragTo(x, y); // a tap on the track puts the value there
+            } else {
+                Activate(press_node_);
+            }
         }
         ReleaseScrollers(time);
         pressed_ = false;

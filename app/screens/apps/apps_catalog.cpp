@@ -6,14 +6,13 @@
 
 #include <memory>
 
-#include "../companion/second_screen.h"
 #include "../player/player_screen.h"
 #include "apps_catalog.h"
+#include "beside.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
 #include "den/base/log.h"
 #include "den/platform/apps.h"
-#include "den/platform/text_input.h"
 
 namespace den::app {
 
@@ -21,7 +20,6 @@ namespace {
 
 constexpr const char* FAVOURITES_KEY = "apps.favourites";
 constexpr const char* RECENT_KEY = "apps.recent";
-constexpr double FOCUS_WAIT = 5.0; // seconds an app opened beside the game has to take the keys
 
 struct Catalog {
     system::AppShelf shelf;
@@ -29,9 +27,6 @@ struct Catalog {
     std::uint64_t listed = 0; // the platform's revision the list was read at
     JobPtr job;
     bool loaded = false;
-    // An app opened beside the game.
-    bool beside = false, focus_lost = false;
-    double beside_since = 0;
 };
 
 Catalog& Get() {
@@ -108,14 +103,6 @@ void Frame() {
     if (!c.job && c.listed != pal::apps::Revision()) {
         Load(c);
     }
-    if (c.beside) {
-        const bool focused = pal::apps::HasInputFocus();
-        if (!focused) {
-            c.focus_lost = true;
-        } else if (c.focus_lost || pal::NowSeconds() - c.beside_since > FOCUS_WAIT) {
-            c.beside = false; // the keys are back, or the app never took them
-        }
-    }
 }
 
 } // namespace
@@ -136,6 +123,10 @@ bool AppsLoading() {
     return !Get().loaded;
 }
 
+bool AppsFake() {
+    return Fake();
+}
+
 void ToggleAppFavourite(const std::string& id) {
     Catalog& c = Get();
     c.shelf.ToggleFavourite(id);
@@ -149,27 +140,12 @@ void OpenApp(const std::string& id, bool beside_game, ui::Stage& stage) {
         return;
     }
     const system::AppItem app = *found;
-    PlayerScreen* screen = PlayerScreen::Current();
-    pal::apps::Display where = pal::apps::Display::Default;
-    bool game_waits = false;
-    if (beside_game && screen) {
-        if (SecondScreenReady() && !screen->Swapped()) {
-            where = pal::apps::Display::Second;
-        } else {
-            // The app takes the display this window is on (the only one, or the one the
-            // quick settings were swapped to): the game waits, with its save on disk.
-            where = SecondScreenReady() ? pal::apps::Display::Main : pal::apps::Display::Default;
-            game_waits = true;
-        }
-    }
-    if (game_waits) {
-        screen->Pause();
-        Svc().player->FlushSaves();
-    }
-    if (Fake()) {
+    if (beside_game && PlayerScreen::Current()) {
+        BesideOpen(app, stage);
+    } else if (Fake()) {
         stage.Toast("Would open " + app.label);
     } else {
-        const Status opened = pal::apps::Launch(id, where);
+        const Status opened = pal::apps::Launch(id, pal::apps::Display::Default);
         if (!opened) {
             stage.Toast(opened.error.empty() ? "The app could not be opened" : opened.error, 5.0f);
             return;
@@ -177,24 +153,10 @@ void OpenApp(const std::string& id, bool beside_game, ui::Stage& stage) {
         for (const std::string& note : opened.notes) {
             stage.Toast(note, 5.0f);
         }
-        if (where == pal::apps::Display::Second && opened.notes.empty()) {
-            c.beside = true;
-            c.focus_lost = false;
-            c.beside_since = pal::NowSeconds();
-        } else if (where == pal::apps::Display::Second && screen) {
-            // It opened over the game after all.
-            screen->Pause();
-            Svc().player->FlushSaves();
-        }
-        log::Info("apps", "opened {}{}", app.id, where == pal::apps::Display::Second ? " beside the game" : "");
+        log::Info("apps", "opened {}", app.id);
     }
     c.shelf.NoteOpened(id);
     Keep(c);
-}
-
-bool PadWithOtherApp() {
-    const Catalog& c = Get();
-    return c.beside && c.focus_lost && !pal::apps::HasInputFocus() && !pal::GetTextInput().Active();
 }
 
 DEN_REGISTER_STARTUP(Start);

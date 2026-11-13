@@ -23,12 +23,14 @@ system::AppShelf& Apps();
 std::uint64_t AppsRevision();
 /// The first list is still being read.
 bool AppsLoading();
+/// The list is the desktop's made-up one (EMUDEN_FAKE_APPS=1): nothing really opens.
+bool AppsFake();
 void ToggleAppFavourite(const std::string& id);
 
 /// Opens an app; problems and notes are shown as toasts on `stage`. `beside_game`: from the
 /// quick settings while a game runs. With two displays the app then opens on the display
-/// the quick settings are on and the game goes on; with one the game is paused first and
-/// the app takes the screen.
+/// the quick settings are on, whichever that is, and the game goes on on the other; with
+/// one the game is paused first and the app takes the screen (beside.h).
 void OpenApp(const std::string& id, bool beside_game, ui::Stage& stage);
 /// An app opened beside the game has the keys and the pad now. A touch on the game's
 /// display brings them back; this is what the player screen tells the user.

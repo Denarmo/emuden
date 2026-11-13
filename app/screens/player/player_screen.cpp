@@ -419,6 +419,9 @@ bool PlayerScreen::OnEvent(const input::Event& event) {
             // way into the menu without a pad or a keyboard.
             const float scale = Svc().canvas->Scale();
             const float x = event.x / scale, y = event.y / scale;
+            if (TabPressed(event, area_, scale)) {
+                return true;
+            }
             if (event.type == Type::PointerDown && x < MENU_CORNER && y < MENU_CORNER) {
                 pointer_down_ = false;
                 OpenMenu();

@@ -9,6 +9,7 @@
 #include <SDL3/SDL.h>
 
 #include "den/input/input.h"
+#include "den/platform/lifecycle.h"
 
 namespace den::input {
 
@@ -443,8 +444,17 @@ void System::Poll(std::vector<Event>& out) {
         }
     }
     SDL_Event e;
-    while (SDL_PollEvent(&e)) {
-        impl_->Handle(e, out);
+    if (pal::EventPumpHeld()) {
+        // The main window is hidden while the app goes on: the system's pump would wait for
+        // it. Pads and keys are queued by the platform itself.
+        SDL_UpdateJoysticks();
+        while (SDL_PeepEvents(&e, 1, SDL_GETEVENT, SDL_EVENT_FIRST, SDL_EVENT_LAST) > 0) {
+            impl_->Handle(e, out);
+        }
+    } else {
+        while (SDL_PollEvent(&e)) {
+            impl_->Handle(e, out);
+        }
     }
     if (impl_->held != Nav::None && impl_->nav_from_pads) {
         const double now = SDL_GetTicks() / 1000.0;

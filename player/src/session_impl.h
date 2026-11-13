@@ -48,6 +48,7 @@ public:
     void SetRewind(bool on) override;
     void Reset() override;
     void FlushSaves() override;
+    void SaveResumeState() override;
     std::vector<CoreOption> Options() const override;
     void SetOption(const std::string& key, const std::string& value) override;
     void SetOption(const std::string& key, const std::string& value, OptionScope scope) override;

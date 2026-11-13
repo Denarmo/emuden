@@ -3,22 +3,29 @@
 
 // The second screen while a game runs on the main one: quick settings by touch. Save and
 // load states with their pictures, fast-forward, rewind, the screen size, the picture
-// preset, the volume, the pause menu with its core options and buttons pages, the way out,
+// preset, the volumes, the pause menu with its core options and buttons pages, the way out,
 // and "Swap screens", which puts the game on this display and these settings on the other.
+// With an app open beside the game and these settings pulled over it, the first row goes
+// back to that app or closes it; the apps opened last are one tap away.
 // Route "companion.play" on the companion stage.
 
 #include <algorithm>
 #include <cmath>
 #include <format>
 
+#include "../apps/app_grid.h"
 #include "../apps/apps_catalog.h"
+#include "../apps/beside.h"
 #include "../home/games.h"
 #include "../player/picture_choice.h"
 #include "../player/player_screen.h"
+#include "../player/volume_rows.h"
 #include "companion_page.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
+#include "den/app/pages.h"
 #include "den/base/files.h"
+#include "den/platform/audio.h"
 #include "second_screen.h"
 
 namespace den::app {
@@ -27,8 +34,9 @@ namespace {
 
 constexpr float BUTTON_HEIGHT = 56;
 constexpr float SLOT_W = 150, SLOT_H = 112;
-constexpr const char* VOLUME_KEY = "player.volume";
 constexpr float CHOICE_HEIGHT = 48, CHOICE_LABEL = 104;
+constexpr float VOLUME_HEIGHT = 64;
+constexpr std::size_t RECENT_APPS = 3;
 
 bool Playing(const player::Snapshot& snapshot) {
     return snapshot.state == player::State::Running || snapshot.state == player::State::Paused;
@@ -61,6 +69,23 @@ public:
             : snapshot.fast_forward                 ? "Fast-forward"
                                                     : "Playing");
         status->tone = ui::Tone::Dim;
+
+        if (const system::AppBeside& beside = Beside();
+            beside.GetStage() == system::AppBeside::Stage::SettingsOver) {
+            // These settings lie over an app the user opened beside the game: the way back
+            // to it comes first.
+            ui::Node* over = root.Add(ui::MakeBox(ui::Axis::Row, 10));
+            auto* back = over->Emplace<AppChip>("Back to " + beside.App().label, beside.App().icon);
+            back->id = "companion.back_to_app";
+            back->strong = true;
+            back->grow = 1;
+            back->height = 64;
+            back->on_activate = [] { BesideBackToApp(); };
+            auto* close = over->Emplace<ui::Button>("Close " + beside.App().label, [] { BesideClose(); });
+            close->id = "companion.close_app";
+            close->height = 64;
+            close->SetPadding(18, 0);
+        }
 
         ui::Node* controls = root.Add(ui::MakeBox(ui::Axis::Row, 10));
         const auto control = [&](const char* id, const std::string& text, bool selected,
@@ -201,17 +226,23 @@ public:
             }
         }
 
-        ui::Node* volume = root.Add(ui::MakeBox(ui::Axis::Row, 10));
-        volume->align = ui::Align::Center;
-        auto* text = volume->Emplace<ui::Label>(std::format("Volume {}%", VolumePercent()));
-        text->grow = 1;
-        const auto step = [&](const char* id, const char* sign, int delta) {
-            auto* button = volume->Emplace<ui::Button>(sign, [delta] { SetVolume(VolumePercent() + delta); });
-            button->id = id;
-            button->width = 96;
-        };
-        step("companion.volume_down", "-", -10);
-        step("companion.volume_up", "+", 10);
+        if (screen && AppsAvailable()) {
+            // The apps opened last, to open one again beside the game with one tap.
+            const std::vector<system::AppItem> recent = Apps().Recent(RECENT_APPS);
+            if (!recent.empty()) {
+                ui::Node* apps = choices("companion.recent_apps", "Recent apps");
+                for (const system::AppItem& app : recent) {
+                    auto* chip = apps->Emplace<AppChip>(app.label, app.icon);
+                    chip->id = "companion.recent." + app.id;
+                    chip->height = CHOICE_HEIGHT;
+                    chip->on_activate = [this, id = app.id] { OpenApp(id, true, GetStage()); };
+                }
+            }
+        }
+
+        // The game's own volume, and the system's while an app plays beside the game.
+        other_volume_ = Beside().GetStage() != system::AppBeside::Stage::None;
+        AddRows(&root, VolumeRows("companion", other_volume_), VOLUME_HEIGHT);
     }
 
     void Update(ui::Context&) override {
@@ -242,21 +273,14 @@ private:
             slots |= Svc().player->HasState(slot) ? 1 << slot : 0;
         }
         const PlayerScreen* screen = PlayerScreen::Current();
-        return std::format("{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", snapshot.game_id, static_cast<int>(snapshot.state),
-                           snapshot.fast_forward, snapshot.rewinding, snapshot.can_rewind,
-                           snapshot.can_save_states, snapshot.picture, slots, VolumePercent(),
-                           screen ? screen->ScreenSizeIndex() : -1);
-    }
-
-    static int VolumePercent() {
-        const double volume = Svc().settings->GetNumber(VOLUME_KEY, 1.0);
-        return static_cast<int>(std::lround(std::clamp(volume, 0.0, 1.0) * 100.0));
-    }
-
-    static void SetVolume(int percent) {
-        const double volume = std::clamp(percent, 0, 100) / 100.0;
-        Svc().settings->SetNumber(VOLUME_KEY, volume);
-        Svc().player->SetVolume(static_cast<float>(volume));
+        // The volumes are not in here: their sliders show the value as it changes, and a
+        // page built again under a finger would end the drag.
+        const system::AppBeside& beside = Beside();
+        return std::format("{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", snapshot.game_id,
+                           static_cast<int>(snapshot.state), snapshot.fast_forward, snapshot.rewinding,
+                           snapshot.can_rewind, snapshot.can_save_states, snapshot.picture, slots,
+                           screen ? screen->ScreenSizeIndex() : -1, static_cast<int>(beside.GetStage()),
+                           beside.App().id, static_cast<int>(beside.GameScreen()), AppsRevision());
     }
 
     void Save(int slot) {
@@ -293,6 +317,7 @@ private:
     std::string key_, game_id_, system_;
     bool save_mode_ = false;
     bool fast_ = false, rewind_ = false;
+    bool other_volume_ = false;
 };
 
 } // namespace

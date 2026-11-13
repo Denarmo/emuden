@@ -34,10 +34,37 @@ bool Available();
 std::vector<App> List();
 /// Grows whenever an app was installed, removed or changed: List() again.
 std::uint64_t Revision();
-/// Opens the app in a task of its own. With Display::Second it opens beside this app, which
-/// keeps running; when the system refuses that display it opens where the system likes and
-/// the notes of the status say so.
+/// Opens the app in a task of its own, over this app's own window on that display, which
+/// keeps running on the other one. When the system refuses the display it opens where the
+/// system likes and the notes of the status say so.
 Status Launch(const std::string& id, Display display);
+/// This app's own window on a display comes to the front of that display, over an app
+/// opened there, and takes the keys. The other app stays as it is underneath.
+void Raise(Display display);
+/// This app's own window on a display goes behind the app under it, which has the display
+/// and the keys again without being started anew.
+void Lower(Display display);
+/// A small round tab over the other app on that display, which the user can drag along the
+/// edges; a tap on it is an Event::Handle. False when the platform cannot draw over other
+/// apps on that display (nothing is shown then).
+bool ShowHandle(Display display);
+void HideHandle();
+/// While on, the system's Back on that display is reported as Event::Back instead of
+/// reaching the app as its own Back.
+void CatchBack(Display display, bool on);
+
+struct Event {
+    enum class Kind {
+        Handle, // the handle was tapped
+        Back,   // Back on a display that CatchBack was set for
+        Home,   // the system's Home was pressed (which display is not known)
+    };
+    Kind kind = Kind::Handle;
+    Display display = Display::Default;
+};
+/// What happened since the last call, oldest first.
+std::vector<Event> TakeEvents();
+
 /// This app's window is the one keys and the pad go to. False while another app (one
 /// opened on the other display) has them; a touch on this app's window brings them back.
 bool HasInputFocus();

@@ -19,6 +19,49 @@ listened.
 
 `emuden --windowed --size 3840x2160` opens a window of that size (new, for such checks).
 
+## An app beside the game, second round (not yet on a device)
+
+Three notes from the owner after using the Apps button on the Retroid, and three leftovers
+of the last report. Built and unit-tested; the Windows build was driven with a second
+window and the made-up apps; **nothing of it has run on the Retroid** (the device was not
+touched in this step), so every Android line below is from reading the code.
+
+| Note | What was wrong | What is built |
+|---|---|---|
+| "With the game on the second screen, opening YouTube closes EmuDEN" | The app opened on the main display over the main activity. Android stopped that activity; SDL blocked the native thread and paused the sound in `onStop`, and the Presentation with the game was dismissed with it. Nothing crashed: the game was frozen and gone from both screens, and the process sat cached | The second display is an activity of its own (`PanelActivity`), which stays resumed; the native loop, the sound and the GL context go on while the main activity is stopped (`shells/android/README.md`). Either arrangement: the game keeps playing on its display with an app on the other. A game whose own display is covered is held (resume state written) and goes on when it is back |
+| "The volume settings should set each screen's volume" | One row with - and + | Two sliders in the quick settings and the pause menu: "Game" (its own gain, a share of the system volume) and "Other app" (the system's media volume through `pal::audio`; Android has none per app), each with its screen under the label, following the swap. Dragged by touch, stepped with left and right. The hardware keys move the system volume as before |
+| "No way back to YouTube after opening the quick settings over it" | The handle only ever brought the quick settings back for good | Quick settings pulled over an app start with "Back to <app>" (its icon; the app gets its display and the keys back, not started anew) and "Close <app>"; the system's Back on that display does the same as the first. The handle is a 44 dp round tab that can be dragged, rests on the nearest edge, is remembered and is half transparent until touched. "Recent apps" (three) in the quick settings |
+| After Home on the second display the quick settings came back only with the handle | | They come back by themselves after 0.4 s when no app of ours is there; with an app in front, when the system's Home broadcast arrives |
+| "1 games" on the Search page | | "1 game for ..." |
+| The Apps page kept the last game on the second screen | | A plain page there (`companion.idle`) |
+
+Run: `win` preset, 11 of 11 test programs (22 new cases for `system::AppBeside`: launch on
+either display, handle, back to the app, close, Back, Home, surfaces going and coming, one
+display, a failed launch, swap). Windows, port 43590, `EMUDEN_SECOND_WINDOW=1`,
+`EMUDEN_FAKE_APPS=1`, `EMUDEN_FAKE_DEVICE=retroid-pocket-duo`, Tetris: the quick settings
+with the Game slider and "Top screen"; an app chosen, then "Back to Settings" / "Close
+Settings" first and "Recent apps" below; the slider dragged from 100% to 40%, tapped to 15%,
+stepped to 25% with the pad in the pause menu. The Android debug APK compiles
+(`-PemudenBuild=beside-android`).
+
+Not run: everything on Android. In particular: `PanelActivity` starting on display 2 and
+the focus coming back to the main activity; the game going on on the second display under
+an app on the main one (picture, sound, 60 fps paced by the second display); the pixel
+buffer context while the main window is hidden; the hold and release of a game whose
+display is covered, and its resume state; the handle (drag, edges, memory) and that the
+main display refuses one; the tab on the game's display; Back over an app; the Home
+broadcast on this device; "Other app" moving the media volume; a core that draws with the
+GPU while the main window is hidden; the Presentation fallback; one display. On Windows:
+the idle page was not looked at, nor "Close" tapped.
+
+Known: the main display takes no handle over another app, so with the game on the second
+display the way to the quick settings is the tab on the game or leaving the app. A game
+cannot be opened with a GPU core while the main window is hidden. While the app is covered
+on both displays its loop idles at 10 Hz instead of sleeping. Home pressed on the main
+display with an app beside on the second gives the second display up; coming back puts the
+quick settings over that app. "Close" does not end the other app, it only stops treating it
+as beside the game.
+
 ## Second screen: quick settings and the pause menu (after the fifth round)
 
 Checked on the Retroid Pocket Duo with the release APK at `75fa362`, through `adb` only
@@ -77,10 +120,9 @@ resumed activity is what changes. See `shells/android/README.md`.
 Not run: one display (the keyboard line above the keyboard, the pause-menu "Apps" row);
 the game swapped to the second display; a keyboard request made with the pad; pinning an
 app; the search of the Apps pages; an app that plays sound beside the game; an app that
-refuses the second display; package changes while the list is open. Known: the handle
-covers a strip 260 pixels wide at the top of the other app; after Home on that display the
-quick settings come back only with the handle; the Search page says "1 games"; the Apps
-page has no backdrop and the second screen keeps showing the last game there.
+refuses the second display; package changes while the list is open. The four things known
+then (the wide handle, Home on that display, "1 games", the last game under the Apps page)
+are answered in the section "An app beside the game, second round".
 
 The frame rate readout (`1544857`) in the same run: the plate's left edge is at the same
 pixel in pictures with 58, 59 and 60 fps on the Retroid, and on Windows (packaged build,

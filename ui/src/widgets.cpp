@@ -146,6 +146,27 @@ void Row::Step(int direction) {
     }
 }
 
+bool Row::WantsDrag(float x, float y) const {
+    // A finger is wider than the track: some room around it counts.
+    return spec.kind == RowSpec::Kind::Slider && spec.set_number && track_.w > 0 && y >= rect.y &&
+           y <= rect.Bottom() && x >= track_.x - 20 && x <= track_.Right() + 20;
+}
+
+void Row::DragTo(float x, float) {
+    if (spec.kind != RowSpec::Kind::Slider || !spec.set_number || track_.w <= 0) {
+        return;
+    }
+    const float t = std::clamp((x - track_.x) / track_.w, 0.0f, 1.0f);
+    float value = spec.min + t * (spec.max - spec.min);
+    if (spec.step > 0) {
+        value = spec.min + std::round((value - spec.min) / spec.step) * spec.step;
+    }
+    value = std::clamp(value, spec.min, spec.max);
+    if (!spec.get_number || value != spec.get_number()) {
+        spec.set_number(value);
+    }
+}
+
 bool Row::OnNav(input::Nav nav) {
     using input::Nav;
     const bool adjustable = spec.kind == RowSpec::Kind::Choice || spec.kind == RowSpec::Kind::Slider;
@@ -233,8 +254,12 @@ void Row::DrawContent(Context& ctx) {
         const std::string text = spec.format ? spec.format(value) : std::format("{:.2f}", value);
         const float text_w = 72;
         const gfx::Rect track{value_area.x, rect.CenterY() - 4, value_area.w - text_w - 12, 8};
+        track_ = track;
+        const float filled = track.w * std::clamp(t, 0.0f, 1.0f);
         canvas.FillRect(track, theme.panel_strong, 4);
-        canvas.FillRect(gfx::Rect{track.x, track.y, track.w * std::clamp(t, 0.0f, 1.0f), track.h}, theme.fg, 4);
+        canvas.FillRect(gfx::Rect{track.x, track.y, filled, track.h}, theme.fg, 4);
+        // The knob a finger takes hold of.
+        canvas.FillRect(gfx::Rect{track.x + filled - 9, track.CenterY() - 9, 18, 18}, theme.fg, 9);
         DrawTextIn(ctx, gfx::Rect{right - text_w, rect.y, text_w, rect.h}, text, theme.text_body,
                    gfx::FONT_BOLD, theme.fg, Align::End);
         break;

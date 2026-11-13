@@ -12,7 +12,9 @@
 #include "den/base/files.h"
 #include "glyphs.h"
 #include "picture_choice.h"
+#include "den/platform/audio.h"
 #include "player_screen.h"
+#include "volume_rows.h"
 
 namespace den::app {
 
@@ -21,6 +23,7 @@ namespace {
 using input::Nav;
 
 constexpr float ROW_HEIGHT = 48;
+constexpr float VOLUME_HEIGHT = 64; // a label and what it belongs to under it
 
 } // namespace
 
@@ -152,6 +155,10 @@ void PlayerScreen::BuildMain(ui::Node* list) {
         "menu.players", "Players",
         [] { return std::format("{}", std::max(1, std::min(4, Svc().input->PadCount()))); },
         [this] { Show(View::Players); }));
+    // The volumes sit between the rows above and below, a little taller for their second line.
+    AddRows(list, std::move(rows), ROW_HEIGHT);
+    AddRows(list, VolumeRows("menu", pal::audio::HasSystemVolume()), VOLUME_HEIGHT);
+    rows.clear();
     rows.push_back(ActionRow("menu.reset", "Reset", [this] {
         GetStage().Confirm("Reset the game?", "The game starts again. Progress that is not saved is lost.",
                            "Reset", [this] {

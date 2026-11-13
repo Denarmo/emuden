@@ -19,7 +19,6 @@ import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.util.Log;
-import android.view.Display;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -32,7 +31,7 @@ import java.util.Set;
 /**
  * The other apps of the device for the native platform layer
  * (platform/src/android/apps_android.cpp): the launcher's activities with their names and
- * icons, and opening one, on the other display when asked. The manifest's queries element
+ * icons, and opening one, on the display asked for. The manifest's queries element
  * makes them visible; nothing here needs a permission.
  */
 final class AppList {
@@ -178,11 +177,17 @@ final class AppList {
             ActivityManager manager = (ActivityManager) activity.getSystemService(Context.ACTIVITY_SERVICE);
             boolean allowed = Build.VERSION.SDK_INT < 29
                     || (manager != null && manager.isActivityStartAllowedOnDisplay(activity, target, intent));
-            Display other = SecondScreen.otherDisplay(activity);
-            if (allowed && other != null) {
-                // The quick settings lie over that display's activities: they make room.
-                activity.runOnUiThread(() -> AppBeside.open(activity, intent, other));
-                return "";
+            // Our own window there is an activity (PanelActivity): the app opens over it and
+            // it is shown again when the app is left. A Presentation would cover the app.
+            if (allowed && SecondScreen.hostsActivity()) {
+                try {
+                    ActivityOptions options = ActivityOptions.makeBasic();
+                    options.setLaunchDisplayId(target);
+                    activity.startActivity(intent, options.toBundle());
+                    return "";
+                } catch (RuntimeException e) {
+                    Log.w(TAG, "the app could not be opened on the other display", e);
+                }
             }
             note = "note:This screen cannot show other apps, so it opened on the main one";
         } else if (display == DISPLAY_SECOND) {

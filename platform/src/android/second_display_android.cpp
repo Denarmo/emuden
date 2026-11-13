@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// The second screen on Android: SecondScreen.java (shells/android) shows a Presentation on
-// the other display and hands its Surface over; here it becomes an EGL window surface of
-// the app's own display and config, so the one GL context draws on both screens.
+// The second screen on Android: SecondScreen.java (shells/android) puts an activity of its
+// own on the other display (a Presentation where the display takes no activities) and hands
+// its Surface over; here it becomes an EGL window surface of the app's own display and
+// config, so the one GL context draws on both screens.
 //
 // The Java side calls in from the UI thread, the app draws on its own thread. The surface is
 // current only between BeginFrame and EndFrame, and the lock is held for that whole time, so
@@ -17,6 +18,7 @@
 #include <jni.h>
 
 #include "den/base/log.h"
+#include "den/platform/lifecycle.h"
 #include "den/platform/second_display.h"
 
 namespace den::pal {
@@ -80,7 +82,8 @@ public:
             return false;
         }
         // Only the main screen waits for its display: two waits would halve the frame rate.
-        eglSwapInterval(display_, 0);
+        // While the main window is hidden this screen is the one that paces the loop.
+        eglSwapInterval(display_, MainWindowHidden() ? 1 : 0);
         EGLint w = 0, h = 0;
         if (eglQuerySurface(display_, surface_, EGL_WIDTH, &w) &&
             eglQuerySurface(display_, surface_, EGL_HEIGHT, &h) && w > 0 && h > 0) {

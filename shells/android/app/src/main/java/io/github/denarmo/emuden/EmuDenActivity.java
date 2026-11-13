@@ -8,6 +8,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
+import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
@@ -27,7 +28,10 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
-/** The one activity: SDL's, plus what the native platform layer asks of Android. */
+/**
+ * The main activity: SDL's, plus what the native platform layer asks of Android. The second
+ * display has an activity of its own (PanelActivity) that shares this one's native loop.
+ */
 public class EmuDenActivity extends SDLActivity {
     private static final String TAG = "EmuDEN";
     private static final String ASSET_ROOT = "emuden";
@@ -57,23 +61,37 @@ public class EmuDenActivity extends SDLActivity {
         textBridge = new TextBridge(this);
         self = this;
         super.onCreate(savedInstanceState);
+        setVolumeControlStream(AudioManager.STREAM_MUSIC);
         AppList.watch(this);
+        AppBeside.watch(this);
         trapBack();
         storage.askAtStart();
     }
 
     @Override
     protected void onStart() {
+        tellStopped(false);
         super.onStart();
         secondScreen.onStart();
     }
 
+    // Another app covers this display, or the user left. The native loop is not ended or
+    // blocked by this: with the game on the other display (PanelActivity) it goes on there,
+    // otherwise the app holds the game itself until this activity is shown again.
     @Override
     protected void onStop() {
         textBridge.onStop();
-        AppBeside.onStop();
         secondScreen.onStop();
         super.onStop();
+        tellStopped(true);
+    }
+
+    private static void tellStopped(boolean stopped) {
+        try {
+            nativeStopped(stopped);
+        } catch (UnsatisfiedLinkError e) {
+            // Not loaded yet: it starts as not stopped.
+        }
     }
 
     @Override
@@ -84,7 +102,10 @@ public class EmuDenActivity extends SDLActivity {
 
     @Override
     protected void onDestroy() {
+        tellStopped(false); // the loop must see the quit that follows
         AppList.unwatch(this);
+        AppBeside.unwatch(this);
+        secondScreen.onDestroy();
         if (self == this) {
             self = null;
         }
@@ -104,9 +125,24 @@ public class EmuDenActivity extends SDLActivity {
         if (Build.VERSION.SDK_INT >= 33) {
             // Android 13 and later: with enableOnBackInvokedCallback the system calls this
             // for the gesture, the bar and Back keys alike.
-            backCallback = this::sendBack;
+            backCallback = this::onBack;
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                     OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback);
+        }
+    }
+
+    // Over an app opened beside the game on this display Back gives the display back to it.
+    private void onBack() {
+        if (!AppBeside.back(AppBeside.MAIN)) {
+            sendBack();
+        }
+    }
+
+    /** Back on the second display's activity is the app's Back as well. */
+    static void backFromPanel() {
+        EmuDenActivity activity = self;
+        if (activity != null) {
+            activity.sendBack();
         }
     }
 
@@ -130,7 +166,7 @@ public class EmuDenActivity extends SDLActivity {
         // skips the callback), it must not reach SDL's gamepad code.
         if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
             if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
-                sendBack();
+                onBack();
             }
             return true;
         }
@@ -138,9 +174,9 @@ public class EmuDenActivity extends SDLActivity {
     }
 
     // With an app opened on the other display this activity stays resumed and keeps drawing
-    // and playing (SDL pauses on stop only); it just no longer has the keys and the pad.
-    // Each display keeps a focused window of its own, so the window does not lose its focus
-    // then: what moves on is which activity is the top resumed one.
+    // and playing; it just no longer has the keys and the pad. Each display keeps a focused
+    // window of its own, so the window does not lose its focus then: what moves on is which
+    // activity is the top resumed one (this one, PanelActivity, or the other app).
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
@@ -156,11 +192,62 @@ public class EmuDenActivity extends SDLActivity {
     }
 
     private void tellFocus() {
-        try {
-            AppList.nativeFocus(windowFocus && topResumed);
-        } catch (UnsatisfiedLinkError e) {
-            // Before the native library is loaded nobody asks.
+        AppBeside.focus(AppBeside.MAIN, windowFocus && topResumed);
+    }
+
+    /** Called from native code (platform/src/android/apps_android.cpp). */
+    public static void besideRaise(int display) {
+        EmuDenActivity activity = self;
+        if (activity != null) {
+            AppBeside.raise(activity, display);
         }
+    }
+
+    public static void besideLower(int display) {
+        EmuDenActivity activity = self;
+        if (activity != null) {
+            AppBeside.lower(activity, display);
+        }
+    }
+
+    public static boolean besideHandle(int display) {
+        EmuDenActivity activity = self;
+        return activity != null && AppBeside.showHandle(activity, display);
+    }
+
+    public static void besideHandleHide(int display) {
+        EmuDenActivity activity = self;
+        if (activity != null) {
+            AppBeside.hideHandle(activity);
+        }
+    }
+
+    /** Called from native code (platform/src/android/lifecycle_android.cpp): the media volume. */
+    public static int volumeSteps() {
+        AudioManager audio = audio();
+        return audio != null ? audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC) : 0;
+    }
+
+    public static int volumeGet() {
+        AudioManager audio = audio();
+        return audio != null ? audio.getStreamVolume(AudioManager.STREAM_MUSIC) : 0;
+    }
+
+    public static void volumeSet(int step) {
+        AudioManager audio = audio();
+        if (audio != null) {
+            int top = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+            try {
+                audio.setStreamVolume(AudioManager.STREAM_MUSIC, Math.max(0, Math.min(top, step)), 0);
+            } catch (SecurityException e) {
+                Log.w(TAG, "the media volume cannot be changed now (do not disturb)");
+            }
+        }
+    }
+
+    private static AudioManager audio() {
+        EmuDenActivity activity = self;
+        return activity != null ? (AudioManager) activity.getSystemService(AUDIO_SERVICE) : null;
     }
 
     /** Called from native code (platform/src/android/apps_android.cpp), from a job's thread. */
@@ -229,6 +316,8 @@ public class EmuDenActivity extends SDLActivity {
             }
         }
     }
+
+    private static native void nativeStopped(boolean stopped);
 
     /** Called from native code (platform/src/android). */
     public static HttpCall httpOpen(String url, String[] headers, int timeoutSeconds) {

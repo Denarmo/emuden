@@ -33,7 +33,9 @@ sources live once in `.deps/`.
 | `den/base/zip.h` | `ListZip`, `ExtractZipEntry` |
 | `den/base/jobs.h` | `Jobs::Run(name, fn(Job&), on_done)`: progress, message, cancel; `on_done` runs on the main thread |
 | `den/platform/pal.h` | window and GL context, `DataDir`, `AssetsDir`, `HttpGet` (redirects, streaming to a file, progress, cancel), `StartProcess`, `GetSecrets`, `GetCaps`, `StartLineServer` |
-| `den/platform/apps.h` | `pal::apps`: the device's other apps where the platform can list them (Android): `Available`, `List` (id, label, icon PNG in the app cache; call it from a job), `Revision`, `Launch(id, Display::Default / Main / Second)`, `HasInputFocus` |
+| `den/platform/apps.h` | `pal::apps`: the device's other apps where the platform can list them (Android): `Available`, `List` (id, label, icon PNG in the app cache; call it from a job), `Revision`, `Launch(id, Display::Default / Main / Second)`, `HasInputFocus`; for an app beside the game: `Raise(display)` / `Lower(display)` (this app's own window over or behind the other app), `ShowHandle` / `HideHandle`, `CatchBack(display, on)`, `TakeEvents()` (Handle, Back, Home) |
+| `den/platform/lifecycle.h` | `pal::MainWindowHidden()` (Android: another app covers the main window, the loop goes on), `PrepareFrame()` at the start of every frame (keeps the GL context usable; false = no GL this frame), `EventPumpHeld()` for `den::input` |
+| `den/platform/audio.h` | `pal::audio`: the system's media volume where an app may set it (Android): `HasSystemVolume`, `SystemVolumeSteps`, `SystemVolume`, `SetSystemVolume` |
 | `den/platform/text_input.h` | `pal::GetTextInput()`: the platform's own keyboard for a text (Android): `Begin(request, TextDisplay::Main / Second)`, `SetText`, `End`, `Poll` (Shown, Hidden, Text, Done, Cancel), `CoveredShare`. `Available()` is false on the desktop |
 | `den/gfx/gl.h` | the GL functions, loaded at run time (`gl::Viewport`, ...); add one by adding a line |
 | `den/gfx/device.h` | textures, shader programs, `ReadPixels`, `SavePng` |
@@ -61,6 +63,9 @@ Everything is in logical units: the window is always 720 units high, the width f
   Confirm or a tap.
 - Widgets: `Label`, `ImageView`, `Tile` (cover + title), `Button`, `Row` built from a
   `RowSpec` (Action, Value, Toggle, Choice, Slider), `MakeList`, `MakeShelf`, `MakeHeading`.
+  A Slider row steps with left and right and follows a finger: a sideways drag that starts
+  on its track, or a tap there, sets the value (`Node::WantsDrag` / `DragTo`, which any node
+  can implement). A page that rebuilds on the value ends the drag, so do not.
 - `ui::Page`: override `Build()` to fill `Root()`. Optional: `Update`, `OnNav`, `OnEvent`,
   `Hints`, `Immersive` (no hint bar) and `Draw` (a page that draws itself, like the player).
   `Rebuild()` builds again and keeps the focus by node id.
@@ -138,7 +143,8 @@ A runnable folder: `powershell -ExecutionPolicy Bypass -File tools\package.ps1` 
   use GL from `den/gfx/gl.h`, then `canvas.RestoreState()`. `libretro.h` is in
   `player/third_party/libretro` (on the include path of `den_player`). Also:
   `OpenRequest::resume` (continue from the state `Close` wrote), `StateThumbnail(slot)`,
-  `SetPointer(x, y, pressed)` (touch screens), `SetAspectOverride`, `FlushSaves()`. Files:
+  `SetPointer(x, y, pressed)` (touch screens), `SetAspectOverride`, `FlushSaves()`,
+  `SaveResumeState()` (the state `Close` writes, now, and the game goes on). Files:
   `<data>/saves/<system>/<game id>.srm`, `<data>/states/<system>/<game id>.slotN.state` and
   `.png`, `.resume.state`. Zipped ROMs are unpacked to `<data>/cache/content` while they
   run. Settings: `player.resume`, `player.rewind`, `player.fast_forward_speed`,
@@ -216,7 +222,8 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
   device, drawn with the app's own GL context (the same textures, shaders and canvas):
   `Present()`, `SetWanted(bool)`, `Ready()`, `PixelSize`, `BeginFrame()` / `EndFrame()` around
   the drawing, `TakePointer` (presses in its pixels; they never reach `input::System`).
-  Android: a Presentation on the other display (`shells/android`, `SecondScreen.java`).
+  Android: an activity of its own on the other display (`shells/android`, `PanelActivity`),
+  which stays while the main window is hidden; a Presentation where the display takes none.
   Desktop: a second window, there when the app is started with `EMUDEN_SECOND_WINDOW=1` or
   the setting is "on".
 - `app/screens/companion/second_screen.h` drives it every frame, before the main window's
@@ -278,9 +285,27 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
   "Apps" row on a device with one display) and `companion.apps` on the companion stage (the
   quick settings' "Apps" button). Confirm or a tap opens, Option or a held finger pins,
   Extra searches.
-- `OpenApp` with `beside_game`: two displays: `Display::Second` and the game goes on; the
-  game swapped to the second display, or one display: the game is paused
-  (`PlayerScreen::Pause()`), its saves flushed, and the app takes this window's display.
+- `OpenApp` with `beside_game` goes through `app/screens/apps/beside.h`. Two displays: the
+  app opens on the display the quick settings are on (the second one, or the main one when
+  the game is swapped to the second) and the game goes on on the other; one display: the
+  game is paused in its menu and the app takes the display.
+- `den/system/app_beside.h`: `system::AppBeside`, the state of all that (which display has
+  the game, the quick settings, the app; `Stage::None / AppFront / SettingsOver`). Every
+  transition (`Launch`, `PullSettings`, `BackToApp`, `CloseApp`, `Back`, `Home`,
+  `SetSurfaces`, `SetGame`, `Tick`) returns `BesideAction`s (Launch, Raise, Lower,
+  ShowHandle, HideHandle, OpenMenu, SaveGame, HoldGame, ReleaseGame), so it is tested with
+  a fake device (`system/tests/app_beside_tests.cpp`). `beside.cpp` feeds it every frame
+  (`pal::MainWindowHidden()`, `SecondDisplay::Ready()`, `PlayerScreen::Swapped()`,
+  `pal::apps::TakeEvents()`) and does what it asks. `Beside()` is the state for pages:
+  the quick settings show "Back to <app>" and "Close <app>" first while `SettingsOver`,
+  `WantsTab()` makes the player draw a tab for the quick settings on the game's display,
+  `PlayerScreen::Hold(bool)` pauses a game whose display is covered without a menu.
+- `app/screens/player/volume_rows.h`: `VolumeRows(prefix, other_app)`, the "Game" slider
+  (`player.volume`, the game's share) and "Other app" (`pal::audio`, the system volume),
+  each with the screen it belongs to (`ScreenName`); in the quick settings (the second one
+  while an app is beside the game) and in the pause menu.
+- The quick settings keep a "Recent apps" row (the last three) and `companion.idle` is the
+  second screen's page while the main one shows the Apps section.
 
 ## Launcher additions
 

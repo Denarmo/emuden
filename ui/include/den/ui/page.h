@@ -104,6 +104,7 @@ private:
     // Pointer state.
     Node* press_node_ = nullptr;
     Node* drag_node_ = nullptr;  // the scrolling node the gesture is locked to
+    Node* value_node_ = nullptr; // the node whose value follows the finger (a slider)
     std::vector<Node*> held_;    // scrolling nodes the finger holds: stopped flings, the drag
     float press_x_ = 0, press_y_ = 0, last_x_ = 0, last_y_ = 0;
     bool pressed_ = false, dragging_ = false;

@@ -25,6 +25,8 @@
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
+#include "../player/player_screen.h"
+#include "den/platform/lifecycle.h"
 #include "den/platform/second_display.h"
 #include "second_screen.h"
 
@@ -209,7 +211,13 @@ void Frame() {
     }
     pal::SecondDisplay& display = pal::GetSecondDisplay();
     const int mode = ModeIndex();
-    const bool wanted = c.claimed || mode == 1 || (mode == 0 && display.Present());
+    bool wanted = c.claimed || mode == 1 || (mode == 0 && display.Present());
+    if (pal::MainWindowHidden()) {
+        // Another app covers the main window (Android). The second screen stays only for a
+        // game that plays there; otherwise the app is left and gives it up as well.
+        const PlayerScreen* playing = PlayerScreen::Current();
+        wanted = wanted && playing && playing->WantsSecond();
+    }
     display.SetWanted(wanted);
     c.pointer.clear();
     display.TakePointer(c.pointer);
@@ -236,9 +244,13 @@ void Frame() {
     if (!c.claimed) {
         TrackGame(c);
         const player::State state = svc.player->GetSnapshot().state;
+        // The quick settings while a game runs; the focused game while browsing; under the
+        // Apps section, which is about no game, a page that says so.
+        const ui::Page* top = svc.stage->Top();
         const char* route = state == player::State::Running || state == player::State::Paused
                                 ? "companion.play"
-                                : "companion.browse";
+                                : top && top->Route() == "apps" ? "companion.idle"
+                                                                : "companion.browse";
         if (!c.stage->Top()) {
             c.stage->Push(route);
         } else if (c.base != route) {

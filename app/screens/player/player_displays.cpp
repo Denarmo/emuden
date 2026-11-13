@@ -13,7 +13,10 @@
 #include <format>
 
 #include "../apps/apps_catalog.h"
+#include "../apps/beside.h"
 #include "../companion/second_screen.h"
+#include "den/base/log.h"
+#include "den/platform/lifecycle.h"
 #include "player_screen.h"
 
 namespace den::app {
@@ -26,6 +29,25 @@ constexpr const char* SWAP_KEY = "player.swap_displays";
 // The screen whose game runs, and the one that draws on the second display.
 PlayerScreen* g_current = nullptr;
 PlayerScreen* g_overlay = nullptr;
+
+// The tab that brings the quick settings back over what covers them, where the system lets
+// no handle of ours float over the other app: a small disc on the game's own display.
+constexpr float TAB_SIZE = 44;
+
+gfx::Rect TabRect(const gfx::Rect& area) {
+    return gfx::Rect{area.Right() - TAB_SIZE - 8, area.y + area.h * 0.3f, TAB_SIZE, TAB_SIZE};
+}
+
+void DrawTab(ui::Context& ctx, const gfx::Rect& area) {
+    gfx::Canvas& canvas = *ctx.canvas;
+    const gfx::Rect disc = TabRect(area);
+    canvas.FillRect(disc, gfx::Color{24, 24, 24, 150}, TAB_SIZE * 0.5f);
+    canvas.StrokeRect(disc, gfx::Color{255, 255, 255, 120}, 1.5f, TAB_SIZE * 0.5f);
+    for (int line = -1; line <= 1; ++line) {
+        canvas.FillRect(gfx::Rect{disc.CenterX() - 9, disc.CenterY() + line * 6.0f - 1, 18, 2},
+                        gfx::Color{255, 255, 255, 200}, 1);
+    }
+}
 
 } // namespace
 
@@ -43,11 +65,48 @@ void PlayerScreen::SwapDisplays() {
     Rebuild();
 }
 
+void PlayerScreen::Hold(bool hold) {
+    if (phase_ != Phase::Running) {
+        held_ = false;
+        return;
+    }
+    if (hold) {
+        if (!held_ && view_ == View::Closed &&
+            Svc().player->GetSnapshot().state == player::State::Running) {
+            Svc().player->Pause();
+            held_ = true;
+            log::Info("player", "held: the game's display is covered");
+        }
+    } else if (held_) {
+        held_ = false;
+        if (view_ == View::Closed) {
+            Svc().player->Resume();
+            wait_release_ = true;
+            log::Info("player", "goes on: the game's display is back");
+        }
+    }
+}
+
+bool PlayerScreen::WantsSecond() const {
+    return phase_ == Phase::Running && !dual_.Active() && Svc().settings->GetBool(SWAP_KEY, false);
+}
+
+bool PlayerScreen::TabPressed(const input::Event& event, const gfx::Rect& area, float scale) {
+    if (event.type != input::Event::Type::PointerDown || !Beside().WantsTab() ||
+        !TabRect(area).Inset(-10).Contains(event.x / scale, event.y / scale)) {
+        return false;
+    }
+    BesidePullSettings();
+    return true;
+}
+
 void PlayerScreen::PlaceDisplays() {
     Services& svc = Svc();
     const bool two = phase_ == Phase::Running && SecondScreenReady();
     swapped_ = two && !dual_.Active() && svc.settings->GetBool(SWAP_KEY, false);
-    menu_apart_ = two && svc.settings->GetBool(OVERLAY_KEY, true);
+    // While another app covers the main window the menu has no display of its own: it opens
+    // over the game, wherever that is.
+    menu_apart_ = two && !pal::MainWindowHidden() && svc.settings->GetBool(OVERLAY_KEY, true);
     // Apart from a game on the main display, or over a game on the second one.
     menu_second_ = menu_apart_ != swapped_;
 }
@@ -78,6 +137,7 @@ void PlayerScreen::StopDisplays() {
     if (g_current == this) {
         g_current = nullptr;
     }
+    held_ = false;
     if (second_down_) {
         second_down_ = false;
         Svc().player->SetPointer(0, 0, false);
@@ -171,6 +231,9 @@ void PlayerScreen::DrawGameLayer(ui::Context& ctx, const gfx::Rect& area, bool m
         svc.player->Draw(canvas, placement.area);
     }
     DrawOverlays(ctx, area, snapshot);
+    if (!menu_here && Beside().WantsTab()) {
+        DrawTab(ctx, area);
+    }
     if (menu_here) {
         if (!choosing) {
             canvas.FillRect(area, ctx.theme->scrim);
@@ -195,6 +258,7 @@ void PlayerScreen::DrawSecond(ui::Context& ctx, const gfx::Rect& area) {
     if (phase_ != Phase::Running) {
         return;
     }
+    second_area_ = area;
     const bool menu_here = view_ != View::Closed && menu_second_;
     if (swapped_) {
         DrawGameLayer(ctx, area, menu_here);
@@ -219,6 +283,9 @@ void PlayerScreen::SecondPointer(const input::Event& event) {
         return;
     }
     if (swapped_) {
+        if (TabPressed(event, second_area_, scale)) {
+            return;
+        }
         // The game is here: its picture is the touch screen of the consoles that have one.
         if (event.type != Type::PointerMove) {
             second_down_ = event.type == Type::PointerDown;

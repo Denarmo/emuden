@@ -33,6 +33,7 @@
   "search.title": "Search",
   "search.placeholder": "Type a game or a console",
   "search.count": "{} games for \"{}\"",
+  "search.count_one": "1 game for \"{}\"",
   "search.key_space": "Space",
   "search.key_delete": "Delete",
   "search.key_clear": "Clear",

@@ -132,6 +132,13 @@ public:
     virtual bool OnNav(input::Nav nav) {
         return false;
     }
+    /// A finger at this point of the node sets a value by where it is (a slider's track):
+    /// a sideways drag that starts here, or a tap, goes to DragTo instead of scrolling or
+    /// activating.
+    virtual bool WantsDrag(float x, float y) const {
+        return false;
+    }
+    virtual void DragTo(float x, float y) {}
 
     Node* FindById(const std::string& wanted);
     /// Every visible focusable node below (and including) this one.

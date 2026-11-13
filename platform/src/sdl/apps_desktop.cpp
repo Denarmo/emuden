@@ -23,6 +23,22 @@ Status Launch(const std::string&, Display) {
     return Status::Fail("this device cannot open other apps");
 }
 
+void Raise(Display) {}
+
+void Lower(Display) {}
+
+bool ShowHandle(Display) {
+    return false;
+}
+
+void HideHandle() {}
+
+void CatchBack(Display, bool) {}
+
+std::vector<Event> TakeEvents() {
+    return {};
+}
+
 bool HasInputFocus() {
     return true;
 }

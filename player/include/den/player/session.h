@@ -198,6 +198,9 @@ public:
     virtual void Reset() = 0;
     /// Writes the battery save now when it changed (Close and a timer do too).
     virtual void FlushSaves() = 0;
+    /// Writes the state the next start resumes from, as Close does, and goes on: for a
+    /// moment after which the process may be ended without a word (the app is covered).
+    virtual void SaveResumeState() {}
 
     virtual std::vector<CoreOption> Options() const = 0;
     virtual void SetOption(const std::string& key, const std::string& value) = 0;

@@ -8,6 +8,7 @@
 
 #include "den/base/files.h"
 #include "den/base/log.h"
+#include "../lifecycle_native.h"
 #include "den/platform/pal.h"
 
 namespace den::pal {
@@ -153,9 +154,11 @@ Status Init() {
     // Android: Back is a key for the app (it goes back a page), never the end of the activity.
     SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
     SDL_SetAppMetadata("EmuDEN", "0.1.0", "io.github.denarmo.emuden");
+    LifecycleBeforeInit();
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         return Status::Fail(std::string("SDL_Init: ") + SDL_GetError());
     }
+    LifecycleAfterInit();
     g_caps = DetectCaps();
     return {};
 }

@@ -194,7 +194,9 @@ private:
             std::erase_if(games, [&](const library::Entry& game) { return !Matches(game, query_); });
         }
         auto* count = results_->Emplace<ui::Label>(
-            query_.empty() ? GameCount(games.size()) : TrF("search.count", games.size(), query_));
+            query_.empty()        ? GameCount(games.size())
+            : games.size() == 1 ? TrF("search.count_one", query_)
+                                : TrF("search.count", games.size(), query_));
         count->tone = ui::Tone::Dim;
         if (games.empty()) {
             return;

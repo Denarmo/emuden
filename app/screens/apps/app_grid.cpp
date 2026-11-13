@@ -85,6 +85,36 @@ void AppTile::DrawContent(ui::Context& ctx) {
                     font);
 }
 
+AppChip::AppChip(std::string text, std::string icon_path) : text_(std::move(text)), icon_(std::move(icon_path)) {
+    focusable = true;
+    label = text_;
+    height = 56;
+}
+
+ui::Size AppChip::MeasureContent(ui::Context& ctx) {
+    const float icon = (height > 0 ? height : 56.0f) - 16;
+    return ui::Size{12 + icon + 10 + ctx.Text().Measure(text_, ctx.theme->text_body, gfx::FONT_BOLD) + 16, 24};
+}
+
+void AppChip::DrawContent(ui::Context& ctx) {
+    const ui::Theme& theme = *ctx.theme;
+    gfx::Canvas& canvas = *ctx.canvas;
+    canvas.FillRect(rect, strong || focused ? theme.panel_strong : theme.panel, theme.radius);
+    const float side = rect.h - 16;
+    const gfx::Rect icon{rect.x + 12, rect.y + 8, side, side};
+    const gfx::Texture texture = ctx.textures && !icon_.empty() ? ctx.textures->Get(icon_, 256) : gfx::Texture{};
+    if (texture) {
+        canvas.DrawImage(icon, texture);
+    } else {
+        canvas.FillRect(icon, theme.page, side * 0.25f);
+    }
+    const int font = strong || focused ? gfx::FONT_BOLD : gfx::FONT_REGULAR;
+    const float size = theme.text_body;
+    const float room = rect.Right() - 14 - (icon.Right() + 10);
+    canvas.DrawText(ctx.Text().Elide(text_, size, room, font), icon.Right() + 10, rect.CenterY() - size * 0.61f,
+                    size, theme.fg, font);
+}
+
 std::string AppInNodeId(const std::string& node_id) {
     for (const char* mark : {APP_MARK, RECENT_MARK}) {
         if (const auto at = node_id.find(mark); at != std::string::npos) {

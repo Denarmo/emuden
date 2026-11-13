@@ -32,6 +32,20 @@ private:
     std::string name_, icon_;
 };
 
+/// A button for one app: its icon, then a text ("Back to YouTube", or just its name).
+class AppChip final : public ui::Node {
+public:
+    AppChip(std::string text, std::string icon_path);
+    bool strong = false; // the row's main action: the stronger tint and bold text
+
+protected:
+    ui::Size MeasureContent(ui::Context& ctx) override;
+    void DrawContent(ui::Context& ctx) override;
+
+private:
+    std::string text_, icon_;
+};
+
 struct AppGridOptions {
     std::string id_prefix;  // ids are prefix + ".app." + app id and prefix + ".recent." + app id
     float width = 0;        // the room the rows have, in units

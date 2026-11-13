@@ -64,6 +64,12 @@ public:
     void Exit() {
         Leave();
     }
+    /// The display the game is on is covered by another app (true): it pauses without a
+    /// menu and goes on by itself when the display is back (false). A game that is paused
+    /// in its menu stays so.
+    void Hold(bool hold);
+    /// The game is set to play on the second display (whether or not that is there now).
+    bool WantsSecond() const;
 
 private:
     enum class Phase { New, Preparing, Running, Left };
@@ -90,6 +96,7 @@ private:
     void DrawSecond(ui::Context& ctx, const gfx::Rect& area);
     void SecondPointer(const input::Event& event);
     void DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const player::Snapshot& snapshot);
+    bool TabPressed(const input::Event& event, const gfx::Rect& area, float scale);
 
     // pause_menu.cpp: the menu's pages as rows.
     void BuildMenu();
@@ -135,6 +142,8 @@ private:
     bool menu_second_ = false;       // an open menu is drawn on the second display
     bool direct_ = false;            // the menu's page was opened from the quick settings
     bool second_down_ = false;       // a finger is on the game on the second display
+    bool held_ = false;              // paused because the game's display is covered
+    gfx::Rect second_area_;          // the second display, as last drawn
     std::string focus_after_build_;
     std::vector<player::CoreOption> options_;
 

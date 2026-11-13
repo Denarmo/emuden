@@ -102,12 +102,15 @@ public:
     explicit Row(RowSpec spec);
     RowSpec spec;
     bool OnNav(input::Nav nav) override;
+    bool WantsDrag(float x, float y) const override;
+    void DragTo(float x, float y) override;
 
 protected:
     void DrawContent(Context& ctx) override;
 
 private:
     void Step(int direction);
+    gfx::Rect track_; // a slider's track as last drawn
 };
 
 /// A heading above a group of rows or a shelf.

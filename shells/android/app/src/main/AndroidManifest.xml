@@ -57,15 +57,18 @@
             </intent-filter>
         </activity>
 
-        <!-- Lies under an app opened beside the game, to notice when it is left. -->
+        <!-- The app's window on the second display, in a task of its own there: it stays
+             resumed while another app covers the main display, and another app opened on
+             the second display lies over it. Drawn by the main activity's native loop. -->
         <activity
-            android:name=".AppHost"
+            android:name=".PanelActivity"
             android:exported="false"
-            android:taskAffinity="io.github.denarmo.emuden.beside"
+            android:taskAffinity="io.github.denarmo.emuden.panel"
+            android:launchMode="singleInstance"
             android:excludeFromRecents="true"
             android:resizeableActivity="true"
-            android:configChanges="layoutDirection|locale|fontScale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation|density"
-            android:theme="@android:style/Theme.Black.NoTitleBar" />
+            android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation|density"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
 
         <!-- Shows nothing: started on a display to move the input focus there. -->
         <activity

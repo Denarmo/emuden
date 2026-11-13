@@ -11,6 +11,8 @@
 #include "den/base/files.h"
 #include "den/base/log.h"
 #include "den/gfx/gl.h"
+#include "den/platform/lifecycle.h"
+#include "den/platform/second_display.h"
 #include "den/system/device.h"
 #include "den/system/first_run.h"
 #include "den/system/info.h"
@@ -214,6 +216,14 @@ int Run(int argc, char** argv) {
                 }
             }
             jobs.DrainMain();
+            // Android: another app may cover the main window while a game goes on on the
+            // second display. The frame runs as always (the game advances in it), drawn for
+            // nobody; without a GL context at all there is nothing to run.
+            const bool hidden = pal::MainWindowHidden();
+            if (!pal::PrepareFrame()) {
+                pal::SleepMs(50);
+                continue;
+            }
             textures.Pump();
             for (const auto& hook : registry.Frame()) {
                 hook();
@@ -238,7 +248,11 @@ int Run(int argc, char** argv) {
             stage.Frame(ctx);
             canvas.End();
             automation.AfterDraw(width, height);
-            svc.window->Swap();
+            if (!hidden) {
+                svc.window->Swap();
+            } else if (!pal::GetSecondDisplay().Ready()) {
+                pal::SleepMs(100); // nothing of the app is shown anywhere: it idles
+            }
             // Without vsync (a hidden or occluded window) the loop must not spin.
             if (pal::NowSeconds() - now < 0.002) {
                 pal::SleepMs(8);

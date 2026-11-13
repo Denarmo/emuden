@@ -145,11 +145,7 @@ Status PlayerSession::Start(const OpenRequest& request) {
 void PlayerSession::Close() {
     if (core_) {
         FlushSaves();
-        if (resume_enabled_ && snapshot_.can_save_states && snapshot_.frames > 0) {
-            if (const Status status = WriteStateFile(paths_.Resume()); !status) {
-                log::Warn("player", "no resume state: {}", status.error);
-            }
-        }
+        SaveResumeState();
         core_.reset();
     }
     hw_.reset();
@@ -275,6 +271,14 @@ void PlayerSession::ReloadButtons() {
     for (std::size_t family = 0; family < button_maps_.size(); ++family) {
         button_maps_[family] = LoadButtons(config_.settings, system_,
                                            static_cast<input::PadFamily>(family), pad_by_label_);
+    }
+}
+
+void PlayerSession::SaveResumeState() {
+    if (core_ && resume_enabled_ && snapshot_.can_save_states && snapshot_.frames > 0) {
+        if (const Status status = WriteStateFile(paths_.Resume()); !status) {
+            log::Warn("player", "no resume state: {}", status.error);
+        }
     }
 }
 
