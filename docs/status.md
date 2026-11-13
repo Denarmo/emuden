@@ -270,10 +270,32 @@ Design and contract: `docs/feature-plugins.md`; the browser page: `docs/in-app-b
   fixes the merge needed there: a constant named like a Linux limit (`MAX_INPUT`) and a
   file time handed to `std::to_string`. Nothing was installed or run on a device in this
   round.
+- **Retroid Pocket Duo after the merge** (release APK of `192cf16` installed over the old
+  one, data kept, `adb` input and `screencap` of both displays, every picture looked at;
+  the device had been idle for over 10 minutes with both launchers in front). Nothing
+  failed and no code was changed.
+  - Plugins is on the rail and lists the four plugins; "ROM Hacks: hackdex.app" installed
+    with one tap (left installed). Its start page was opened once: it rendered on the main
+    display, the second display showed the "Browser" page, Back closed it. Nothing was
+    tapped on the site.
+  - Test site on the PC through `adb reverse`, with a developer-folder copy of the same
+    Lua (debug APK for this part, since `run-as` and `plugins.developer` need it): a tap on
+    a `.gba` link was refused with "EmuDEN only installs patch files; this is a full game
+    file"; a tap on a BPS made against the device's Tetris gave "You have the base game",
+    installed the hack in `ROMS/GB/Hacks` and it ran (791 frames, 59.9 fps, mGBA, quick
+    settings on the second display). Removed again through the plugin; the test plugin,
+    its data, the setting, the hack's records and the empty `Hacks` folder are gone.
+  - Still working: Tetris with the quick settings on the second screen, Apps > Settings
+    beside the game ("The pad is with the app on the other screen"), Back to the quick
+    settings, Gboard on the second screen for the Search page (`input -d 2 text tetris`,
+    one result, Enter closed it).
+  - Seen, not changed: the second display keeps the last game's page while the Plugins
+    section and a plugin's pages are open; the consent page of the developer plugin showed
+    two of its permission sentences above the buttons.
 - **Not run:** a 7z download from any real site (for the owner by hand, as the list
-  above); Linux build and run; the web page with the system keyboard and the second
-  display on the Retroid; a 7z over a few megabytes; BCJ2, delta and PPMd outside the unit
-  tests.
+  above); Linux build and run; the web page's text entry (X) with the system keyboard on
+  the Retroid; pad input in the web page there; a 7z over a few megabytes; BCJ2, delta and
+  PPMd outside the unit tests.
 - **Limits:** a solid 7z block is unpacked in memory (refused over 1 GiB, so a large disc
   image in a solid 7z does not play); 7z with a password is not asked for one; a console
   whose rule is "pass" gets a zip as it is but a 7z unpacked.
