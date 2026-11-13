@@ -29,7 +29,7 @@ pinned versions and shared by every build directory.
 
 | Directory | Target | Contents |
 |---|---|---|
-| `base/` | `den_base` | results, log, files, UTF-8, JSON, hashes, zip, jobs |
+| `base/` | `den_base` | results, log, files, UTF-8, JSON, hashes, zip and 7z, jobs |
 | `platform/` | `den_platform` | `pal.h`: window, GL context, folders, HTTP, processes, secrets, Caps |
 | `gfx/` | `den_gfx` | GL 3.3 / GLES 3 device, 2D canvas, text, images, texture cache |
 | `input/` | `den_input` | pads, families, mapping by label, navigation events, glyph names |

@@ -66,6 +66,7 @@ copy_licence "$deps/freetype-src/docs/FTL.TXT" FreeType-FTL.txt
 copy_licence "$deps/stb-src/LICENSE" stb.txt
 copy_licence "$root/plugins/src/third_party/monocypher/LICENCE.md" Monocypher.md
 copy_licence "$deps/xzembedded-src/COPYING" XZ-Embedded.txt
+copy_licence "$deps/lzma-sdk-src/DOC/lzma-sdk.txt" LZMA-SDK.txt
 copy_licence "$root/assets/fonts/OFL.txt" Google-Sans-OFL.txt
 
 image="$out/EmuDEN-x86_64.AppImage"

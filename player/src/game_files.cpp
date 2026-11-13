@@ -5,7 +5,7 @@
 #include <cstring>
 
 #include "den/base/files.h"
-#include "den/base/zip.h"
+#include "den/base/archive.h"
 #include "game_files.h"
 
 namespace den::player {
@@ -104,16 +104,17 @@ Result<fs::path> ResolveContent(const fs::path& content,
     const auto accepted = [&](const std::string& ext) {
         return std::find(extensions.begin(), extensions.end(), ext) != extensions.end();
     };
-    if (Extension(content) != "zip" || accepted("zip")) {
+    const std::string packed = Extension(content);
+    if (!IsArchiveExtension(packed) || accepted(packed)) {
         return content;
     }
-    const auto entries = ListZip(content);
+    const auto entries = ListArchive(content);
     if (!entries || entries->empty()) {
-        return Out::Fail("The zip file could not be opened: " + PathToUtf8(content.filename()));
+        return Out::Fail("The " + packed + " file could not be opened: " + PathToUtf8(content.filename()));
     }
     const ZipEntry* pick = nullptr;
     for (const ZipEntry& entry : *entries) {
-        if (entry.encrypted || entry.symlink || !CanExtractZipEntry(entry)) {
+        if (entry.encrypted || entry.symlink || !CanExtractArchiveEntry(entry)) {
             continue;
         }
         if (accepted(Extension(PathFromUtf8(entry.name)))) {
@@ -122,14 +123,14 @@ Result<fs::path> ResolveContent(const fs::path& content,
         }
     }
     if (!pick) {
-        return Out::Fail("The zip file holds no game this console can play.");
+        return Out::Fail("The " + packed + " file holds no game this console can play.");
     }
     std::error_code ec;
     fs::remove_all(cache_dir, ec);
     fs::create_directories(cache_dir, ec);
     const fs::path name = PathFromUtf8(SafeFileName(PathToUtf8(PathFromUtf8(pick->name).filename())));
     const fs::path target = cache_dir / name;
-    if (const Status status = ExtractZipEntry(content, *pick, target); !status) {
+    if (const Status status = ExtractArchiveEntry(content, *pick, target); !status) {
         return Out::Fail("The game could not be unpacked: " + status.error);
     }
     return target;

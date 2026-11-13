@@ -308,7 +308,9 @@ Result<std::vector<patching::RomForm>> ChecksumCache::Get(const fs::path& rom, s
     if (ec) {
         return Status::Fail("Cannot read " + PathToUtf8(rom));
     }
-    const std::string written = std::to_string(fs::last_write_time(rom, ec).time_since_epoch().count());
+    // The file clock counts in a type std::to_string does not take everywhere.
+    const std::string written =
+        std::to_string(static_cast<std::int64_t>(fs::last_write_time(rom, ec).time_since_epoch().count()));
     const std::string key = Key(rom);
     {
         std::lock_guard lock(mutex_);

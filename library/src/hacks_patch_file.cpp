@@ -6,7 +6,7 @@
 #include <algorithm>
 
 #include "den/base/files.h"
-#include "den/base/zip.h"
+#include "den/base/archive.h"
 #include "den/library/content.h"
 #include "den/library/hacks.h"
 
@@ -21,22 +21,22 @@ std::string ExtensionOf(const fs::path& file) {
     return extension.empty() ? extension : extension.substr(1);
 }
 
-// The patch a zip archive holds, unpacked to `work_dir`.
+// The patch a zip or 7z archive holds, unpacked to `work_dir`.
 Result<fs::path> PatchInZip(const fs::path& archive, const fs::path& work_dir, const Job* cancel) {
-    const auto members = ListZip(archive);
+    const auto members = ListArchive(archive);
     if (!members) {
         return Status::Fail("Cannot read " + PathToUtf8(archive.filename()));
     }
     for (const ZipEntry& member : *members) {
         const fs::path inside = PathFromUtf8(member.name);
         if (!patching::IsPatchExtension(ExtensionOf(inside)) || !IsSafeRelativePath(member.name) ||
-            !CanExtractZipEntry(member)) {
+            !CanExtractArchiveEntry(member)) {
             continue;
         }
         std::error_code ec;
         fs::create_directories(work_dir, ec);
         const fs::path patch = work_dir / inside.filename();
-        const Status unpacked = ExtractZipEntry(archive, member, patch, [cancel] {
+        const Status unpacked = ExtractArchiveEntry(archive, member, patch, [cancel] {
             return cancel != nullptr && cancel->CancelRequested();
         });
         if (!unpacked) {
@@ -54,7 +54,11 @@ Result<PatchFile> OpenPatchFile(Library& library, const fs::path& file, const fs
                                 const Job* cancel) {
     PatchFile opened;
     opened.patch = file;
-    if (ExtensionOf(file) == "zip") {
+    if (const std::string extension = ExtensionOf(file); extension == "rar") {
+        return Status::Fail(PathToUtf8(file.filename()) +
+                            " is a rar archive, which EmuDEN does not open: unpack it and choose the "
+                            "patch file");
+    } else if (IsArchiveExtension(extension)) {
         auto inside = PatchInZip(file, work_dir, cancel);
         if (!inside) {
             return inside.status();

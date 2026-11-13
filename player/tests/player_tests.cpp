@@ -18,6 +18,7 @@
 #include "game_files.h"
 #include "pad_map.h"
 #include "rewind_buffer.h"
+#include "seven_zip_writer.h"
 
 using namespace den;
 using namespace den::player;
@@ -125,6 +126,24 @@ TEST_CASE("content that is not a zip is used as it is") {
     REQUIRE(path.ok());
     REQUIRE(path.value() == fs::path("roms/Game.gba"));
     REQUIRE_FALSE(ResolveContent("roms/missing.zip", {"gba"}, FreshDir("zip")).ok());
+}
+
+TEST_CASE("a game in a 7z is unpacked for a core that does not open it") {
+    const fs::path dir = FreshDir("seven");
+    const std::string archive =
+        den::test::StoredSevenZip({{"readme.txt", "notes"}, {"sub/Game (USA).gba", "GBADATA"}});
+    std::ofstream(dir / "Game.7z", std::ios::binary)
+        .write(archive.data(), static_cast<std::streamsize>(archive.size()));
+    const auto path = ResolveContent(dir / "Game.7z", {"gba"}, dir / "cache");
+    INFO(path.error());
+    REQUIRE(path.ok());
+    REQUIRE(path.value() == dir / "cache" / "Game (USA).gba");
+    REQUIRE(ReadTextFile(path.value()) == std::optional<std::string>("GBADATA"));
+    // A core that takes 7z itself gets the archive.
+    REQUIRE(ResolveContent(dir / "Game.7z", {"gba", "7z"}, dir / "cache").value() == dir / "Game.7z");
+    const auto none = ResolveContent(dir / "Game.7z", {"nes"}, dir / "cache");
+    REQUIRE_FALSE(none.ok());
+    REQUIRE(none.error() == "The 7z file holds no game this console can play.");
 }
 
 TEST_CASE("pads map by position, and by label on Nintendo consoles") {

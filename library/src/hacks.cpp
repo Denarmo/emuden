@@ -8,7 +8,7 @@
 #include "den/base/files.h"
 #include "den/base/hash.h"
 #include "den/base/log.h"
-#include "den/base/zip.h"
+#include "den/base/archive.h"
 #include "den/library/content.h"
 #include "den/library/hacks.h"
 #include "den/library/scan.h"
@@ -27,7 +27,8 @@ std::int64_t UnixNow() {
 }
 
 bool IsZip(const std::string& path) {
-    return ToLower(path).ends_with(".zip");
+    const std::string lower = ToLower(path);
+    return lower.ends_with(".zip") || lower.ends_with(".7z");
 }
 
 bool Wanted(const BaseQuery& query, const patching::RomForm& form) {
@@ -44,7 +45,7 @@ bool SizeMayFit(std::uint64_t file_size, std::uint64_t wanted) {
 
 // The archive knows the size and CRC-32 of the game in it: only a likely match is unpacked.
 bool ZipMayMatch(const fs::path& archive, const Entry& entry, const BaseQuery& query) {
-    const auto members = ListZip(archive);
+    const auto members = ListArchive(archive);
     if (!members) {
         return false;
     }
@@ -54,7 +55,7 @@ bool ZipMayMatch(const fs::path& archive, const Entry& entry, const BaseQuery& q
     for (const ZipEntry& member : *members) {
         if (member.name == entry.archive_member) {
             return (!query.size || SizeMayFit(member.size, *query.size)) &&
-                   (!query.crc32 || member.crc == *query.crc32 || other_forms);
+                   (!query.crc32 || !member.crc_known || member.crc == *query.crc32 || other_forms);
         }
     }
     return false;

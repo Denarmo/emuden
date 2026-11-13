@@ -20,7 +20,7 @@ using plugins::UiEvent;
 
 constexpr float TILE_W = 144, TILE_GAP = 18, DETAIL_COVER_W = 240, DETAIL_GAP = 36, SHOT_H = 150;
 constexpr float DEFAULT_ASPECT = 0.75f; // width / height of a cover
-constexpr int MAX_INPUT = 64;
+constexpr int MAX_TYPED = 64;
 constexpr std::size_t LONG_TEXT = 400; // from here on a pad steps through the paragraphs
 
 struct Builder {
@@ -233,7 +233,7 @@ struct Builder {
                 ui::TextRequest request;
                 request.title = label;
                 request.text = secret ? std::string() : *value;
-                request.max_length = MAX_INPUT;
+                request.max_length = MAX_TYPED;
                 request.allow_empty = true;
                 Svc().stage->AskText(std::move(request), [value, send, action, arg](const std::string& text) {
                     *value = text;
@@ -340,7 +340,7 @@ struct Builder {
                 ui::TextRequest request;
                 request.title = field->placeholder;
                 request.text = field->text;
-                request.max_length = MAX_INPUT;
+                request.max_length = MAX_TYPED;
                 request.allow_empty = true;
                 Svc().stage->AskText(std::move(request), [send, action](const std::string& text) {
                     send(UiEvent{action, {}, text});

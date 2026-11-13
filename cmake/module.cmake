@@ -20,6 +20,11 @@ function(den_tests name)
     endif()
     add_executable(den_${name}_tests ${tests})
     target_link_libraries(den_${name}_tests PRIVATE ${ARGN} Catch2::Catch2WithMain)
+    # Shared by the modules that read archives: 7z files a 7z tool wrote (base/tests/data)
+    # and a writer of stored ones (base/tests/seven_zip_writer.h).
+    target_include_directories(den_${name}_tests PRIVATE "${CMAKE_SOURCE_DIR}/base/tests")
+    target_compile_definitions(den_${name}_tests PRIVATE
+        DEN_ARCHIVE_FIXTURES="${CMAKE_SOURCE_DIR}/base/tests/data")
     den_warnings(den_${name}_tests)
     add_test(NAME den_${name}_tests COMMAND den_${name}_tests)
 endfunction()

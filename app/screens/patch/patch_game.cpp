@@ -37,7 +37,7 @@ void ChoosePatch() {
     PickOptions options;
     options.title = "Choose a patch file";
     options.files = true;
-    options.extensions = {"ips", "ups", "bps", "aps", "ppf", "xdelta", "xdelta3", "vcdiff", "zip"};
+    options.extensions = {"ips", "ups", "bps", "aps", "ppf", "xdelta", "xdelta3", "vcdiff", "zip", "7z"};
     Pick(std::move(options), [](const std::string& path) { Svc().stage->Push("patch_game", {{"file", path}}); });
 }
 

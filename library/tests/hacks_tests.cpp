@@ -9,6 +9,7 @@
 #include "den/base/jobs.h"
 #include "den/library/hacks.h"
 #include "../src/hacks_store.h"
+#include "seven_zip_writer.h"
 
 using namespace den;
 using namespace den::library;
@@ -395,6 +396,25 @@ TEST_CASE("Patch a game: from the chosen file to the game it is for") {
     REQUIRE(opened.ok());
     REQUIRE(!opened.value().base);
     REQUIRE(opened.value().missing.find(patching::CrcText(CrcOf(absent))) != std::string::npos);
+
+    // A 7z gives its patch like a zip; rar is named as what it is.
+    const Bytes bps = MakeBps(base, patched);
+    const std::string seven = den::test::StoredSevenZip(
+        {{"readme.txt", "notes"}, {"patches/Night Shift 2.bps", std::string(bps.begin(), bps.end())}});
+    WriteFile(f.dir / "dl" / "Night Shift v2.7z", Bytes(seven.begin(), seven.end()));
+    opened = OpenPatchFile(*f.library, f.dir / "dl" / "Night Shift v2.7z", f.dir / "work");
+    INFO(opened.error());
+    REQUIRE(opened.ok());
+    REQUIRE(opened.value().title == "Night Shift 2");
+    REQUIRE(opened.value().base);
+    REQUIRE(opened.value().base->entry.name == "Emerald Quest");
+    const std::string none = den::test::StoredSevenZip({{"readme.txt", "notes"}});
+    WriteFile(f.dir / "dl" / "empty.7z", Bytes(none.begin(), none.end()));
+    REQUIRE(!OpenPatchFile(*f.library, f.dir / "dl" / "empty.7z", f.dir / "work").ok());
+    WriteFile(f.dir / "dl" / "pack.rar", Bytes{'R', 'a', 'r', '!'});
+    opened = OpenPatchFile(*f.library, f.dir / "dl" / "pack.rar", f.dir / "work");
+    REQUIRE(!opened.ok());
+    REQUIRE(opened.error().find("rar archive") != std::string::npos);
 
     WriteFile(f.dir / "dl" / "empty.zip", StoredZip("readme.txt", Bytes{'h', 'i'}));
     REQUIRE(!OpenPatchFile(*f.library, f.dir / "dl" / "empty.zip", f.dir / "work").ok());

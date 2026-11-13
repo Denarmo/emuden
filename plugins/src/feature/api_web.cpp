@@ -13,7 +13,7 @@
 
 #include "den/base/files.h"
 #include "den/base/json.h"
-#include "den/base/zip.h"
+#include "den/base/archive.h"
 #include "den/patching/patch.h"
 #include "feature/runner.h"
 #include "feature/ui_model.h"
@@ -36,15 +36,16 @@ namespace fs = std::filesystem;
 
 constexpr std::uint64_t MAX_PATCH = 256ull << 20;
 
-// What a plugin can be handed from a web site: patches, or a zip holding one. Never a ROM
-// image, whatever the plugin asks for. (7z cannot be opened here, so it cannot be checked.)
+// What a plugin can be handed from a web site: patches, or a zip or 7z holding one. Never a
+// ROM image, whatever the plugin asks for. (rar cannot be opened here, so it cannot be
+// checked and is never taken.)
 bool Takes(const std::string& extension) {
     return !patching::IsRomImageExtension(extension) &&
-           (patching::IsPatchExtension(extension) || extension == "zip");
+           (patching::IsPatchExtension(extension) || IsArchiveExtension(extension));
 }
 
 std::vector<std::string> DefaultExtensions() {
-    return {"bps", "ips", "ups", "xdelta", "vcdiff", "aps", "ppf", "zip"};
+    return {"bps", "ips", "ups", "xdelta", "vcdiff", "aps", "ppf", "zip", "7z"};
 }
 
 bool Has(const std::vector<std::string>& list, const std::string& item) {
@@ -63,10 +64,10 @@ void Remove(const fs::path& file) {
     fs::remove(file, ec);
 }
 
-// The patch a zip holds, unpacked beside it. An archive with a ROM image in it is refused
+// The patch a zip or a 7z holds, unpacked beside it. An archive with a ROM image in it is refused
 // whole: a patched game is not a patch.
 Result<fs::path> PatchInZip(const fs::path& archive) {
-    const auto members = ListZip(archive);
+    const auto members = ListArchive(archive);
     if (!members) {
         return Status::Fail("the archive cannot be read");
     }
@@ -77,7 +78,8 @@ Result<fs::path> PatchInZip(const fs::path& archive) {
             return Status::Fail("EmuDEN only installs patch files; this archive holds a full game file");
         }
         if (patch == nullptr && patching::IsPatchExtension(extension) && IsSafeRelativePath(member.name) &&
-            CanExtractZipEntry(member) && !member.symlink && member.size <= MAX_PATCH) {
+            CanExtractArchiveEntry(member) && !member.symlink && member.size <= MAX_PATCH &&
+            member.block_size <= MAX_PATCH) {
             patch = &member;
         }
     }
@@ -88,7 +90,7 @@ Result<fs::path> PatchInZip(const fs::path& archive) {
                          PathFromUtf8(patch->name).filename();
     std::error_code ec;
     fs::create_directories(out.parent_path(), ec);
-    if (const Status unpacked = ExtractZipEntry(archive, *patch, out); !unpacked.ok) {
+    if (const Status unpacked = ExtractArchiveEntry(archive, *patch, out); !unpacked.ok) {
         return unpacked;
     }
     return out;
@@ -108,7 +110,7 @@ Result<WebVisit::File> TakeFile(Runner& runner, const WebFile& arrived) {
         result = Status::Fail("the plugin does not take this kind of file");
     } else {
         Status ready;
-        if (extension == "zip") {
+        if (IsArchiveExtension(extension)) {
             auto inside = PatchInZip(file);
             if (inside) {
                 patch = inside.take();

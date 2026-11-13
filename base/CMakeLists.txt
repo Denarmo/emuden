@@ -1,2 +1,2 @@
-den_module(base PRIVATE_DEPS zlibstatic)
+den_module(base PRIVATE_DEPS zlibstatic den_lzma)
 target_compile_definitions(den_base PRIVATE DEN_HAVE_ZLIB)

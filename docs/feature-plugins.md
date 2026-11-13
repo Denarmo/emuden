@@ -212,15 +212,18 @@ end
   the page is closed. The plugin has no part in it and never learns the host's pages; a file
   downloaded there passes the same checks, and `source_host` names where it came from.
 - `extensions` (default: the manifest's `file_types`, else every patch type) are cut down to
-  `bps ips ups aps ppf xdelta xdelta3 vcdiff zip`. A ROM image type is never on the list,
+  `bps ips ups aps ppf xdelta xdelta3 vcdiff zip 7z`. A ROM image type is never on the list,
   whatever the plugin asks for; a call left with no type is refused.
 - Every file is checked again by the host before the script hears of it: a ROM image by name
   (`patching::IsRomImageExtension`), a file that is not a patch by its content (a patched
-  game renamed `.bps`), a zip that holds a ROM image or no patch are refused, deleted, and
-  the user is told in a toast ("EmuDEN only installs patch files; this is a full game
-  file"). A zip's patch is unpacked: `path` names the patch (the first one, when it holds
-  several). 7z and rar cannot be opened here and are not taken: the page says so and asks
-  the user to unpack the file and choose the patch.
+  game renamed `.bps`), a zip or 7z that holds a ROM image or no patch are refused,
+  deleted, and the user is told in a toast ("EmuDEN only installs patch files; this is a
+  full game file"). An archive's patch is unpacked: `path` names the patch (the first one,
+  when it holds several). What an archive is comes from its first bytes (`den/base/archive.h`),
+  so a 7z under a zip's name is judged as a 7z. A 7z with a password, or packed with a
+  method other than copy, LZMA, LZMA2 and the BCJ and delta filters, gives no patch. rar
+  cannot be opened and is never taken: the page says so and asks the user to unpack the
+  file and choose the patch.
 - The file is moved from the app's web inbox to the plugin's `inbox/`.
 - Without a web engine the same page is its fallback: it opens the site in the user's
   browser and offers the patch files that then appear in the Downloads folder. The call and
@@ -350,7 +353,7 @@ folder for `<data>/plugins-dev/<id>`.
 | `emuden.romhacks` "ROM Hacks: hackdex.app" | `https://www.hackdex.app/discover` | `www.hackdex.app`, `hackdex.app`, `patches.hackdex.app` (where patch downloads are redirected) | `bps` and `xdelta` patches of Pokemon hacks; no account needed to download; creators may disable downloads |
 | `emuden.romhacks-whackahack` "ROM Hacks: whackahack.com" | `https://whackahack.com/foro/` | `whackahack.com`, `www.whackahack.com` (forum, attachments and sign-in are on the same host) | A Spanish-language forum; a thread's files are forum attachments or links to file hosts (MediaFire, MEGA, Drive), reached through the "leaving" question; patches (`ips`, `ups`, `bps`) and sometimes patched games, which are refused |
 | `emuden.romhacks-pokeharbor` "ROM Hacks: pokeharbor.com" | `https://www.pokeharbor.com/` | `www.pokeharbor.com`, `pokeharbor.com` | **Pre-patched games, not patches** ("All games are pre-patched"), as zips on MediaFire and MEGA. The user can browse, but those downloads are refused; the plugin's first page and About say so. Only an entry that links to a real patch installs |
-| `emuden.romhacks-romhacking` "ROM Hacks: romhacking.net" | `https://www.romhacking.net/` | `www.romhacking.net`, `romhacking.net`, `archive.org`, `www.archive.org` | Hacks and translations for many consoles, mostly `ips`/`bps`/`xdelta`/`ppf` inside `zip`, `7z` or `rar`. Closed to submissions since August 2024, files also at the Internet Archive; the live site still serves pages (its front page showed news of 2026-11-12). zip works, 7z and rar do not |
+| `emuden.romhacks-romhacking` "ROM Hacks: romhacking.net" | `https://www.romhacking.net/` | `www.romhacking.net`, `romhacking.net`, `archive.org`, `www.archive.org` | Hacks and translations for many consoles, mostly `ips`/`bps`/`xdelta`/`ppf` inside `zip`, `7z` or `rar`. Closed to submissions since August 2024, files also at the Internet Archive; the live site still serves pages (its front page showed news of 2026-11-12). zip and 7z work, rar does not |
 
 ### 8.1 Pages (shared by the four)
 

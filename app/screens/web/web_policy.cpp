@@ -83,10 +83,10 @@ std::string RefusalText(const std::string& file_name, Verdict verdict) {
     if (verdict == Verdict::RomImage) {
         return std::format("EmuDEN only installs patch files; this is a full game file ({})", file_name);
     }
-    if (const std::string extension = ExtensionOf(file_name); extension == "7z" || extension == "rar") {
-        return std::format("{} is a {} archive, which EmuDEN cannot open yet: download it in your browser, unpack it "
+    if (ExtensionOf(file_name) == "rar") {
+        return std::format("{} is a rar archive, which EmuDEN does not open: download it in your browser, unpack it "
                            "and choose the patch file",
-                           file_name, extension);
+                           file_name);
     }
     return std::format("{} is not a file this page takes", file_name);
 }

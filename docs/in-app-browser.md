@@ -38,9 +38,9 @@ These hold for every backend and every opener.
 - **Never a ROM.** Cartridge, disc and card images (`gb gbc gba nds 3ds iso bin cue chd nes
   sfc n64 z64` and the rest of the list in `patching::IsRomImageExtension`) are refused even
   when an opener lists them, with "EmuDEN only installs patch files; this is a full game
-  file". A `7z` or `rar` an opener does not take is refused with a sentence of its own (the
-  feature host cannot open them, so plugins never take them). An archive is taken as it is; what is inside is the opener's to
-  check.
+  file". A `rar` is refused with a sentence of its own (nothing in the app opens one, so no
+  opener takes it). A `zip` or `7z` is taken as it is; what is inside is the opener's to
+  check (the feature host refuses one that holds a ROM image).
 - **No sign-in by the app, no saved passwords.** Password saving and form autofill are off.
   Camera, microphone, location, notification and every other permission request is denied.
   The engine's developer tools, context menu, browser shortcuts and download bubble are off.
@@ -95,6 +95,14 @@ the app draws, so:
 - while toasts show, the view starts below them (one toast fits in the bar, so nothing moves
   for it; more push the view down);
 - when another page is pushed on top, the view is hidden until the page is back on top.
+
+On a device with two screens the view is on the main display (the one the app's window or
+activity is on) and is never drawn on the second one: while the page is the top page the
+second screen shows a plain page that says so (`companion.web`,
+`app/screens/companion/companion_idle.cpp`). The text entry (X) is the stage's
+(`Stage::AskText`), so on Android it is the system keyboard, on the second display when
+there is one (`app/screens/settings/keyboard.cpp`), and the view is hidden while it is open
+like for any dialog.
 
 | Pad | Does |
 |---|---|

@@ -38,6 +38,7 @@ $third = [ordered]@{
     'Monocypher.md'     = 'plugins\src\third_party\monocypher\LICENCE.md'
     'WebView2.txt'      = '.deps\webview2-src\LICENSE.txt'
     'XZ-Embedded.txt'   = '.deps\xzembedded-src\COPYING'
+    'LZMA-SDK.txt'      = '.deps\lzma-sdk-src\DOC\lzma-sdk.txt'
     'Google-Sans-OFL.txt' = 'assets\fonts\OFL.txt'
 }
 foreach ($name in $third.Keys) {

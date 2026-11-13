@@ -31,6 +31,7 @@ sources live once in `.deps/`.
 | `den/base/json.h` | `ParseJson`, `WriteJson`, `JsonValue` |
 | `den/base/hash.h` | `Sha256`, `Md5`, `Crc32Update`, file variants |
 | `den/base/zip.h` | `ListZip`, `ExtractZipEntry` |
+| `den/base/archive.h` | zip or 7z by the file's first bytes: `ListArchive`, `CanExtractArchiveEntry`, `ExtractArchiveEntry`, `ArchiveReader` (several files of one solid 7z block), `IsArchiveExtension`. 7z through the LZMA SDK's decoder (`cmake/deps.cmake`): copy, LZMA, LZMA2, BCJ, BCJ2, delta; no password, no PPMd; a solid block is unpacked in memory, at most 1 GiB. rar is not read |
 | `den/base/jobs.h` | `Jobs::Run(name, fn(Job&), on_done)`: progress, message, cancel; `on_done` runs on the main thread |
 | `den/platform/pal.h` | window and GL context, `DataDir`, `AssetsDir`, `HttpGet` (redirects, streaming to a file, progress, cancel), `StartProcess`, `GetSecrets`, `GetCaps`, `StartLineServer` |
 | `den/platform/apps.h` | `pal::apps`: the device's other apps where the platform can list them (Android): `Available`, `List` (id, label, icon PNG in the app cache; call it from a job), `Revision`, `Launch(id, Display::Default / Main / Second)`, `HasInputFocus`; for an app beside the game: `Raise(display)` (this app's own window over the other app) / `Lower(display, app)` (that app in front again), `ShowHandle` / `HideHandle`, `CatchBack(display, on)`, `TakeEvents()` (Handle, Back, Home) |
@@ -146,8 +147,8 @@ A runnable folder: `powershell -ExecutionPolicy Bypass -File tools\package.ps1` 
   `SetPointer(x, y, pressed)` (touch screens), `SetAspectOverride`, `FlushSaves()`,
   `SaveResumeState()` (the state `Close` writes, now, and the game goes on). Files:
   `<data>/saves/<system>/<game id>.srm`, `<data>/states/<system>/<game id>.slotN.state` and
-  `.png`, `.resume.state`. Zipped ROMs are unpacked to `<data>/cache/content` while they
-  run. Settings: `player.resume`, `player.rewind`, `player.fast_forward_speed`,
+  `.png`, `.resume.state`. ROMs in a zip or a 7z are unpacked to `<data>/cache/content`
+  while they run. Settings: `player.resume`, `player.rewind`, `player.fast_forward_speed`,
   `player.integer_scale`, `player.smooth`, `player.pad_by_label`, `player.volume`,
   `core_options.<core>.<key>`. GPU cores draw in their own GL context that shares objects
   with the app's. Core options have a scope: `SetOption(key, value, OptionScope::Game)` keeps

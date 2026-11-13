@@ -8,7 +8,7 @@
 #include <tuple>
 
 #include "den/base/files.h"
-#include "den/base/zip.h"
+#include "den/base/archive.h"
 #include "den/library/content.h"
 #include "den/library/names.h"
 #include "den/library/scan.h"
@@ -195,14 +195,16 @@ void AddRom(Scan& scan, const fs::path& file, const SystemDef* def, const fs::pa
     const std::string name = PathToUtf8(file.filename());
     const std::string extension = scan.systems.RomExtension(ToLower(name));
     std::string archive_member;
-    // "no": this console's games are never zipped. "pass": its emulator opens the zip itself.
+    // "no": this console's games are never packed. "pass": its emulator opens the zip itself
+    // (a 7z is unpacked for it all the same).
     const std::string zip_rule = def != nullptr ? def->zip : "unpack";
+    const bool archive = IsArchiveExtension(extension);
     const bool passed_zip = extension == "zip" && zip_rule == "pass";
-    if (extension == "zip" && zip_rule == "no") {
+    if (archive && zip_rule == "no") {
         return;
     }
-    if (extension == "zip" && !passed_zip) {
-        const auto members = ListZip(file);
+    if (archive && !passed_zip) {
+        const auto members = ListArchive(file);
         if (!members) {
             return;
         }
@@ -213,7 +215,7 @@ void AddRom(Scan& scan, const fs::path& file, const SystemDef* def, const fs::pa
             const SystemDef* member_def =
                 def != nullptr ? def : scan.systems.FromUniqueExtension(member_extension);
             if (member_def == nullptr || !IsSafeRelativePath(member.name) ||
-                !CanExtractZipEntry(member)) {
+                !CanExtractArchiveEntry(member)) {
                 continue;
             }
             const int rank = MemberRank(*member_def, member_extension);
@@ -337,7 +339,7 @@ void ScanMixedDir(Scan& scan, const fs::path& root) {
         }
         const std::string extension = scan.systems.RomExtension(ToLower(name));
         const SystemDef* def = scan.systems.FromUniqueExtension(extension);
-        if (def != nullptr || extension == "zip") {
+        if (def != nullptr || IsArchiveExtension(extension)) {
             AddRom(scan, entry, def, {});
         }
     }

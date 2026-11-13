@@ -7,7 +7,7 @@
 #include <map>
 
 #include "den/base/files.h"
-#include "den/base/zip.h"
+#include "den/base/archive.h"
 #include "den/library/content.h"
 #include "den/library/names.h"
 #include "den/library/systems.h"
@@ -121,10 +121,12 @@ Result<fs::path> PrepareRom(const Entry& entry, const fs::path& unpack_dir,
     if (entry.archive_member.empty()) {
         return archive;
     }
-    const auto members = ListZip(archive);
-    if (!members || !IsSafeRelativePath(entry.archive_member)) {
+    // One reader for all the files: a solid 7z block is unpacked once.
+    const auto reader = ArchiveReader::Open(archive);
+    if (!reader || !IsSafeRelativePath(entry.archive_member)) {
         return Status::Fail("cannot read " + entry.path);
     }
+    const std::vector<ZipEntry>* members = &reader->Entries();
 
     // One folder per archive as it is now: a changed archive is unpacked again.
     std::error_code ec;
@@ -174,7 +176,7 @@ Result<fs::path> PrepareRom(const Entry& entry, const fs::path& unpack_dir,
         }
         const fs::path file = folder / PathFromUtf8(packed.name);
         fs::create_directories(file.parent_path(), ec);
-        if (Status result = ExtractZipEntry(archive, packed, file, cancelled); !result) {
+        if (Status result = reader->Extract(packed, file, cancelled); !result) {
             fs::remove_all(folder, ec);
             return result;
         }

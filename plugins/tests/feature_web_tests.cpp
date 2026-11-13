@@ -12,6 +12,7 @@
 #include "den/platform/webview.h"
 #include "feature/runner.h"
 #include "feature_test_util.h"
+#include "seven_zip_writer.h"
 
 using namespace den;
 using namespace den::plugins;
@@ -206,7 +207,7 @@ TEST_CASE("den.web.open is refused without the permission, for other hosts and f
             "the plugin did not declare the host www.example.org");
     refused(R"({"url":"https://www.example.org/","extensions":["gba","nds","iso"]})",
             "only patch files can be taken from a web site, never a game");
-    refused(R"({"url":"https://www.example.org/","extensions":["exe","7z"]})",
+    refused(R"({"url":"https://www.example.org/","extensions":["exe","rar"]})",
             "only patch files can be taken from a web site, never a game");
 }
 
@@ -317,6 +318,57 @@ TEST_CASE("the host takes no game and nothing that is not a patch, whatever it i
     CHECK_FALSE(fs::exists(stage.scratch.dir / "data/inbox"));
     screen.ClosePage();
     CHECK(Logged(*runner, "ended: closed"));
+}
+
+TEST_CASE("a 7z is opened like a zip: its patch is taken, one holding a game is refused") {
+    Stage stage;
+    const auto runner = stage.Run(ManifestOf(R"({"entry":"main.lua","permissions":["browse"],
+        "browse_hosts":["www.example.org","example.org"],"file_types":["bps","zip","7z","rar"]})"));
+    Screen screen{*runner, stage.scratch.dir / "app-inbox"};
+    runner->Call({"actions", "browse"}, {});
+    screen.Serve();
+    REQUIRE(screen.view);
+    // rar is never on the page's list: the host could not look inside.
+    CHECK(screen.open.extensions == std::vector<std::string>{"bps", "zip", "7z"});
+
+    screen.Download("pack.7z", den::test::StoredSevenZip({{"readme.txt", "hello"},
+                                                         {"hack/Crystal Clear.bps", "BPS1 more"}}));
+    CHECK(Logged(*runner, "got inbox/Crystal Clear.bps | Crystal Clear.bps | files.example.net"));
+    CHECK(fs::is_empty(screen.inbox));
+    CHECK(screen.toasts.empty());
+
+    const auto hand = [&](const std::string& name, const std::string& content) {
+        stage.scratch.Write("app-inbox/" + name, content);
+        screen.Hand(screen.inbox / PathFromUtf8(name), name, "www.example.org");
+    };
+    hand("bundle.7z", den::test::StoredSevenZip({{"hack.bps", "BPS1 x"}, {"Emerald (patched).gba", "game"}}));
+    REQUIRE(screen.toasts.size() == 1);
+    CHECK(screen.toasts[0].find("holds a full game file") != std::string::npos);
+    hand("notes.7z", den::test::StoredSevenZip({{"readme.txt", "hello"}}));
+    REQUIRE(screen.toasts.size() == 2);
+    CHECK(screen.toasts[1].find("no patch file") != std::string::npos);
+    // A zip that is a 7z inside is judged by what it is.
+    hand("sneaky.zip", den::test::StoredSevenZip({{"Emerald.gba", "game"}}));
+    REQUIRE(screen.toasts.size() == 3);
+    CHECK(screen.toasts[2].find("holds a full game file") != std::string::npos);
+    // What 7-Zip wrote: a .bin beside a text, a text alone, and names behind a password.
+    const auto vector = [](const char* name) {
+        const auto bytes = ReadBinaryFile(fs::path(DEN_ARCHIVE_FIXTURES) / name);
+        REQUIRE(bytes);
+        return std::string(bytes->begin(), bytes->end());
+    };
+    hand("texts.7z", vector("lzma-each.7z"));
+    REQUIRE(screen.toasts.size() == 4);
+    CHECK(screen.toasts[3].find("holds a full game file") != std::string::npos); // its code.bin
+    hand("text.7z", vector("ppmd.7z"));
+    REQUIRE(screen.toasts.size() == 5);
+    CHECK(screen.toasts[4].find("no patch file") != std::string::npos);
+    hand("locked.7z", vector("password-names.7z"));
+    REQUIRE(screen.toasts.size() == 6);
+    CHECK(screen.toasts[5].find("cannot be read") != std::string::npos);
+
+    CHECK(fs::is_empty(screen.inbox));
+    screen.ClosePage();
 }
 
 TEST_CASE("without a web engine the same call works through the user's browser") {

@@ -25,6 +25,16 @@ struct ZipEntry {
     bool encrypted = false;
     /// A symbolic link. It is never followed or created.
     bool symlink = false;
+
+    // Set by den/base/archive.h for the files of a 7z archive.
+    /// The file's number in a 7z; -1 in a zip.
+    std::int32_t index = -1;
+    /// False where a 7z carries no checksum for the file (`crc` is 0 then).
+    bool crc_known = true;
+    /// Packed with a method this build does not read.
+    bool unsupported = false;
+    /// The unpacked size of the solid block the file is part of.
+    std::uint64_t block_size = 0;
 };
 
 /// The files of a zip archive (folders left out), from its central directory. Zip64 archives

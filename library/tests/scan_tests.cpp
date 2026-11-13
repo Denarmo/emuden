@@ -11,6 +11,7 @@
 #include "den/library/content.h"
 #include "den/library/names.h"
 #include "den/library/scan.h"
+#include "seven_zip_writer.h"
 
 using namespace den;
 using namespace den::library;
@@ -211,6 +212,36 @@ TEST_CASE("zipped ROMs") {
     CHECK(PathToUtf8(plain.value()) == ByName(entries, "Both")->path);
     CHECK_FALSE(IsSafeRelativePath("../evil.gb"));
     CHECK(IsSafeRelativePath("disc/game.cue"));
+}
+
+TEST_CASE("ROMs in a 7z") {
+    const fs::path root = FreshDir("sevens");
+    Put(root / "gb" / "Packed (World).7z",
+        den::test::StoredSevenZip({{"readme.txt", "hi"}, {"Packed (World).gb", "GBDATA"}}));
+    Put(root / "gb" / "Empty.7z", den::test::StoredSevenZip({{"readme.txt", "hi"}}));
+    Put(root / "Loose (USA).7z", den::test::StoredSevenZip({{"Loose (USA).gba", "gba"}}));
+    Put(root / "broken.7z", "7z\xBC\xAF\x27\x1C and nothing else");
+    // Behind a password: it is listed, and left out because it cannot be unpacked.
+    fs::copy_file(fs::path(DEN_ARCHIVE_FIXTURES) / "password.7z", root / "gb" / "Locked (World).7z");
+
+    const std::vector<Entry> entries = ScanFolders(Options(root));
+    CHECK(entries.size() == 2);
+    const Entry* packed = ByName(entries, "Packed");
+    REQUIRE(packed != nullptr);
+    CHECK(packed->system == "gb");
+    CHECK(packed->archive_member == "Packed (World).gb");
+    REQUIRE(ByName(entries, "Loose") != nullptr);
+    CHECK(ByName(entries, "Loose")->system == "gba");
+
+    const fs::path unpack = root / "unpacked";
+    const auto rom = PrepareRom(*packed, unpack);
+    REQUIRE(rom.ok());
+    CHECK(rom.value().filename() == "Packed (World).gb");
+    CHECK(ReadTextFile(rom.value()) == std::optional<std::string>("GBDATA"));
+    CHECK(ReadTextFile(rom.value().parent_path() / "readme.txt") == std::optional<std::string>("hi"));
+    const auto again = PrepareRom(*packed, unpack);
+    REQUIRE(again.ok());
+    CHECK(again.value() == rom.value());
 }
 
 TEST_CASE("regional versions are one entry") {

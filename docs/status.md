@@ -220,8 +220,8 @@ Design and contract: `docs/feature-plugins.md`; the browser page: `docs/in-app-b
     archive.org); Rename (the automation cannot type); "Update from a file"; a file handed
     over by the fallback page; UPS, APS and PPF through the plugin; pad and touch; Linux
     (SteamOS has no engine: fallback) and Android.
-  - **Limits:** 7z and rar are not read (most of romhacking.net's files: unpack by hand and
-    use "Choose a patch file"); a zip with several patches gives its first; pokeharbor.com
+  - **Limits:** rar is not read (unpack by hand and use "Choose a patch file"; 7z is read
+    since the section below); an archive with several patches gives its first; pokeharbor.com
     offers pre-patched games, so its plugin is mostly a browser that refuses them; MEGA
     downloads are made by the page itself (a blob), which Android hands over without the
     file's name; `library/src/library.cpp` was already over 600 lines after the merge and
@@ -234,6 +234,49 @@ Design and contract: `docs/feature-plugins.md`; the browser page: `docs/in-app-b
   Embedded licences are packaged.
   Builds older than this branch download the plugin's package on every list refresh, refuse
   it ("not a console plugin") and keep the rest of the list.
+
+## The merge and 7z (2026-11-13)
+
+- **Merged:** `feat/hackdex` into main (`60895b1`). Three conflicts, both sides kept: this
+  file, `platform/CMakeLists.txt` and `EmuDenActivity.java` (one reference to the activity
+  for the apps, the keyboard and the web page). While the browser page is open a
+  two-screen device shows a plain page on the second display (`companion.web`); the page's
+  text entry is the stage's, so it is the system keyboard on Android.
+- **7z:** `den/base/archive.h` reads zip and 7z (the LZMA SDK's C decoder, public domain,
+  fetched by `cmake/deps.cmake` with a pinned hash; decoder files only). Used for a patch
+  in an archive ("Patch a game", the feature host), for ROMs in the library (scan, the
+  unpack cache, the base-game search of hacks) and by the player. A 7z holding a ROM image
+  is refused by the feature host like a zip; a password, PPMd and solid blocks over 1 GiB
+  are refused with a sentence; rar keeps its message. The four ROM hack plugins ask for 7z
+  too (2.0.2 / 1.0.2, index 10 of `Denarmo/emuden-plugins`, pushed).
+- **Tests:** `base/tests/archive_tests.cpp` with nine archives written by 7-Zip 26.00
+  (`base/tests/data`, `make_vectors.py` there: LZMA2 solid, LZMA, BCJ, BCJ2, delta, copy,
+  PPMd, a password, hidden names) and a stored 7z the tests write byte for byte
+  (`base/tests/seven_zip_writer.h`) for the library, plugin and player tests. Windows:
+  clean build directory, `ctest` 12 of 12.
+- **Run on Windows** (automation port 26087, fresh portable `user` folder, scratch library
+  of copies of Tetris and Wario Land 3): the Plugins section listed the four plugins from
+  the live index; romhacking.net installed with one press (1.0.2) and its start page was
+  opened once (title "Romhacking.net - Home", the window captured); nothing was clicked
+  there. With a developer-folder copy of the same Lua on a test site on `127.0.0.1`: a
+  `.7z` 7-Zip wrote (LZMA2) holding a BPS gave "You have the base game", installed as a
+  hack beside the base (`Hacks`) and ran for over 10 s (985 frames, mGBA, 59.7 fps); a
+  `.gba` was refused with "EmuDEN only installs patch files; this is a full game file".
+  Tetris: dot matrix picture and the frame rate readout ("59 fps · 69 ms · 0 gaps"). A
+  game in a 7z (Super Mario Bros. Deluxe, packed by 7-Zip) was listed and ran (mGBA). With
+  `EMUDEN_SECOND_WINDOW=1` the second window showed the "Browser" page while the web page
+  was open.
+- **Android:** the debug APK builds (Java and native, own build directory) after two
+  fixes the merge needed there: a constant named like a Linux limit (`MAX_INPUT`) and a
+  file time handed to `std::to_string`. Nothing was installed or run on a device in this
+  round.
+- **Not run:** a 7z download from any real site (for the owner by hand, as the list
+  above); Linux build and run; the web page with the system keyboard and the second
+  display on the Retroid; a 7z over a few megabytes; BCJ2, delta and PPMd outside the unit
+  tests.
+- **Limits:** a solid 7z block is unpacked in memory (refused over 1 GiB, so a large disc
+  image in a solid 7z does not play); 7z with a password is not asked for one; a console
+  whose rule is "pass" gets a zip as it is but a 7z unpacked.
 
 ## The owner's notes
 

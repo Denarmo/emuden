@@ -112,3 +112,35 @@ if(MSVC)
 else()
     target_compile_options(den_xz PRIVATE -w)
 endif()
+
+# The LZMA SDK (public domain, Igor Pavlov) reads 7z archives (base/src/seven_zip.cpp): the
+# container, LZMA, LZMA2, the BCJ and delta filters. Decoder files only; no encoder is built.
+set(DEN_LZMA_SDK_VERSION 2501)
+set(lzma_sdk_src "${DEN_DEPS_DIR}/lzma-sdk-src")
+if(NOT EXISTS "${lzma_sdk_src}/.den-ready-${DEN_LZMA_SDK_VERSION}")
+    set(lzma_sdk_archive "${DEN_DEPS_DIR}/lzma${DEN_LZMA_SDK_VERSION}.7z")
+    file(DOWNLOAD "https://www.7-zip.org/a/lzma${DEN_LZMA_SDK_VERSION}.7z" "${lzma_sdk_archive}"
+        EXPECTED_HASH SHA256=cbc3babd589d971e45971d787ff100be8aaa5eab15b2694497ec3e447009e1f2
+        TLS_VERIFY ON STATUS lzma_sdk_status)
+    list(GET lzma_sdk_status 0 lzma_sdk_code)
+    if(NOT lzma_sdk_code EQUAL 0)
+        message(FATAL_ERROR "LZMA SDK download failed: ${lzma_sdk_status}")
+    endif()
+    file(ARCHIVE_EXTRACT INPUT "${lzma_sdk_archive}" DESTINATION "${lzma_sdk_src}"
+        PATTERNS "C/*.c" "C/*.h" "DOC/lzma-sdk.txt")
+    file(REMOVE "${lzma_sdk_archive}")
+    file(TOUCH "${lzma_sdk_src}/.den-ready-${DEN_LZMA_SDK_VERSION}")
+endif()
+set(den_lzma_sources)
+foreach(name 7zArcIn 7zBuf 7zCrc 7zCrcOpt 7zDec 7zStream Bcj2 Bra Bra86 BraIA64 CpuArch Delta
+        LzmaDec Lzma2Dec)
+    list(APPEND den_lzma_sources "${lzma_sdk_src}/C/${name}.c")
+endforeach()
+add_library(den_lzma STATIC ${den_lzma_sources})
+target_include_directories(den_lzma SYSTEM PUBLIC "${lzma_sdk_src}/C")
+set_target_properties(den_lzma PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(MSVC)
+    target_compile_options(den_lzma PRIVATE /w)
+else()
+    target_compile_options(den_lzma PRIVATE -w)
+endif()
