@@ -219,7 +219,7 @@ bool Artwork::ResolveHack(const Entry& entry, const SystemDef& system, const Thu
         }
     }
 
-    const fs::path marked = WithSuffix(stem, ".tagged.png");
+    const fs::path marked = WithSuffix(stem, ".hackbox.png");
     if (IsRegularFile(marked)) {
         result = {marked, ArtworkSource::Cache};
         return true;
@@ -287,7 +287,7 @@ std::vector<CoverChoice> Artwork::Choices(const Entry& entry, const SystemDef* s
         const fs::path raw = fetch(std::string(THUMBNAIL_HOST) + UrlEncodeSegment(system->libretro_thumbnails) +
                                    "/Named_Boxarts/" + UrlEncodeSegment(base) + ".png");
         if (!raw.empty()) {
-            const fs::path marked = WithSuffix(raw, ".tagged.png");
+            const fs::path marked = WithSuffix(raw, ".hackbox.png");
             const bool tagged = is_hack && (IsRegularFile(marked) || WriteHackMarkedCover(raw, marked));
             out.push_back({"base", base, PathToUtf8(tagged ? marked : raw)});
         }

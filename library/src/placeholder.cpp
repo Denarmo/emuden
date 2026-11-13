@@ -204,6 +204,10 @@ bool WritePlaceholderCover(const fs::path& file, std::string_view title,
     return WriteFileAtomic(file, EncodePng(WIDTH, HEIGHT, rows));
 }
 
+bool IsHackBox(std::string_view cover_path) {
+    return cover_path.ends_with(".hackbox.png");
+}
+
 bool WriteHackMarkedCover(const fs::path& image, const fs::path& out) {
     auto loaded = gfx::LoadImageFile(image);
     if (!loaded || loaded->width < 64 || loaded->height < 64) {
@@ -211,30 +215,6 @@ bool WriteHackMarkedCover(const fs::path& image, const fs::path& out) {
     }
     gfx::ImageData& picture = *loaded;
     gfx::ShrinkImage(picture, 512);
-    // A dark tag in the bottom left corner that says HACK, sized with the picture. The top
-    // corners are where tiles put their own badges.
-    static constexpr std::string_view TEXT = "HACK";
-    const int cell = std::max(2, picture.width / 80);
-    const int columns = static_cast<int>(TEXT.size()) * 6 - 1;
-    const int tag_w = std::min(picture.width, (columns + 4) * cell);
-    const int tag_h = std::min(picture.height, 11 * cell);
-    for (int y = 0; y < tag_h; ++y) {
-        for (int x = 0; x < tag_w; ++x) {
-            const int column = x / cell - 2, row = y / cell - 2;
-            bool lit = false;
-            if (column >= 0 && column < columns && row >= 0 && row < 7 && column % 6 < 5) {
-                const int index = GlyphIndex(TEXT[static_cast<std::size_t>(column / 6)]);
-                lit = index >= 0 && ((FONT[index][row] >> (4 - column % 6)) & 1);
-            }
-            const auto line = static_cast<std::size_t>(picture.height - tag_h + y);
-            std::uint8_t* pixel = &picture.rgba[(line * picture.width + x) * 4];
-            for (int channel = 0; channel < 3; ++channel) {
-                // The tag is 85% opaque, so the box still shows through a little.
-                pixel[channel] = lit ? 0xF4 : static_cast<std::uint8_t>(pixel[channel] * 15 / 100 + 16);
-            }
-            pixel[3] = 0xFF;
-        }
-    }
     std::error_code ec;
     fs::create_directories(out.parent_path(), ec);
     return gfx::SavePng(out, picture.width, picture.height, picture.rgba.data()).ok;

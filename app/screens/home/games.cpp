@@ -80,10 +80,18 @@ std::string SystemName(const std::string& system) {
 }
 
 std::string SystemShortName(const std::string& system) {
+    // The library's table has the real short names ("GBA"); a plugin without one repeats
+    // its full name.
+    const std::string full = SystemName(system);
+    for (const library::SystemInfo& info : Svc().library->Systems()) {
+        if (info.id == system && !info.short_name.empty() && info.short_name != info.name) {
+            return info.short_name;
+        }
+    }
     if (const auto console = Svc().plugins->FindConsole(system); console && !console->short_name.empty()) {
         return console->short_name;
     }
-    return SystemName(system);
+    return full;
 }
 
 std::string PlayTimeText(std::int64_t seconds) {

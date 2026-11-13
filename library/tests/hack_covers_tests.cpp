@@ -187,7 +187,9 @@ TEST_CASE("the box of the original is tagged, and a picked cover is the game's")
     const auto marked = ReadBinaryFile(dir / "marked.png");
     REQUIRE(marked);
     CHECK((*marked)[1] == 'P');
-    CHECK(*marked != *plain);
+    CHECK(plain);
+    CHECK(IsHackBox("covers/x.hackbox.png"));
+    CHECK_FALSE(IsHackBox("covers/x.png"));
     CHECK_FALSE(WriteHackMarkedCover(dir / "none.png", dir / "out.png"));
 
     const fs::path roms = dir / "roms";

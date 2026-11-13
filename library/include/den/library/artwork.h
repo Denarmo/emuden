@@ -57,10 +57,13 @@ std::string UrlDecode(std::string_view text);
 bool WritePlaceholderCover(const std::filesystem::path& file, std::string_view title,
                            std::string_view system_id);
 
-/// A copy of `image` (at most 512 pixels a side) with a "HACK" tag in its bottom left
-/// corner, as a PNG: the box of the original game on a hack. False when the image cannot be
-/// read.
+/// A copy of `image` (at most 512 pixels a side) as a PNG named `*.hackbox.png`: the box of
+/// the original game on a hack. The name is the mark; whoever draws the cover puts a "HACK"
+/// chip beside it (IsHackBox), so the art itself stays whole. False when the image cannot
+/// be read.
 bool WriteHackMarkedCover(const std::filesystem::path& image, const std::filesystem::path& out);
+/// Whether a cover path is such a copy.
+bool IsHackBox(std::string_view cover_path);
 
 enum class ArtworkSource {
     Local,       // the entry already had a cover on this machine

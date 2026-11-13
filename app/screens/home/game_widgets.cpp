@@ -7,6 +7,7 @@
 
 #include "den/app/app.h"
 #include "den/base/files.h"
+#include "den/library/artwork.h"
 #include "game_widgets.h"
 #include "games.h"
 
@@ -155,6 +156,8 @@ void DrawCover(ui::Context& ctx, const gfx::Rect& rect, const gfx::Texture& text
     ctx.canvas->DrawImage(fit, texture, gfx::Color{255, 255, 255, 255}, ctx.theme->radius_small);
 }
 
+float DrawChip(ui::Context& ctx, const gfx::Rect& image, const std::string& text, bool right, float room);
+
 CoverView::CoverView(std::string title, std::string image_path, float w, float h)
     : title_(std::move(title)), image_path_(std::move(image_path)) {
     width = w;
@@ -168,6 +171,9 @@ void CoverView::DrawContent(ui::Context& ctx) {
         DrawCover(ctx, rect, texture, overlay_title);
         if (overlay_title) {
             DrawCentered(ctx, rect.Inset(16), title_, theme.text_heading, gfx::FONT_BOLD, theme.page);
+        }
+        if (library::IsHackBox(image_path_)) {
+            DrawChip(ctx, rect, "HACK", true, rect.w - 16);
         }
     } else {
         ctx.canvas->FillRect(rect, theme.panel, theme.radius);
@@ -193,9 +199,29 @@ void ProgressBar::DrawContent(ui::Context& ctx) {
     }
 }
 
+// A small label in a top corner of a picture, never wider than `room`: a long text is cut.
+// Returns the width it took.
+float DrawChip(ui::Context& ctx, const gfx::Rect& image, const std::string& text, bool right, float room) {
+    const ui::Theme& theme = *ctx.theme;
+    constexpr float INSET = 8, PAD = 14;
+    if (room < 3 * PAD) {
+        return 0;
+    }
+    const float wanted = std::ceil(ctx.Text().Measure(text, theme.text_small, gfx::FONT_BOLD)) + PAD;
+    const float w = std::min(room, wanted);
+    const gfx::Rect chip{right ? image.x + image.w - INSET - w : image.x + INSET, image.y + INSET, w, 22};
+    ctx.canvas->FillRect(chip, theme.dialog, theme.radius_small);
+    // Only a chip that was cut needs its text cut: the whole one gets the full width.
+    const gfx::Rect inner = w < wanted ? gfx::Rect{chip.x + PAD / 2, chip.y, chip.w - PAD, chip.h} : chip;
+    DrawCentered(ctx, inner, text, theme.text_small, gfx::FONT_BOLD, theme.fg);
+    return w;
+}
+
 void GameTile::DrawContent(ui::Context& ctx) {
     const ui::Theme& theme = *ctx.theme;
     const gfx::Rect image = FocusRect();
+    constexpr float HACK_CHIP = 58; // kept free for the "HACK" chip beside a long badge
+    float hack_room = image.w - 16 - (hack && !badge.empty() ? HACK_CHIP : 0);
     const gfx::Texture texture =
         ctx.textures && !image_path.empty() ? ctx.textures->Get(image_path) : gfx::Texture{};
     if (texture) {
@@ -208,10 +234,10 @@ void GameTile::DrawContent(ui::Context& ctx) {
         DrawCentered(ctx, image.Inset(12), title, theme.text_body, gfx::FONT_BOLD, theme.fg);
     }
     if (!badge.empty()) {
-        const float w = ctx.Text().Measure(badge, theme.text_small, gfx::FONT_BOLD) + 14;
-        const gfx::Rect chip{image.x + 8, image.y + 8, w, 22};
-        ctx.canvas->FillRect(chip, theme.dialog, theme.radius_small);
-        DrawCentered(ctx, chip, badge, theme.text_small, gfx::FONT_BOLD, theme.fg);
+        DrawChip(ctx, image, badge, false, hack_room);
+    }
+    if (hack) {
+        DrawChip(ctx, image, "HACK", true, image.w - 16);
     }
     const gfx::Rect caption{rect.x, image.Bottom() + 6, image_width, 24};
     DrawLine(ctx, caption, title, theme.text_small + 1, focused ? gfx::FONT_BOLD : gfx::FONT_REGULAR,
@@ -221,6 +247,7 @@ void GameTile::DrawContent(ui::Context& ctx) {
 ui::Tile* AddGameTile(ui::Node* parent, const library::Entry& game, const GameTileOptions& options) {
     auto* tile = parent->Emplace<GameTile>(game.name, game.cover, options.w, options.h);
     tile->overlay_title = game.placeholder_cover;
+    tile->hack = library::IsHackBox(game.cover);
     tile->id = options.id_prefix + "." + game.id;
     if (options.show_badge) {
         tile->badge = options.badge.empty() ? SystemShortName(game.system) : options.badge;
