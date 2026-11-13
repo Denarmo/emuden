@@ -37,6 +37,8 @@ Caps DetectCaps() {
     caps.windowed = !android;
     caps.child_processes = !android;
     caps.handheld = android || !GetEnv("SteamDeck").empty() || !GetEnv("GAMESCOPE_WAYLAND_DISPLAY").empty();
+    // SDL keeps a borderless Windows window's shadow, snapping and animations.
+    caps.custom_frame = caps.os == "windows" && GetEnv("EMUDEN_SYSTEM_FRAME").empty();
     return caps;
 }
 
@@ -81,10 +83,66 @@ public:
     void* SdlWindow() const override {
         return window_;
     }
+    void SetTitleBar(int height, std::vector<std::array<int, 4>> buttons) override {
+        const bool was = bar_height_ > 0;
+        bar_height_ = height;
+        bar_buttons_ = std::move(buttons);
+        if (was != (height > 0)) {
+            SDL_SetWindowHitTest(window_, height > 0 ? &SdlWindowImpl::HitTest : nullptr, this);
+        }
+    }
+    void Minimize() override {
+        SDL_MinimizeWindow(window_);
+    }
+    void ToggleMaximize() override {
+        if (Maximized()) {
+            SDL_RestoreWindow(window_);
+        } else {
+            SDL_MaximizeWindow(window_);
+        }
+    }
+    bool Maximized() const override {
+        return (SDL_GetWindowFlags(window_) & SDL_WINDOW_MAXIMIZED) != 0;
+    }
 
 private:
+    // SDL asks in window points; the bar is kept in pixels.
+    static SDL_HitTestResult SDLCALL HitTest(SDL_Window* window, const SDL_Point* point, void* data) {
+        const auto* self = static_cast<const SdlWindowImpl*>(data);
+        const float density = SDL_GetWindowPixelDensity(window);
+        const int x = static_cast<int>(point->x * density), y = static_cast<int>(point->y * density);
+        int w = 0, h = 0;
+        SDL_GetWindowSizeInPixels(window, &w, &h);
+        if (!self->Maximized() && !(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN)) {
+            const int edge = static_cast<int>(6 * density);
+            const bool left = x < edge, right = x >= w - edge, top = y < edge, bottom = y >= h - edge;
+            if (top && left) return SDL_HITTEST_RESIZE_TOPLEFT;
+            if (top && right) return SDL_HITTEST_RESIZE_TOPRIGHT;
+            if (bottom && left) return SDL_HITTEST_RESIZE_BOTTOMLEFT;
+            if (bottom && right) return SDL_HITTEST_RESIZE_BOTTOMRIGHT;
+            if (left) return SDL_HITTEST_RESIZE_LEFT;
+            if (right) return SDL_HITTEST_RESIZE_RIGHT;
+            if (bottom) return SDL_HITTEST_RESIZE_BOTTOM;
+            if (top && !self->InButton(x, y)) return SDL_HITTEST_RESIZE_TOP;
+        }
+        if (y < self->bar_height_ && !self->InButton(x, y)) {
+            return SDL_HITTEST_DRAGGABLE;
+        }
+        return SDL_HITTEST_NORMAL;
+    }
+    bool InButton(int x, int y) const {
+        for (const auto& b : bar_buttons_) {
+            if (x >= b[0] && x < b[0] + b[2] && y >= b[1] && y < b[1] + b[3]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     SDL_Window* window_;
     SDL_GLContext context_;
+    int bar_height_ = 0;
+    std::vector<std::array<int, 4>> bar_buttons_;
 };
 
 class SdlProcess final : public Process {
@@ -190,6 +248,9 @@ Result<std::unique_ptr<Window>> CreateAppWindow(const WindowDesc& desc) {
     }
     if (desc.hidden) {
         flags |= SDL_WINDOW_HIDDEN;
+    }
+    if (desc.custom_frame && g_caps.custom_frame && g_caps.windowed) {
+        flags |= SDL_WINDOW_BORDERLESS;
     }
     SDL_Window* window = SDL_CreateWindow(desc.title.c_str(), desc.width, desc.height, flags);
     if (!window) {

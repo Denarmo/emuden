@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "automation.h"
+#include "title_bar.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
@@ -119,6 +120,7 @@ int Run(int argc, char** argv) {
                       (HasArg(argc, argv, "--fullscreen") ||
                        settings.GetBool("window.fullscreen", pal::GetCaps().handheld));
     SizeFromArgs(argc, argv, desc);
+    desc.custom_frame = true; // where the platform allows it (Windows), the app draws the title bar
     if (auto icon = gfx::LoadImageFile(pal::AssetsDir() / "branding" / "icon-256.png");
         icon && icon->width == icon->height) {
         desc.icon_size = icon->width;
@@ -194,6 +196,7 @@ int Run(int argc, char** argv) {
         Automation automation;
         automation.Start();
 
+        TitleBar title_bar;
         std::vector<input::Event> events;
         double last = pal::NowSeconds();
         double fps_time = last;
@@ -211,7 +214,15 @@ int Run(int argc, char** argv) {
             automation.Pump();
             events.clear();
             input.Poll(events);
-            for (const input::Event& event : events) {
+            for (input::Event& event : events) {
+                if (title_bar.HandleEvent(event, *svc.window, svc.quit)) {
+                    continue;
+                }
+                using T = input::Event::Type;
+                if (event.type == T::PointerDown || event.type == T::PointerMove ||
+                    event.type == T::PointerUp || event.type == T::Wheel) {
+                    event.y -= static_cast<float>(svc.title_bar_px); // the screens start under the bar
+                }
                 if (event.type == input::Event::Type::Quit) {
                     svc.quit = true;
                 } else if (event.type == input::Event::Type::Key && event.down && !event.repeat &&
@@ -241,8 +252,13 @@ int Run(int argc, char** argv) {
                 pal::SleepMs(50);
                 continue;
             }
+            // The screens get the window below the app's own title bar, if it has one: with GL's
+            // origin at the bottom left, a shorter canvas leaves the bar's rows free.
+            const int bar = title_bar.PixelHeight(*svc.window, PixelScale(width, height));
+            svc.title_bar_px = bar;
+            const float scale = PixelScale(width, height - bar);
             device.BeginFrame(width, height, svc.theme->page);
-            canvas.Begin(width, height, PixelScale(width, height));
+            canvas.Begin(width, height - bar, scale);
             ui::Context ctx;
             ctx.canvas = &canvas;
             ctx.textures = &textures;
@@ -252,6 +268,9 @@ int Run(int argc, char** argv) {
             ctx.dt = dt;
             ctx.time = now;
             stage.Frame(ctx);
+            canvas.End();
+            canvas.Begin(width, height, scale);
+            title_bar.Draw(ctx, *svc.window, width, bar);
             canvas.End();
             automation.AfterDraw(width, height);
             if (!hidden) {

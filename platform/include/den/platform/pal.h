@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -28,6 +29,7 @@ struct Caps {
     bool windowed = true;     // windows can be resized and left
     bool child_processes = true;
     bool handheld = false; // SteamOS-style handheld or Android
+    bool custom_frame = false; // the app draws the window's title bar itself (Windows)
 };
 
 /// Starts SDL (video, gamepads). Call once before anything else in pal.
@@ -41,6 +43,8 @@ struct WindowDesc {
     int height = 720;
     bool fullscreen = false;
     bool hidden = false;
+    /// No system title bar: the app draws its own (Caps::custom_frame) and calls SetTitleBar.
+    bool custom_frame = false;
     /// The window's own icon (title bar, task switcher), square RGBA; empty for none.
     std::vector<std::uint8_t> icon_rgba;
     int icon_size = 0;
@@ -63,6 +67,14 @@ public:
     virtual void MakeCurrent() = 0;
     /// The SDL_Window, for code that needs SDL itself (audio, input).
     virtual void* SdlWindow() const = 0;
+    /// For a window without the system's title bar: the top `height` pixels move the window,
+    /// except the `buttons` (x, y, width, height in pixels); the edges resize it. 0: off.
+    virtual void SetTitleBar(int height, std::vector<std::array<int, 4>> buttons) {}
+    virtual void Minimize() {}
+    virtual void ToggleMaximize() {}
+    virtual bool Maximized() const {
+        return false;
+    }
 };
 
 Result<std::unique_ptr<Window>> CreateAppWindow(const WindowDesc& desc);

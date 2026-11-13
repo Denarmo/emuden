@@ -41,7 +41,7 @@ void Pointer(input::Event::Type type, float x, float y) {
     event.type = type;
     event.down = type != input::Event::Type::PointerUp;
     event.x = x * svc.canvas->Scale();
-    event.y = y * svc.canvas->Scale();
+    event.y = y * svc.canvas->Scale() + svc.title_bar_px;
     svc.input->Inject(event);
 }
 
@@ -129,7 +129,7 @@ void Automation::Pump() {
             in >> x >> y;
             input::Event event;
             event.x = x * svc.canvas->Scale();
-            event.y = y * svc.canvas->Scale();
+            event.y = y * svc.canvas->Scale() + svc.title_bar_px;
             event.type = input::Event::Type::PointerDown;
             svc.input->Inject(event);
             event.type = input::Event::Type::PointerUp;
@@ -177,7 +177,7 @@ void Automation::Pump() {
             in >> x >> y >> event.dy;
             event.type = input::Event::Type::Wheel;
             event.x = x * svc.canvas->Scale();
-            event.y = y * svc.canvas->Scale();
+            event.y = y * svc.canvas->Scale() + svc.title_bar_px;
             svc.input->Inject(event);
         } else if (command == "screenshot") {
             std::string path;

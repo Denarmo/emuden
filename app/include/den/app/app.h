@@ -40,6 +40,9 @@ struct Services {
     std::filesystem::path data_dir;
     double fps = 0;
     bool quit = false;
+    /// Pixels the app's own title bar takes at the top of the window (0 without one); the
+    /// screens are drawn below it and their pointer positions start under it.
+    int title_bar_px = 0;
 };
 
 Services& Svc();
