@@ -443,6 +443,13 @@ ColecoVision, Intellivision, Vectrex, MSX, arcade) have no game in the test libr
 their downloads (checksums and sizes) and the Windows cores loading and naming themselves
 were checked; none of them has run a game on any platform.
 
+PS2 on the Retroid (release APK, PCSX2 core from the plugin source): BIOS files added with
+the console page's new "Add BIOS files" row (14 files copied from a folder on shared
+storage into the app's private BIOS folder); Colin McRae Rally 3 (PAL) reached its title
+screen in about 40 s and ran at 50 fps (20.0 ms, slowest 28 ms). A Start pressed through
+`adb` did not reach the game (adb's keys are not the pad), so in-game play is not checked.
+The library scanned the ISO while it was still being copied and shows 1.10 GiB for it.
+
 Pause, save state and exit to home were confirmed on one game per console in the first
 round (Tetris, Mario Tennis, Pokemon - Lazarus, Explorers of Skies, Gran Turismo 2,
 PoPoLoCrois).

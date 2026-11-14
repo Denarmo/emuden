@@ -9,6 +9,7 @@
 #include <format>
 
 #include "../details/game_prefs.h"
+#include "bios_import.h"
 #include "console_state.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
@@ -93,6 +94,7 @@ public:
     void Build() override {
         Services& svc = Svc();
         revision_ = svc.plugins->Revision();
+        bios_imports_ = BiosImports();
         const std::string system = Param("system");
         const auto console = svc.plugins->FindConsole(system);
         ui::Node* content = BuildPlainFrame(*this, console ? console->name : "Console");
@@ -130,7 +132,7 @@ public:
     }
 
     void Update(ui::Context&) override {
-        if (Svc().plugins->Revision() != revision_) {
+        if (Svc().plugins->Revision() != revision_ || BiosImports() != bios_imports_) {
             Rebuild();
         }
     }
@@ -207,6 +209,12 @@ private:
             if (!chosen->system_dir.empty()) {
                 rows.push_back(ValueRow("console.bios_dir", "BIOS folder",
                                         [dir = PathToUtf8(chosen->system_dir)] { return dir; }));
+                if (!console.bios.empty()) {
+                    rows.push_back(ActionRow(
+                        "console.bios_import", "Add BIOS files",
+                        [console, dir = chosen->system_dir] { ImportBios(console, dir); },
+                        "Copies this console's BIOS files from a folder you choose"));
+                }
             }
         }
         std::string extensions;
@@ -270,6 +278,7 @@ private:
     }
 
     std::uint64_t revision_ = 0;
+    int bios_imports_ = 0;
 };
 
 } // namespace
