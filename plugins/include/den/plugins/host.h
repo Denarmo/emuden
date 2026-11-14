@@ -122,12 +122,27 @@ struct GameMatch {
     }
 };
 
+/// An engine app that is one of a console's cores (Runner::Engine on CoreInfo).
+struct EngineAppInfo {
+    int level = 1;
+    std::vector<std::string> capabilities; // from the manifest; the engine's hello decides
+    std::vector<std::string> needs;        // bios, keys, firmware: set up inside the engine
+    std::filesystem::path executable;      // desktop, once installed
+    std::string package;                   // Android
+    std::string cert_sha256;               // Android: the pinned signing certificate
+    std::string store_url;                 // Android: where to get it when there is no APK
+    bool downloadable = false;             // EmuDEN can download and install it itself
+};
+
 /// The core that plays a system on this device.
 struct CoreInfo {
     std::string id;     // "mgba"
     std::string name;   // "mGBA"
     std::string system;
-    std::filesystem::path library;    // the core file to load; empty until installed
+    /// Core: a libretro core loaded into the app. Engine: an engine app (`engine`).
+    Runner runner = Runner::Core;
+    EngineAppInfo engine;
+    std::filesystem::path library;    // the core file to load (an engine app's executable); empty until installed
     std::filesystem::path system_dir; // where the core looks for BIOS files
     bool installed = false;
     bool needs_gl = false; // the core renders with OpenGL itself
@@ -139,6 +154,11 @@ struct CoreInfo {
     GameMatch games; // the games this core plays instead of the console's chosen core
     /// BIOS files the core needs and does not find (empty = ready).
     std::vector<std::string> missing_bios;
+
+    /// It is installed and can be started (an Android engine app has no library file).
+    bool Ready() const {
+        return installed && (runner == Runner::Engine || !library.empty());
+    }
 };
 
 class Host {

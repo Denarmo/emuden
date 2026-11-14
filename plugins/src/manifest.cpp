@@ -8,41 +8,9 @@
 #include "den/base/json.h"
 #include "den/plugins/manifest.h"
 #include "json_util.h"
+#include "manifest_parts.h"
 
 namespace den::plugins {
-
-namespace {
-
-bool IsPluginId(std::string_view id) {
-    if (id.size() < 3 || id.size() > 64 || id.find('.') == std::string_view::npos) {
-        return false;
-    }
-    bool start = true;
-    for (const char c : id) {
-        const bool alnum = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
-        if (start ? !alnum : !(alnum || c == '-' || c == '.')) {
-            return false;
-        }
-        start = c == '.';
-    }
-    return !start;
-}
-
-bool IsSystemId(std::string_view id) {
-    if (id.size() < 2 || id.size() > 32 || id.front() == '-') {
-        return false;
-    }
-    return std::all_of(id.begin(), id.end(), [](char c) {
-        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-';
-    });
-}
-
-// A component id becomes a file name, so it is kept to plain characters.
-bool IsComponentId(std::string_view id) {
-    return !id.empty() && id.size() <= 64 && std::all_of(id.begin(), id.end(), [](char c) {
-        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
-    });
-}
 
 Result<Download> ParseDownload(const JsonValue& value) {
     static const char* const KNOWN[] = {"url",  "sha256",           "size",   "archive",
@@ -75,6 +43,39 @@ Result<Download> ParseDownload(const JsonValue& value) {
         return Status::Fail("a download names no file to unpack");
     }
     return download;
+}
+
+namespace {
+
+bool IsPluginId(std::string_view id) {
+    if (id.size() < 3 || id.size() > 64 || id.find('.') == std::string_view::npos) {
+        return false;
+    }
+    bool start = true;
+    for (const char c : id) {
+        const bool alnum = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+        if (start ? !alnum : !(alnum || c == '-' || c == '.')) {
+            return false;
+        }
+        start = c == '.';
+    }
+    return !start;
+}
+
+bool IsSystemId(std::string_view id) {
+    if (id.size() < 2 || id.size() > 32 || id.front() == '-') {
+        return false;
+    }
+    return std::all_of(id.begin(), id.end(), [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-';
+    });
+}
+
+// A component id becomes a file name, so it is kept to plain characters.
+bool IsComponentId(std::string_view id) {
+    return !id.empty() && id.size() <= 64 && std::all_of(id.begin(), id.end(), [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
+    });
 }
 
 Result<Component> ParseComponent(const JsonValue& value) {
@@ -125,6 +126,13 @@ Result<Component> ParseComponent(const JsonValue& value) {
         }
     }
     component.cores = json::Strings(value, "cores", false);
+    if (component.type == TYPE_ENGINE_APP) {
+        Result<EngineAppSpec> spec = ParseEngineApp(value);
+        if (!spec) {
+            return Status::Fail(component.id + ": " + spec.error());
+        }
+        component.engine_app = spec.take();
+    }
     if (const JsonValue* downloads = value.Find("downloads")) {
         for (const auto& [platform, entry] : downloads->members) {
             Result<Download> download = ParseDownload(entry);
@@ -390,6 +398,7 @@ const std::vector<std::string>& HostCapabilities() {
         "engine.libretro",    "engine.switch2", "settings.v1",
         "content.multi_file", "content.magic",  "presentation.buttons",
         "kind.feature",       "feature.lua.1",  "feature.web.1",
+        "core.engine-app.1",
     };
     return capabilities;
 }
@@ -413,8 +422,8 @@ std::vector<const Component*> Manifest::CoresFor(const SystemDef& system,
     std::vector<const Component*> out;
     for (const std::string& core : system.cores) {
         const Component* component = FindComponent(core);
-        if (component != nullptr && component->type == TYPE_CORE &&
-            component->DownloadFor(platform_key) != nullptr) {
+        if (component != nullptr && (component->type == TYPE_CORE || component->type == TYPE_ENGINE_APP) &&
+            component->OffersPlatform(platform_key)) {
             out.push_back(component);
         }
     }
@@ -476,7 +485,7 @@ Result<Manifest> ParseManifest(std::string_view text) {
         for (const JsonValue& value : components->items) {
             // A component of a type this version does not know is not its business.
             const std::string type = value.String("type");
-            if (type != TYPE_CORE && type != TYPE_ENGINE && type != TYPE_SYSTEM_FILES) {
+            if (type != TYPE_CORE && type != TYPE_ENGINE && type != TYPE_SYSTEM_FILES && type != TYPE_ENGINE_APP) {
                 continue;
             }
             Result<Component> component = ParseComponent(value);

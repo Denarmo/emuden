@@ -19,6 +19,7 @@
 #include "den/plugins/installer.h"
 #include "den/plugins/manifest.h"
 #include "den/plugins/signature.h"
+#include "den/platform/engine_apps.h"
 #include "den/store/settings.h"
 #include "feature/index_source.h"
 #include "json_util.h"
@@ -283,6 +284,9 @@ private:
     // The core is in the ledger and its file is the one that was installed. The file is
     // hashed once and again whenever its size or time changes.
     bool CoreGood(const Component& core) const {
+        if (core.type == TYPE_ENGINE_APP) {
+            return EngineAppGood(core);
+        }
         const CoreRecord* record = ledger_.Find(core.id);
         if (record == nullptr) {
             return false;
@@ -321,7 +325,9 @@ private:
             const Component* core = ChosenCore(loaded, system);
             console.available = core != nullptr;
             console.installed = core != nullptr && CoreGood(*core);
-            if (console.installed) {
+            if (console.installed && core->type == TYPE_ENGINE_APP) {
+                console.update_available = EngineAppUpdate(*core);
+            } else if (console.installed) {
                 const CoreRecord* record = ledger_.Find(core->id);
                 const Download* download = core->DownloadFor(deps_.platform_key);
                 console.update_available = record != nullptr && download != nullptr &&
@@ -342,6 +348,9 @@ private:
     }
 
     CoreInfo Describe(const SystemDef& system, const Component& core) const {
+        if (core.type == TYPE_ENGINE_APP) {
+            return DescribeEngineApp(system, core);
+        }
         CoreInfo info;
         info.id = core.id;
         info.name = core.name;
@@ -464,6 +473,25 @@ private:
 
     Status DoRemove(const std::string& system);
 
+    // Engine apps as cores (engine_app_install.cpp).
+    struct EngineRecord {
+        std::string executable; // relative to engines/<id>/
+        std::string executable_sha256;
+        std::string download_sha256;
+        std::string version;
+    };
+    fs::path EnginesDir() const;
+    void LoadEngines() const;
+    bool SaveEngines() const;
+    pal::engine_apps::Installed QueryApp(const std::string& package, bool fresh) const;
+    static bool AppMatches(const Component& core, const pal::engine_apps::Installed& app);
+    bool EngineAppGood(const Component& core) const;
+    bool EngineAppUpdate(const Component& core) const;
+    CoreInfo DescribeEngineApp(const SystemDef& system, const Component& core) const;
+    Status InstallEngineApp(Job& job, const Component& core, Status result);
+    Status InstallAndroidApp(Job& job, const Component& core, Status result);
+    Status RemoveEngineApp(const Component& core);
+
     Config config_;
     HostDeps deps_;
     fs::path plugins_dir_;
@@ -478,6 +506,9 @@ private:
     std::int64_t fetched_ = 0;
     std::map<std::string, std::string, std::less<>> system_files_; // plugin/component -> sha256
     mutable std::map<std::string, Checked, std::less<>> checked_;
+    mutable bool engines_loaded_ = false;
+    mutable std::map<std::string, EngineRecord, std::less<>> engines_;
+    mutable std::map<std::string, std::pair<std::uint64_t, pal::engine_apps::Installed>, std::less<>> apps_;
     std::atomic<std::uint64_t> revision_{1};
 };
 

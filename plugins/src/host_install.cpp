@@ -150,6 +150,7 @@ Status RealHost::DoInstall(Job& job, const std::string& system) {
     Download download;
     bool from_index = false;
     bool have_core = false;
+    bool engine_app = false;
     std::vector<std::pair<Component, Download>> companions; // cores chosen for listed games
     {
         std::lock_guard lock(mutex_);
@@ -173,6 +174,17 @@ Status RealHost::DoInstall(Job& job, const std::string& system) {
                                 " is not available on this device yet.");
         }
         core = *chosen;
+        engine_app = core.type == TYPE_ENGINE_APP;
+    }
+    if (engine_app) {
+        return InstallEngineApp(job, core, std::move(result));
+    }
+    {
+        std::lock_guard lock(mutex_);
+        const Found found = Find(system);
+        if (found.system == nullptr) {
+            return Status::Fail("EmuDEN does not know the console \"" + system + "\".");
+        }
         download = *core.DownloadFor(deps_.platform_key);
         if (index_) {
             if (const auto reason = index_->BlockedReason(download.sha256)) {
@@ -182,7 +194,8 @@ Status RealHost::DoInstall(Job& job, const std::string& system) {
         for (const std::string& id : found.system->cores) {
             const Component* other = manifest.FindComponent(id);
             const Download* other_download = other != nullptr ? other->DownloadFor(deps_.platform_key) : nullptr;
-            if (other != nullptr && other->id != core.id && !other->games.Empty() && other_download != nullptr &&
+            if (other != nullptr && other->type == TYPE_CORE && other->id != core.id && !other->games.Empty() &&
+                other_download != nullptr &&
                 !CoreGood(*other) &&
                 !(index_ && index_->BlockedReason(other_download->sha256))) {
                 companions.emplace_back(*other, *other_download);
@@ -317,6 +330,9 @@ Status RealHost::DoRemove(const std::string& system) {
     const Component* core = ChosenCore(*found.loaded, *found.system);
     if (core == nullptr) {
         return {};
+    }
+    if (core->type == TYPE_ENGINE_APP) {
+        return RemoveEngineApp(*core);
     }
     const Status status = ledger_.Remove(core->id);
     if (status.ok) {

@@ -48,9 +48,29 @@ struct Download {
 /// Component types this app reads; others are left out of the manifest.
 inline constexpr const char* TYPE_CORE = "libretro-core";
 inline constexpr const char* TYPE_ENGINE = "engine";
+/// A standalone emulator app that speaks the Emulator Control Protocol: one of a console's
+/// cores like a libretro core, run by den::engine instead of inside the app.
+inline constexpr const char* TYPE_ENGINE_APP = "engine-app";
 /// Files a core needs in the system folder (PPSSPP's assets): a zip whose folder `entry`
 /// is unpacked there when the core is installed.
 inline constexpr const char* TYPE_SYSTEM_FILES = "system-files";
+
+/// The parts of an engine-app component beyond its desktop downloads.
+struct EngineAppSpec {
+    // The protocol descriptor (section 2 of the spec).
+    std::string ecp_id; // the engine's own stable id
+    int level = 1;      // 1 or 2
+    std::vector<std::string> capabilities;
+    std::vector<std::string> needs; // bios, keys, firmware: what the player provides in the engine
+    /// Desktop: the executable inside the unpacked download, by platform key.
+    std::map<std::string, std::string, std::less<>> executables;
+    // Android.
+    std::string package;
+    std::string cert_sha256; // lower-case hex, no colons
+    std::int64_t min_version_code = 0;
+    std::optional<Download> apk; // archive "none"
+    std::string store_url;       // https:// or market://, when there is no APK to pin
+};
 
 struct Component {
     std::string id; // for a libretro core its library base name ("mgba")
@@ -65,9 +85,18 @@ struct Component {
     GameMatch games;
     std::map<std::string, Download, std::less<>> downloads; // by platform key or "any"
     std::vector<std::string> cores; // system files: the cores they are for (empty = all)
+    EngineAppSpec engine_app;       // type engine-app
 
     const Download* DownloadFor(std::string_view platform_key) const;
+    /// It can be installed on the platform: a download (an engine app also needs its
+    /// executable there), or on Android a package with an APK or a store page.
+    bool OffersPlatform(std::string_view platform_key) const;
+    /// The engine app's executable for a desktop platform; empty when none.
+    std::string ExecutableFor(std::string_view platform_key) const;
 };
+
+/// Android platform keys ("android-arm64").
+bool IsAndroidKey(std::string_view platform_key);
 
 struct SystemDef {
     Console console;                // installed and available are filled by the host
