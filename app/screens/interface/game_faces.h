@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // The pictures of games' other faces (box back and spine, cartridge, disc) for the 3D layout,
-// fetched one game at a time in the background, nearest the selection first.
+// fetched one game at a time in the background, nearest the selection first. Each picture is
+// cleaned once and kept beside the download: cropped to the object, a cartridge's or disc's
+// plain background made clear, a sideways spine turned upright.
 
 #pragma once
 
@@ -18,12 +20,15 @@
 namespace den::app {
 
 struct LoadedFaces {
-    library::GameFaces faces;
-    // From the cartridge's photograph: the plastic's colour round its edge, the part of the
-    // picture it fills and that part's width over its height (0: no usable photograph).
+    library::GameFaces faces; // the cleaned pictures
+    std::string cover;        // the front cover, its scan margins cropped off; "" for none
+    float cover_aspect = 0;   // its width over its height
+    // From the cartridge's photograph: the plastic's colour round its edge, the cartridge's
+    // width over its height (0: no usable photograph) and where its label is, 0..1 of the
+    // picture (empty when it could not be told).
     gfx::Color plastic;
-    gfx::Rect cart_uv{0, 0, 1, 1};
     float cart_aspect = 0;
+    gfx::Rect cart_label{0, 0, 0, 0};
 };
 
 class FaceLoader {

@@ -84,6 +84,9 @@ struct Material {
     // Pictures of the other faces, each optional: what Back, Spine, Photo and DiscPrint show.
     Texture back_art, spine_art, cart_art, disc_art;
     Rect cart_uv{0, 0, 1, 1}; // the part of cart_art the cartridge fills
+    // A sticker over the photographed cartridge's own label (a ROM hack on the cartridge of the
+    // game it was made from): the cover through label_uv, over this part of the front, 0..1.
+    Rect sticker{0, 0, 0, 0};
     float light = 1.0f; // multiplies the result: side objects are darker
 };
 
@@ -111,7 +114,7 @@ private:
     unsigned int program_ = 0, fbo_ = 0, color_ = 0, depth_ = 0;
     int fbo_w_ = 0, fbo_h_ = 0, draw_w_ = 0, draw_h_ = 0;
     int u_view_proj_ = -1, u_model_ = -1, u_rot_ = -1, u_shell_ = -1, u_label_ = -1, u_spine_ = -1,
-        u_light_ = -1, u_has_tex_ = -1, u_tex_ = -1, u_clear_ = -1, u_arts_ = -1, u_cart_uv_ = -1;
+        u_light_ = -1, u_has_tex_ = -1, u_tex_ = -1, u_clear_ = -1, u_arts_ = -1, u_cart_uv_ = -1, u_sticker_ = -1;
     int u_art_[4] = {-1, -1, -1, -1};
     Rect clip_;
     Mat4 view_proj_;

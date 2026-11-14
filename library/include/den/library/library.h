@@ -85,6 +85,9 @@ struct GameFaces {
     std::string cart;      // the cartridge's front, the whole cartridge on a clear ground
     std::string cart_back; // the cartridge's back
     std::string disc;      // the disc's printed side, round on a clear ground
+    /// The faces are the game a ROM hack was made from: its cartridge and box, not its disc.
+    /// Its own cover belongs on the label.
+    bool base_game = false;
 };
 
 class Library {

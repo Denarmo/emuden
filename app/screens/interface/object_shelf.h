@@ -42,7 +42,7 @@ private:
     float ObjectHeight() const;
 
     mutable std::map<std::string, GameObject> objects_; // by system
-    mutable std::map<std::string, GameObject> photos_;  // by game, cartridges from a photograph
+    mutable std::map<std::string, GameObject> own_;     // by game: shaped by its own pictures
     FaceLoader faces_;
     float slide_ = 0; // the selected case's disc: 0 inside, 1 out
     float view_h_ = 720, view_w_ = 1280;

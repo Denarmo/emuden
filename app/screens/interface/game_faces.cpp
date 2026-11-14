@@ -3,66 +3,97 @@
 
 #include "game_faces.h"
 
-#include <algorithm>
+#include <format>
+#include <functional>
+#include <optional>
 
 #include "den/app/app.h"
 #include "den/base/files.h"
+#include "den/gfx/device.h"
 #include "den/gfx/images.h"
+#include "face_images.h"
 
 namespace den::app {
+
+namespace fs = std::filesystem;
 
 namespace {
 
 constexpr std::size_t MAX_QUEUED = 8; // older requests are dropped and asked again when seen
+constexpr int MAX_SIDE = 1024;
+constexpr int CLEAN_VERSION = 1; // bump when CleanFace changes, so pictures are cleaned again
 
-// Where the cartridge is in its photograph (the opaque part), and the colour of its plastic:
-// the mean of the opaque pixels in a band along that part's edge, where no label is.
-void ReadPhoto(const std::string& path, LoadedFaces& out) {
-    auto image = gfx::LoadImageFile(PathFromUtf8(path));
-    if (!image) {
-        return;
+// The cleaned copy of a picture, made once under the cache (never beside the original, which
+// may sit in a read-only games folder). `image` gets the cleaned pixels when asked for. ""
+// when the picture cannot be read.
+std::string Cleaned(const std::string& path, FaceKind kind, gfx::ImageData* image = nullptr) {
+    if (path.empty()) {
+        return {};
     }
-    gfx::ImageData& im = *image;
-    gfx::ShrinkImage(im, 256);
-    const auto alpha = [&](int x, int y) { return im.rgba[(static_cast<std::size_t>(y) * im.width + x) * 4 + 3]; };
-    int x0 = im.width, y0 = im.height, x1 = -1, y1 = -1;
-    for (int y = 0; y < im.height; ++y) {
-        for (int x = 0; x < im.width; ++x) {
-            if (alpha(x, y) > 128) {
-                x0 = std::min(x0, x);
-                x1 = std::max(x1, x);
-                y0 = std::min(y0, y);
-                y1 = std::max(y1, y);
+    const fs::path source = PathFromUtf8(path);
+    std::error_code ec;
+    const auto size = fs::file_size(source, ec);
+    if (ec) {
+        return {};
+    }
+    const std::size_t hash = std::hash<std::string>{}(std::format("{}|{}|{}|{}", path, size, static_cast<int>(kind),
+                                                                  CLEAN_VERSION));
+    const fs::path out = Svc().data_dir / "cache" / "faces" / std::format("{:016x}.png", hash);
+    if (IsRegularFile(out)) {
+        if (image != nullptr) {
+            auto loaded = gfx::LoadImageFile(out);
+            if (!loaded) {
+                return {};
             }
+            *image = std::move(*loaded);
+        }
+        return PathToUtf8(out);
+    }
+    auto loaded = gfx::LoadImageFile(source);
+    if (!loaded) {
+        return {};
+    }
+    gfx::ImageData& im = *loaded;
+    gfx::ShrinkImage(im, MAX_SIDE);
+    if (!CleanFace(im, kind)) {
+        return {};
+    }
+    fs::create_directories(out.parent_path(), ec);
+    if (!gfx::SavePng(out, im.width, im.height, im.rgba.data()).ok) {
+        return {};
+    }
+    if (image != nullptr) {
+        *image = std::move(im);
+    }
+    return PathToUtf8(out);
+}
+
+LoadedFaces Load(const std::string& id, Job& job) {
+    LoadedFaces out;
+    library::Library& library = *Svc().library;
+    out.faces = library.Faces(id, [&job] { return job.CancelRequested(); });
+    library::GameFaces& f = out.faces;
+    f.back = Cleaned(f.back, FaceKind::Back);
+    f.spine = Cleaned(f.spine, FaceKind::Spine);
+    f.cart_back = Cleaned(f.cart_back, FaceKind::Cart);
+    f.disc = Cleaned(f.disc, FaceKind::Disc);
+    if (gfx::ImageData cart; !f.cart.empty()) {
+        f.cart = Cleaned(f.cart, FaceKind::Cart, &cart);
+        if (!f.cart.empty()) {
+            const CartReading reading = ReadCart(cart);
+            out.plastic = reading.plastic;
+            out.cart_aspect = reading.aspect;
+            out.cart_label = reading.label;
         }
     }
-    if (x1 - x0 < 8 || y1 - y0 < 8) {
-        return;
-    }
-    const int band = std::max(2, std::min(x1 - x0, y1 - y0) / 12);
-    double sum[3] = {0, 0, 0};
-    int count = 0;
-    for (int y = y0; y <= y1; ++y) {
-        for (int x = x0; x <= x1; ++x) {
-            const bool edge = x - x0 < band || x1 - x < band || y1 - y < band;
-            if (edge && alpha(x, y) > 200) {
-                const std::uint8_t* p = &im.rgba[(static_cast<std::size_t>(y) * im.width + x) * 4];
-                for (int c = 0; c < 3; ++c) {
-                    sum[c] += p[c];
-                }
-                ++count;
-            }
+    if (const std::optional<library::Entry> entry = library.Find(id); entry && !entry->placeholder_cover) {
+        gfx::ImageData cover;
+        out.cover = Cleaned(entry->cover, FaceKind::Cover, &cover);
+        if (!out.cover.empty()) {
+            out.cover_aspect = static_cast<float>(cover.width) / static_cast<float>(cover.height);
         }
     }
-    if (count == 0) {
-        return;
-    }
-    // The edge is in shadow on most photographs: a little lighter is closer to the plastic.
-    const auto channel = [&](int c) { return static_cast<std::uint8_t>(std::min(255.0, sum[c] / count * 1.12)); };
-    out.plastic = gfx::Color{channel(0), channel(1), channel(2), 255};
-    const float w = static_cast<float>(im.width), h = static_cast<float>(im.height);
-    out.cart_uv = gfx::Rect{x0 / w, y0 / h, (x1 + 1 - x0) / w, (y1 + 1 - y0) / h};
-    out.cart_aspect = static_cast<float>(x1 + 1 - x0) / static_cast<float>(y1 + 1 - y0);
+    return out;
 }
 
 } // namespace
@@ -104,10 +135,7 @@ void FaceLoader::Pump() {
     job_ = Svc().jobs->Run(
         "Box faces",
         [slot, id](Job& job) {
-            slot->result.faces = Svc().library->Faces(id, [&job] { return job.CancelRequested(); });
-            if (!slot->result.faces.cart.empty()) {
-                ReadPhoto(slot->result.faces.cart, slot->result);
-            }
+            slot->result = Load(id, job);
             return Status{};
         },
         [this, slot, alive = alive_](Job&) {

@@ -35,6 +35,16 @@ gfx::Renderer3D* Renderer() {
     return state > 0 ? &renderer : nullptr;
 }
 
+// Where a hack's sticker goes on a photographed cartridge: the label found in the photo when
+// it agrees with where the console's labels are, else that place (a label coloured like its
+// plastic is not found whole).
+gfx::Rect StickerRect(const gfx::Rect& found, const gfx::Rect& mould) {
+    const float ix = std::max(0.0f, std::min(found.Right(), mould.Right()) - std::max(found.x, mould.x));
+    const float iy = std::max(0.0f, std::min(found.Bottom(), mould.Bottom()) - std::max(found.y, mould.y));
+    const float common = ix * iy, area = mould.w * mould.h;
+    return found.w > 0 && common > area * 0.8f && found.w * found.h < area * 1.25f ? found : mould;
+}
+
 } // namespace
 
 ObjectShelf::ObjectShelf(std::shared_ptr<const InterfaceSpec> spec) : CoverCarousel(std::move(spec)) {}
@@ -52,17 +62,21 @@ const GameObject& ObjectShelf::ObjectFor(const std::string& system) const {
 const GameObject& ObjectShelf::ObjectAt(std::size_t index) const {
     const library::Entry& game = games_[index];
     const GameObject& object = ObjectFor(game.system);
-    if (object.shape != "cartridge" && object.shape != "card") {
-        return object;
-    }
-    if (const auto found = photos_.find(game.id); found != photos_.end()) {
+    if (const auto found = own_.find(game.id); found != own_.end()) {
         return found->second;
     }
     const LoadedFaces* faces = faces_.Peek(game.id);
-    if (faces == nullptr || faces->cart_aspect <= 0) {
+    if (faces == nullptr) {
         return object;
     }
-    return photos_[game.id] = object.WithPhoto(faces->plastic, faces->cart_aspect);
+    const bool cart = object.shape == "cartridge" || object.shape == "card";
+    if (cart && faces->cart_aspect > 0) {
+        return own_[game.id] = object.WithPhoto(faces->plastic, faces->cart_aspect);
+    }
+    if ((object.shape == "case" || object.shape == "jewel") && faces->cover_aspect > 0) {
+        return own_[game.id] = object.WithCover(faces->cover_aspect);
+    }
+    return object;
 }
 
 float ObjectShelf::ObjectHeight() const {
@@ -162,21 +176,30 @@ void ObjectShelf::DrawContent(ui::Context& ctx) {
         const library::Entry& game = games_[p.index];
         gfx::Material m;
         m.shell = p.object->shell;
-        m.cover = game.cover.empty() ? gfx::Texture{} : ctx.textures->Get(game.cover, 1024);
+        const LoadedFaces* faces = faces_.Peek(game.id);
+        const std::string& cover = faces != nullptr && !faces->cover.empty() ? faces->cover : game.cover;
+        m.cover = cover.empty() ? gfx::Texture{} : ctx.textures->Get(cover, 1024);
         if (m.cover) {
             const float aspect = p.object->shape == "case" || p.object->shape == "jewel" ? p.object->aspect
                                                                                           : p.object->LabelAspect();
             m.label_uv = gfx::CoverUv(m.cover.width, m.cover.height, gfx::Rect{0, 0, aspect * 100, 100});
             m.spine_uv = gfx::Rect{m.label_uv.x, m.label_uv.y, m.label_uv.w * 0.07f, m.label_uv.h};
         }
-        if (const LoadedFaces* faces = faces_.Peek(game.id)) {
+        if (faces != nullptr) {
             const auto art = [&](const std::string& path, int size) {
                 return path.empty() ? gfx::Texture{} : ctx.textures->Get(path, size);
             };
             if (p.object->photo) {
                 m.cart_art = art(faces->faces.cart, 1024);
-                m.cart_uv = faces->cart_uv;
                 m.back_art = art(faces->faces.cart_back, 512);
+                // A hack on the cartridge of the game it was made from: its own cover over the
+                // label (where the photo shows one, else where the mould has it).
+                if (faces->faces.base_game && m.cover) {
+                    const gfx::Rect label = StickerRect(faces->cart_label, p.object->label);
+                    m.sticker = label;
+                    const float aspect = label.w * p.object->aspect / std::max(0.01f, label.h);
+                    m.label_uv = gfx::CoverUv(m.cover.width, m.cover.height, gfx::Rect{0, 0, aspect * 100, 100});
+                }
             } else {
                 m.back_art = art(faces->faces.back, 1024);
                 m.spine_art = art(faces->faces.spine, 512);

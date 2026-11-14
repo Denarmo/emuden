@@ -11,7 +11,7 @@ namespace den::library {
 
 extern const char* const BUILTIN_SYSTEMS_JSON[];
 const char* const BUILTIN_SYSTEMS_JSON[] = {
-    R"json({"id":"switch2","name":"Nintendo Switch 2","short_name":"Switch 2","order":0,"content":{"extensions":["nup","nsp","xci"],"scanner":"switch2","folder_aliases":["switch 2","ns2","nx2","nintendo switch 2","nintendoswitch2"],"zip":"no"}})json",
+    R"json({"id":"switch2","name":"Nintendo Switch 2","short_name":"Switch 2","order":0,"content":{"extensions":["nup","nsp","xci"],"scanner":"switch2","folder_aliases":["switch 2","ns2","nx2","nintendo switch 2","nintendoswitch2"],"zip":"no"},"artwork":{"launchbox":"Nintendo Switch 2"}})json",
     R"json({"id":"nes","name":"NES","short_name":"NES","order":200,"content":{"extensions":["nes","fds","unf","unif"],"folder_aliases":["famicom","fc","nintendo"],"zip":"unpack"},"artwork":{"libretro_thumbnails":"Nintendo - Nintendo Entertainment System"}})json",
     R"json({"id":"snes","name":"Super Nintendo","short_name":"SNES","order":300,"content":{"extensions":["sfc","smc","fig","swc","bs"],"folder_aliases":["sfc","superfamicom","supernintendo"],"zip":"unpack"},"artwork":{"libretro_thumbnails":"Nintendo - Super Nintendo Entertainment System"}})json",
     R"json({"id":"gb","name":"Game Boy","short_name":"GB","order":400,"content":{"extensions":["gb"],"folder_aliases":["gameboy"],"zip":"unpack","header_title":[{"offset":308,"length":11,"encoding":"ascii"}]},"artwork":{"libretro_thumbnails":"Nintendo - Game Boy"}})json",

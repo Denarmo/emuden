@@ -42,7 +42,7 @@ uniform float u_light; uniform int u_has_tex; uniform int u_clear;
 uniform sampler2D u_tex;
 // The other faces' pictures: back, spine, cart, disc; bit i of u_arts says art i is there.
 uniform sampler2D u_back_art; uniform sampler2D u_spine_art; uniform sampler2D u_cart_art;
-uniform sampler2D u_disc_art; uniform int u_arts; uniform vec4 u_cart_uv;
+uniform sampler2D u_disc_art; uniform int u_arts; uniform vec4 u_cart_uv; uniform vec4 u_sticker;
 out vec4 o_color;
 vec4 cover(vec4 r) { return texture(u_tex, r.xy + clamp(v_uv, 0.0, 1.0) * r.zw); }
 bool has_art(int bit) { return (u_arts / bit) % 2 == 1; }
@@ -112,6 +112,11 @@ void main() {
         vec4 p = has_art(4) ? texture(u_cart_art, u_cart_uv.xy + clamp(v_uv, 0.0, 1.0) * u_cart_uv.zw) : vec4(0.0);
         base = mix(u_shell.rgb, p.rgb, p.a);
         gloss = 36.0; spec = 0.3;
+        vec2 s = (v_uv - u_sticker.xy) / max(u_sticker.zw, vec2(0.0001));
+        if (u_has_tex == 1 && u_sticker.z > 0.0 && all(greaterThanEqual(s, vec2(0.0))) && all(lessThanEqual(s, vec2(1.0)))) {
+            base = texture(u_tex, u_label.xy + s * u_label.zw).rgb;
+            gloss = 8.0; spec = 0.06;
+        }
     }
     vec3 key = normalize(vec3(-0.45, 0.6, 0.66));
     vec3 fill = normalize(vec3(0.8, 0.05, 0.45));
@@ -238,6 +243,7 @@ Status Renderer3D::Init(Device& device) {
     u_clear_ = at("u_clear");
     u_arts_ = at("u_arts");
     u_cart_uv_ = at("u_cart_uv");
+    u_sticker_ = at("u_sticker");
     const char* arts[] = {"u_back_art", "u_spine_art", "u_cart_art", "u_disc_art"};
     for (int i = 0; i < 4; ++i) {
         u_art_[i] = at(arts[i]);
@@ -354,6 +360,8 @@ void Renderer3D::Submit(const Mesh3D& mesh, const Mat4& model, const Material& m
     gl::Uniform1i(u_arts_, present);
     const Rect& cu = material.cart_uv;
     gl::Uniform4f(u_cart_uv_, cu.x, cu.y, cu.w, cu.h);
+    const Rect& st = material.sticker;
+    gl::Uniform4f(u_sticker_, st.x, st.y, st.w, st.h);
     gl::BindTexture(gl::TEXTURE_2D, material.cover.id);
     gl::BindVertexArray(mesh.vao_);
     gl::DrawArrays(gl::TRIANGLES, 0, mesh.count_);

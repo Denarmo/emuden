@@ -39,6 +39,8 @@ struct GameObject {
     /// The same cartridge or card with a photograph of the real one as its front, in the
     /// photograph's proportions and the plastic's colour.
     GameObject WithPhoto(gfx::Color plastic, float photo_aspect) const;
+    /// A case or jewel case in the proportions of its own cover.
+    GameObject WithCover(float cover_aspect) const;
     /// The part of the front the cover is printed on: the sticker inside its border.
     gfx::Rect CoverRect() const;
     /// The cover's width over its height, for cropping the cover onto it.

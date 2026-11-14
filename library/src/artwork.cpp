@@ -172,7 +172,8 @@ bool Artwork::ResolveLaunchBox(const Entry& entry, const SystemDef& system, cons
     return false;
 }
 
-GameFaces Artwork::Faces(const Entry& entry, const SystemDef* system, const std::function<bool()>& stopping) {
+GameFaces Artwork::Faces(const Entry& entry, const SystemDef* system, const std::function<bool()>& stopping,
+                         const std::string& base_title) {
     GameFaces faces;
     if (system == nullptr || (system->launchbox.empty() && system->libretro_thumbnails.empty())) {
         return faces;
@@ -192,8 +193,10 @@ GameFaces Artwork::Faces(const Entry& entry, const SystemDef* system, const std:
     };
     // ".faces" marks a game whose faces were all fetched, ".faces.miss" one without any.
     const fs::path done = WithSuffix(stem, ".faces"), miss = WithSuffix(stem, ".faces.miss");
+    const fs::path base_mark = WithSuffix(stem, ".faces.base");
     if (IsRegularFile(done)) {
         cached();
+        faces.base_game = IsRegularFile(base_mark);
         return faces;
     }
     if (!fetcher_ || (stopping && stopping()) || IsFresh(miss, MISS_LIFETIME)) {
@@ -204,7 +207,32 @@ GameFaces Artwork::Faces(const Entry& entry, const SystemDef* system, const std:
         titles.push_back(std::move(base));
     }
     bool answered = true;
-    const auto found = launchbox_->FindFaces(*system, titles, RegionTags(original), answered);
+    auto found = launchbox_->FindFaces(*system, titles, RegionTags(original), answered);
+    if (!found || found->cart.empty()) {
+        // A hack the database knows no cartridge of: the cartridge (and, knowing nothing at
+        // all of it, the box) of the game it was made from.
+        std::string base = base_title;
+        if (base.empty() && !system->libretro_thumbnails.empty()) {
+            const ThumbnailIndex& index = IndexFor(*system);
+            if (!index.names.empty() && MatchThumbnail(index, original).empty()) {
+                base = MatchBaseGame(index, original, QueryFor(entry, *system, index, original).header);
+            }
+        }
+        auto from_base = base.empty() ? std::nullopt
+                                      : launchbox_->FindFaces(*system, {ParseGameName(base).base, base},
+                                                              RegionTags(original), answered);
+        if (from_base && (!found || !from_base->cart.empty())) {
+            if (found) {
+                found->cart = std::move(from_base->cart);
+                found->cart_back = std::move(from_base->cart_back);
+            } else {
+                found = std::move(from_base);
+                found->disc.clear(); // the base game's disc names the wrong game
+            }
+            faces.base_game = true;
+            Touch(base_mark);
+        }
+    }
     if (!found) {
         if (answered) {
             Touch(miss);

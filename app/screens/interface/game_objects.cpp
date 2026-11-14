@@ -4,6 +4,7 @@
 #include "game_objects.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <format>
 #include <map>
@@ -361,6 +362,14 @@ GameObject GameObject::WithPhoto(gfx::Color plastic, float photo_aspect) const {
     o.shell.a = 255;
     // Proportions within reach of the mould's: a photo cropped oddly does not squash the cart.
     o.aspect = std::clamp(photo_aspect, aspect * 0.8f, aspect * 1.25f);
+    return o;
+}
+
+GameObject GameObject::WithCover(float cover_aspect) const {
+    GameObject o = *this;
+    // A jewel case's inlay leaves room for the hinge; a keep case's sleeve covers its front.
+    const float wanted = shape == "jewel" ? cover_aspect + 0.09f : cover_aspect;
+    o.aspect = std::round(std::clamp(wanted, aspect * 0.82f, aspect * 1.2f) * 100.0f) / 100.0f;
     return o;
 }
 

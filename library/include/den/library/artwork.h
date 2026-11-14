@@ -106,8 +106,11 @@ public:
     std::vector<CoverChoice> Choices(const Entry& entry, const SystemDef* system,
                                      const std::function<bool()>& stopping = {});
     /// The game's other faces from the LaunchBox Games Database, downloaded once and kept; a
-    /// game without any is not asked about again for two weeks.
-    GameFaces Faces(const Entry& entry, const SystemDef* system, const std::function<bool()>& stopping = {});
+    /// game without any is not asked about again for two weeks. A ROM hack the database does
+    /// not know gets those of the game it was made from: `base_title` when the caller knows
+    /// it (the library holds that game), else the game MatchBaseGame finds.
+    GameFaces Faces(const Entry& entry, const SystemDef* system, const std::function<bool()>& stopping = {},
+                    const std::string& base_title = {});
 
 private:
     const ThumbnailIndex& IndexFor(const SystemDef& system);

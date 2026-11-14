@@ -327,7 +327,13 @@ public:
             std::lock_guard lock(mutex_);
             systems = systems_;
         }
-        return artwork_.Faces(*entry, systems.Find(entry->system), stopping);
+        std::string base;
+        if (!entry->hack_of.empty()) {
+            if (const std::optional<Entry> original = Find(entry->hack_of)) {
+                base = original->original_name.empty() ? original->name : original->original_name;
+            }
+        }
+        return artwork_.Faces(*entry, systems.Find(entry->system), stopping, base);
     }
 
     Status SetCover(const std::string& id, const std::string& image_path) override {
