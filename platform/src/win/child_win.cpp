@@ -4,7 +4,9 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <atomic>
 #include <map>
+#include <mutex>
 
 #include "den/base/files.h"
 #include "den/platform/child.h"
@@ -121,13 +123,124 @@ BOOL CALLBACK FindDialogOfJob(HWND window, LPARAM param) {
     return TRUE;
 }
 
+// The app's ends of a child's standard input and output.
+class PipeStream final : public Stream {
+public:
+    PipeStream(HANDLE read, HANDLE write) : read_(read), write_(write) {}
+    ~PipeStream() override {
+        CloseHandle(read_);
+        if (write_) {
+            CloseHandle(write_);
+        }
+    }
+
+    bool Read(void* data, std::size_t size) override {
+        auto* out = static_cast<char*>(data);
+        while (size > 0 && !closed_) {
+            DWORD got = 0;
+            const DWORD chunk = static_cast<DWORD>(size > (1u << 20) ? (1u << 20) : size);
+            if (!ReadFile(read_, out, chunk, &got, nullptr) || got == 0) {
+                return false;
+            }
+            out += got;
+            size -= got;
+        }
+        return size == 0;
+    }
+
+    bool Write(const void* data, std::size_t size) override {
+        std::lock_guard lock(write_lock_);
+        const auto* in = static_cast<const char*>(data);
+        while (size > 0) {
+            DWORD sent = 0;
+            const DWORD chunk = static_cast<DWORD>(size > (1u << 20) ? (1u << 20) : size);
+            if (!write_ || !WriteFile(write_, in, chunk, &sent, nullptr) || sent == 0) {
+                return false;
+            }
+            in += sent;
+            size -= sent;
+        }
+        return true;
+    }
+
+    void Close() override {
+        closed_ = true;
+        {
+            std::lock_guard lock(write_lock_);
+            if (write_) {
+                CloseHandle(write_); // the child reads the end of its input
+                write_ = nullptr;
+            }
+        }
+        CancelIoEx(read_, nullptr);
+    }
+
+private:
+    HANDLE read_;
+    HANDLE write_;
+    std::mutex write_lock_;
+    std::atomic<bool> closed_{false};
+};
+
+// A child's standard input, output and error while it is being started.
+struct ChildPipes {
+    HANDLE inherited[3] = {nullptr, nullptr, nullptr}; // the child's input, output, error
+    HANDLE our_in = nullptr, our_out = nullptr;
+
+    ~ChildPipes() {
+        CloseChildEnds();
+        for (HANDLE handle : {our_in, our_out}) {
+            if (handle) {
+                CloseHandle(handle);
+            }
+        }
+    }
+
+    bool Open(const std::filesystem::path& log_file) {
+        SECURITY_ATTRIBUTES inherit{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
+        if (!CreatePipe(&inherited[0], &our_in, &inherit, 0) || !CreatePipe(&our_out, &inherited[1], &inherit, 0)) {
+            return false;
+        }
+        SetHandleInformation(our_in, HANDLE_FLAG_INHERIT, 0);
+        SetHandleInformation(our_out, HANDLE_FLAG_INHERIT, 0);
+        HANDLE error = log_file.empty() ? CreateFileW(L"NUL", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                      &inherit, OPEN_EXISTING, 0, nullptr)
+                                        : CreateFileW(log_file.c_str(), GENERIC_WRITE, FILE_SHARE_READ, &inherit,
+                                                      CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        inherited[2] = error == INVALID_HANDLE_VALUE ? nullptr : error;
+        return inherited[2] != nullptr;
+    }
+
+    // The child has its own copies once it was created.
+    void CloseChildEnds() {
+        for (HANDLE& handle : inherited) {
+            if (handle) {
+                CloseHandle(handle);
+                handle = nullptr;
+            }
+        }
+    }
+
+    std::unique_ptr<PipeStream> TakeStream() {
+        auto stream = std::make_unique<PipeStream>(our_out, our_in);
+        our_in = our_out = nullptr;
+        return stream;
+    }
+};
+
 class WinChild final : public Child {
 public:
-    WinChild(HANDLE job, HANDLE process) : job_(job), process_(process) {}
+    WinChild(HANDLE job, HANDLE process, std::unique_ptr<PipeStream> channel)
+        : job_(job), process_(process), channel_(std::move(channel)) {}
     ~WinChild() override {
         Kill();
+        channel_.reset();
         CloseHandle(process_);
         CloseHandle(job_); // kill-on-close ends whatever is left in the job
+    }
+
+    Stream* Channel() override {
+        return channel_.get();
     }
 
     std::optional<int> Poll() override {
@@ -195,6 +308,7 @@ private:
     std::optional<int> exit_;
     std::vector<HWND> asked_;
     std::vector<HWND> answered_;
+    std::unique_ptr<PipeStream> channel_;
 };
 
 std::string LastError() {
@@ -231,13 +345,41 @@ Result<std::unique_ptr<Child>> StartChild(const ChildDesc& desc) {
     const std::filesystem::path cwd =
         desc.working_dir.empty() ? desc.executable.parent_path() : desc.working_dir;
 
-    STARTUPINFOW startup{};
-    startup.cb = sizeof(startup);
+    ChildPipes pipes;
+    if (desc.channel && !pipes.Open(desc.log_file)) {
+        const std::string error = LastError();
+        CloseHandle(job);
+        return Status::Fail("could not start " + name + ": " + error);
+    }
+    STARTUPINFOEXW startup{};
+    startup.StartupInfo.cb = sizeof(startup);
+    DWORD flags = CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT;
+    std::vector<char> attributes;
+    if (desc.channel) {
+        // The pipes and the log are the only handles the child inherits.
+        SIZE_T size = 0;
+        InitializeProcThreadAttributeList(nullptr, 1, 0, &size);
+        attributes.resize(size);
+        startup.lpAttributeList = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attributes.data());
+        InitializeProcThreadAttributeList(startup.lpAttributeList, 1, 0, &size);
+        UpdateProcThreadAttribute(startup.lpAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, pipes.inherited,
+                                  sizeof(HANDLE) * 3, nullptr, nullptr);
+        startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+        startup.StartupInfo.hStdInput = pipes.inherited[0];
+        startup.StartupInfo.hStdOutput = pipes.inherited[1];
+        startup.StartupInfo.hStdError = pipes.inherited[2];
+        flags |= EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW;
+    }
     PROCESS_INFORMATION info{};
     // Suspended, so the child is in the job before it runs a single instruction.
-    if (!CreateProcessW(desc.executable.c_str(), line.data(), nullptr, nullptr, FALSE,
-                        CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT, env.data(),
-                        cwd.empty() ? nullptr : cwd.c_str(), &startup, &info)) {
+    const BOOL created = CreateProcessW(desc.executable.c_str(), line.data(), nullptr, nullptr,
+                                        desc.channel ? TRUE : FALSE, flags, env.data(),
+                                        cwd.empty() ? nullptr : cwd.c_str(), &startup.StartupInfo, &info);
+    if (startup.lpAttributeList) {
+        DeleteProcThreadAttributeList(startup.lpAttributeList);
+    }
+    pipes.CloseChildEnds();
+    if (!created) {
         const std::string error = LastError();
         CloseHandle(job);
         return Status::Fail("could not start " + name + ": " + error);
@@ -252,7 +394,7 @@ Result<std::unique_ptr<Child>> StartChild(const ChildDesc& desc) {
     }
     ResumeThread(info.hThread);
     CloseHandle(info.hThread);
-    return std::unique_ptr<Child>(new WinChild(job, info.hProcess));
+    return std::unique_ptr<Child>(new WinChild(job, info.hProcess, desc.channel ? pipes.TakeStream() : nullptr));
 }
 
 } // namespace den::pal

@@ -378,6 +378,34 @@ public class EmuDenActivity extends SDLActivity {
         return activity != null ? AppList.launch(activity, id, display) : "error:The app is closing";
     }
 
+    /** Called from native code (platform/src/android/engine_apps_android.cpp). */
+    public static String engineQuery(String pkg) {
+        EmuDenActivity activity = self;
+        return activity != null ? EngineApps.query(activity, pkg) : "";
+    }
+
+    public static String engineInstall(String apk) {
+        EmuDenActivity activity = self;
+        return activity != null ? EngineApps.install(activity, apk) : "error:The app is closing";
+    }
+
+    public static String engineStore(String url) {
+        EmuDenActivity activity = self;
+        return activity != null ? EngineApps.store(activity, url) : "error:The app is closing";
+    }
+
+    public static String enginePlay(String pkg, String cert, String path, int port, String token, String session,
+                                    boolean fullscreen, int display) {
+        EmuDenActivity activity = self;
+        return activity != null ? EngineApps.play(activity, pkg, cert, path, port, token, session, fullscreen, display)
+                : "error:The app is closing";
+    }
+
+    public static String engineResume(String pkg, int display) {
+        EmuDenActivity activity = self;
+        return activity != null ? EngineApps.resume(activity, pkg, display) : "error:The app is closing";
+    }
+
     /** Called from native code (platform/src/android/text_input_android.cpp). */
     public static void textBegin(int session, String text, String hint, int maxLength, boolean second) {
         TextBridge.begin(session, text, hint, maxLength, second);

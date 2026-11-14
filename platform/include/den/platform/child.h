@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "den/base/result.h"
+#include "den/platform/stream.h"
 
 namespace den::pal {
 
@@ -24,6 +25,10 @@ struct ChildDesc {
     std::vector<std::pair<std::string, std::string>> env;
     /// Empty: the executable's folder.
     std::filesystem::path working_dir;
+    /// Its standard input and output become Child::Channel(); its standard error goes to
+    /// `log_file` (nowhere when empty).
+    bool channel = false;
+    std::filesystem::path log_file;
 };
 
 class Child {
@@ -42,6 +47,10 @@ public:
     virtual bool ConfirmClose() = 0;
     /// Ends it and everything it started, now.
     virtual void Kill() = 0;
+    /// Its standard input and output, when started with ChildDesc::channel. Owned by the child.
+    virtual Stream* Channel() {
+        return nullptr;
+    }
 };
 
 Result<std::unique_ptr<Child>> StartChild(const ChildDesc& desc);

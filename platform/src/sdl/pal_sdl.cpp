@@ -78,6 +78,12 @@ public:
     void Hide() override {
         SDL_HideWindow(window_);
     }
+    void Raise() override {
+        SDL_ShowWindow(window_);
+        SDL_SetHint(SDL_HINT_FORCE_RAISEWINDOW, "1");
+        SDL_RaiseWindow(window_);
+        SDL_SetHint(SDL_HINT_FORCE_RAISEWINDOW, "0");
+    }
     void SetTitle(const std::string& title) override {
         SDL_SetWindowTitle(window_, title.c_str());
     }

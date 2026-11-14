@@ -11,6 +11,8 @@ if(ANDROID)
     list(APPEND platform_exclude "/src/sdl/second_display_sdl.cpp")
     # Other apps and the system keyboard exist on Android only (src/android).
     list(APPEND platform_exclude "/src/sdl/apps_desktop.cpp" "/src/sdl/text_input_desktop.cpp")
+    # Engines are apps of their own there (src/android).
+    list(APPEND platform_exclude "/src/sdl/engine_apps_desktop.cpp")
     # The app goes on while its activity is stopped, and Android has a media volume.
     list(APPEND platform_exclude "/src/sdl/lifecycle_desktop.cpp")
     # The web view is android.webkit.WebView (src/android).

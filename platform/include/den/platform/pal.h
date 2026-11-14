@@ -63,6 +63,10 @@ public:
     virtual bool Fullscreen() const = 0;
     virtual void Show() = 0;
     virtual void Hide() = 0;
+    /// Shows it and asks for it to be the foreground window (an engine handed the menu over).
+    virtual void Raise() {
+        Show();
+    }
     virtual void SetTitle(const std::string& title) = 0;
     virtual void MakeCurrent() = 0;
     /// The SDL_Window, for code that needs SDL itself (audio, input).
