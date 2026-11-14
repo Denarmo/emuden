@@ -19,6 +19,33 @@ listened.
 
 `emuden --windowed --size 3840x2160` opens a window of that size (new, for such checks).
 
+## Plugin sources from other developers
+
+Settings > Plugin sources (also from the Plugins page): EmuDEN's own source, always on, and
+the ones the user adds as `owner/repo[@ref]`, a github.com link or an https address that
+serves `index.json`, `index.json.sig` and `keys/source.pub`. Adding fetches the key and the
+signed list and shows the key's fingerprint to confirm; `owner/repo#<16 hex>` adds it only
+with that key and asks nothing. Each source can be switched off, checked again, or removed.
+Kept in the setting `plugins.sources`, one line per source: `<address> <key>[,<key>] on|off`.
+
+- Rules for an added source: ids only in its namespace (the GitHub owner in lower case, or
+  the host of an https source), never `emuden.*`, no `switch2` or `pcstore` engine, no engine
+  scanner; never the console of an official plugin; when two added sources publish an id, the
+  one added first is used. What is left out is listed on the source's page.
+- Every plugin folder names its source (`plugins/<id>/source.json`; none means the official
+  source), cores of an added source are in the ledger as `<plugin>/<core>` with the source as
+  origin, and updates come only from that source.
+- The official index can withdraw a source's key (`revoked_keys`, by fingerprint): nothing
+  of that source loads any more and it cannot be added again.
+- Removing a source removes the console plugins, cores and feature plugins it installed;
+  games, saves, BIOS files and the plugins' own data stay.
+- A core from an added source is installed only after a question naming the source, on the
+  console page and on the "core needed" page.
+
+Tested in `plugins/tests/sources_tests.cpp`; the pages were looked at on Windows. Not done:
+an added source's core as an alternative for an official console (it is refused instead),
+and adding a local folder as a source (the old desktop build had it).
+
 ## An app beside the game, second round (checked on the Retroid)
 
 Three notes from the owner after using the Apps button on the Retroid, and three leftovers
