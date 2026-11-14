@@ -508,7 +508,10 @@ at PAL's 512 lines (before, PAL pictures were shifted down, cut off and letterbo
 Colin McRae Rally 3's timer wait and skips framebuffer fetch on Adreno: a CMR3 stage runs at 68% of
 full speed on the Retroid (in-game timer against the wall clock), up from 54%. Since 1.1.4 the core's
 GS work runs on a thread of its own on Android, with an EGL context shared with the player's: about 70%.
-That thread is now the limit, at 100% of a CPU core inside the Adreno driver's per-draw work. The PCSX2 notes below are history.
+That thread is now the limit, at 100% of a CPU core inside the Adreno driver's per-draw work. Since 1.1.5 interlaced
+games no longer shake (the odd field is shown half a line lower). Batching draws across palette changes
+(one palette texture, a row per vertex) was tried and dropped: in CMR3 every split also changes texture
+and shader, so draws and speed stayed the same. The PCSX2 notes below are history.
 
 The 24 consoles added on 2026-11-14 (Atari 2600/5200/7800/Lynx/Jaguar, Sega CD/32X/SG-1000,
 PC Engine/CD/PC-FX, Neo Geo/Pocket/Color, WonderSwan/Color, Virtual Boy, Pokémon mini, 3DO,
