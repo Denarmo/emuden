@@ -79,7 +79,9 @@ pal::engine_apps::Installed RealHost::QueryApp(const std::string& package, bool 
 
 bool RealHost::AppMatches(const Component& core, const pal::engine_apps::Installed& app) {
     const EngineAppSpec& spec = core.engine_app;
-    return app.present && app.plays && app.cert_sha256 == spec.cert_sha256 && app.version_code >= spec.min_version_code;
+    // A level 0 app is only handed games to open: it has no protocol activity.
+    return app.present && (app.plays || spec.level == 0) && app.cert_sha256 == spec.cert_sha256 &&
+           app.version_code >= spec.min_version_code;
 }
 
 bool RealHost::EngineAppGood(const Loaded& loaded, const Component& core) const {

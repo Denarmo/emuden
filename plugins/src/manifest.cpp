@@ -235,6 +235,8 @@ Result<SystemDef> ParseSystem(const JsonValue& value, const Manifest& manifest) 
     if (const JsonValue* artwork = value.Find("artwork")) {
         console.thumbnails = artwork->String("libretro_thumbnails");
         console.rdb = artwork->String("rdb");
+        console.launchbox = artwork->String("launchbox");
+        console.cover_by_id = json::Strings(*artwork, "cover_by_id", false);
     }
     if (const JsonValue* achievements = value.Find("achievements")) {
         console.rcheevos_console = static_cast<int>(json::Number(*achievements, "rcheevos_console", 0));

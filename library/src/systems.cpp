@@ -181,6 +181,12 @@ void SystemTable::Merge(std::vector<SystemDef> systems) {
         if (def.libretro_thumbnails.empty()) {
             def.libretro_thumbnails = found->libretro_thumbnails;
         }
+        if (def.launchbox.empty()) {
+            def.launchbox = found->launchbox;
+        }
+        if (def.cover_by_id.empty()) {
+            def.cover_by_id = found->cover_by_id;
+        }
         *found = std::move(def);
     }
     std::stable_sort(systems_.begin(), systems_.end(),

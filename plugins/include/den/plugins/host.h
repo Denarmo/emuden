@@ -93,6 +93,8 @@ struct Console {
     std::vector<ButtonName> buttons;
     std::string thumbnails; // the libretro thumbnail folder ("Nintendo - Game Boy"), or empty
     std::string rdb;        // the libretro database name, or empty
+    std::string launchbox;  // the LaunchBox Games Database platform, or empty
+    std::vector<std::string> cover_by_id; // cover addresses with "{id}" (library::SystemDef)
     int rcheevos_console = 0;
     std::vector<BiosSet> bios;
 };
