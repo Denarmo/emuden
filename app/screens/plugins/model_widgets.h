@@ -25,6 +25,7 @@ public:
     ui::Tone tone = ui::Tone::Text;
     bool centered = false;
     bool boxed = false; // on a panel tint (a warning)
+    bool clip = false;  // only the lines that fit its height, the last cut with "..."
 
 protected:
     ui::Size MeasureContent(ui::Context& ctx) override;

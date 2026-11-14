@@ -90,6 +90,22 @@ struct GameFaces {
     bool base_game = false;
 };
 
+/// What the LaunchBox Games Database says about a game: "", 0 or empty for what it does not
+/// know. `found` is false when it knows nothing of the game.
+struct GameDetails {
+    bool found = false;
+    std::string title;    // the game's name in the database
+    std::string overview; // a paragraph or a few about the game
+    std::string date;     // the release, "YYYY-MM-DD"
+    int year = 0;         // the release year, also without a date
+    std::vector<std::string> genres;
+    std::string developer, publisher;
+    int players = 0;    // the most players at once
+    double rating = 0;  // the community's, 0..5
+    int votes = 0;      // how many gave it
+    std::string esrb;   // "E - Everyone"
+};
+
 class Library {
 public:
     virtual ~Library() = default;
@@ -128,6 +144,13 @@ public:
     /// Pictures of the game's box back and spine, cartridge and disc, downloaded once from the
     /// LaunchBox Games Database. Blocks on the network: call it from a job.
     virtual GameFaces Faces(const std::string& id, const std::function<bool()>& stopping = {}) {
+        (void)id;
+        (void)stopping;
+        return {};
+    }
+    /// What the LaunchBox Games Database says about the game, fetched once and kept. Blocking,
+    /// like Faces.
+    virtual GameDetails Details(const std::string& id, const std::function<bool()>& stopping = {}) {
         (void)id;
         (void)stopping;
         return {};

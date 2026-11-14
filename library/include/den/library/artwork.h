@@ -111,6 +111,9 @@ public:
     /// it (the library holds that game), else the game MatchBaseGame finds.
     GameFaces Faces(const Entry& entry, const SystemDef* system, const std::function<bool()>& stopping = {},
                     const std::string& base_title = {});
+    /// What the LaunchBox Games Database says about the game, fetched once and kept; a game it
+    /// does not know is not asked about again for two weeks.
+    GameDetails Details(const Entry& entry, const SystemDef* system, const std::function<bool()>& stopping = {});
     /// The picture of the system's console from the LaunchBox Games Database, downloaded once
     /// and kept; a system without one is not asked about again for two weeks. `url`, when
     /// given, is fetched instead (an https picture of the console from elsewhere).

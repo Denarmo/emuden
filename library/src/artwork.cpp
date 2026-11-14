@@ -12,20 +12,13 @@
 #include "den/library/content.h"
 #include "den/library/launchbox_covers.h"
 #include "den/library/names.h"
+#include "artwork_cache.h"
 
 namespace den::library {
 
 namespace fs = std::filesystem;
 
-namespace {
-
-constexpr std::string_view THUMBNAIL_HOST = "https://thumbnails.libretro.com/";
-// A lookup that found nothing is not repeated for this long.
-constexpr auto MISS_LIFETIME = std::chrono::hours(24 * 14);
-constexpr auto INDEX_LIFETIME = std::chrono::hours(24 * 30);
-// A hack's own art is asked for again sooner: collections of fan art grow.
-constexpr auto HACK_MISS_LIFETIME = std::chrono::hours(24 * 7);
-constexpr std::size_t MAX_CHOICES = 8;
+namespace artwork_cache {
 
 // A name that is safe as a file name everywhere, unique through a hash of the original.
 std::string CacheFileName(std::string_view name) {
@@ -73,13 +66,6 @@ void Touch(const fs::path& file) {
     WriteFileAtomic(file, "");
 }
 
-HeaderFetcher WithoutHeaders(HttpFetcher fetcher) {
-    if (!fetcher) {
-        return {};
-    }
-    return [fetcher = std::move(fetcher)](const std::string& url, const HttpHeaders&) { return fetcher(url); };
-}
-
 fs::path FindCached(const fs::path& file_stem) {
     for (const char* extension : {".png", ".jpg"}) {
         fs::path file = file_stem;
@@ -89,6 +75,24 @@ fs::path FindCached(const fs::path& file_stem) {
         }
     }
     return {};
+}
+
+} // namespace artwork_cache
+
+using namespace artwork_cache;
+
+namespace {
+
+constexpr std::string_view THUMBNAIL_HOST = "https://thumbnails.libretro.com/";
+constexpr auto INDEX_LIFETIME = std::chrono::hours(24 * 30);
+// A hack's own art is asked for again sooner: collections of fan art grow.
+constexpr auto HACK_MISS_LIFETIME = std::chrono::hours(24 * 7);
+constexpr std::size_t MAX_CHOICES = 8;
+HeaderFetcher WithoutHeaders(HttpFetcher fetcher) {
+    if (!fetcher) {
+        return {};
+    }
+    return [fetcher = std::move(fetcher)](const std::string& url, const HttpHeaders&) { return fetcher(url); };
 }
 
 // The short id a game file holds as its whole text ("620"), or "" when it holds something else.
@@ -172,124 +176,6 @@ bool Artwork::ResolveLaunchBox(const Entry& entry, const SystemDef& system, cons
         return true;
     }
     return false;
-}
-
-GameFaces Artwork::Faces(const Entry& entry, const SystemDef* system, const std::function<bool()>& stopping,
-                         const std::string& base_title) {
-    GameFaces faces;
-    if (system == nullptr || (system->launchbox.empty() && system->libretro_thumbnails.empty())) {
-        return faces;
-    }
-    const std::string original = entry.original_name.empty() ? entry.name : entry.original_name;
-    const fs::path stem =
-        cache_dir_ / "launchbox-faces" / PathFromUtf8(system->id) / PathFromUtf8(CacheFileName(original));
-    std::pair<const char*, std::string*> kinds[] = {{".back", &faces.back},
-                                                    {".spine", &faces.spine},
-                                                    {".cart", &faces.cart},
-                                                    {".cart-back", &faces.cart_back},
-                                                    {".disc", &faces.disc}};
-    const auto cached = [&] {
-        for (auto& [suffix, path] : kinds) {
-            *path = PathToUtf8(FindCached(WithSuffix(stem, suffix)));
-        }
-    };
-    // ".faces2" marks a game whose faces were all fetched, ".faces2.miss" one without any (the
-    // number goes up when the rules change, so earlier answers are asked again; pictures
-    // already downloaded are kept).
-    const fs::path done = WithSuffix(stem, ".faces2"), miss = WithSuffix(stem, ".faces2.miss");
-    const fs::path base_mark = WithSuffix(stem, ".faces2.base");
-    if (IsRegularFile(done)) {
-        cached();
-        faces.base_game = IsRegularFile(base_mark);
-        return faces;
-    }
-    if (!fetcher_ || (stopping && stopping()) || IsFresh(miss, MISS_LIFETIME)) {
-        return faces;
-    }
-    std::vector<std::string> titles{entry.name};
-    if (std::string base = ParseGameName(original).base; base != entry.name) {
-        titles.push_back(std::move(base));
-    }
-    bool answered = true;
-    auto found = launchbox_->FindFaces(*system, titles, RegionTags(original), answered);
-    if (!found || found->cart.empty()) {
-        // A hack the database knows no cartridge of: the cartridge (and, knowing nothing at
-        // all of it, the box) of the game it was made from.
-        std::string base = base_title;
-        if (base.empty() && !system->libretro_thumbnails.empty()) {
-            const ThumbnailIndex& index = IndexFor(*system);
-            if (!index.names.empty() && MatchThumbnail(index, original).empty()) {
-                base = MatchBaseGame(index, original, QueryFor(entry, *system, index, original).header);
-            }
-        }
-        auto from_base = base.empty() ? std::nullopt
-                                      : launchbox_->FindFaces(*system, {ParseGameName(base).base, base},
-                                                              RegionTags(original), answered);
-        if (from_base && (!found || !from_base->cart.empty())) {
-            if (found) {
-                found->cart = std::move(from_base->cart);
-                found->cart_back = std::move(from_base->cart_back);
-            } else {
-                found = std::move(from_base);
-                found->disc.clear(); // the base game's disc names the wrong game
-            }
-            faces.base_game = true;
-            Touch(base_mark);
-        }
-    }
-    if (!found) {
-        if (answered) {
-            Touch(miss);
-        }
-        return faces;
-    }
-    const std::string* urls[] = {&found->back, &found->spine, &found->cart, &found->cart_back, &found->disc};
-    bool complete = true;
-    for (std::size_t i = 0; i < std::size(kinds); ++i) {
-        const fs::path face = WithSuffix(stem, kinds[i].first);
-        if (urls[i]->empty() || !FindCached(face).empty()) {
-            continue;
-        }
-        if (stopping && stopping()) {
-            complete = false;
-            break;
-        }
-        bool reached = false;
-        fs::path file;
-        complete = Download(*urls[i], face, file, reached) && complete;
-    }
-    if (complete) {
-        Touch(done);
-    }
-    cached();
-    return faces;
-}
-
-std::string Artwork::Device(const SystemDef* system, const std::string& url, const std::function<bool()>& stopping) {
-    if (system == nullptr || (url.empty() && system->launchbox.empty() && system->libretro_thumbnails.empty()) ||
-        (!url.empty() && !url.starts_with("https://"))) {
-        return {};
-    }
-    const std::string name =
-        url.empty() ? system->id : std::format("{}-{:016x}", system->id, std::hash<std::string>{}(url));
-    const fs::path stem = cache_dir_ / "launchbox-devices" / PathFromUtf8(CacheFileName(name));
-    if (fs::path cached = FindCached(stem); !cached.empty()) {
-        return PathToUtf8(cached);
-    }
-    const fs::path miss = WithSuffix(stem, ".miss");
-    if (!fetcher_ || (stopping && stopping()) || IsFresh(miss, MISS_LIFETIME)) {
-        return {};
-    }
-    bool answered = true;
-    const std::string address = url.empty() ? launchbox_->FindDevice(*system, answered) : url;
-    fs::path file;
-    if (!address.empty() && Download(address, stem, file, answered)) {
-        return PathToUtf8(file);
-    }
-    if (answered) {
-        Touch(miss);
-    }
-    return {};
 }
 
 void Artwork::SetHackOptions(HackCoverOptions options) {

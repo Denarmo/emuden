@@ -342,6 +342,19 @@ public:
         return artwork_.Faces(*entry, systems.Find(entry->system), stopping, base);
     }
 
+    GameDetails Details(const std::string& id, const std::function<bool()>& stopping) override {
+        const std::optional<Entry> entry = Find(id);
+        if (!entry) {
+            return {};
+        }
+        SystemTable systems;
+        {
+            std::lock_guard lock(mutex_);
+            systems = systems_;
+        }
+        return artwork_.Details(*entry, systems.Find(entry->system), stopping);
+    }
+
     std::string Device(const std::string& id, const std::string& url,
                        const std::function<bool()>& stopping) override {
         const std::optional<Entry> entry = Find(id);

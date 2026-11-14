@@ -4,7 +4,7 @@
 // Box covers from the LaunchBox Games Database, through its split copy at
 // github.com/Denarmo/launchbox-covers: a small manifest, then per platform one file per first
 // letter of a title's key, and beside it one with the other faces of those games (the box's
-// back and spine, the cartridge, the disc). The images themselves come from LaunchBox's image
+// back and spine, the cartridge, the disc) and one with their details. The images themselves come from LaunchBox's image
 // server.
 
 #pragma once
@@ -61,6 +61,10 @@ public:
     /// one there, else the region that fits best. Empty when the game has none.
     std::optional<LaunchBoxFaces> FindFaces(const SystemDef& system, const std::vector<std::string>& titles,
                                             const std::vector<std::string>& region_tags, bool& answered);
+    /// The details of the game Find picks (README, "Details"); `found` false when there are
+    /// none.
+    GameDetails FindDetails(const SystemDef& system, const std::vector<std::string>& titles,
+                            const std::vector<std::string>& region_tags, bool& answered);
     /// The address of the picture of the system's console seen from the front, on a clear
     /// ground (README, "Devices"); "" when the data has none.
     std::string FindDevice(const SystemDef& system, bool& answered);
@@ -69,7 +73,8 @@ private:
     struct Platform {
         std::string dir;
         std::vector<std::string> buckets;
-        std::vector<std::string> faces; // the face files that exist
+        std::vector<std::string> faces;   // the face files that exist
+        std::vector<std::string> details; // the detail files that exist
         std::string device;             // the console's picture, under the image server
     };
     struct Match {
@@ -85,7 +90,7 @@ private:
     };
     const Manifest* LoadManifest(bool& answered);
     const JsonValue* LoadBucket(const Manifest& manifest, const Platform& platform, const std::string& bucket,
-                                bool& answered, bool faces = false);
+                                bool& answered, const char* kind = "covers");
     const Platform* PlatformOf(const Manifest& manifest, const SystemDef& system) const;
     std::optional<Match> FindMatch(const Manifest& manifest, const SystemDef& system,
                                    const std::vector<std::string>& titles, const std::vector<std::string>& order,

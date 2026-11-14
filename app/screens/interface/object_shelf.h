@@ -15,6 +15,7 @@
 #include "cover_carousel.h"
 #include "game_faces.h"
 #include "game_objects.h"
+#include "shelf_parts.h"
 
 namespace den::app {
 
@@ -41,17 +42,13 @@ private:
         float height, yaw, light, weight;
         float width; // across, at the front
     };
-    // One object of a game, relative to the anchor: across, forward and its height.
-    struct Piece {
-        float dx = 0, dz = 0, height = 0;
-    };
     const GameObject& ObjectFor(const std::string& system) const;
     /// The game's object: its console's, or shaped by its own pictures once they are loaded.
     const GameObject& ObjectAt(std::size_t index) const;
     const GameObject* BoxAt(std::size_t index) const;
     Placed Place(std::size_t index, float time) const;
-    static Piece CartPiece(const Placed& p);
-    static Piece BoxPiece(const Placed& p);
+    static ShelfPiece CartPiece(const Placed& p);
+    static ShelfPiece BoxPiece(const Placed& p);
     float Floor() const;
     float ObjectHeight() const;
     gfx::Material MaterialFor(ui::Context& ctx, const Placed& p, bool box) const;

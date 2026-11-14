@@ -78,7 +78,21 @@ void Paragraph::DrawContent(ui::Context& ctx) {
     }
     const gfx::Color color = tone == ui::Tone::Dim ? theme.text_dim : theme.fg;
     float y = rect.y + inset;
-    for (const std::string& text_line : lines_) {
+    for (std::size_t i = 0; i < lines_.size(); ++i) {
+        std::string text_line = lines_[i];
+        if (clip && y + line > rect.Bottom() - inset) {
+            break;
+        }
+        if (clip && y + line * 2 > rect.Bottom() - inset && i + 1 < lines_.size()) {
+            // The last line that fits: as much of it as leaves room for the dots.
+            const float room = rect.w - inset * 2;
+            while (!text_line.empty() && ctx.Text().Measure(text_line + "...", s, font) > room) {
+                const std::size_t space = text_line.rfind(' ');
+                text_line.resize(space == std::string::npos ? 0 : space);
+            }
+            text_line += "...";
+            i = lines_.size();
+        }
         float x = rect.x + inset;
         if (centered) {
             x += (rect.w - inset * 2 - ctx.Text().Measure(text_line, s, font)) * 0.5f;

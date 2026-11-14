@@ -97,7 +97,7 @@ void ObjectShelf::DrawLaunch(ui::Context& ctx, gfx::Renderer3D& renderer, const 
         y = cy - ly * hc;
     };
 
-    const auto piece_model = [&](const Placed& p, const Piece& piece) {
+    const auto piece_model = [&](const Placed& p, const ShelfPiece& piece) {
         return gfx::Renderer3D::Model(p.x, p.y, p.z, p.yaw) * gfx::Mat4::Translate(piece.dx, piece.height * 0.5f, piece.dz) *
                gfx::Mat4::Scale(piece.height, piece.height, piece.height);
     };
@@ -164,7 +164,7 @@ void ObjectShelf::DrawLaunch(ui::Context& ctx, gfx::Renderer3D& renderer, const 
     renderer.Draw(*console.mesh, into * gfx::Renderer3D::Model(cx, cy, cz, turn) * gfx::Mat4::Scale(hc, hc, hc), body);
 
     // The cartridge: up from its place over the slot, then down into it.
-    const Piece piece = CartPiece(sel);
+    const ShelfPiece piece = CartPiece(sel);
     const float lift = Ease(t, 0.02f, 0.21f);
     const float fall = std::clamp((t - 0.23f) / 0.11f, 0.0f, 1.0f);
     const float above = hover - console.cart_height * 0.5f; // the cartridge's middle, held over the slot

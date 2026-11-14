@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <iterator>
 #include <chrono>
+#include <cstdlib>
 
 #include "den/base/files.h"
 #include "den/base/json.h"
@@ -169,9 +170,11 @@ const LaunchBoxCovers::Manifest* LaunchBoxCovers::LoadManifest(bool& answered) {
     std::optional<std::string> text;
     if (IsFresh(file, MANIFEST_LIFETIME)) {
         text = ReadTextFile(file);
-        // A copy from before the data had faces or consoles is asked for again, so they show now.
+        // A copy from before the data had faces, consoles or details is asked for again, so
+        // they show now.
         if (text && (text->find("\"face_kinds\"") == std::string::npos ||
-                     text->find("\"device\"") == std::string::npos)) {
+                     text->find("\"device\"") == std::string::npos ||
+                     text->find("\"detail_kinds\"") == std::string::npos)) {
             text.reset();
         }
     }
@@ -209,9 +212,11 @@ const LaunchBoxCovers::Manifest* LaunchBoxCovers::LoadManifest(bool& answered) {
                     platform.buckets.push_back(bucket.string);
                 }
             }
-            if (const JsonValue* faces = value.Find("faces")) {
-                for (const JsonValue& bucket : faces->items) {
-                    platform.faces.push_back(bucket.string);
+            for (auto [kind, list] : {std::pair{"faces", &platform.faces}, std::pair{"details", &platform.details}}) {
+                if (const JsonValue* buckets = value.Find(kind)) {
+                    for (const JsonValue& bucket : buckets->items) {
+                        list->push_back(bucket.string);
+                    }
                 }
             }
             if (const std::string device = value.String("device");
@@ -238,14 +243,15 @@ const LaunchBoxCovers::Manifest* LaunchBoxCovers::LoadManifest(bool& answered) {
 }
 
 const JsonValue* LaunchBoxCovers::LoadBucket(const Manifest& manifest, const Platform& platform,
-                                             const std::string& bucket, bool& answered, bool faces) {
-    const std::string relative = std::string(faces ? "faces/" : "covers/") + platform.dir + "/" + bucket + ".json";
+                                             const std::string& bucket, bool& answered, const char* kind) {
+    const bool covers = std::string_view(kind) == "covers";
+    const std::string relative = std::string(kind) + "/" + platform.dir + "/" + bucket + ".json";
     if (const auto found = buckets_.find(relative); found != buckets_.end()) {
         return found->second.get();
     }
-    // Cover files sit right under the version, as they always have; face files under "faces".
+    // Cover files sit right under the version, as they always have; the others under their kind.
     const fs::path base = cache_dir_ / PathFromUtf8(manifest.version);
-    const fs::path file = (faces ? base / "faces" : base) / PathFromUtf8(platform.dir) / PathFromUtf8(bucket + ".json");
+    const fs::path file = (covers ? base : base / kind) / PathFromUtf8(platform.dir) / PathFromUtf8(bucket + ".json");
     std::optional<JsonValue> json;
     if (const auto text = ReadTextFile(file)) {
         json = ParseJson(*text);
@@ -352,7 +358,7 @@ std::optional<LaunchBoxFaces> LaunchBoxCovers::FindFaces(const SystemDef& system
     if (std::find(listed.begin(), listed.end(), match->bucket) == listed.end()) {
         return std::nullopt;
     }
-    const JsonValue* bucket = LoadBucket(*manifest, *match->platform, match->bucket, answered, true);
+    const JsonValue* bucket = LoadBucket(*manifest, *match->platform, match->bucket, answered, "faces");
     const std::string id = std::to_string(static_cast<long long>(match->game->items[0].number));
     const JsonValue* faces = bucket ? bucket->Find(id) : nullptr;
     if (faces == nullptr) {
@@ -372,6 +378,51 @@ std::optional<LaunchBoxFaces> LaunchBoxCovers::FindFaces(const SystemDef& system
     if (out.back.empty() && out.spine.empty() && out.cart.empty() && out.cart_back.empty() && out.disc.empty()) {
         return std::nullopt;
     }
+    return out;
+}
+
+GameDetails LaunchBoxCovers::FindDetails(const SystemDef& system, const std::vector<std::string>& titles,
+                                         const std::vector<std::string>& region_tags, bool& answered) {
+    const std::lock_guard lock(mutex_);
+    GameDetails out;
+    const Manifest* manifest = LoadManifest(answered);
+    const auto match = manifest ? FindMatch(*manifest, system, titles, RegionOrder(region_tags), answered) : std::nullopt;
+    if (!match) {
+        return out;
+    }
+    const auto& listed = match->platform->details;
+    if (std::find(listed.begin(), listed.end(), match->bucket) == listed.end()) {
+        return out;
+    }
+    const JsonValue* bucket = LoadBucket(*manifest, *match->platform, match->bucket, answered, "details");
+    const std::string id = std::to_string(static_cast<long long>(match->game->items[0].number));
+    const JsonValue* game = bucket ? bucket->Find(id) : nullptr;
+    if (game == nullptr || game->kind != JsonValue::Kind::Object) {
+        return out;
+    }
+    const auto number = [&](const char* name) {
+        const JsonValue* value = game->Find(name);
+        return value && value->kind == JsonValue::Kind::Number ? value->number : 0.0;
+    };
+    out.found = true;
+    out.title = match->game->items[1].string;
+    out.overview = game->String("overview");
+    out.date = game->String("date");
+    out.year = static_cast<int>(number("year"));
+    if (out.year == 0 && out.date.size() >= 4) {
+        out.year = std::atoi(out.date.substr(0, 4).c_str());
+    }
+    if (const JsonValue* genres = game->Find("genres")) {
+        for (const JsonValue& genre : genres->items) {
+            out.genres.push_back(genre.string);
+        }
+    }
+    out.developer = game->String("developer");
+    out.publisher = game->String("publisher");
+    out.players = static_cast<int>(number("players"));
+    out.rating = number("rating");
+    out.votes = static_cast<int>(number("votes"));
+    out.esrb = game->String("esrb");
     return out;
 }
 

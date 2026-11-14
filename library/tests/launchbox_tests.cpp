@@ -28,7 +28,7 @@ const std::string DATA(LAUNCHBOX_DATA);
 std::map<std::string, std::string> FakeData() {
     return {
         {DATA + "manifest.json",
-         R"({"format":1,"version":"2026-11-14","images":"https://images.example/","face_kinds":["back"],
+         R"({"format":1,"version":"2026-11-14","images":"https://images.example/","face_kinds":["back"],"detail_kinds":["overview"],
              "libretro":{"Nintendo - Game Boy Advance":"Nintendo Game Boy Advance"},
              "platforms":{"Nintendo Game Boy Advance":{"dir":"nintendo-game-boy-advance","games":2,"buckets":["c","l"],
                                                        "device":"Platforms/gba.png"}}})"},
@@ -129,7 +129,7 @@ TEST_CASE("the other faces of a game come from its face file, the front cover's 
     const fs::path dir = FreshDir("faces");
     auto data = FakeData();
     data[DATA + "manifest.json"] =
-        R"({"format":1,"version":"2026-11-14","images":"https://images.example/","face_kinds":["back"],
+        R"({"format":1,"version":"2026-11-14","images":"https://images.example/","face_kinds":["back"],"detail_kinds":["overview"],
             "libretro":{"Nintendo - Game Boy Advance":"Nintendo Game Boy Advance"},
             "platforms":{"Nintendo Game Boy Advance":{"dir":"nintendo-game-boy-advance","games":2,
                          "buckets":["c","l"],"faces":["c"]}}})";
@@ -165,5 +165,60 @@ TEST_CASE("the other faces of a game come from its face file, the front cover's 
     CHECK(art.Faces(other, &gba, {}).back.empty());
     const int missed = requests;
     CHECK(art.Faces(other, &gba, {}).back.empty());
+    CHECK(requests == missed);
+}
+
+TEST_CASE("a game's details come from its detail file and are kept") {
+    const fs::path dir = FreshDir("details");
+    auto data = FakeData();
+    data[DATA + "manifest.json"] =
+        R"({"format":1,"version":"2026-11-14","images":"https://images.example/","face_kinds":["back"],
+            "detail_kinds":["overview"],"libretro":{"Nintendo - Game Boy Advance":"Nintendo Game Boy Advance"},
+            "platforms":{"Nintendo Game Boy Advance":{"dir":"nintendo-game-boy-advance","games":2,
+                         "buckets":["c","l"],"details":["c"]}}})";
+    data[DATA + "details/nintendo-game-boy-advance/c.json"] =
+        R"({"3349":{"overview":"Soma Cruz.","date":"2003-05-06","genres":["Action","Platform"],
+                    "developer":"Konami","players":1,"rating":4.61,"votes":389}})";
+    int requests = 0;
+    const auto fetch = [&](const std::string& url) -> HttpAnswer {
+        ++requests;
+        const auto found = data.find(url);
+        return found == data.end() ? HttpAnswer{404, {}} : HttpAnswer{200, found->second};
+    };
+    Entry entry;
+    entry.id = "aos";
+    entry.name = "Castlevania - Aria of Sorrow";
+    entry.original_name = "Castlevania - Aria of Sorrow (USA)";
+    entry.system = "gba";
+    const SystemDef gba = Gba();
+    {
+        Artwork art(dir / "cache", fetch);
+        const GameDetails details = art.Details(entry, &gba, {});
+        CHECK(details.found);
+        CHECK(details.title == "Castlevania: Aria of Sorrow");
+        CHECK(details.overview == "Soma Cruz.");
+        CHECK(details.year == 2003);
+        CHECK(details.genres == std::vector<std::string>{"Action", "Platform"});
+        CHECK(details.developer == "Konami");
+        CHECK(details.publisher.empty());
+        CHECK(details.players == 1);
+        CHECK(details.votes == 389);
+    }
+    // Kept: a new run reads it without asking.
+    const int after = requests;
+    Artwork again(dir / "cache", fetch);
+    const GameDetails kept = again.Details(entry, &gba, {});
+    CHECK(kept.found);
+    CHECK(kept.date == "2003-05-06");
+    CHECK(kept.rating > 4.6);
+    CHECK(requests == after);
+
+    // A game without details has none, and is not asked about again.
+    Entry other = entry;
+    other.name = "Legend of Zelda, The - A Link to the Past & Four Swords";
+    other.original_name = other.name;
+    CHECK_FALSE(again.Details(other, &gba, {}).found);
+    const int missed = requests;
+    CHECK_FALSE(again.Details(other, &gba, {}).found);
     CHECK(requests == missed);
 }
