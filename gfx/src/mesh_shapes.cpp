@@ -62,6 +62,30 @@ std::vector<Vec2> RoundedOutline(float w, float h, float r_top, float r_bottom, 
     return points;
 }
 
+std::vector<Vec2> ShoulderedOutline(float w, float h, float shoulder, float drop, float r_top, float r_bottom,
+                                    float chamfer, int segments) {
+    const float x = w * 0.5f, y = h * 0.5f;
+    shoulder = std::clamp(shoulder, 0.0f, x * 0.45f);
+    drop = std::clamp(drop, 0.0f, h * 0.45f);
+    r_top = std::clamp(r_top, 0.0f, std::min(shoulder, x - shoulder) * 0.9f);
+    r_bottom = std::clamp(r_bottom, 0.0f, std::min(x, y - drop) * 0.9f);
+    chamfer = std::clamp(chamfer, 0.0f, std::min(shoulder, drop) * 0.9f);
+    const float xs = x - shoulder, ys = y - drop;
+    std::vector<Vec2> points;
+    Corner(points, x - r_bottom, -y + r_bottom, r_bottom, -PI * 0.5f, 0, segments);
+    Corner(points, x - r_top, ys - r_top, r_top, 0, PI * 0.5f, segments);
+    // The step up to the narrower top, its inner corner cut at 45 degrees.
+    points.push_back({xs + chamfer, ys});
+    points.push_back({xs, ys + chamfer});
+    Corner(points, xs - r_top, y - r_top, r_top, 0, PI * 0.5f, segments);
+    Corner(points, -xs + r_top, y - r_top, r_top, PI * 0.5f, PI, segments);
+    points.push_back({-xs, ys + chamfer});
+    points.push_back({-xs - chamfer, ys});
+    Corner(points, -x + r_top, ys - r_top, r_top, PI * 0.5f, PI, segments);
+    Corner(points, -x + r_bottom, -y + r_bottom, r_bottom, PI, PI * 1.5f, segments);
+    return points;
+}
+
 void AddSlab(std::vector<MeshVertex>& out, const std::vector<Vec2>& outline, float depth, float bevel,
              const SlabParts& parts, float cz, float cx, float cy, int steps) {
     const std::size_t n = outline.size();
@@ -87,7 +111,9 @@ void AddSlab(std::vector<MeshVertex>& out, const std::vector<Vec2>& outline, flo
     for (std::size_t i = 0; i < n; ++i) {
         const Vec2 e0 = edge[(i + n - 1) % n], e1 = edge[i];
         normal[i] = Normalized(Vec2{e0.x + e1.x, e0.y + e1.y});
-        inner[i] = Vec2{outline[i].x - normal[i].x * bevel, outline[i].y - normal[i].y * bevel};
+        // Mitred, so square corners keep an even bevel.
+        const float miter = bevel / std::max(0.5f, normal[i].x * e1.x + normal[i].y * e1.y);
+        inner[i] = Vec2{outline[i].x - normal[i].x * miter, outline[i].y - normal[i].y * miter};
     }
     // Rings from the back face to the front face: back bevel, the wall, front bevel.
     struct Ring {
@@ -184,6 +210,32 @@ void AddRing(std::vector<MeshVertex>& out, float r_in, float r_out, float depth,
         const Vec3 m0{-c0, -s0, 0}, m1{-c1, -s1, 0};
         out.insert(out.end(), {rim(i0, zt, m0), rim(i1, zb, m1), rim(i0, zb, m0),
                                rim(i0, zt, m0), rim(i1, zt, m1), rim(i1, zb, m1)});
+    }
+}
+
+void AddGroove(std::vector<MeshVertex>& out, const std::vector<Vec2>& outline, float width, float z, float cx,
+               float cy, Part part, bool raised) {
+    const std::size_t n = outline.size();
+    if (n < 3 || width <= 0) {
+        return;
+    }
+    std::vector<Vec2> edge(n), inner(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        edge[i] = EdgeNormal(outline[i], outline[(i + 1) % n]);
+    }
+    for (std::size_t i = 0; i < n; ++i) {
+        const Vec2 e0 = edge[(i + n - 1) % n], e1 = edge[i];
+        const Vec2 m = Normalized(Vec2{e0.x + e1.x, e0.y + e1.y});
+        const float miter = width / std::max(0.35f, m.x * e1.x + m.y * e1.y);
+        inner[i] = Vec2{outline[i].x - m.x * miter, outline[i].y - m.y * miter};
+    }
+    // A wall going down into a pocket faces its middle; one rising to a ridge faces out.
+    const float lean = raised ? 0.72f : -0.72f, up = 0.69f;
+    for (std::size_t i = 0; i < n; ++i) {
+        const std::size_t j = (i + 1) % n;
+        const Vec3 nrm{edge[i].x * lean, edge[i].y * lean, up};
+        const auto at = [&](Vec2 p) { return V({cx + p.x, cy + p.y, z}, nrm, 0, 0, part); };
+        out.insert(out.end(), {at(outline[i]), at(outline[j]), at(inner[j]), at(outline[i]), at(inner[j]), at(inner[i])});
     }
 }
 

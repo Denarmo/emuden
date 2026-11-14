@@ -84,6 +84,16 @@ void main() {
     } else if (part == 9) {
         base = vec3(0.93, 0.93, 0.9);
         gloss = 6.0; spec = 0.04;
+    } else if (part == 10) {
+        gloss = 80.0; spec = 0.7; fresnel = 0.6; alpha = u_shell.a;
+    } else if (part == 11) {
+        vec2 g = fract(v_uv * vec2(46.0, 9.0));
+        float trace = step(0.82, g.x) * step(0.35, g.y) + step(0.9, g.y) * 0.6;
+        base = mix(vec3(0.13, 0.3, 0.14), vec3(0.62, 0.55, 0.26), clamp(trace, 0.0, 1.0) * 0.45);
+        gloss = 30.0; spec = 0.3;
+    } else if (part == 12) {
+        base = vec3(0.74, 0.75, 0.78);
+        gloss = 55.0; spec = 0.75; diffuse_k = 0.75;
     }
     vec3 key = normalize(vec3(-0.45, 0.6, 0.66));
     vec3 fill = normalize(vec3(0.8, 0.05, 0.45));
@@ -297,7 +307,7 @@ void Renderer3D::Submit(const Mesh3D& mesh, const Mat4& model, const Material& m
     gl::UniformMatrix4fv(u_model_, 1, gl::FALSE_, model.m);
     gl::UniformMatrix4fv(u_rot_, 1, gl::FALSE_, rot.m);
     const Color c = material.shell;
-    gl::Uniform4f(u_shell_, c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, 1.0f);
+    gl::Uniform4f(u_shell_, c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f);
     const Rect& l = material.label_uv;
     const Rect& s = material.spine_uv;
     gl::Uniform4f(u_label_, l.x, l.y, l.w, l.h);

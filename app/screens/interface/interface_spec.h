@@ -29,7 +29,11 @@ struct ObjectLook {
     bool disc = false;          // a case or jewel case with a disc that slides out when chosen
     float radius = -1;          // the top corners' rounding; below 0: the shape's own
     float notch = -1;           // the top-right corner cut off at 45 degrees; below 0: the shape's own
-    int grip = -1;              // ridges under a cartridge's label; below 0: the shape's own
+    int grip = -1;              // a cartridge's grip ridges; below 0: the shape's own
+    // A cartridge's mould: "plain"; "pocket", a handheld's with stepped top corners, a sunk
+    // panel and label well; "pocket_wide", a wide one with shoulders. Empty: plain.
+    std::string style;
+    std::string label_edge; // "none", "paper" or "foil" round the cover; empty: the style's own
 };
 
 /// How one console looks: its colour, a wallpaper of the package and the label on its tab.

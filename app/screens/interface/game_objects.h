@@ -19,9 +19,12 @@ namespace den::app {
 /// An ObjectLook with every default filled in.
 struct GameObject {
     std::string shape;
+    std::string style;      // a cartridge's mould: "plain", "pocket" or "pocket_wide"
+    std::string label_edge; // "none", "paper" or "foil": the sticker's border round the cover
+    bool smoke = false;     // see-through shell (its colour's alpha), the board showing inside
     float aspect = 0.7f, depth = 0.07f;
     gfx::Color shell;
-    gfx::Rect label; // of the front, 0..1
+    gfx::Rect label; // the sticker on the front, 0..1
     float radius = 0, notch = 0;
     int grip = 0;
     bool disc = false;
@@ -32,9 +35,12 @@ struct GameObject {
     const gfx::Mesh3D* ClearMesh() const;
     /// The disc that slides out of a case, one unit across; null when the object has none.
     const gfx::Mesh3D* DiscMesh() const;
-    /// The label's width over its height, for cropping the cover onto it.
+    /// The part of the front the cover is printed on: the sticker inside its border.
+    gfx::Rect CoverRect() const;
+    /// The cover's width over its height, for cropping the cover onto it.
     float LabelAspect() const {
-        return label.w * aspect / std::max(0.01f, label.h);
+        const gfx::Rect c = CoverRect();
+        return c.w * aspect / std::max(0.01f, c.h);
     }
 };
 

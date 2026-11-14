@@ -90,6 +90,8 @@ void ReadObject(const JsonValue* object, ObjectLook& out) {
         return;
     }
     ReadChoice(object, "shape", {"cartridge", "card", "case", "jewel", "disc"}, out.shape);
+    ReadChoice(object, "style", {"plain", "pocket", "pocket_wide"}, out.style);
+    ReadChoice(object, "label_edge", {"none", "paper", "foil"}, out.label_edge);
     ReadNumber(object, "aspect", 0.3f, 2.5f, out.aspect);
     ReadNumber(object, "depth", 0.01f, 0.6f, out.depth);
     if (const auto shell = ParseColor(object->String("shell"))) {

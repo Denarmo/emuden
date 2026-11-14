@@ -43,6 +43,10 @@ enum class Part : int {
     Clear = 7,     // clear plastic (drawn in the transparent pass)
     DiscData = 8,  // a disc's data side: silver, with a rainbow sheen
     Paper = 9,     // plain white card
+    Smoke = 10,    // tinted see-through plastic in the shell colour, as opaque as its alpha
+                   // (drawn in the transparent pass)
+    Board = 11,    // a green circuit board
+    Steel = 12,    // brushed metal: a battery, a label's foil edge
 };
 
 struct MeshVertex {
@@ -71,7 +75,7 @@ private:
 };
 
 struct Material {
-    Color shell{90, 90, 100, 255};
+    Color shell{90, 90, 100, 255}; // its alpha is how opaque Smoke is
     Texture cover;             // the label, spine, sleeve and disc print; none: plain card
     Rect label_uv{0, 0, 1, 1}; // the part of the cover on the label or sleeve
     Rect spine_uv{0, 0, 0.08f, 1};

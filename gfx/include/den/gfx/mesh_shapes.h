@@ -23,6 +23,12 @@ struct Vec2 {
 std::vector<Vec2> RoundedOutline(float w, float h, float r_top, float r_bottom, float notch = 0,
                                  int corner_segments = 6);
 
+/// A rectangle `w` x `h` whose top corners step down by `drop` for `shoulder` from each side:
+/// the outline of a handheld's cartridge. `r_top` rounds the top corners (of both steps),
+/// `r_bottom` the bottom ones, `chamfer` cuts the steps' inner corners.
+std::vector<Vec2> ShoulderedOutline(float w, float h, float shoulder, float drop, float r_top, float r_bottom,
+                                    float chamfer, int corner_segments = 5);
+
 struct SlabParts {
     Part front = Part::Shell;
     Part back = Part::Shell;
@@ -41,6 +47,12 @@ void AddSlab(std::vector<MeshVertex>& out, const std::vector<Vec2>& outline, flo
 /// faces -z, the rims are Shell. uv spans the outer circle.
 void AddRing(std::vector<MeshVertex>& out, float r_in, float r_out, float depth, Part top, Part back,
              float cz = 0, int segments = 72);
+
+/// Moulded relief on a flat face at height `z`: a band `width` wide inside the outline whose
+/// normals slope like the walls of a pocket sunk into the face (or of a ridge standing out
+/// of it when `raised`), so the light picks it out without cutting the face.
+void AddGroove(std::vector<MeshVertex>& out, const std::vector<Vec2>& outline, float width, float z, float cx = 0,
+               float cy = 0, Part part = Part::Shell, bool raised = false);
 
 /// A box centred on (cx, cy, cz) with sharp edges; every face is `part`.
 void AddBox(std::vector<MeshVertex>& out, float w, float h, float d, Part part, float cx = 0, float cy = 0,
