@@ -109,6 +109,7 @@ public:
         strip->id = "iface.tabs";
         strip->scrollable = true;
         strip->grow = 1;
+        strip->width = 0; // the room the clock leaves, however many tabs there are
         strip->SetPadding(6, 6);
         tab_nodes_.clear();
         for (std::size_t i = 0; i < tabs_.size(); ++i) {
@@ -122,6 +123,7 @@ public:
         clock_->tone = ui::Tone::Dim;
         clock_->pad_left = 12;
         clock_->pad_right = 8;
+        clock_->width = Svc().canvas->GetText().Measure("00:00", theme_.text_heading) + 28;
 
         if (tabs_.empty()) {
             BuildEmpty(root);
