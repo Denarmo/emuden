@@ -144,8 +144,12 @@ TEST_CASE("every bundled manifest is read") {
             CHECK(console.scan.loose_members);
             CHECK(console.bios.empty()); // only cores that need no BIOS are offered
         } else if (manifest->id == "emuden.ps2") {
-            // Play! needs no BIOS and is offered everywhere, Android included.
-            REQUIRE(manifest->CoresFor(manifest->systems.front(), "android-arm64").size() == 1);
+            // Play! needs no BIOS and is the default everywhere; PSX2 ECP is an optional
+            // Android engine app that needs the player's BIOS.
+            const auto android = manifest->CoresFor(manifest->systems.front(), "android-arm64");
+            REQUIRE(android.size() == 2);
+            CHECK(android[0]->id == "play");
+            CHECK(android[1]->type == "engine-app");
             const auto cores = manifest->CoresFor(manifest->systems.front(), "windows-x86_64");
             REQUIRE(cores.size() == 1);
             CHECK(cores[0]->id == "play");
