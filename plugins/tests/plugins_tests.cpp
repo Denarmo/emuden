@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <algorithm>
 #include <array>
 #include <filesystem>
 #include <fstream>
@@ -149,6 +150,13 @@ TEST_CASE("every bundled manifest is read") {
             REQUIRE(cores.size() == 1);
             CHECK(cores[0]->id == "play");
             CHECK(console.bios.empty());
+        } else if (manifest->id == "emuden.gba") {
+            // GBA DS is chosen by ROM code for the games it has a second screen for.
+            const Component* gbads = manifest->FindComponent("gbads");
+            REQUIRE(gbads != nullptr);
+            CHECK(gbads->games.offset == 0xAC);
+            CHECK(std::find(gbads->games.codes.begin(), gbads->games.codes.end(), "A2CP") != gbads->games.codes.end());
+            CHECK(manifest->systems.front().cores.front() == "mgba");
         } else if (manifest->id == "emuden.msx") {
             // blueMSX runs on the free C-BIOS, which comes as system files.
             CHECK(console.bios.empty());
