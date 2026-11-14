@@ -94,6 +94,18 @@ TEST_CASE("plugin manifests extend the consoles") {
     CHECK(table.Find("switch2")->short_name == "Switch 2");
 }
 
+TEST_CASE("a console whose plugin is removed leaves the table") {
+    SystemTable table;
+    table.Set(ParseSystems(R"json({"id":"x.steam","systems":[
+        {"id":"steam","name":"Steam","content":{"extensions":["steam"]}},
+        {"id":"gba","name":"Game Boy Advance (plugin)","content":{"extensions":["gba"]}}]})json"));
+    REQUIRE(table.Find("steam") != nullptr);
+    CHECK(table.Find("gba")->name == "Game Boy Advance (plugin)");
+    table.Set({});
+    CHECK(table.Find("steam") == nullptr);
+    CHECK(table.Find("gba")->name == "Game Boy Advance");
+}
+
 TEST_CASE("box art is matched by name, region and base game") {
     const ThumbnailIndex index = BuildThumbnailIndex({
         "Tetris (World) (Rev 1)",

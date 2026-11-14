@@ -160,6 +160,11 @@ const std::vector<std::string>& BuiltinRomExtensions() {
 
 SystemTable::SystemTable() : systems_(BuiltinSystems()) {}
 
+void SystemTable::Set(std::vector<SystemDef> systems) {
+    systems_ = BuiltinSystems();
+    Merge(std::move(systems));
+}
+
 void SystemTable::Merge(std::vector<SystemDef> systems) {
     for (SystemDef& def : systems) {
         const auto found = std::find_if(systems_.begin(), systems_.end(),

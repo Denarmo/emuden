@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // The library learns the consoles of the installed plugins: whenever the plugins change, the
-// consoles that are ready (their core or engine app is installed) are handed to it, and a
-// console it did not know yet has its games searched for at once.
+// consoles that are ready (their core or engine app is installed) are handed to it. A console
+// it did not have has its games searched for at once; one whose plugin is gone is dropped.
 
 #include <algorithm>
 #include <set>
@@ -21,8 +21,8 @@ namespace {
 
 struct State {
     std::uint64_t revision = ~std::uint64_t(0);
-    std::set<std::string> known; // the consoles the library has been given or always had
-    bool started = false;
+    std::set<std::string> builtin;
+    std::set<std::string> pushed; // the plugin consoles the library has now
 };
 
 State& Get() {
@@ -67,23 +67,25 @@ void Frame() {
         return;
     }
     state.revision = revision;
-    if (!state.started) {
-        state.started = true;
+    if (state.builtin.empty()) {
         for (const library::SystemDef& def : library::BuiltinSystems()) {
-            state.known.insert(def.id);
+            state.builtin.insert(def.id);
         }
     }
     std::vector<library::SystemDef> systems;
+    std::set<std::string> pushed;
     std::vector<std::string> added;
     for (const plugins::Console& console : svc.plugins->Consoles()) {
         if (!console.installed || !console.available) {
             continue;
         }
-        if (state.known.insert(console.id).second) {
+        pushed.insert(console.id);
+        if (!state.builtin.contains(console.id) && !state.pushed.contains(console.id)) {
             added.push_back(console.id);
         }
         systems.push_back(ToSystemDef(console));
     }
+    state.pushed = std::move(pushed);
     svc.library->SetSystems(std::move(systems));
     if (!added.empty()) {
         std::string names;

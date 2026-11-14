@@ -69,6 +69,8 @@ public:
     /// Replaces the console of the same id (lists a manifest leaves empty keep their built-in
     /// value) or adds a new one.
     void Merge(std::vector<SystemDef> systems);
+    /// The built-in consoles merged with these, dropping consoles an earlier call added.
+    void Set(std::vector<SystemDef> systems);
 
     const std::vector<SystemDef>& All() const {
         return systems_;

@@ -148,8 +148,9 @@ public:
     /// Forgets a cover set with SetCover; the next scan looks one up again.
     virtual void ResetCover(const std::string& id) = 0;
 
-    /// Consoles from plugin manifests (systems.h). They replace the built-in rules of the same
-    /// id and add new ones. The plugin host or the app calls this; the next scan uses them.
+    /// The consoles of the installed plugins (systems.h), each call the whole set. They replace
+    /// the built-in rules of the same id and add new ones; a console left out of a later call
+    /// is gone again, and its games are hidden. The next scan uses them.
     virtual void SetSystems(std::vector<SystemDef> systems) = 0;
     /// Adds the host folders an earlier app's profile lists as game folders (its
     /// config/qt-config.ini, read only). Fails when there is no such profile.

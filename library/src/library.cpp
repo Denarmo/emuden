@@ -191,7 +191,13 @@ public:
 
     std::vector<Entry> Entries() const override {
         std::lock_guard lock(mutex_);
-        return entries_;
+        std::vector<Entry> out;
+        for (const Entry& entry : entries_) {
+            if (Shown(entry)) {
+                out.push_back(entry);
+            }
+        }
+        return out;
     }
 
     std::optional<Entry> Find(const std::string& id) const override {
@@ -221,7 +227,7 @@ public:
         std::lock_guard lock(mutex_);
         std::vector<Entry> out;
         for (const Entry& entry : entries_) {
-            if (entry.last_played > 0) {
+            if (entry.last_played > 0 && Shown(entry)) {
                 out.push_back(entry);
             }
         }
@@ -237,7 +243,7 @@ public:
         std::lock_guard lock(mutex_);
         std::vector<Entry> out;
         for (const Entry& entry : entries_) {
-            if (entry.favourite) {
+            if (entry.favourite && Shown(entry)) {
                 out.push_back(entry);
             }
         }
@@ -248,7 +254,7 @@ public:
         std::lock_guard lock(mutex_);
         std::vector<Entry> out;
         for (const Entry& entry : entries_) {
-            if (entry.added > 0) {
+            if (entry.added > 0 && Shown(entry)) {
                 out.push_back(entry);
             }
         }
@@ -385,7 +391,7 @@ public:
 
     void SetSystems(std::vector<SystemDef> systems) override {
         std::lock_guard lock(mutex_);
-        systems_.Merge(std::move(systems));
+        systems_.Set(std::move(systems));
         ++revision_;
     }
 
@@ -427,6 +433,12 @@ public:
     }
 
 private:
+    // A game whose console is gone (its plugin was removed) stays in the cache, hidden, until
+    // the next scan drops it; reinstalling the plugin brings it back.
+    bool Shown(const Entry& entry) const {
+        return entry.system.empty() || systems_.Find(entry.system) != nullptr;
+    }
+
     SystemTable SystemsCopy() const {
         std::lock_guard lock(mutex_);
         return systems_;
