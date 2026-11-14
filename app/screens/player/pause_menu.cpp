@@ -129,6 +129,19 @@ void PlayerScreen::BuildMain(ui::Node* list) {
     rows.push_back(ChoiceRow(
         "menu.size", "Screen size", ScreenSizeNames(), [this] { return static_cast<int>(size_); },
         [this](int index) { SetScreenSize(index); }));
+    if (CanWidescreen()) {
+        ui::RowSpec wide = ToggleRow("menu.widescreen", "Widescreen", [this] { return Widescreen(); },
+                                     [this](bool on) {
+                                         if (!WidescreenRestarts()) {
+                                             return SetWidescreen(on);
+                                         }
+                                         GetStage().Confirm(WIDESCREEN_TITLE, WIDESCREEN_TEXT, "Start again",
+                                                            [this, on] { SetWidescreen(on); });
+                                     });
+        wide.description = WidescreenRestarts() ? "For this game; it starts again from the beginning"
+                                                : "For this game";
+        rows.push_back(std::move(wide));
+    }
     if (dual_.Active()) {
         // Two screens: which display or which place each has.
         rows.push_back(ActionRow("menu.swap", "Swap screens", [this] {

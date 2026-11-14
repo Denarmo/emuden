@@ -59,6 +59,9 @@ struct Component {
     std::string version;
     bool opengl = false;
     std::vector<std::pair<std::string, std::string>> forced_core_options;
+    /// The core options that make the picture widescreen; off is each option's default.
+    std::vector<std::pair<std::string, std::string>> widescreen_options;
+    bool widescreen_restart = false; // they take effect when the game starts
     std::map<std::string, Download, std::less<>> downloads; // by platform key or "any"
     std::vector<std::string> cores; // system files: the cores they are for (empty = all)
 

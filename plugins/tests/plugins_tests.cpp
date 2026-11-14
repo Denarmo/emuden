@@ -143,6 +143,13 @@ TEST_CASE("every bundled manifest is read") {
             CHECK(console.scan.loose_members);
             REQUIRE(console.bios.size() == 1);
             CHECK(console.bios[0].files.size() == 3);
+        } else if (manifest->id == "emuden.ps2") {
+            const auto cores = manifest->CoresFor(manifest->systems.front(), "android-arm64");
+            REQUIRE(cores.size() == 1);
+            CHECK(cores[0]->widescreen_restart);
+            REQUIRE(cores[0]->widescreen_options.size() == 2);
+            CHECK(cores[0]->widescreen_options[0].second == "enabled (16:9)");
+            CHECK(manifest->SystemFilesFor("pcsx2", "android-arm64").size() == 1);
         } else if (manifest->id == "emuden.switch2") {
             saw_switch2 = true;
             CHECK(console.runner == Runner::Engine);

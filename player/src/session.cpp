@@ -224,6 +224,7 @@ std::vector<CoreOption> PlayerSession::Options() const {
         item.key = option.key;
         item.label = option.label;
         item.value = option.value;
+        item.default_value = option.default_value;
         item.for_game = config_.settings && config_.settings->Has(GameOptionKey(option.key));
         for (const OptionChoice& value : option.values) {
             item.values.push_back(value.value);

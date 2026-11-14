@@ -101,6 +101,7 @@ struct CoreOption {
     std::string key;
     std::string label;
     std::string value;
+    std::string default_value;
     std::vector<std::string> values;
     bool for_game = false; // the value is this game's own, not the console's
 };

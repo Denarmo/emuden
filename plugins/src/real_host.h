@@ -28,7 +28,7 @@ namespace den::plugins {
 namespace fs = std::filesystem;
 
 inline constexpr std::int64_t POLL_INTERVAL_SECONDS = 6 * 3600;
-inline constexpr std::size_t MAX_SYSTEM_FILES = 4096;
+inline constexpr std::size_t MAX_SYSTEM_FILES = 8192;
 inline constexpr std::uint64_t MAX_SYSTEM_FILES_BYTES = 512ull << 20;
 
 struct Loaded {
@@ -345,6 +345,8 @@ private:
         info.system_dir = bios_dir_;
         info.needs_gl = core.opengl;
         info.option_hints = core.forced_core_options;
+        info.widescreen_options = core.widescreen_options;
+        info.widescreen_restart = core.widescreen_restart;
         info.missing_bios = MissingBios(bios_dir_, system.console);
         info.installed = CoreGood(core);
         if (info.installed) {

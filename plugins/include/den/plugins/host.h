@@ -121,6 +121,9 @@ struct CoreInfo {
     bool needs_gl = false; // the core renders with OpenGL itself
     /// Option values the manifest recommends, applied before the user's own.
     std::vector<std::pair<std::string, std::string>> option_hints;
+    /// The core options that make the picture widescreen (empty = the core cannot).
+    std::vector<std::pair<std::string, std::string>> widescreen_options;
+    bool widescreen_restart = false;
     /// BIOS files the core needs and does not find (empty = ready).
     std::vector<std::string> missing_bios;
 };

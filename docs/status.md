@@ -450,6 +450,19 @@ screen in about 40 s and ran at 50 fps (20.0 ms, slowest 28 ms). A Start pressed
 `adb` did not reach the game (adb's keys are not the pad), so in-game play is not checked.
 The library scanned the ISO while it was still being copied and shows 1.10 GiB for it.
 
+Widescreen (pause menu row and a card on the second screen's Screen and picture view), for
+the cores whose plugin names widescreen options: PCSX2, Dolphin, Flycast, Mupen64Plus-Next,
+ParaLLEl N64, Beetle PSX, SwanStation. Kept per game. Cores that read the options only at
+the start ask, then boot the game again from the beginning. Retroid, PCSX2: Colin McRae
+Rally 3 and Gran Turismo 4 (PAL) came back in 16:9 at 50 fps and went back to 4:3; the
+other cores were not tried. With widescreen on, GT4's language menu shows its buttons
+without their text (its 16:9 patch rewrites the text drawing); whether the game itself
+looks right is not checked, as adb cannot press the pad.
+
+PS2 save states are broken with this core: a resumed game draws GT4's menu without text
+and runs at 60 fps instead of 50, and loading a slot during play crashed the app inside the
+core's `retro_unserialize`. Not fixed yet.
+
 Pause, save state and exit to home were confirmed on one game per console in the first
 round (Tetris, Mario Tennis, Pokemon - Lazarus, Explorers of Skies, Gran Turismo 2,
 PoPoLoCrois).

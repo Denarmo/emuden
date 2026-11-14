@@ -25,6 +25,11 @@
 
 namespace den::app {
 
+/// What is asked before a widescreen change that starts the game again.
+inline constexpr const char* WIDESCREEN_TITLE = "Start the game again?";
+inline constexpr const char* WIDESCREEN_TEXT =
+    "Widescreen changes when the game starts. Progress that is not saved is lost.";
+
 class PlayerScreen final : public ui::Page {
 public:
     ~PlayerScreen() override;
@@ -60,6 +65,20 @@ public:
         return fps_mode_;
     }
     void SetFpsMode(int mode);
+    /// The core can make the picture widescreen (a hack or the game's own patch).
+    bool CanWidescreen() const {
+        return !core_.widescreen_options.empty();
+    }
+    bool Widescreen() const {
+        return widescreen_;
+    }
+    /// The core reads its widescreen options only when the game starts.
+    bool WidescreenRestarts() const {
+        return core_.widescreen_restart;
+    }
+    /// Kept for this game. When WidescreenRestarts, the game starts again from the beginning
+    /// (a resumed state is not trusted to survive a reload of every core); ask first.
+    void SetWidescreen(bool on);
     /// The game is on the second display and the quick settings in the main window.
     bool Swapped() const {
         return swapped_;
@@ -85,9 +104,11 @@ private:
 
     // player_screen.cpp: the session.
     void Open();
-    void Begin(const std::filesystem::path& content);
+    void Begin(const std::filesystem::path& content, bool resume = true);
     void Fail(const std::string& message);
     void Leave();
+    void Restart();
+    void ReadWidescreen();
     void OpenMenu(View view = View::Main);
     void CloseMenu();
     void Show(View view, std::string focus = {});
@@ -133,6 +154,8 @@ private:
     plugins::CoreInfo core_;
     JobPtr prepare_;
     std::shared_ptr<std::filesystem::path> prepared_;
+    std::filesystem::path content_; // what the core was given
+    bool widescreen_ = false;
     std::int64_t started_unix_ = 0;
     double started_ = 0;
 

@@ -97,6 +97,18 @@ Result<Component> ParseComponent(const JsonValue& value) {
             }
         }
     }
+    if (const JsonValue* widescreen = value.Find("widescreen")) {
+        if (const JsonValue* options = widescreen->Find("options")) {
+            for (const auto& [key, option] : options->members) {
+                if (option.kind == JsonValue::Kind::String) {
+                    component.widescreen_options.emplace_back(key, option.string);
+                }
+            }
+        }
+        if (const JsonValue* restart = widescreen->Find("restart")) {
+            component.widescreen_restart = restart->kind == JsonValue::Kind::Bool && restart->boolean;
+        }
+    }
     component.cores = json::Strings(value, "cores", false);
     if (const JsonValue* downloads = value.Find("downloads")) {
         for (const auto& [platform, entry] : downloads->members) {

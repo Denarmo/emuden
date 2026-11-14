@@ -392,6 +392,25 @@ private:
             counter->grow = 1;
             counter->width = 0;
             counter->selected = fps != 0;
+            if (screen->CanWidescreen()) {
+                const bool wide = screen->Widescreen();
+                auto* card = row->Emplace<CompanionCard>("Widescreen", [this, wide] {
+                    PlayerScreen* now = PlayerScreen::Current();
+                    if (now && !now->WidescreenRestarts()) {
+                        now->SetWidescreen(!wide);
+                    } else if (now) {
+                        GetStage().Confirm(WIDESCREEN_TITLE, WIDESCREEN_TEXT, "Start again", [wide] {
+                            if (PlayerScreen* still = PlayerScreen::Current()) {
+                                still->SetWidescreen(!wide);
+                            }
+                        });
+                    }
+                });
+                card->id = "companion.widescreen";
+                card->grow = 1;
+                card->width = 0;
+                card->selected = wide;
+            }
         }
     }
 
@@ -475,12 +494,13 @@ private:
         // The volumes are not in here: their sliders show the value as it changes, and a
         // page built again under a finger would end the drag.
         const system::AppBeside& beside = Beside();
-        return std::format("{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", snapshot.game_id,
+        return std::format("{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", snapshot.game_id,
                            static_cast<int>(snapshot.state), snapshot.fast_forward, snapshot.rewinding,
                            snapshot.can_rewind, snapshot.can_save_states, snapshot.picture, slots,
                            screen ? screen->ScreenSizeIndex() : -1, static_cast<int>(beside.GetStage()),
                            beside.App().id, static_cast<int>(beside.GameScreen()), AppsRevision(),
-                           static_cast<int>(view_), screen ? screen->FpsMode() : -1);
+                           static_cast<int>(view_), screen ? screen->FpsMode() : -1,
+                           screen && screen->Widescreen());
     }
 
     void Save(int slot) {

@@ -101,21 +101,23 @@ void PlayerScreen::Open() {
     });
 }
 
-void PlayerScreen::Begin(const std::filesystem::path& content) {
+void PlayerScreen::Begin(const std::filesystem::path& content, bool resume) {
     Services& svc = Svc();
     player::OpenRequest request;
     request.core = core_.library;
     request.content = content;
+    content_ = content;
     request.system_dir = core_.system_dir;
     request.game_id = game_.id;
     request.system = game_.system;
     request.option_hints = core_.option_hints;
-    request.resume = Param("resume") != "0";
+    request.resume = resume && Param("resume") != "0";
     log::Info("player", "open {} with {}", game_.name, core_.id);
     if (const Status opened = svc.player->Open(request); !opened) {
         return Fail(opened.error.empty() ? game_.name + " could not be started." : opened.error);
     }
     phase_ = Phase::Running;
+    ReadWidescreen();
     started_ = pal::NowSeconds();
     started_unix_ = std::chrono::duration_cast<std::chrono::seconds>(
                         std::chrono::system_clock::now().time_since_epoch())
