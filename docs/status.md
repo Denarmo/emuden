@@ -493,6 +493,10 @@ has a second-screen profile for, picked by the ROM code at 0xAC; every other GBA
 Its picture is 240x320, the game over its second screen, so it uses the DS dual-screen layout.
 Aria of Sorrow ran on the Retroid at 60 fps with no gaps, the second screen on the top display.
 A console installed before such a core existed shows an update that installs it.
+PSX2 ECP (Denarmo/PSX2, a fork of izzy2lost/PSX2) is an optional Android PS2 core since PS2 1.1.0:
+a standalone app driven over the Emulator Control Protocol (Denarmo/emulator-control-protocol), the
+worked example for emulator developers. It needs the player's own BIOS, so Play! stays the default.
+It passed ecp-probe on the Retroid; starting it from EmuDEN on the device is not tested yet.
 PS2 has Play!, built from the fork Denarmo/Play- so that it also runs on
 Android (GT4 PAL reaches its language menu at 50 fps on the Retroid Pocket Duo, and its save
 states load). Since 1.0.6 its OpenGL renderer streams draws and texture uploads through persistent
