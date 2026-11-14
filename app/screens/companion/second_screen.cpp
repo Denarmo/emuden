@@ -215,9 +215,10 @@ void Frame() {
     bool wanted = c.claimed || mode == 1 || (mode == 0 && display.Present());
     if (pal::MainWindowHidden()) {
         // Another app covers the main window (Android). The second screen stays only for a
-        // game that plays there; otherwise the app is left and gives it up as well.
+        // game that plays there or in an engine app; otherwise the app is left and gives it
+        // up as well.
         const PlayerScreen* playing = PlayerScreen::Current();
-        wanted = wanted && playing && playing->WantsSecond();
+        wanted = wanted && playing && (playing->WantsSecond() || playing->External());
     }
     if (const system::AppBeside& beside = Beside();
         beside.GetStage() == system::AppBeside::Stage::AppFront &&

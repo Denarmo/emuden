@@ -67,8 +67,12 @@ void PlayerScreen::SwapDisplays() {
     Rebuild();
 }
 
+bool PlayerScreen::External() const {
+    return Svc().player->GetSnapshot().external;
+}
+
 void PlayerScreen::Hold(bool hold) {
-    if (phase_ != Phase::Running) {
+    if (phase_ != Phase::Running || External()) {
         held_ = false;
         return;
     }

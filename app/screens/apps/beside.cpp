@@ -121,10 +121,11 @@ void Run(const BesideActions& actions, ui::Stage* stage) {
 // The Retroid Pocket Duo gives the second screen's volume to the apps with a task on that
 // display, and this app always has one (the quick settings) unless the audio focus says
 // otherwise: a game on the main display holds the focus from there. Not while an app beside
-// it plays (the focus is that app's) or the game is on the second display.
+// it plays (the focus is that app's), the game is on the second display or an engine app
+// plays it (the sound and the focus are the engine's).
 void HoldFocus(const system::AppBeside& machine, const PlayerScreen* screen) {
     static bool held = false;
-    const bool hold = pal::audio::HasScreenControls() && screen && !screen->Swapped() &&
+    const bool hold = pal::audio::HasScreenControls() && screen && !screen->Swapped() && !screen->External() &&
                       machine.GetStage() == system::AppBeside::Stage::None;
     if (hold != held) {
         held = hold;
@@ -141,7 +142,8 @@ void Frame() {
     const PlayerScreen* screen = PlayerScreen::Current();
     machine.SetTwoDisplays(second.Present());
     Run(machine.SetGame(screen != nullptr, screen && screen->Swapped() ? Screen::Second : Screen::Main));
-    Run(machine.SetSurfaces(!pal::MainWindowHidden(), second.Ready()));
+    // An engine app over the main window is the game itself.
+    Run(machine.SetSurfaces(!pal::MainWindowHidden() || (screen && screen->External()), second.Ready()));
     HoldFocus(machine, screen);
     const double now = pal::NowSeconds();
     for (const pal::apps::Event& event : pal::apps::TakeEvents()) {

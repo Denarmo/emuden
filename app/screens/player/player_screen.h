@@ -95,6 +95,8 @@ public:
     void Hold(bool hold);
     /// The game is set to play on the second display (whether or not that is there now).
     bool WantsSecond() const;
+    /// An engine app plays it: its window over the main one is the game, not an app beside it.
+    bool External() const;
 
 private:
     enum class Phase { New, Preparing, Running, Left };
