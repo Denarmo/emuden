@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Facade of the ROM player: one libretro core with one game, running inside the app's
-// window. libretro.h (from upstream libretro) is in third_party/libretro.
+// window. libretro.h (from upstream libretro) is in third_party/libretro. The same facade
+// drives a game in an engine app (CreateEngineSession) through the Emulator Control
+// Protocol, so the player screen and its menus serve both.
 
 #pragma once
 
@@ -10,12 +12,14 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "den/base/jobs.h"
 #include "den/base/result.h"
+#include "den/engine/host.h"
 #include "den/gfx/canvas.h"
 #include "den/input/input.h"
 #include "den/player/screens.h"
@@ -37,6 +41,10 @@ struct OpenRequest {
     /// Continue from where the game was left (the state written by Close), when there is one
     /// and the "player.resume" setting allows it.
     bool resume = true;
+    /// An engine app plays the game instead of a libretro core (`core` is then unused).
+    std::optional<engine::Install> engine;
+    std::string title;
+    bool fullscreen = true; // the engine's own window
 };
 
 enum class State { Closed, Running, Paused, Failed };
@@ -95,6 +103,14 @@ struct Snapshot {
     std::array<std::uint16_t, 4> game_buttons{};
     std::size_t rewind_states = 0;  // states the rewind history holds
     bool audio_capturing = false;   // a capture asked for with StartAudioCapture still runs
+    /// An engine app outside the app runs the game; the rows below say what it can do.
+    bool external = false;
+    bool can_pause = true;
+    bool can_fast_forward = true;
+    bool can_reset = true;
+    bool can_options = true;
+    bool can_volume = true;
+    bool can_picture = true; // picture presets, screen size and button remapping (EmuDEN draws it)
 };
 
 struct CoreOption {
@@ -269,6 +285,11 @@ public:
     }
 
     virtual Snapshot GetSnapshot() const = 0;
+
+    /// True once after an engine paused and handed its menu over (the player opens it).
+    virtual bool TakeMenuRequest() {
+        return false;
+    }
 };
 
 struct Config {
@@ -279,5 +300,14 @@ struct Config {
 };
 
 std::unique_ptr<Session> CreateSession(const Config& config);
+
+/// A session over the engine host: the game runs in an engine app, controlled through the
+/// protocol. Option values are kept as "key=value" lists under engine_options.<core> for the
+/// console and engine_game_options.<system>.<game> for one game, and sent with every launch.
+std::unique_ptr<Session> CreateEngineSession(const Config& config, engine::Host& host);
+
+/// One session for the app: Open goes to `engine` for a request with an engine and to
+/// `core` otherwise, and everything else to whichever was opened last.
+std::unique_ptr<Session> CreateRoutedSession(std::unique_ptr<Session> core, std::unique_ptr<Session> engine);
 
 } // namespace den::player
