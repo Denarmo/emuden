@@ -238,6 +238,12 @@ final class EngineApps {
         if (target == null) {
             return "error:The app cannot be started by EmuDEN";
         }
+        // Launcher icons are often an activity-alias; the app sees the real activity's name only
+        // when it is started directly (DroidDeck closes its link task only then).
+        android.content.pm.ResolveInfo resolved = activity.getPackageManager().resolveActivity(launch, 0);
+        if (resolved != null && resolved.activityInfo != null && resolved.activityInfo.targetActivity != null) {
+            target = new ComponentName(pkg, resolved.activityInfo.targetActivity);
+        }
         Intent intent = new Intent(Intent.ACTION_VIEW)
                 .setComponent(target)
                 .setDataAndType(GameProvider.uriFor(activity, new File(path)), "application/octet-stream")
