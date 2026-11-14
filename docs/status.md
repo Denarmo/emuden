@@ -478,7 +478,8 @@ Android (GT4 PAL reaches its language menu at 50 fps on the Retroid Pocket Duo, 
 states load). Since 1.0.6 its OpenGL renderer streams draws and texture uploads through persistent
 buffers: on the Retroid a Colin McRae Rally 3 stage went from 2.3 to 27 fps and a GT4 race from
 9.7 to 27 fps, both still short of full speed (50/60). GT4's race view is noise with Play! on
-Android (HUD fine), before and after. The PCSX2 notes below are history.
+Android (HUD fine), before and after. Since 1.0.7 the core fills the frame it reports
+at PAL's 512 lines (before, PAL pictures were shifted down, cut off and letterboxed twice). The PCSX2 notes below are history.
 
 The 24 consoles added on 2026-11-14 (Atari 2600/5200/7800/Lynx/Jaguar, Sega CD/32X/SG-1000,
 PC Engine/CD/PC-FX, Neo Geo/Pocket/Color, WonderSwan/Color, Virtual Boy, Pokémon mini, 3DO,
