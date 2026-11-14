@@ -141,18 +141,14 @@ TEST_CASE("every bundled manifest is read") {
             CHECK(console.scan.index_extensions == std::vector<std::string>{"m3u", "cue"});
             CHECK(console.scan.member_extensions == std::vector<std::string>{"bin"});
             CHECK(console.scan.loose_members);
-            REQUIRE(console.bios.size() == 1);
-            CHECK(console.bios[0].files.size() == 3);
+            CHECK(console.bios.empty()); // only cores that need no BIOS are offered
         } else if (manifest->id == "emuden.ps2") {
-            const auto cores = manifest->CoresFor(manifest->systems.front(), "android-arm64");
-            REQUIRE(cores.size() == 1); // Play! has no Android build yet
-            CHECK(manifest->CoresFor(manifest->systems.front(), "windows-x86_64").size() == 2);
-            REQUIRE(console.bios.size() == 1);
-            CHECK(console.bios[0].cores == std::vector<std::string>{"pcsx2"});
-            CHECK(cores[0]->widescreen_restart);
-            REQUIRE(cores[0]->widescreen_options.size() == 2);
-            CHECK(cores[0]->widescreen_options[0].second == "enabled (16:9)");
-            CHECK(manifest->SystemFilesFor("pcsx2", "android-arm64").size() == 1);
+            // Play! needs no BIOS; its Android build is not offered yet.
+            CHECK(manifest->CoresFor(manifest->systems.front(), "android-arm64").empty());
+            const auto cores = manifest->CoresFor(manifest->systems.front(), "windows-x86_64");
+            REQUIRE(cores.size() == 1);
+            CHECK(cores[0]->id == "play");
+            CHECK(console.bios.empty());
         } else if (manifest->id == "emuden.switch2") {
             saw_switch2 = true;
             CHECK(console.runner == Runner::Engine);

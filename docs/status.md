@@ -437,6 +437,12 @@ Racing Lagoon pictures were looked at.
 | PS1 | Racing Lagoon | PCSX-ReARMed (no BIOS) | 621 | black for the first ~12 s, then the intro plays |
 | Switch 2 | Ocarina of Time | installed emulator (engine level 0) | - | in the engine's own window |
 
+Only cores that need no BIOS are offered (owner's decision, 2026-11-14). Removed: PCSX2,
+Beetle PSX, SwanStation, Beetle Saturn, Beetle Lynx, every BIOS set, and the consoles whose
+every core needs a BIOS (Sega CD, PC Engine CD, PC-FX, Neo Geo, 3DO, ColecoVision,
+Intellivision, MSX). PS2 has Play! on Windows and Linux only until its Android build is fixed,
+so Android has no PS2 core for now. The PCSX2 notes below are history.
+
 The 24 consoles added on 2026-11-14 (Atari 2600/5200/7800/Lynx/Jaguar, Sega CD/32X/SG-1000,
 PC Engine/CD/PC-FX, Neo Geo/Pocket/Color, WonderSwan/Color, Virtual Boy, Pokémon mini, 3DO,
 ColecoVision, Intellivision, Vectrex, MSX, arcade) have no game in the test library. Only
