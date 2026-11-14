@@ -22,6 +22,7 @@ struct GameObject {
     std::string style;      // a cartridge's mould: "plain", "pocket" or "pocket_wide"
     std::string label_edge; // "none", "paper" or "foil": the sticker's border round the cover
     bool smoke = false;     // see-through shell (its colour's alpha), the board showing inside
+    bool photo = false;     // a cartridge or card whose front is a photograph of the real one
     float aspect = 0.7f, depth = 0.07f;
     gfx::Color shell;
     gfx::Rect label; // the sticker on the front, 0..1
@@ -35,6 +36,9 @@ struct GameObject {
     const gfx::Mesh3D* ClearMesh() const;
     /// The disc that slides out of a case, one unit across; null when the object has none.
     const gfx::Mesh3D* DiscMesh() const;
+    /// The same cartridge or card with a photograph of the real one as its front, in the
+    /// photograph's proportions and the plastic's colour.
+    GameObject WithPhoto(gfx::Color plastic, float photo_aspect) const;
     /// The part of the front the cover is printed on: the sticker inside its border.
     gfx::Rect CoverRect() const;
     /// The cover's width over its height, for cropping the cover onto it.

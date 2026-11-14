@@ -172,6 +172,67 @@ bool Artwork::ResolveLaunchBox(const Entry& entry, const SystemDef& system, cons
     return false;
 }
 
+GameFaces Artwork::Faces(const Entry& entry, const SystemDef* system, const std::function<bool()>& stopping) {
+    GameFaces faces;
+    if (system == nullptr || (system->launchbox.empty() && system->libretro_thumbnails.empty())) {
+        return faces;
+    }
+    const std::string original = entry.original_name.empty() ? entry.name : entry.original_name;
+    const fs::path stem =
+        cache_dir_ / "launchbox-faces" / PathFromUtf8(system->id) / PathFromUtf8(CacheFileName(original));
+    std::pair<const char*, std::string*> kinds[] = {{".back", &faces.back},
+                                                    {".spine", &faces.spine},
+                                                    {".cart", &faces.cart},
+                                                    {".cart-back", &faces.cart_back},
+                                                    {".disc", &faces.disc}};
+    const auto cached = [&] {
+        for (auto& [suffix, path] : kinds) {
+            *path = PathToUtf8(FindCached(WithSuffix(stem, suffix)));
+        }
+    };
+    // ".faces" marks a game whose faces were all fetched, ".faces.miss" one without any.
+    const fs::path done = WithSuffix(stem, ".faces"), miss = WithSuffix(stem, ".faces.miss");
+    if (IsRegularFile(done)) {
+        cached();
+        return faces;
+    }
+    if (!fetcher_ || (stopping && stopping()) || IsFresh(miss, MISS_LIFETIME)) {
+        return faces;
+    }
+    std::vector<std::string> titles{entry.name};
+    if (std::string base = ParseGameName(original).base; base != entry.name) {
+        titles.push_back(std::move(base));
+    }
+    bool answered = true;
+    const auto found = launchbox_->FindFaces(*system, titles, RegionTags(original), answered);
+    if (!found) {
+        if (answered) {
+            Touch(miss);
+        }
+        return faces;
+    }
+    const std::string* urls[] = {&found->back, &found->spine, &found->cart, &found->cart_back, &found->disc};
+    bool complete = true;
+    for (std::size_t i = 0; i < std::size(kinds); ++i) {
+        const fs::path face = WithSuffix(stem, kinds[i].first);
+        if (urls[i]->empty() || !FindCached(face).empty()) {
+            continue;
+        }
+        if (stopping && stopping()) {
+            complete = false;
+            break;
+        }
+        bool reached = false;
+        fs::path file;
+        complete = Download(*urls[i], face, file, reached) && complete;
+    }
+    if (complete) {
+        Touch(done);
+    }
+    cached();
+    return faces;
+}
+
 void Artwork::SetHackOptions(HackCoverOptions options) {
     const std::lock_guard lock(options_mutex_);
     hack_options_ = std::move(options);

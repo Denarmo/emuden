@@ -223,10 +223,25 @@ void BuildCard(std::vector<gfx::MeshVertex>& out, const GameObject& o) {
     }
 }
 
+// A cartridge or card from its photograph: the moulded body, the photo for a front and the
+// back's picture behind; the photo shows the relief and the label as they really are.
+void BuildPhoto(Built& b, const GameObject& o) {
+    const float a = o.aspect, d = o.depth;
+    SlabParts parts = All(Part::Shell);
+    parts.front = Part::Photo;
+    parts.back = Part::Back;
+    const std::vector<gfx::Vec2> outline =
+        o.style == "pocket"        ? gfx::ShoulderedOutline(a, 1, a * 0.105f, 0.035f, 0.01f, 0.022f, 0.02f)
+        : o.style == "pocket_wide" ? gfx::ShoulderedOutline(a, 1, 0.07f, 0.21f, 0.03f, 0.06f, 0.04f)
+                                   : RoundedOutline(a, 1, o.radius, std::max(0.02f, o.radius), o.notch);
+    gfx::AddSlab(b.solid, outline, d, std::min(0.012f, d * 0.2f), parts);
+}
+
 void BuildCase(std::vector<gfx::MeshVertex>& out, const GameObject& o) {
     const float a = o.aspect, d = o.depth;
     SlabParts parts = All(Part::Shell);
     parts.front = Part::Gloss;
+    parts.back = Part::Back;
     parts.spine = Part::Spine;
     gfx::AddSlab(out, RoundedOutline(a, 1, o.radius, o.radius), d, std::min(0.014f, d * 0.3f), parts);
     // The crease of the sleeve along the hinge.
@@ -237,7 +252,9 @@ void BuildJewel(std::vector<gfx::MeshVertex>& out, const GameObject& o) {
     const float a = o.aspect, d = o.depth;
     const float hinge = a * 0.055f;
     // The black tray at the back and the printed inlay under the lid.
-    gfx::AddSlab(out, RoundedOutline(a * 0.99f, 0.99f, 0.01f, 0.01f), d * 0.6f, 0.006f, All(Part::Dark), -d * 0.2f);
+    SlabParts tray = All(Part::Dark);
+    tray.back = Part::Back;
+    gfx::AddSlab(out, RoundedOutline(a * 0.99f, 0.99f, 0.01f, 0.01f), d * 0.6f, 0.006f, tray, -d * 0.2f);
     SlabParts inlay = All(Part::Paper);
     inlay.front = Part::Label;
     gfx::AddSlab(out, RoundedOutline(a - hinge - 0.03f, 0.95f, 0, 0), 0.003f, 0, inlay, d * 0.5f - 0.016f,
@@ -268,13 +285,15 @@ struct Meshes {
 const Meshes& MeshesFor(const GameObject& o) {
     static std::map<std::string, Meshes> cache;
     const std::string key =
-        std::format("{} {} {} {} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {}", o.shape, o.style,
-                    o.label_edge, o.smoke, o.aspect, o.depth, o.label.x, o.label.y, o.label.w, o.label.h, o.radius,
+        std::format("{} {} {} {} {} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {}", o.shape, o.style,
+                    o.label_edge, o.smoke, o.photo, o.aspect, o.depth, o.label.x, o.label.y, o.label.w, o.label.h, o.radius,
                     o.notch, o.grip);
     Meshes& meshes = cache[key];
     if (!meshes.solid) {
         Built b;
-        if (o.shape == "disc") {
+        if (o.photo) {
+            BuildPhoto(b, o);
+        } else if (o.shape == "disc") {
             BuildDisc(b.solid, o.depth);
         } else if (o.shape == "cartridge" && o.style != "plain") {
             BuildPocket(b, o);
@@ -331,6 +350,17 @@ GameObject Resolve(const ObjectLook& look) {
     o.notch = look.notch >= 0 ? look.notch : shape->notch;
     o.grip = look.grip >= 0 ? look.grip : o.grip;
     o.disc = look.disc && (o.shape == "case" || o.shape == "jewel");
+    return o;
+}
+
+GameObject GameObject::WithPhoto(gfx::Color plastic, float photo_aspect) const {
+    GameObject o = *this;
+    o.photo = true;
+    o.smoke = false;
+    o.shell = plastic;
+    o.shell.a = 255;
+    // Proportions within reach of the mould's: a photo cropped oddly does not squash the cart.
+    o.aspect = std::clamp(photo_aspect, aspect * 0.8f, aspect * 1.25f);
     return o;
 }
 

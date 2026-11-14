@@ -49,6 +49,22 @@ const GameObject& ObjectShelf::ObjectFor(const std::string& system) const {
     return objects_[system] = Resolve(look.object);
 }
 
+const GameObject& ObjectShelf::ObjectAt(std::size_t index) const {
+    const library::Entry& game = games_[index];
+    const GameObject& object = ObjectFor(game.system);
+    if (object.shape != "cartridge" && object.shape != "card") {
+        return object;
+    }
+    if (const auto found = photos_.find(game.id); found != photos_.end()) {
+        return found->second;
+    }
+    const LoadedFaces* faces = faces_.Peek(game.id);
+    if (faces == nullptr || faces->cart_aspect <= 0) {
+        return object;
+    }
+    return photos_[game.id] = object.WithPhoto(faces->plastic, faces->cart_aspect);
+}
+
 float ObjectShelf::ObjectHeight() const {
     return std::max(40.0f, std::min(rect.h * spec_->cover_height, rect.w * 0.3f));
 }
@@ -58,7 +74,7 @@ float ObjectShelf::Floor() const {
 }
 
 ObjectShelf::Placed ObjectShelf::Place(std::size_t index, float time) const {
-    const GameObject& object = ObjectFor(games_[index].system);
+    const GameObject& object = ObjectAt(index);
     // A wide object (a landscape cart) is kept to a width that leaves its neighbours room.
     const float h_main = std::min(ObjectHeight(), rect.w * 0.26f / object.aspect);
     const float offset = static_cast<float>(index) - pos_;
@@ -123,6 +139,14 @@ void ObjectShelf::DrawContent(ui::Context& ctx) {
     view_w_ = canvas.Width();
     view_h_ = canvas.Height();
     const float time = static_cast<float>(time_);
+    // The faces of the selected game first, then of its neighbours.
+    for (int d = 0; d <= 3; ++d) {
+        for (const int i : {static_cast<int>(index_) - d, static_cast<int>(index_) + d}) {
+            if (i >= 0 && i < static_cast<int>(games_.size()) && (d > 0 || i == static_cast<int>(index_))) {
+                faces_.Get(games_[static_cast<std::size_t>(i)].id);
+            }
+        }
+    }
 
     std::vector<Placed> placed;
     const float reach = 7;
@@ -144,6 +168,20 @@ void ObjectShelf::DrawContent(ui::Context& ctx) {
                                                                                           : p.object->LabelAspect();
             m.label_uv = gfx::CoverUv(m.cover.width, m.cover.height, gfx::Rect{0, 0, aspect * 100, 100});
             m.spine_uv = gfx::Rect{m.label_uv.x, m.label_uv.y, m.label_uv.w * 0.07f, m.label_uv.h};
+        }
+        if (const LoadedFaces* faces = faces_.Peek(game.id)) {
+            const auto art = [&](const std::string& path, int size) {
+                return path.empty() ? gfx::Texture{} : ctx.textures->Get(path, size);
+            };
+            if (p.object->photo) {
+                m.cart_art = art(faces->faces.cart, 1024);
+                m.cart_uv = faces->cart_uv;
+                m.back_art = art(faces->faces.cart_back, 512);
+            } else {
+                m.back_art = art(faces->faces.back, 1024);
+                m.spine_art = art(faces->faces.spine, 512);
+            }
+            m.disc_art = art(faces->faces.disc, 512);
         }
         m.light = p.light;
         return m;

@@ -28,7 +28,7 @@ const std::string DATA(LAUNCHBOX_DATA);
 std::map<std::string, std::string> FakeData() {
     return {
         {DATA + "manifest.json",
-         R"({"format":1,"version":"2026-11-14","images":"https://images.example/",
+         R"({"format":1,"version":"2026-11-14","images":"https://images.example/","face_kinds":["back"],
              "libretro":{"Nintendo - Game Boy Advance":"Nintendo Game Boy Advance"},
              "platforms":{"Nintendo Game Boy Advance":{"dir":"nintendo-game-boy-advance","games":2,"buckets":["c","l"]}}})"},
         {DATA + "covers/nintendo-game-boy-advance/c.json",
@@ -119,4 +119,47 @@ TEST_CASE("the artwork takes a LaunchBox cover before the libretro collection") 
     const int after = requests;
     CHECK(art.Resolve(entry, &gba, {}).source == ArtworkSource::Cache);
     CHECK(requests == after);
+}
+
+TEST_CASE("the other faces of a game come from its face file, the front cover's region first") {
+    const fs::path dir = FreshDir("faces");
+    auto data = FakeData();
+    data[DATA + "manifest.json"] =
+        R"({"format":1,"version":"2026-11-14","images":"https://images.example/","face_kinds":["back"],
+            "libretro":{"Nintendo - Game Boy Advance":"Nintendo Game Boy Advance"},
+            "platforms":{"Nintendo Game Boy Advance":{"dir":"nintendo-game-boy-advance","games":2,
+                         "buckets":["c","l"],"faces":["c"]}}})";
+    data[DATA + "faces/nintendo-game-boy-advance/c.json"] =
+        R"({"3349":{"back":[["Europe","eb.jpg"],["North America","nb.jpg"]],"cart":[["Japan","jc.png"]]}})";
+    data["https://images.example/nb.jpg"] = "\xFF\xD8\xFF" "back";
+    data["https://images.example/jc.png"] = "\x89PNG\r\n\x1A\n" "cart";
+    int requests = 0;
+    Artwork art(dir / "cache", [&](const std::string& url) -> HttpAnswer {
+        ++requests;
+        const auto found = data.find(url);
+        return found == data.end() ? HttpAnswer{404, {}} : HttpAnswer{200, found->second};
+    });
+    Entry entry;
+    entry.id = "aos";
+    entry.name = "Castlevania - Aria of Sorrow";
+    entry.original_name = "Castlevania - Aria of Sorrow (USA)";
+    entry.system = "gba";
+    const SystemDef gba = Gba();
+    const GameFaces faces = art.Faces(entry, &gba, {});
+    CHECK(ReadTextFile(PathFromUtf8(faces.back)).value_or("").ends_with("back"));
+    CHECK(ReadTextFile(PathFromUtf8(faces.cart)).value_or("").ends_with("cart"));
+    CHECK(faces.spine.empty());
+    CHECK(faces.disc.empty());
+    const int after = requests;
+    CHECK(art.Faces(entry, &gba, {}).back == faces.back);
+    CHECK(requests == after);
+
+    // A game the face file does not list has none, and is not asked about again.
+    Entry other = entry;
+    other.name = "Legend of Zelda, The - A Link to the Past & Four Swords";
+    other.original_name = other.name;
+    CHECK(art.Faces(other, &gba, {}).back.empty());
+    const int missed = requests;
+    CHECK(art.Faces(other, &gba, {}).back.empty());
+    CHECK(requests == missed);
 }

@@ -40,8 +40,12 @@ in vec3 v_n; in vec2 v_uv; in float v_part;
 uniform vec4 u_shell; uniform vec4 u_label; uniform vec4 u_spine;
 uniform float u_light; uniform int u_has_tex; uniform int u_clear;
 uniform sampler2D u_tex;
+// The other faces' pictures: back, spine, cart, disc; bit i of u_arts says art i is there.
+uniform sampler2D u_back_art; uniform sampler2D u_spine_art; uniform sampler2D u_cart_art;
+uniform sampler2D u_disc_art; uniform int u_arts; uniform vec4 u_cart_uv;
 out vec4 o_color;
 vec4 cover(vec4 r) { return texture(u_tex, r.xy + clamp(v_uv, 0.0, 1.0) * r.zw); }
+bool has_art(int bit) { return (u_arts / bit) % 2 == 1; }
 void main() {
     vec3 n = normalize(v_n);
     if (!gl_FrontFacing) n = -n;
@@ -53,11 +57,16 @@ void main() {
         base = u_has_tex == 1 ? cover(u_label).rgb : vec3(0.92);
         gloss = 6.0; spec = 0.05;
     } else if (part == 2) {
-        base = u_has_tex == 1 ? cover(u_spine).rgb * 0.88 : u_shell.rgb;
+        base = has_art(2) ? texture(u_spine_art, clamp(v_uv, 0.0, 1.0)).rgb * 0.92
+             : u_has_tex == 1 ? cover(u_spine).rgb * 0.88 : u_shell.rgb;
         gloss = 90.0; spec = 0.7; fresnel = 0.35;
     } else if (part == 3) {
         float r = length(v_uv - 0.5) * 2.0;
-        if (r < 0.34) {
+        if (has_art(8)) {
+            vec4 d = texture(u_disc_art, clamp(v_uv, 0.0, 1.0));
+            base = mix(vec3(0.72, 0.74, 0.78), d.rgb, d.a);
+            gloss = mix(120.0, 16.0, d.a); spec = mix(1.1, 0.14, d.a);
+        } else if (r < 0.34) {
             base = mix(vec3(0.78, 0.8, 0.84), vec3(0.62, 0.65, 0.7), smoothstep(0.30, 0.34, r));
             gloss = 120.0; spec = 1.1; fresnel = 0.4;
         } else {
@@ -94,6 +103,15 @@ void main() {
     } else if (part == 12) {
         base = vec3(0.74, 0.75, 0.78);
         gloss = 55.0; spec = 0.75; diffuse_k = 0.75;
+    } else if (part == 13) {
+        if (has_art(1)) {
+            base = texture(u_back_art, clamp(v_uv, 0.0, 1.0)).rgb;
+            gloss = 80.0; spec = 0.5; fresnel = 0.35;
+        }
+    } else if (part == 14) {
+        vec4 p = has_art(4) ? texture(u_cart_art, u_cart_uv.xy + clamp(v_uv, 0.0, 1.0) * u_cart_uv.zw) : vec4(0.0);
+        base = mix(u_shell.rgb, p.rgb, p.a);
+        gloss = 36.0; spec = 0.3;
     }
     vec3 key = normalize(vec3(-0.45, 0.6, 0.66));
     vec3 fill = normalize(vec3(0.8, 0.05, 0.45));
@@ -218,6 +236,12 @@ Status Renderer3D::Init(Device& device) {
     u_has_tex_ = at("u_has_tex");
     u_tex_ = at("u_tex");
     u_clear_ = at("u_clear");
+    u_arts_ = at("u_arts");
+    u_cart_uv_ = at("u_cart_uv");
+    const char* arts[] = {"u_back_art", "u_spine_art", "u_cart_art", "u_disc_art"};
+    for (int i = 0; i < 4; ++i) {
+        u_art_[i] = at(arts[i]);
+    }
     gl::GenFramebuffers(1, &fbo_);
     gl::GenTextures(1, &color_);
     gl::GenRenderbuffers(1, &depth_);
@@ -293,6 +317,9 @@ void Renderer3D::Begin(Canvas& canvas, const Rect& clip) {
     gl::UseProgram(program_);
     gl::UniformMatrix4fv(u_view_proj_, 1, gl::FALSE_, view_proj_.m);
     gl::Uniform1i(u_tex_, 0);
+    for (int i = 0; i < 4; ++i) {
+        gl::Uniform1i(u_art_[i], i + 1);
+    }
     gl::ActiveTexture(gl::TEXTURE0);
 }
 
@@ -314,6 +341,19 @@ void Renderer3D::Submit(const Mesh3D& mesh, const Mat4& model, const Material& m
     gl::Uniform4f(u_spine_, s.x, s.y, s.w, s.h);
     gl::Uniform1f(u_light_, material.light);
     gl::Uniform1i(u_has_tex_, material.cover ? 1 : 0);
+    const Texture* arts[] = {&material.back_art, &material.spine_art, &material.cart_art, &material.disc_art};
+    int present = 0;
+    for (int i = 0; i < 4; ++i) {
+        if (*arts[i]) {
+            present |= 1 << i;
+            gl::ActiveTexture(gl::TEXTURE0 + 1 + i);
+            gl::BindTexture(gl::TEXTURE_2D, arts[i]->id);
+        }
+    }
+    gl::ActiveTexture(gl::TEXTURE0);
+    gl::Uniform1i(u_arts_, present);
+    const Rect& cu = material.cart_uv;
+    gl::Uniform4f(u_cart_uv_, cu.x, cu.y, cu.w, cu.h);
     gl::BindTexture(gl::TEXTURE_2D, material.cover.id);
     gl::BindVertexArray(mesh.vao_);
     gl::DrawArrays(gl::TRIANGLES, 0, mesh.count_);

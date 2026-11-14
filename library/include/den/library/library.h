@@ -78,6 +78,15 @@ struct CoverChoice {
     std::string image;  // UTF-8 path of the downloaded image
 };
 
+/// A game's other faces (Library::Faces): UTF-8 paths of downloaded images, "" for none.
+struct GameFaces {
+    std::string back;      // the box's back
+    std::string spine;     // the box's spine, top to bottom
+    std::string cart;      // the cartridge's front, the whole cartridge on a clear ground
+    std::string cart_back; // the cartridge's back
+    std::string disc;      // the disc's printed side, round on a clear ground
+};
+
 class Library {
 public:
     virtual ~Library() = default;
@@ -113,6 +122,13 @@ public:
     /// of the game it was made from. Blocks on the network: call it from a job.
     virtual std::vector<CoverChoice> CoverChoices(const std::string& id,
                                                   const std::function<bool()>& stopping = {}) = 0;
+    /// Pictures of the game's box back and spine, cartridge and disc, downloaded once from the
+    /// LaunchBox Games Database. Blocks on the network: call it from a job.
+    virtual GameFaces Faces(const std::string& id, const std::function<bool()>& stopping = {}) {
+        (void)id;
+        (void)stopping;
+        return {};
+    }
     /// Makes an image file the game's cover: it is copied into the library's own covers
     /// folder, where every later scan finds it first.
     virtual Status SetCover(const std::string& id, const std::string& image_path) = 0;

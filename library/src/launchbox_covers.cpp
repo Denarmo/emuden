@@ -104,12 +104,9 @@ std::vector<std::string> RegionOrder(const std::vector<std::string>& tags) {
     return order;
 }
 
-// The best cover of one game ([id, name, [[region, file], ...]]), "" when it has none.
-std::pair<std::string, std::string> PickCover(const JsonValue& game, const std::vector<std::string>& order) {
-    if (game.items.size() < 3) {
-        return {};
-    }
-    const std::vector<JsonValue>& covers = game.items[2].items;
+// The image of the region that comes first in `order` ([[region, file], ...]), else the first.
+std::pair<std::string, std::string> PickRegion(const std::vector<JsonValue>& covers,
+                                               const std::vector<std::string>& order) {
     for (const std::string& region : order) {
         for (const JsonValue& cover : covers) {
             if (cover.items.size() == 2 && cover.items[0].string == region) {
@@ -121,6 +118,11 @@ std::pair<std::string, std::string> PickCover(const JsonValue& game, const std::
         return {covers.front().items[0].string, covers.front().items[1].string};
     }
     return {};
+}
+
+// The best cover of one game ([id, name, [[region, file], ...]]), "" when it has none.
+std::pair<std::string, std::string> PickCover(const JsonValue& game, const std::vector<std::string>& order) {
+    return game.items.size() < 3 ? std::pair<std::string, std::string>{} : PickRegion(game.items[2].items, order);
 }
 
 bool SafeFileName(const std::string& name) {
@@ -167,6 +169,10 @@ const LaunchBoxCovers::Manifest* LaunchBoxCovers::LoadManifest(bool& answered) {
     std::optional<std::string> text;
     if (IsFresh(file, MANIFEST_LIFETIME)) {
         text = ReadTextFile(file);
+        // A copy from before the data had faces is asked for again, so the faces show now.
+        if (text && text->find("\"face_kinds\"") == std::string::npos) {
+            text.reset();
+        }
     }
     if (!text && fetcher_) {
         const HttpAnswer answer = fetcher_(std::string(LAUNCHBOX_DATA) + "manifest.json");
@@ -202,6 +208,11 @@ const LaunchBoxCovers::Manifest* LaunchBoxCovers::LoadManifest(bool& answered) {
                     platform.buckets.push_back(bucket.string);
                 }
             }
+            if (const JsonValue* faces = value.Find("faces")) {
+                for (const JsonValue& bucket : faces->items) {
+                    platform.faces.push_back(bucket.string);
+                }
+            }
             if (SafeFileName(platform.dir)) {
                 manifest.platforms.emplace(name, std::move(platform));
             }
@@ -222,19 +233,20 @@ const LaunchBoxCovers::Manifest* LaunchBoxCovers::LoadManifest(bool& answered) {
 }
 
 const JsonValue* LaunchBoxCovers::LoadBucket(const Manifest& manifest, const Platform& platform,
-                                             const std::string& bucket, bool& answered) {
-    const std::string relative = platform.dir + "/" + bucket + ".json";
+                                             const std::string& bucket, bool& answered, bool faces) {
+    const std::string relative = std::string(faces ? "faces/" : "covers/") + platform.dir + "/" + bucket + ".json";
     if (const auto found = buckets_.find(relative); found != buckets_.end()) {
         return found->second.get();
     }
-    const fs::path file = cache_dir_ / PathFromUtf8(manifest.version) / PathFromUtf8(platform.dir) /
-                          PathFromUtf8(bucket + ".json");
+    // Cover files sit right under the version, as they always have; face files under "faces".
+    const fs::path base = cache_dir_ / PathFromUtf8(manifest.version);
+    const fs::path file = (faces ? base / "faces" : base) / PathFromUtf8(platform.dir) / PathFromUtf8(bucket + ".json");
     std::optional<JsonValue> json;
     if (const auto text = ReadTextFile(file)) {
         json = ParseJson(*text);
     }
     if (!json && fetcher_) {
-        const HttpAnswer answer = fetcher_(std::string(LAUNCHBOX_DATA) + "covers/" + relative);
+        const HttpAnswer answer = fetcher_(std::string(LAUNCHBOX_DATA) + relative);
         answered = answered && answer.status != 0;
         if (answer.status == 200) {
             json = ParseJson(answer.body);
@@ -253,13 +265,12 @@ const JsonValue* LaunchBoxCovers::LoadBucket(const Manifest& manifest, const Pla
     return slot.get();
 }
 
-std::optional<LaunchBoxCover> LaunchBoxCovers::Find(const SystemDef& system, const std::vector<std::string>& titles,
-                                                    const std::vector<std::string>& region_tags, bool& answered) {
-    const std::lock_guard lock(mutex_);
-    const Manifest* manifest = LoadManifest(answered);
-    if (manifest == nullptr) {
-        return std::nullopt;
-    }
+std::optional<LaunchBoxCovers::Match> LaunchBoxCovers::FindMatch(const Manifest& manifest_ref,
+                                                                  const SystemDef& system,
+                                                                  const std::vector<std::string>& titles,
+                                                                  const std::vector<std::string>& order,
+                                                                  bool& answered) {
+    const Manifest* manifest = &manifest_ref;
     std::string name = system.launchbox;
     if (name.empty()) {
         const auto mapped = manifest->libretro.find(system.libretro_thumbnails);
@@ -272,7 +283,6 @@ std::optional<LaunchBoxCover> LaunchBoxCovers::Find(const SystemDef& system, con
     if (platform == manifest->platforms.end()) {
         return std::nullopt;
     }
-    const std::vector<std::string> order = RegionOrder(region_tags);
     for (const std::string& title : titles) {
         const std::string key = LaunchBoxKey(title);
         if (key.empty()) {
@@ -292,11 +302,66 @@ std::optional<LaunchBoxCover> LaunchBoxCovers::Find(const SystemDef& system, con
         for (const JsonValue& game : matches->items) {
             auto [region, image] = PickCover(game, order);
             if (SafeFileName(image)) {
-                return LaunchBoxCover{manifest->images + image, game.items[1].string, region};
+                return Match{&game, &platform->second, bucket, std::move(region), std::move(image)};
             }
         }
     }
     return std::nullopt;
+}
+
+std::optional<LaunchBoxCover> LaunchBoxCovers::Find(const SystemDef& system, const std::vector<std::string>& titles,
+                                                    const std::vector<std::string>& region_tags, bool& answered) {
+    const std::lock_guard lock(mutex_);
+    const Manifest* manifest = LoadManifest(answered);
+    if (manifest == nullptr) {
+        return std::nullopt;
+    }
+    const auto match = FindMatch(*manifest, system, titles, RegionOrder(region_tags), answered);
+    if (!match) {
+        return std::nullopt;
+    }
+    return LaunchBoxCover{manifest->images + match->image, match->game->items[1].string, match->region};
+}
+
+std::optional<LaunchBoxFaces> LaunchBoxCovers::FindFaces(const SystemDef& system,
+                                                         const std::vector<std::string>& titles,
+                                                         const std::vector<std::string>& region_tags,
+                                                         bool& answered) {
+    const std::lock_guard lock(mutex_);
+    const Manifest* manifest = LoadManifest(answered);
+    if (manifest == nullptr) {
+        return std::nullopt;
+    }
+    std::vector<std::string> order = RegionOrder(region_tags);
+    const auto match = FindMatch(*manifest, system, titles, order, answered);
+    if (!match) {
+        return std::nullopt;
+    }
+    const auto& listed = match->platform->faces;
+    if (std::find(listed.begin(), listed.end(), match->bucket) == listed.end()) {
+        return std::nullopt;
+    }
+    const JsonValue* bucket = LoadBucket(*manifest, *match->platform, match->bucket, answered, true);
+    const std::string id = std::to_string(static_cast<long long>(match->game->items[0].number));
+    const JsonValue* faces = bucket ? bucket->Find(id) : nullptr;
+    if (faces == nullptr) {
+        return std::nullopt;
+    }
+    // The faces of one copy of the game: the front cover's region first.
+    order.insert(order.begin(), match->region);
+    const auto pick = [&](const char* face) -> std::string {
+        const JsonValue* regions = faces->Find(face);
+        if (regions == nullptr) {
+            return {};
+        }
+        auto [region, image] = PickRegion(regions->items, order);
+        return SafeFileName(image) ? manifest->images + image : std::string();
+    };
+    LaunchBoxFaces out{pick("back"), pick("spine"), pick("cart"), pick("cart_back"), pick("disc")};
+    if (out.back.empty() && out.spine.empty() && out.cart.empty() && out.cart_back.empty() && out.disc.empty()) {
+        return std::nullopt;
+    }
+    return out;
 }
 
 } // namespace den::library

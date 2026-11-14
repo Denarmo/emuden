@@ -317,6 +317,19 @@ public:
         return artwork_.Choices(*entry, systems.Find(entry->system), stopping);
     }
 
+    GameFaces Faces(const std::string& id, const std::function<bool()>& stopping) override {
+        const std::optional<Entry> entry = Find(id);
+        if (!entry) {
+            return {};
+        }
+        SystemTable systems;
+        {
+            std::lock_guard lock(mutex_);
+            systems = systems_;
+        }
+        return artwork_.Faces(*entry, systems.Find(entry->system), stopping);
+    }
+
     Status SetCover(const std::string& id, const std::string& image_path) override {
         std::lock_guard lock(mutex_);
         for (Entry& entry : entries_) {

@@ -35,8 +35,8 @@ struct Mat4 {
 enum class Part : int {
     Shell = 0,     // moulded plastic in the material's shell colour
     Label = 1,     // a matte paper label: the cover through the label's uv rectangle
-    Spine = 2,     // a printed spine under clear plastic: a slice of the cover
-    DiscPrint = 3, // a disc's printed side: the cover, with a clear hub towards the middle
+    Spine = 2,     // a printed spine under clear plastic: the spine's art, else a slice of the cover
+    DiscPrint = 3, // a disc's printed side: the disc's art, else the cover with a clear hub
     Dark = 4,      // the shell colour, darker: grooves, a hinge, a tray
     Gloss = 5,     // the cover under a clear sleeve: shiny, with a sheen at grazing angles
     Metal = 6,     // gold contacts
@@ -47,6 +47,8 @@ enum class Part : int {
                    // (drawn in the transparent pass)
     Board = 11,    // a green circuit board
     Steel = 12,    // brushed metal: a battery, a label's foil edge
+    Back = 13,     // a box's or cartridge's back: the back's art, else the shell colour
+    Photo = 14,    // a cartridge's front as photographed: the cart's art over the shell colour
 };
 
 struct MeshVertex {
@@ -79,6 +81,9 @@ struct Material {
     Texture cover;             // the label, spine, sleeve and disc print; none: plain card
     Rect label_uv{0, 0, 1, 1}; // the part of the cover on the label or sleeve
     Rect spine_uv{0, 0, 0.08f, 1};
+    // Pictures of the other faces, each optional: what Back, Spine, Photo and DiscPrint show.
+    Texture back_art, spine_art, cart_art, disc_art;
+    Rect cart_uv{0, 0, 1, 1}; // the part of cart_art the cartridge fills
     float light = 1.0f; // multiplies the result: side objects are darker
 };
 
@@ -106,7 +111,8 @@ private:
     unsigned int program_ = 0, fbo_ = 0, color_ = 0, depth_ = 0;
     int fbo_w_ = 0, fbo_h_ = 0, draw_w_ = 0, draw_h_ = 0;
     int u_view_proj_ = -1, u_model_ = -1, u_rot_ = -1, u_shell_ = -1, u_label_ = -1, u_spine_ = -1,
-        u_light_ = -1, u_has_tex_ = -1, u_tex_ = -1, u_clear_ = -1;
+        u_light_ = -1, u_has_tex_ = -1, u_tex_ = -1, u_clear_ = -1, u_arts_ = -1, u_cart_uv_ = -1;
+    int u_art_[4] = {-1, -1, -1, -1};
     Rect clip_;
     Mat4 view_proj_;
 };

@@ -3,7 +3,9 @@
 
 // Box covers from the LaunchBox Games Database, through its split copy at
 // github.com/Denarmo/launchbox-covers: a small manifest, then per platform one file per first
-// letter of a title's key. The images themselves come from LaunchBox's image server.
+// letter of a title's key, and beside it one with the other faces of those games (the box's
+// back and spine, the cartridge, the disc). The images themselves come from LaunchBox's image
+// server.
 
 #pragma once
 
@@ -39,6 +41,11 @@ struct LaunchBoxCover {
     std::string region; // LaunchBox's region name of the cover, "" for none
 };
 
+/// A game's other faces (README, "Faces"): image addresses, "" for a face the data lacks.
+struct LaunchBoxFaces {
+    std::string back, spine, cart, cart_back, disc;
+};
+
 class LaunchBoxCovers {
 public:
     /// `cache_dir` holds the manifest and the files read so far, per data version.
@@ -50,11 +57,21 @@ public:
     /// not be reached, so a miss is not to be remembered.
     std::optional<LaunchBoxCover> Find(const SystemDef& system, const std::vector<std::string>& titles,
                                        const std::vector<std::string>& region_tags, bool& answered);
+    /// The other faces of the game Find picks, each from the front cover's region if it has
+    /// one there, else the region that fits best. Empty when the game has none.
+    std::optional<LaunchBoxFaces> FindFaces(const SystemDef& system, const std::vector<std::string>& titles,
+                                            const std::vector<std::string>& region_tags, bool& answered);
 
 private:
     struct Platform {
         std::string dir;
         std::vector<std::string> buckets;
+        std::vector<std::string> faces; // the face files that exist
+    };
+    struct Match {
+        const JsonValue* game = nullptr; // [id, name, [[region, file], ...]]
+        const Platform* platform = nullptr;
+        std::string bucket, region, image;
     };
     struct Manifest {
         std::string version;
@@ -64,7 +81,10 @@ private:
     };
     const Manifest* LoadManifest(bool& answered);
     const JsonValue* LoadBucket(const Manifest& manifest, const Platform& platform, const std::string& bucket,
-                                bool& answered);
+                                bool& answered, bool faces = false);
+    std::optional<Match> FindMatch(const Manifest& manifest, const SystemDef& system,
+                                   const std::vector<std::string>& titles, const std::vector<std::string>& order,
+                                   bool& answered);
 
     std::filesystem::path cache_dir_;
     HttpFetcher fetcher_;
