@@ -218,13 +218,13 @@ ConsoleModel ConsoleFor(const std::string& name) {
     Vertices (*build)(const ConsoleModel&) = nullptr;
     if (name == "portrait") {
         build = Portrait;
-        // A cartridge about half the console's height, nearly all of it down in a pocket as
-        // deep as it is thick: only its top stands out.
-        model = {nullptr, 0.6f, 0.2f, 0.5f, -0.069f, 0.47f, 0.9f, true, 0.5f, 0, 0.248f, 0.3f, 0.27f,
+        // A cartridge about half the console's height, all of it down in a pocket as
+        // deep as it is thick, its top flush with the console's.
+        model = {nullptr, 0.6f, 0.2f, 0.5f, -0.069f, 0.47f, 1.03f, true, 0.5f, 0, 0.248f, 0.3f, 0.27f,
                  0.44f, 0.062f, 0.33f};
     } else if (name == "landscape") {
         build = Landscape;
-        model = {nullptr, 1.75f, 0.24f, 0.5f, -0.078f, 0.43f, 0.85f, true, 0.5f, 0, 0.063f, 0.62f, 0.44f,
+        model = {nullptr, 1.75f, 0.24f, 0.5f, -0.078f, 0.43f, 1.03f, true, 0.5f, 0, 0.063f, 0.62f, 0.44f,
                  0.76f, 0.084f, 0.345f};
     } else if (name == "clamshell") {
         build = Clamshell;
