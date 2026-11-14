@@ -7,21 +7,24 @@
 using SocketHandle = SOCKET;
 constexpr int SHUT_BOTH = SD_BOTH;
 #define DEN_CLOSE_SOCKET closesocket
+#define DEN_POLL WSAPoll
 #else
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <sys/select.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
 using SocketHandle = int;
 constexpr SocketHandle INVALID_SOCKET = -1;
 constexpr int SHUT_BOTH = SHUT_RDWR;
 #define DEN_CLOSE_SOCKET ::close
+#define DEN_POLL ::poll
 #endif
 
 #include <atomic>
 #include <mutex>
+#include <vector>
 
 #include "den/platform/stream.h"
 
@@ -99,12 +102,16 @@ private:
     std::mutex write_;
 };
 
+// Listens on 127.0.0.1 and, where the system has it, on ::1 at the same port: Java's
+// InetAddress.getLoopbackAddress() is ::1 on Android, so an engine may connect there.
 class SocketListener final : public Listener {
 public:
-    SocketListener(SocketHandle socket, int port) : socket_(socket), port_(port) {}
+    SocketListener(std::vector<SocketHandle> sockets, int port) : sockets_(std::move(sockets)), port_(port) {}
     ~SocketListener() override {
         Close();
-        DEN_CLOSE_SOCKET(socket_);
+        for (const SocketHandle socket : sockets_) {
+            DEN_CLOSE_SOCKET(socket);
+        }
     }
 
     int Port() const override {
@@ -112,26 +119,33 @@ public:
     }
 
     Result<std::unique_ptr<Stream>> Accept(double seconds) override {
-        // In slices, so a Close from another thread is seen soon.
+        // In slices, so a Close from another thread is seen soon. poll, not select: the
+        // process may hold more descriptors than an fd_set does.
         double left = seconds;
+        std::vector<pollfd> fds;
+        for (const SocketHandle socket : sockets_) {
+            pollfd fd{};
+            fd.fd = socket;
+            fd.events = POLLIN;
+            fds.push_back(fd);
+        }
         while (!closed_) {
             const double slice = left < 0.1 ? left : 0.1;
-            fd_set read;
-            FD_ZERO(&read);
-            FD_SET(socket_, &read);
-            timeval wait{};
-            wait.tv_sec = 0;
-            wait.tv_usec = static_cast<long>(slice * 1e6);
-            const int ready = select(static_cast<int>(socket_) + 1, &read, nullptr, nullptr, &wait);
-            if (ready > 0 && !closed_) {
-                const SocketHandle client = accept(socket_, nullptr, nullptr);
-                if (client == INVALID_SOCKET) {
-                    return Status::Fail("the connection could not be accepted");
-                }
-                return std::unique_ptr<Stream>(new SocketStream(client));
+            for (pollfd& fd : fds) {
+                fd.revents = 0;
             }
+            const int ready = DEN_POLL(fds.data(), static_cast<unsigned>(fds.size()), static_cast<int>(slice * 1000));
             if (ready < 0) {
                 return Status::Fail("the listener failed");
+            }
+            for (const pollfd& fd : fds) {
+                if (ready > 0 && !closed_ && (fd.revents & POLLIN) != 0) {
+                    const SocketHandle client = accept(fd.fd, nullptr, nullptr);
+                    if (client == INVALID_SOCKET) {
+                        return Status::Fail("the connection could not be accepted");
+                    }
+                    return std::unique_ptr<Stream>(new SocketStream(client));
+                }
             }
             left -= slice;
             if (left <= 0) {
@@ -146,7 +160,7 @@ public:
     }
 
 private:
-    SocketHandle socket_;
+    std::vector<SocketHandle> sockets_;
     int port_;
     std::atomic<bool> closed_{false};
 };
@@ -159,22 +173,53 @@ sockaddr_in Loopback(int port) {
     return address;
 }
 
+// ::1 at the port, or nothing when the system has no IPv6 loopback or the port is taken there.
+SocketHandle ListenIpv6(int port) {
+    const SocketHandle listener = socket(AF_INET6, SOCK_STREAM, 0);
+    if (listener == INVALID_SOCKET) {
+        return INVALID_SOCKET;
+    }
+    const int on = 1;
+    setsockopt(listener, IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&on), sizeof(on));
+    sockaddr_in6 address{};
+    address.sin6_family = AF_INET6;
+    address.sin6_port = htons(static_cast<unsigned short>(port));
+    address.sin6_addr = in6addr_loopback;
+    if (bind(listener, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0 || listen(listener, 2) != 0) {
+        DEN_CLOSE_SOCKET(listener);
+        return INVALID_SOCKET;
+    }
+    return listener;
+}
+
 } // namespace
 
 Result<std::unique_ptr<Listener>> ListenLoopback() {
     StartSockets();
-    const SocketHandle listener = socket(AF_INET, SOCK_STREAM, 0);
-    if (listener == INVALID_SOCKET) {
-        return Status::Fail("could not create a socket");
+    // A port free on both addresses; a few tries, then IPv4 alone.
+    for (int attempt = 0; attempt < 8; ++attempt) {
+        const SocketHandle listener = socket(AF_INET, SOCK_STREAM, 0);
+        if (listener == INVALID_SOCKET) {
+            return Status::Fail("could not create a socket");
+        }
+        sockaddr_in address = Loopback(0);
+        socklen_t length = sizeof(address);
+        if (bind(listener, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0 ||
+            listen(listener, 2) != 0 || getsockname(listener, reinterpret_cast<sockaddr*>(&address), &length) != 0) {
+            DEN_CLOSE_SOCKET(listener);
+            return Status::Fail("could not listen on the loopback address");
+        }
+        const int port = ntohs(address.sin_port);
+        std::vector<SocketHandle> sockets = {listener};
+        if (const SocketHandle v6 = ListenIpv6(port); v6 != INVALID_SOCKET) {
+            sockets.push_back(v6);
+        } else if (attempt < 7) {
+            DEN_CLOSE_SOCKET(listener);
+            continue;
+        }
+        return std::unique_ptr<Listener>(new SocketListener(std::move(sockets), port));
     }
-    sockaddr_in address = Loopback(0);
-    socklen_t length = sizeof(address);
-    if (bind(listener, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0 || listen(listener, 2) != 0 ||
-        getsockname(listener, reinterpret_cast<sockaddr*>(&address), &length) != 0) {
-        DEN_CLOSE_SOCKET(listener);
-        return Status::Fail("could not listen on the loopback address");
-    }
-    return std::unique_ptr<Listener>(new SocketListener(listener, ntohs(address.sin_port)));
+    return Status::Fail("could not listen on the loopback address");
 }
 
 Result<std::unique_ptr<Stream>> ConnectLoopback(int port) {
