@@ -210,6 +210,12 @@ Status CoreLedger::Remove(std::string_view core_id) {
     return {};
 }
 
+void CoreLedger::Forget(std::string_view core_id) {
+    if (const auto it = records_.find(core_id); it != records_.end()) {
+        records_.erase(it);
+    }
+}
+
 Status CoreLedger::VerifyForLoad(
     const fs::path& core_file,
     const std::function<std::string(std::string_view sha256)>& blocked) const {

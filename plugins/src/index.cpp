@@ -7,6 +7,7 @@
 #include "den/base/json.h"
 #include "den/plugins/index.h"
 #include "den/plugins/signature.h"
+#include "den/plugins/sources.h"
 #include "json_util.h"
 
 namespace den::plugins {
@@ -80,6 +81,16 @@ std::optional<std::string> Index::BlockedReason(std::string_view sha256) const {
     return std::nullopt;
 }
 
+std::optional<std::string> Index::RevokedKeyReason(std::string_view fingerprint) const {
+    const std::string wanted = CompactFingerprint(fingerprint);
+    for (const RevokedKey& key : revoked_keys) {
+        if (!wanted.empty() && CompactFingerprint(key.fingerprint) == wanted) {
+            return key.reason.empty() ? std::string("withdrawn by EmuDEN") : key.reason;
+        }
+    }
+    return std::nullopt;
+}
+
 Result<Index> ParseIndex(std::string_view text) {
     if (text.size() > MAX_INDEX_SIZE) {
         return Status::Fail("the plugin list is too large");
@@ -130,6 +141,7 @@ Result<Index> ParseIndex(std::string_view text) {
                 return Status::Fail("the plugin list has a package without a checksum");
             }
             plugin.kind = value.String("kind");
+            plugin.engine = value.String("engine");
             if (plugin.kind.empty()) {
                 plugin.kind = "console";
             }
@@ -161,6 +173,11 @@ Result<Index> ParseIndex(std::string_view text) {
                 index.blocked_sha256.push_back(
                     {ToLower(value.String("sha256")), value.String("reason")});
             }
+        }
+    }
+    if (const JsonValue* keys = root->Find("revoked_keys")) {
+        for (const JsonValue& value : keys->items) {
+            index.revoked_keys.push_back({value.String("fingerprint"), value.String("reason")});
         }
     }
     return index;

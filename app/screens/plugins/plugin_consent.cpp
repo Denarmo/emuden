@@ -6,6 +6,7 @@
 
 #include <format>
 
+#include "../home/strings.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/pages.h"
@@ -29,7 +30,7 @@ std::string TrustText(const FeaturePlugin& plugin) {
     case FeaturePlugin::Trust::Official:
         return "From EmuDEN's own source";
     case FeaturePlugin::Trust::ThirdParty:
-        return "From a source you added, not checked by EmuDEN";
+        return TrF("source.from_added", plugin.source_name);
     case FeaturePlugin::Trust::Developer:
         return "A developer folder on this device, not signed";
     }

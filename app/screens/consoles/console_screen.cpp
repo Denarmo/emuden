@@ -9,6 +9,7 @@
 #include <format>
 
 #include "../details/game_prefs.h"
+#include "../home/strings.h"
 #include "bios_import.h"
 #include "console_state.h"
 #include "den/app/app.h"
@@ -110,6 +111,11 @@ public:
             const auto found = Svc().plugins->FindConsole(system);
             return found ? StateText(*found) : std::string();
         }));
+        if (!console->source.empty()) {
+            rows.push_back(ValueRow("console.source", Tr("source.label"), [source = console->source] { return source; },
+                                    [] { Svc().stage->Push("settings", {{"section", "Plugin sources"}}); }));
+            rows.back().description = TrF("source.from_added", console->source);
+        }
         if (console->runner == plugins::Runner::Engine) {
             EngineRows(*console, rows);
         } else {
@@ -142,7 +148,18 @@ private:
         if (ConsoleJob(console.id)) {
             return;
         }
-        TrackConsoleJob(console.id, console.name, done, Svc().plugins->Install(console.id));
+        const auto install = [id = console.id, name = console.name, done] {
+            TrackConsoleJob(id, name, done, Svc().plugins->Install(id));
+        };
+        // A core from an added source is a program EmuDEN did not check: asked before the first install.
+        if (!console.source.empty() && !console.installed) {
+            Svc().stage->Confirm(TrF("source.install_title", console.name),
+                                 TrF("source.from_added", console.source) + ". " +
+                                     TrF("source.core_warning", console.source),
+                                 Tr("source.install"), install);
+            return;
+        }
+        install();
     }
 
     static void CoreRows(const plugins::Console& console, std::vector<ui::RowSpec>& rows) {
