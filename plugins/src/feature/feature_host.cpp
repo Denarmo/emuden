@@ -68,12 +68,9 @@ Result<std::shared_ptr<Runner>> RealFeatureHost::Start(const std::string& id) {
         return Status::Fail("The plugin is not installed.");
     }
     Package& package = found->second;
-    bool expired = false;
-    if (const std::optional<Index> index = CurrentIndex(expired)) {
-        if (const auto reason = index->RevokedReason(id, package.manifest.version)) {
-            return Status::Fail(reason->empty() ? "This plugin was withdrawn by its source."
-                                                : *reason);
-        }
+    const std::vector<SourceView> views = Views();
+    if (const auto reason = RevokedFor(views, ViewOf(views, package), id, package.manifest.version)) {
+        return Status::Fail(reason->empty() ? "This plugin was withdrawn by its source." : *reason);
     }
     if (!Empty(AccessBeyond(package.manifest.access, package.granted))) {
         if (package.trust != FeaturePlugin::Trust::Official) {
@@ -305,13 +302,19 @@ std::string RealFeatureHost::RouteFile(const fs::path& file) {
 }
 
 void RealFeatureHost::Pump() {
-    // The console host fetched a new index: versions, revocations and updates may differ.
+    // The console host fetched a new index or changed the sources: versions, revocations,
+    // updates and the plugins of a removed source may differ.
     if (config_.plugins != nullptr && config_.plugins->Revision() != host_revision_) {
         host_revision_ = config_.plugins->Revision();
-        ++revision_;
+        Scan();
     }
-    bool expired = false;
-    const std::optional<Index> index = CurrentIndex(expired);
+    std::vector<SourceView> views;
+    {
+        std::lock_guard lock(mutex_);
+        if (!running_.empty()) {
+            views = Views();
+        }
+    }
     std::vector<std::shared_ptr<Runner>> retired;
     std::string signature;
     {
@@ -320,8 +323,9 @@ void RealFeatureHost::Pump() {
         for (auto it = running_.begin(); it != running_.end();) {
             const auto package = installed_.find(it->first);
             const bool revoked =
-                index && package != installed_.end() &&
-                index->RevokedReason(it->first, package->second.manifest.version).has_value();
+                package != installed_.end() &&
+                RevokedFor(views, ViewOf(views, package->second), it->first, package->second.manifest.version)
+                    .has_value();
             const bool idle = !it->second.open &&
                               now - it->second.closed_at >= std::chrono::seconds(deps_.idle_seconds);
             if (revoked || idle || package == installed_.end()) {

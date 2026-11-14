@@ -19,6 +19,7 @@
 #include "den/plugins/feature_host.h"
 #include "den/plugins/feature_manifest.h"
 #include "den/plugins/feature_services.h"
+#include "den/plugins/sources.h"
 #include "feature/runner.h"
 
 namespace den::plugins::feature {
@@ -40,6 +41,7 @@ struct Package {
     bool bundled = false;       // ships with the app; cannot be removed
     FeatureAccess granted;      // grant.json
     std::uint64_t data_bytes = 0;
+    std::string origin; // the address of the source it came from
 };
 
 class RealFeatureHost final : public FeatureHost {
@@ -74,8 +76,11 @@ private:
 
     // feature_catalog.cpp
     void Scan();
-    std::optional<Index> CurrentIndex(bool& expired) const;
-    std::string IndexUrl() const;
+    /// The sources, the official one first; one made of the deps' index in tests.
+    std::vector<SourceView> Views() const;
+    /// The view a package's revocations and updates come from (bundled and developer
+    /// packages: the first); views.size() when its source is gone.
+    static std::size_t ViewOf(const std::vector<SourceView>& views, const Package& package);
     FeatureAccess ReadGrant(const std::string& id) const;
     bool WriteGrant(const std::string& id, const FeatureAccess& access) const;
     fs::path DataDir(const std::string& id) const {

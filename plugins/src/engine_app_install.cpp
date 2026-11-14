@@ -27,6 +27,10 @@ fs::path RealHost::EnginesDir() const {
     return config_.data_dir / "engines";
 }
 
+fs::path RealHost::EngineDir(const std::string& key) const {
+    return EnginesDir() / PathFromUtf8(key);
+}
+
 void RealHost::LoadEngines() const {
     if (engines_loaded_) {
         return;
@@ -43,7 +47,8 @@ void RealHost::LoadEngines() const {
         record.executable_sha256 = value.String("executable_sha256");
         record.download_sha256 = value.String("download_sha256");
         record.version = value.String("version");
-        if (IsSafeRelativePath(record.executable) && IsSha256Hex(record.executable_sha256)) {
+        record.origin = value.String("origin");
+        if (IsSafeRelativePath(id) && IsSafeRelativePath(record.executable) && IsSha256Hex(record.executable_sha256)) {
             engines_[id] = std::move(record);
         }
     }
@@ -55,7 +60,8 @@ bool RealHost::SaveEngines() const {
         members.emplace_back(id, JsonObject({{"executable", JsonString(record.executable)},
                                              {"executable_sha256", JsonString(record.executable_sha256)},
                                              {"download_sha256", JsonString(record.download_sha256)},
-                                             {"version", JsonString(record.version)}}));
+                                             {"version", JsonString(record.version)},
+                                             {"origin", JsonString(record.origin)}}));
     }
     std::error_code ec;
     fs::create_directories(EnginesDir(), ec);
@@ -76,23 +82,29 @@ bool RealHost::AppMatches(const Component& core, const pal::engine_apps::Install
     return app.present && app.plays && app.cert_sha256 == spec.cert_sha256 && app.version_code >= spec.min_version_code;
 }
 
-bool RealHost::EngineAppGood(const Component& core) const {
+bool RealHost::EngineAppGood(const Loaded& loaded, const Component& core) const {
     if (IsAndroidKey(deps_.platform_key)) {
         return AppMatches(core, QueryApp(core.engine_app.package, false));
     }
     LoadEngines();
-    const auto it = engines_.find(core.id);
+    const std::string key = LedgerKey(loaded, core);
+    const auto it = engines_.find(key);
     if (it == engines_.end()) {
         return false;
     }
-    const fs::path file = EnginesDir() / PathFromUtf8(core.id) / PathFromUtf8(it->second.executable);
+    const std::size_t origin = OriginOf(loaded);
+    if (BlockedFor(views_, origin, it->second.download_sha256) ||
+        BlockedFor(views_, origin, it->second.executable_sha256)) {
+        return false;
+    }
+    const fs::path file = EngineDir(key) / PathFromUtf8(it->second.executable);
     std::error_code ec;
     const std::uintmax_t size = fs::file_size(file, ec);
     if (ec) {
         return false;
     }
     const fs::file_time_type time = fs::last_write_time(file, ec);
-    Checked& checked = checked_["engine:" + core.id];
+    Checked& checked = checked_["engine:" + key];
     if (checked.size != size || checked.time != time) {
         const auto sha = Sha256File(file);
         checked = {size, time, sha && *sha == it->second.executable_sha256};
@@ -100,17 +112,17 @@ bool RealHost::EngineAppGood(const Component& core) const {
     return checked.good;
 }
 
-bool RealHost::EngineAppUpdate(const Component& core) const {
+bool RealHost::EngineAppUpdate(const Loaded& loaded, const Component& core) const {
     if (IsAndroidKey(deps_.platform_key)) {
         return false; // the system's installer and store update apps
     }
     LoadEngines();
-    const auto it = engines_.find(core.id);
+    const auto it = engines_.find(LedgerKey(loaded, core));
     const Download* download = core.DownloadFor(deps_.platform_key);
     return it != engines_.end() && download != nullptr && it->second.download_sha256 != download->sha256;
 }
 
-CoreInfo RealHost::DescribeEngineApp(const SystemDef& system, const Component& core) const {
+CoreInfo RealHost::DescribeEngineApp(const Loaded& loaded, const SystemDef& system, const Component& core) const {
     CoreInfo info;
     info.id = core.id;
     info.name = core.name;
@@ -126,9 +138,10 @@ CoreInfo RealHost::DescribeEngineApp(const SystemDef& system, const Component& c
     info.engine.store_url = spec.store_url;
     const bool android = IsAndroidKey(deps_.platform_key);
     info.engine.downloadable = android ? spec.apk.has_value() : core.DownloadFor(deps_.platform_key) != nullptr;
-    info.installed = EngineAppGood(core);
+    info.installed = EngineAppGood(loaded, core);
     if (info.installed && !android) {
-        info.library = EnginesDir() / PathFromUtf8(core.id) / PathFromUtf8(engines_.at(core.id).executable);
+        const std::string key = LedgerKey(loaded, core);
+        info.library = EngineDir(key) / PathFromUtf8(engines_.at(key).executable);
         info.engine.executable = info.library;
     }
     // The widescreen row works through the engine's standard setting.
@@ -136,7 +149,7 @@ CoreInfo RealHost::DescribeEngineApp(const SystemDef& system, const Component& c
     return info;
 }
 
-Status RealHost::InstallEngineApp(Job& job, const Component& core, Status result) {
+Status RealHost::InstallEngineApp(Job& job, const Loaded& loaded, const Component& core, Status result) {
     if (IsAndroidKey(deps_.platform_key)) {
         return InstallAndroidApp(job, core, std::move(result));
     }
@@ -146,16 +159,17 @@ Status RealHost::InstallEngineApp(Job& job, const Component& core, Status result
         return Status::Fail(core.name + " is not available on this device.");
     }
     const Download download = *found;
+    std::string key;
     {
         std::lock_guard lock(mutex_);
-        if (index_) {
-            if (const auto reason = index_->BlockedReason(download.sha256)) {
-                return Status::Fail(core.name + " must not be used: " + *reason);
-            }
+        key = LedgerKey(loaded, core);
+        if (const auto reason = BlockedFor(views_, OriginOf(loaded), download.sha256)) {
+            return Status::Fail(core.name + " must not be used: " + *reason);
         }
     }
     job.SetMessage("Downloading " + core.name);
     const fs::path temp = EnginesDir() / "tmp" / PathFromUtf8(core.id + "-" + download.sha256.substr(0, 12));
+    const fs::path dir = EngineDir(key);
     std::error_code ec;
     fs::create_directories(temp.parent_path(), ec);
     Status status = DownloadPinned(deps_.http, download.url, download.sha256, download.size, temp, &job,
@@ -164,7 +178,6 @@ Status RealHost::InstallEngineApp(Job& job, const Component& core, Status result
         return status;
     }
     job.SetMessage("Installing " + core.name);
-    const fs::path dir = EnginesDir() / PathFromUtf8(core.id);
     fs::remove_all(dir, ec);
     fs::create_directories(dir, ec);
     if (download.archive == "zip" && download.entry.ends_with("/")) {
@@ -193,11 +206,11 @@ Status RealHost::InstallEngineApp(Job& job, const Component& core, Status result
     }
     std::lock_guard lock(mutex_);
     LoadEngines();
-    engines_[core.id] = {executable, *sha, download.sha256, core.version};
+    engines_[key] = {executable, *sha, download.sha256, core.version, loaded.origin};
     if (!SaveEngines()) {
         return Status::Fail("The list of installed engines could not be saved.");
     }
-    checked_.erase("engine:" + core.id);
+    checked_.erase("engine:" + key);
     ++revision_;
     job.SetProgress(1.0f);
     return result;
@@ -261,19 +274,20 @@ Status RealHost::InstallAndroidApp(Job& job, const Component& core, Status resul
 }
 
 // Called with the lock held.
-Status RealHost::RemoveEngineApp(const Component& core) {
+Status RealHost::RemoveEngineApp(const Loaded& loaded, const Component& core) {
     if (IsAndroidKey(deps_.platform_key)) {
         return Status::Fail(core.name + " is an app of its own: uninstall it in Android's settings.");
     }
     LoadEngines();
+    const std::string key = LedgerKey(loaded, core);
     std::error_code ec;
-    fs::remove_all(EnginesDir() / PathFromUtf8(core.id), ec);
+    fs::remove_all(EngineDir(key), ec);
     if (ec) {
         return Status::Fail(core.name + " could not be removed (it may be running).");
     }
-    engines_.erase(core.id);
+    engines_.erase(key);
     SaveEngines();
-    checked_.erase("engine:" + core.id);
+    checked_.erase("engine:" + key);
     ++revision_;
     return {};
 }

@@ -75,6 +75,7 @@ struct Console {
     std::string name;       // "Game Boy Advance"
     std::string short_name; // "GBA"
     std::string plugin_id;  // the plugin that provides it
+    std::string source;     // the added source the plugin came from ("jdoe/consoles"); empty: EmuDEN's own
     std::vector<std::string> extensions; // lower case, without the dot
     Runner runner = Runner::Core;
     /// A core console: its core is on disk and matches its checksum. Engine consoles are
@@ -161,6 +162,31 @@ struct CoreInfo {
     }
 };
 
+/// A plugin source, as the Sources page shows it.
+struct SourceInfo {
+    std::string address; // "github:jdoe/consoles@main", "https://x.org/emu/"
+    std::string label;   // "jdoe/consoles"
+    std::string fingerprint; // of the pinned key, "3fa9 12c4 77e0 b5d1"
+    bool official = false;   // built in; cannot be removed or switched off
+    bool enabled = true;
+    std::int64_t checked = 0; // last good check, Unix seconds; 0 = never
+    std::string error;        // what the last check found wrong, user-facing
+    std::size_t offered = 0;  // plugins it offers that are used
+    std::size_t installed = 0; // plugins on this device that came from it
+    std::vector<std::string> notes; // plugins of it that are refused or not used, and why
+};
+
+/// A source checked before the user agrees to add it.
+struct SourceProbe {
+    std::string address, label;
+    std::string ns;  // its plugins' ids start with ns + "."
+    std::string key; // the key it publishes (keys/source.pub), base64
+    std::string fingerprint;
+    bool pinned = false; // the user gave the fingerprint and it matches: nothing to ask
+    std::string name;    // what its plugin list calls itself
+    std::size_t plugins = 0;
+};
+
 class Host {
 public:
     virtual ~Host() = default;
@@ -194,6 +220,29 @@ public:
     virtual JobPtr Refresh() = 0;
     /// Grows whenever consoles or their installed state changed.
     virtual std::uint64_t Revision() const = 0;
+
+    /// The official source first, then the added ones in the order they were added.
+    virtual std::vector<SourceInfo> Sources() const {
+        return {};
+    }
+    /// Reads what the user typed (owner/repo, an https address, "#fingerprint" to pin), fetches
+    /// the source's key and its signed list and checks them; `out` is filled when it is done.
+    virtual JobPtr ProbeSource(const std::string& /*text*/, std::shared_ptr<SourceProbe> /*out*/) {
+        return nullptr;
+    }
+    /// Adds a probed source with its key pinned. Check for updates afterwards to see its plugins.
+    virtual Status AddSource(const SourceProbe& /*probe*/) {
+        return Status::Fail("This version cannot add plugin sources.");
+    }
+    /// A switched-off source is not checked and offers nothing; what came from it stays.
+    virtual Status SetSourceEnabled(const std::string& /*address*/, bool /*enabled*/) {
+        return Status::Fail("This version cannot change plugin sources.");
+    }
+    /// Removes the source and everything installed from it (its consoles' plugins and cores,
+    /// its feature plugins). Games, saves, BIOS files and the plugins' own data stay.
+    virtual JobPtr RemoveSource(const std::string& /*address*/) {
+        return nullptr;
+    }
 };
 
 struct Config {

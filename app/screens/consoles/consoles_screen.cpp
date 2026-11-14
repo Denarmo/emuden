@@ -53,6 +53,9 @@ public:
             } else if (const auto core = svc.plugins->CoreFor(console.id)) {
                 detail += "  ·  " + (core->name.empty() ? core->id : core->name);
             }
+            if (!console.source.empty()) {
+                detail += "  ·  from " + console.source;
+            }
             row.description = std::move(detail);
             rows.push_back(std::move(row));
         }

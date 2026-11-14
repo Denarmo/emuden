@@ -44,6 +44,20 @@ public:
         bar_->visible = !failed_;
         ui::Node* buttons = panel->Add(ui::MakeBox(ui::Axis::Row, 12));
         buttons->pad_top = 16;
+        // A core from an added source is a program EmuDEN did not check: asked first.
+        const auto console = svc.plugins->FindConsole(system);
+        const bool ask = !job_ && !failed_ && !confirmed_ && console && !console->source.empty() && !console->installed;
+        if (ask) {
+            status_->text = TrF("source.from_added", console->source) + ". " +
+                            TrF("source.core_warning", console->source);
+            bar_->visible = false;
+            auto* install = buttons->Emplace<ui::Button>(Tr("source.install"), [this] {
+                confirmed_ = true;
+                Rebuild();
+            });
+            install->id = "install.confirm";
+            install->width = 200;
+        }
         if (failed_) {
             status_->text = error_;
             auto* retry = buttons->Emplace<ui::Button>(Tr("install.retry"), [this] {
@@ -59,7 +73,7 @@ public:
         cancel->id = "install.cancel";
         cancel->width = 200;
 
-        if (!job_ && !failed_) {
+        if (!job_ && !failed_ && !ask) {
             job_ = svc.plugins->Install(system);
         }
     }
@@ -120,6 +134,7 @@ private:
 
     JobPtr job_;
     bool failed_ = false;
+    bool confirmed_ = false;
     std::string error_;
     ui::Label* status_ = nullptr;
     ProgressBar* bar_ = nullptr;

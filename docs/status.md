@@ -39,6 +39,33 @@ one yet), and anything on Android.
 
 `emuden --windowed --size 3840x2160` opens a window of that size (new, for such checks).
 
+## Plugin sources from other developers
+
+Settings > Plugin sources (also from the Plugins page): EmuDEN's own source, always on, and
+the ones the user adds as `owner/repo[@ref]`, a github.com link or an https address that
+serves `index.json`, `index.json.sig` and `keys/source.pub`. Adding fetches the key and the
+signed list and shows the key's fingerprint to confirm; `owner/repo#<16 hex>` adds it only
+with that key and asks nothing. Each source can be switched off, checked again, or removed.
+Kept in the setting `plugins.sources`, one line per source: `<address> <key>[,<key>] on|off`.
+
+- Rules for an added source: ids only in its namespace (the GitHub owner in lower case, or
+  the host of an https source), never `emuden.*`, no `switch2` or `pcstore` engine, no engine
+  scanner; never the console of an official plugin; when two added sources publish an id, the
+  one added first is used. What is left out is listed on the source's page.
+- Every plugin folder names its source (`plugins/<id>/source.json`; none means the official
+  source), cores of an added source are in the ledger as `<plugin>/<core>` with the source as
+  origin, and updates come only from that source.
+- The official index can withdraw a source's key (`revoked_keys`, by fingerprint): nothing
+  of that source loads any more and it cannot be added again.
+- Removing a source removes the console plugins, cores and feature plugins it installed;
+  games, saves, BIOS files and the plugins' own data stay.
+- A core from an added source is installed only after a question naming the source, on the
+  console page and on the "core needed" page.
+
+Tested in `plugins/tests/sources_tests.cpp`; the pages were looked at on Windows. Not done:
+an added source's core as an alternative for an official console (it is refused instead),
+and adding a local folder as a source (the old desktop build had it).
+
 ## An app beside the game, second round (checked on the Retroid)
 
 Three notes from the owner after using the Apps button on the Retroid, and three leftovers
@@ -461,9 +488,18 @@ Only cores that need no BIOS are offered (owner's decision, 2026-11-14). Removed
 Beetle PSX, SwanStation, Beetle Saturn, Beetle Lynx, every BIOS set, and the consoles whose
 every core needs a BIOS (Sega CD, PC Engine CD, PC-FX, Neo Geo, 3DO, ColecoVision,
 Intellivision; MSX came back the same day with blueMSX on the free C-BIOS, cartridges only).
+GBA DS (Denarmo/gba-ds, a libretro port of kyannon/gba-ds) is the GBA core for the 146 games it
+has a second-screen profile for, picked by the ROM code at 0xAC; every other GBA game keeps mGBA.
+Its picture is 240x320, the game over its second screen, so it uses the DS dual-screen layout.
+Aria of Sorrow ran on the Retroid at 60 fps with no gaps, the second screen on the top display.
+A console installed before such a core existed shows an update that installs it.
 PS2 has Play!, built from the fork Denarmo/Play- so that it also runs on
 Android (GT4 PAL reaches its language menu at 50 fps on the Retroid Pocket Duo, and its save
-states load). The PCSX2 notes below are history.
+states load). Since 1.0.6 its OpenGL renderer streams draws and texture uploads through persistent
+buffers: on the Retroid a Colin McRae Rally 3 stage went from 2.3 to 27 fps and a GT4 race from
+9.7 to 27 fps, both still short of full speed (50/60). GT4's race view is noise with Play! on
+Android (HUD fine), before and after. Since 1.0.7 the core fills the frame it reports
+at PAL's 512 lines (before, PAL pictures were shifted down, cut off and letterboxed twice). The PCSX2 notes below are history.
 
 The 24 consoles added on 2026-11-14 (Atari 2600/5200/7800/Lynx/Jaguar, Sega CD/32X/SG-1000,
 PC Engine/CD/PC-FX, Neo Geo/Pocket/Color, WonderSwan/Color, Virtual Boy, Pokémon mini, 3DO,

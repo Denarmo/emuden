@@ -50,7 +50,7 @@ struct CoreRecord {
     std::string download_sha256;
     std::string url;
     std::string version;
-    std::string origin; // "official" (manifest from the signed index) or "bundled"
+    std::string origin; // "official" (manifest from the signed index), "bundled", or an added source's address
     std::vector<std::string> owners; // the plugins it was installed for
 };
 
@@ -73,6 +73,8 @@ public:
     void AddOwner(std::string_view core_id, std::string_view plugin_id);
     /// Forgets the core and deletes its file. Fails when the file is in use.
     Status Remove(std::string_view core_id);
+    /// Forgets the core and leaves its file (another core's took its place).
+    void Forget(std::string_view core_id);
 
     /// Hashes the whole file and compares it with the ledger. `blocked` gives the reason
     /// when a checksum must not be loaded (empty = fine).

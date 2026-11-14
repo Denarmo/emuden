@@ -124,6 +124,15 @@ public:
             }
             AddRows(list, std::move(rows));
         }
+
+        AddHeading(list, "Sources");
+        rows.clear();
+        ui::RowSpec sources = ValueRow(
+            "plugins.sources", "Plugin sources", [] { return std::format("{}", Svc().plugins->Sources().size()); },
+            [] { Svc().stage->Push("settings", {{"section", "Plugin sources"}}); });
+        sources.description = "Where plugins come from: EmuDEN's own source and the ones you added";
+        rows.push_back(std::move(sources));
+        AddRows(list, std::move(rows));
     }
 
     void Update(ui::Context&) override {

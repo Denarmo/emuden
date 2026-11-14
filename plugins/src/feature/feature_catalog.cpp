@@ -62,11 +62,23 @@ FeatureAccess AccessOf(const IndexPlugin& offered) {
     return access;
 }
 
-std::string TrustName(const Package& package, const std::string& source_name) {
+FeaturePlugin::Trust TrustOf(const SourceView& view) {
+    return view.official ? FeaturePlugin::Trust::Official : FeaturePlugin::Trust::ThirdParty;
+}
+
+// The official source by the name its list gives itself, an added one by its address.
+std::string SourceName(const SourceView& view) {
+    if (!view.official) {
+        return view.label;
+    }
+    return view.index && !view.index->source_name.empty() ? view.index->source_name : std::string("EmuDEN");
+}
+
+std::string TrustName(const Package& package, const std::vector<SourceView>& views, std::size_t origin) {
     if (package.trust == FeaturePlugin::Trust::Developer) {
         return "Developer folder";
     }
-    return package.bundled || source_name.empty() ? "EmuDEN" : source_name;
+    return package.bundled || origin >= views.size() ? "EmuDEN" : SourceName(views[origin]);
 }
 
 } // namespace
@@ -101,13 +113,6 @@ RealFeatureHost::RealFeatureHost(const FeatureConfig& config, FeatureDeps deps)
                                            : std::string();
             deps_.downloads_dir = chosen.empty() ? pal::DownloadsDir() : PathFromUtf8(chosen);
         }
-        if (const auto* source = dynamic_cast<const IndexSource*>(config.plugins)) {
-            const Result<SourceLocation> location = ParseSourceUrl(source->SourceText());
-            if (location && source->SourceText() != OFFICIAL_SOURCE) {
-                deps_.source_trust = FeaturePlugin::Trust::ThirdParty;
-                deps_.source_owner = location.value().owner;
-            }
-        }
     }
     if (!deps_.now) {
         deps_.now = [] {
@@ -122,23 +127,28 @@ RealFeatureHost::RealFeatureHost(const FeatureConfig& config, FeatureDeps deps)
     Scan();
 }
 
-std::optional<Index> RealFeatureHost::CurrentIndex(bool& expired) const {
-    expired = false;
+std::vector<SourceView> RealFeatureHost::Views() const {
     if (deps_.index) {
-        return deps_.index();
+        SourceView view;
+        view.address = deps_.index_url;
+        view.label = deps_.source_owner;
+        view.ns = ToLower(deps_.source_owner);
+        view.official = deps_.source_trust == FeaturePlugin::Trust::Official;
+        view.index = deps_.index();
+        view.index_url = deps_.index_url;
+        return {std::move(view)};
     }
     if (const auto* source = dynamic_cast<const IndexSource*>(config_.plugins)) {
-        return source->OfferedIndex(expired);
+        return source->SourceViews();
     }
-    return std::nullopt;
+    return {};
 }
 
-std::string RealFeatureHost::IndexUrl() const {
-    if (!deps_.index_url.empty()) {
-        return deps_.index_url;
+std::size_t RealFeatureHost::ViewOf(const std::vector<SourceView>& views, const Package& package) {
+    if (package.bundled || package.trust == FeaturePlugin::Trust::Developer || package.origin.empty()) {
+        return 0;
     }
-    const auto* source = dynamic_cast<const IndexSource*>(config_.plugins);
-    return source != nullptr ? source->IndexUrl() : std::string();
+    return FindView(views, package.origin);
 }
 
 FeatureAccess RealFeatureHost::ReadGrant(const std::string& id) const {
@@ -180,12 +190,24 @@ void RealFeatureHost::Scan() {
         }
         take(std::move(package), dir);
     }
+    const std::vector<SourceView> views = Views();
     for (const fs::path& dir : ListDirectory(plugins_dir_)) {
+        // Without a source.json a plugin came from the first source, the official one.
+        const std::string named = ReadOrigin(dir);
+        const std::size_t origin = named.empty() ? 0 : FindView(views, named);
+        FeaturePlugin::Trust trust = deps_.source_trust;
+        std::string ns = deps_.source_owner;
+        if (origin < views.size()) {
+            trust = TrustOf(views[origin]);
+            ns = views[origin].ns;
+        } else if (!named.empty()) {
+            continue; // its source was removed
+        }
         for (const fs::path& version : ListDirectory(dir)) {
-            std::optional<Package> package =
-                ReadPackage(version, deps_.source_trust, deps_.source_owner);
+            std::optional<Package> package = ReadPackage(version, trust, ns);
             // A folder is a version only under its own name; an unfinished install is not.
             if (package && PathToUtf8(version.filename()) == package->manifest.version.Text()) {
+                package->origin = origin < views.size() ? views[origin].address : std::string();
                 take(std::move(package), dir);
             }
         }
@@ -205,19 +227,20 @@ void RealFeatureHost::Scan() {
 }
 
 std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
-    bool expired = false;
-    const std::optional<Index> index = CurrentIndex(expired);
+    const std::vector<SourceView> views = Views();
+    const Catalogue catalogue = MergeCatalogue(views);
     std::vector<FeaturePlugin> out;
     std::lock_guard lock(mutex_);
     for (const auto& [id, package] : installed_) {
         const FeatureManifest& manifest = package.manifest;
+        const std::size_t origin = ViewOf(views, package);
         FeaturePlugin plugin;
         plugin.id = id;
         plugin.name = manifest.name;
         plugin.version = manifest.version.Text();
         plugin.publisher = manifest.publisher;
         plugin.summary = manifest.summary;
-        plugin.source_name = TrustName(package, index ? index->source_name : std::string());
+        plugin.source_name = TrustName(package, views, origin);
         plugin.trust = package.trust;
         plugin.installed = true;
         plugin.permissions = PermissionLines(manifest.access);
@@ -232,11 +255,13 @@ std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
             plugin.needs_consent = true;
             plugin.new_permissions = PermissionLines(beyond);
         }
-        const IndexPlugin* offered = index && !expired ? index->Find(id) : nullptr;
+        // Only the plugin's own source updates it.
+        const IndexPlugin* offered =
+            origin < views.size() && views[origin].Offers() ? views[origin].index->Find(id) : nullptr;
         if (offered != nullptr && offered->kind == "feature" &&
             package.trust != FeaturePlugin::Trust::Developer &&
             offered->version > manifest.version &&
-            !index->RevokedReason(id, offered->version)) {
+            !RevokedFor(views, origin, id, offered->version)) {
             plugin.update_available = true;
             const FeatureAccess granted =
                 Empty(package.granted) ? manifest.access : package.granted;
@@ -246,10 +271,8 @@ std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
                 plugin.new_permissions = PermissionLines(beyond);
             }
         }
-        if (index) {
-            if (const auto reason = index->RevokedReason(id, manifest.version)) {
-                plugin.error = reason->empty() ? "This plugin was withdrawn by its source." : *reason;
-            }
+        if (const auto reason = RevokedFor(views, origin, id, manifest.version)) {
+            plugin.error = reason->empty() ? "This plugin was withdrawn by its source." : *reason;
         }
         if (const auto running = running_.find(id); running != running_.end()) {
             plugin.running = !running->second.runner->Stopped();
@@ -259,27 +282,26 @@ std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
         }
         out.push_back(std::move(plugin));
     }
-    if (index && !expired) {
-        for (const IndexPlugin& offered : index->plugins) {
-            if (offered.kind != "feature" || installed_.contains(offered.id) ||
-                index->RevokedReason(offered.id, offered.version)) {
-                continue;
-            }
-            FeaturePlugin plugin;
-            plugin.id = offered.id;
-            plugin.name = offered.name;
-            plugin.version = offered.version.Text();
-            plugin.publisher = offered.publisher;
-            plugin.summary = offered.summary;
-            plugin.source_name = index->source_name;
-            plugin.trust = deps_.source_trust;
-            plugin.permissions = PermissionLines(AccessOf(offered));
-            if (deps_.source_trust != FeaturePlugin::Trust::Official) {
-                plugin.needs_consent = true;
-                plugin.new_permissions = plugin.permissions;
-            }
-            out.push_back(std::move(plugin));
+    for (const Offer& offer : catalogue.offers) {
+        const IndexPlugin& offered = *offer.plugin;
+        const SourceView& view = views[offer.source];
+        if (offered.kind != "feature" || installed_.contains(offered.id)) {
+            continue;
         }
+        FeaturePlugin plugin;
+        plugin.id = offered.id;
+        plugin.name = offered.name;
+        plugin.version = offered.version.Text();
+        plugin.publisher = offered.publisher;
+        plugin.summary = offered.summary;
+        plugin.source_name = SourceName(view);
+        plugin.trust = TrustOf(view);
+        plugin.permissions = PermissionLines(AccessOf(offered));
+        if (plugin.trust != FeaturePlugin::Trust::Official) {
+            plugin.needs_consent = true;
+            plugin.new_permissions = plugin.permissions;
+        }
+        out.push_back(std::move(plugin));
     }
     return out;
 }

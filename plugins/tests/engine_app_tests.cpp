@@ -7,6 +7,7 @@
 
 #include "den/plugins/installer.h"
 #include "den/plugins/manifest.h"
+#include "den/plugins/sources.h"
 #include "den/store/settings.h"
 #include "feature_test_util.h"
 
@@ -95,6 +96,30 @@ TEST_CASE("an engine app that is not pinned is refused", "[plugins][engine-app]"
     auto manifest = ParseManifest(ManifestText(desktop_only));
     REQUIRE(manifest);
     CHECK(manifest->CoresFor(manifest->systems.front(), "android-arm64").empty());
+}
+
+TEST_CASE("an added source offers only engine apps of its own namespace", "[plugins][engine-app]") {
+    const auto from = [](const std::string& package, const std::string& plugin = "jdoe.testcon") {
+        std::string text = ManifestText(EngineComponent(std::string(64, 'c'), 10));
+        for (const std::string& old : {std::string("emuden.testcon"), std::string("io.github.example.testengine")}) {
+            for (std::size_t at = text.find(old); at != std::string::npos; at = text.find(old)) {
+                text.replace(at, old.size(), old == "emuden.testcon" ? plugin : package);
+            }
+        }
+        return ParseManifest(text);
+    };
+    auto own = from("io.github.jdoe.testengine");
+    REQUIRE(own);
+    CHECK(CheckThirdPartyManifest(*own, "jdoe").ok);
+    auto plain = from("jdoe.testengine");
+    REQUIRE(plain);
+    CHECK(CheckThirdPartyManifest(*plain, "jdoe").ok);
+    auto other = from("org.ppsspp.ppsspp");
+    REQUIRE(other);
+    CHECK_FALSE(CheckThirdPartyManifest(*other, "jdoe").ok);
+    auto host = from("org.example.testengine", "example.org.testcon");
+    REQUIRE(host);
+    CHECK(CheckThirdPartyManifest(*host, "example.org").ok);
 }
 
 TEST_CASE("a desktop engine app is installed, verified and removed", "[plugins][engine-app]") {
