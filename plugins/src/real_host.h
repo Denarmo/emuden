@@ -51,9 +51,13 @@ inline bool BiosPresent(const fs::path& dir, const BiosFile& file) {
     return fs::is_regular_file(path, ec);
 }
 
-inline std::vector<std::string> MissingBios(const fs::path& dir, const Console& console) {
+inline std::vector<std::string> MissingBios(const fs::path& dir, const Console& console,
+                                            std::string_view core_id = {}) {
     std::vector<std::string> missing;
     for (const BiosSet& set : console.bios) {
+        if (!set.cores.empty() && std::find(set.cores.begin(), set.cores.end(), core_id) == set.cores.end()) {
+            continue; // another core's
+        }
         bool any = false;
         std::vector<std::string> required;
         for (const BiosFile& file : set.files) {
@@ -347,7 +351,7 @@ private:
         info.option_hints = core.forced_core_options;
         info.widescreen_options = core.widescreen_options;
         info.widescreen_restart = core.widescreen_restart;
-        info.missing_bios = MissingBios(bios_dir_, system.console);
+        info.missing_bios = MissingBios(bios_dir_, system.console, core.id);
         info.installed = CoreGood(core);
         if (info.installed) {
             info.library = ledger_.Directory() / PathFromUtf8(ledger_.Find(core.id)->file);

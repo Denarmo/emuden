@@ -209,7 +209,11 @@ private:
             if (!chosen->system_dir.empty()) {
                 rows.push_back(ValueRow("console.bios_dir", "BIOS folder",
                                         [dir = PathToUtf8(chosen->system_dir)] { return dir; }));
-                if (!console.bios.empty()) {
+                const bool needs_bios = std::any_of(console.bios.begin(), console.bios.end(), [&](const auto& set) {
+                    return set.cores.empty() ||
+                           std::find(set.cores.begin(), set.cores.end(), chosen->id) != set.cores.end();
+                });
+                if (needs_bios) {
                     rows.push_back(ActionRow(
                         "console.bios_import", "Add BIOS files",
                         [console, dir = chosen->system_dir] { ImportBios(console, dir); },

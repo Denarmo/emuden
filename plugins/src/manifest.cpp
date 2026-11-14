@@ -164,6 +164,7 @@ void ParseBios(const JsonValue& sets, Console& console) {
         BiosSet out;
         out.label = set.String("label");
         out.any_one = json::Bool(set, "any_one", false);
+        out.cores = json::Strings(set, "cores", false);
         if (const JsonValue* files = set.Find("files")) {
             for (const JsonValue& file : files->items) {
                 const std::string path = file.String("path");

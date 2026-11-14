@@ -44,6 +44,7 @@ struct BiosSet {
     std::string label;
     bool any_one = false; // one of the files is enough
     std::vector<BiosFile> files;
+    std::vector<std::string> cores; // the cores that need it (empty = every core)
 };
 
 /// Where a ROM keeps its own title.

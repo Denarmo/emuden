@@ -5,6 +5,9 @@
 #include <mutex>
 
 #include <SDL3/SDL.h>
+#ifdef __ANDROID__
+#include <jni.h>
+#endif
 
 #include "den/base/files.h"
 #include "den/base/log.h"
@@ -283,6 +286,21 @@ Result<std::unique_ptr<Window>> CreateAppWindow(const WindowDesc& desc) {
 
 void* GlProcAddress(const char* name) {
     return reinterpret_cast<void*>(SDL_GL_GetProcAddress(name));
+}
+
+void* JavaVm() {
+#ifdef __ANDROID__
+    static JavaVM* vm = [] {
+        JavaVM* found = nullptr;
+        if (auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv())) {
+            env->GetJavaVM(&found);
+        }
+        return found;
+    }();
+    return vm;
+#else
+    return nullptr;
+#endif
 }
 
 std::filesystem::path ExecutableDir() {

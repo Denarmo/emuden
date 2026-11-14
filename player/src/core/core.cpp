@@ -10,6 +10,7 @@
 
 #include "core/core_impl.h"
 #include "den/base/files.h"
+#include "den/platform/pal.h"
 
 namespace den::player {
 
@@ -90,6 +91,18 @@ std::unique_ptr<LibretroCore> LibretroCore::Load(const LoadParams& params, std::
 #undef DEN_LOAD
     if (missing) {
         return fail(std::string("This file is not a libretro core (no ") + missing + ").");
+    }
+    // A core built to be loaded by Java finds the Java VM through JNI_OnLoad, which only
+    // System.loadLibrary calls; Play! asks for it with its own setter.
+    if (void* vm = pal::JavaVm()) {
+        auto* object = static_cast<SDL_SharedObject*>(c.library);
+        if (auto on_load = reinterpret_cast<int (*)(void*, void*)>(SDL_LoadFunction(object, "JNI_OnLoad"))) {
+            on_load(vm, nullptr);
+        }
+        if (auto set_vm = reinterpret_cast<void (*)(void*)>(
+                SDL_LoadFunction(object, "_ZN9Framework7CJavaVM9SetJavaVMEP7_JavaVM"))) {
+            set_vm(vm);
+        }
     }
     if (c.retro_api_version() != RETRO_API_VERSION) {
         return fail("The core uses an unsupported libretro version.");

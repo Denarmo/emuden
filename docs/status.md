@@ -463,6 +463,12 @@ PS2 save states are broken with this core: a resumed game draws GT4's menu witho
 and runs at 60 fps instead of 50, and loading a slot during play crashed the app inside the
 core's `retro_unserialize`. Not fixed yet.
 
+Play! (PS2 without a BIOS): Windows and Linux. On Windows (`den_player_play`) Gran Turismo 4
+(PAL) reached its language menu with no BIOS file, text drawn, 2,525 frames in 120 s at the
+core's reported 60 fps. On Android it crashed: first in `CJavaVM::AttachCurrentThread` (its
+Java VM is set by `JNI_OnLoad`, which `dlopen` does not call; the core loader now hands it
+the app's VM), then inside its I/O processor recompiler. So it has no Android download.
+
 Pause, save state and exit to home were confirmed on one game per console in the first
 round (Tetris, Mario Tennis, Pokemon - Lazarus, Explorers of Skies, Gran Turismo 2,
 PoPoLoCrois).

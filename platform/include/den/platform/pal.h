@@ -83,6 +83,9 @@ public:
 Result<std::unique_ptr<Window>> CreateAppWindow(const WindowDesc& desc);
 /// Looks up an OpenGL function of the current context; the loader gfx is started with.
 void* GlProcAddress(const char* name);
+/// The Java VM of an Android app (a JavaVM*), for native code that calls into Java from its
+/// own threads; null on the other systems.
+void* JavaVm();
 
 // Folders.
 std::filesystem::path ExecutableDir();

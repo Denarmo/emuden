@@ -145,7 +145,10 @@ TEST_CASE("every bundled manifest is read") {
             CHECK(console.bios[0].files.size() == 3);
         } else if (manifest->id == "emuden.ps2") {
             const auto cores = manifest->CoresFor(manifest->systems.front(), "android-arm64");
-            REQUIRE(cores.size() == 1);
+            REQUIRE(cores.size() == 1); // Play! has no Android build yet
+            CHECK(manifest->CoresFor(manifest->systems.front(), "windows-x86_64").size() == 2);
+            REQUIRE(console.bios.size() == 1);
+            CHECK(console.bios[0].cores == std::vector<std::string>{"pcsx2"});
             CHECK(cores[0]->widescreen_restart);
             REQUIRE(cores[0]->widescreen_options.size() == 2);
             CHECK(cores[0]->widescreen_options[0].second == "enabled (16:9)");
