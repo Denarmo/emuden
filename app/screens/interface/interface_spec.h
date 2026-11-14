@@ -18,11 +18,26 @@
 
 namespace den::app {
 
+/// The object a game is in the "shelf3d" layout. Sizes are relative to the object's height.
+struct ObjectLook {
+    std::string shape = "case"; // "cartridge", "card", "case", "jewel" or "disc"
+    float aspect = 0;           // the front's width over its height; 0: the shape's own
+    float depth = 0;            // thickness over height; 0: the shape's own
+    gfx::Color shell{28, 29, 34, 255};
+    bool has_shell = false;     // false: the shape's own colour
+    gfx::Rect label{0, 0, 0, 0}; // the part of the front the cover is on; empty: the shape's own
+    bool disc = false;          // a case or jewel case with a disc that slides out when chosen
+    float radius = -1;          // the top corners' rounding; below 0: the shape's own
+    float notch = -1;           // the top-right corner cut off at 45 degrees; below 0: the shape's own
+    int grip = -1;              // ridges under a cartridge's label; below 0: the shape's own
+};
+
 /// How one console looks: its colour, a wallpaper of the package and the label on its tab.
 struct ConsoleLook {
     gfx::Color color{90, 96, 120, 255};
     std::string wallpaper; // UTF-8 path inside the package, or empty
     std::string label;     // empty: the console's short name
+    ObjectLook object;
 };
 
 struct InterfaceSpec {
@@ -30,7 +45,8 @@ struct InterfaceSpec {
     std::filesystem::path dir; // the package
 
     /// The layout that draws it. "carousel": consoles as tabs, one row of covers with the
-    /// selected one large in the middle.
+    /// selected one large in the middle. "shelf3d": the same row as 3D objects (cartridges,
+    /// cases, discs) that turn towards the selected one.
     std::string layout = "carousel";
 
     gfx::Color background{16, 17, 24, 255};
@@ -52,6 +68,9 @@ struct InterfaceSpec {
     float reflection = 0.18f;   // opacity of the mirrored cover under it; 0 = none
     float bob = 4;              // the selected cover floats up and down by this much
     float speed = 12;           // how fast the row glides (higher is snappier)
+
+    float side_angle = 0.9f; // shelf3d: how far side objects turn towards the middle (radians)
+    float sway = 0.12f;      // shelf3d: the selected object's slow turn either way (radians)
 
     bool tab_recent = true; // a "Recent" tab first when something was played
     bool tab_all = true;    // an "All" tab with every game

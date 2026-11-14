@@ -17,7 +17,8 @@
 
 namespace den::app {
 
-class CoverCarousel final : public ui::Node {
+/// The 2D layout ("carousel"); ObjectShelf draws the same row in 3D ("shelf3d").
+class CoverCarousel : public ui::Node {
 public:
     explicit CoverCarousel(std::shared_ptr<const InterfaceSpec> spec);
 
@@ -51,7 +52,7 @@ protected:
     void DrawContent(ui::Context& ctx) override;
     void OnTick(ui::Context& ctx) override;
 
-private:
+protected:
     struct Slot {
         gfx::Rect rect;
         float weight = 0; // 1 for the selected cover, 0 beside it

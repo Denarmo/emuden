@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// The "carousel" layout of interface plugins: consoles as coloured tabs along the top (the
+// The "carousel" and "shelf3d" layouts of interface plugins: consoles as coloured tabs along the top (the
 // shoulder buttons step through them), one gliding row of covers, and the selected game's
 // name and records under it, over a backdrop in the console's colour. The plugin's spec sets
 // the colours, art and motion; the page is drawn with a copy of the app's theme in them.
@@ -14,6 +14,7 @@
 #include "../home/games.h"
 #include "../home/strings.h"
 #include "cover_carousel.h"
+#include "object_shelf.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
@@ -130,7 +131,11 @@ public:
             AddScreens(root);
             return;
         }
-        carousel_ = root.Emplace<CoverCarousel>(spec_);
+        if (spec_->layout == "shelf3d") {
+            carousel_ = root.Emplace<ObjectShelf>(spec_);
+        } else {
+            carousel_ = root.Emplace<CoverCarousel>(spec_);
+        }
         carousel_->on_select = [this](const library::Entry& game) { ShowGame(game); };
         carousel_->on_activate = [this] {
             if (const library::Entry* game = carousel_->Selected(); game && !carousel_->Launching()) {

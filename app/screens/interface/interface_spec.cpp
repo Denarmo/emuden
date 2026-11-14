@@ -85,10 +85,40 @@ std::string PackageImage(const std::filesystem::path& dir, const std::string& re
     return PathToUtf8(dir / PathFromUtf8(relative));
 }
 
+void ReadObject(const JsonValue* object, ObjectLook& out) {
+    if (object == nullptr || object->kind != JsonValue::Kind::Object) {
+        return;
+    }
+    ReadChoice(object, "shape", {"cartridge", "card", "case", "jewel", "disc"}, out.shape);
+    ReadNumber(object, "aspect", 0.3f, 2.5f, out.aspect);
+    ReadNumber(object, "depth", 0.01f, 0.6f, out.depth);
+    if (const auto shell = ParseColor(object->String("shell"))) {
+        out.shell = *shell;
+        out.has_shell = true;
+    }
+    ReadBool(object, "disc", out.disc);
+    ReadNumber(object, "radius", 0, 0.45f, out.radius);
+    ReadNumber(object, "notch", 0, 0.4f, out.notch);
+    float grip = static_cast<float>(out.grip);
+    ReadNumber(object, "grip", 0, 8, grip);
+    out.grip = static_cast<int>(grip);
+    const JsonValue* label = object->Find("label");
+    if (label != nullptr && label->kind == JsonValue::Kind::Array && label->items.size() == 4) {
+        float v[4];
+        for (int i = 0; i < 4; ++i) {
+            const JsonValue& item = label->items[static_cast<std::size_t>(i)];
+            v[i] = item.kind == JsonValue::Kind::Number ? std::clamp(static_cast<float>(item.number), 0.0f, 1.0f) : 0;
+        }
+        if (v[2] > 0.05f && v[3] > 0.05f && v[0] + v[2] <= 1.001f && v[1] + v[3] <= 1.001f) {
+            out.label = gfx::Rect{v[0], v[1], v[2], v[3]};
+        }
+    }
+}
+
 } // namespace
 
 bool KnownLayout(std::string_view layout) {
-    return layout == "carousel";
+    return layout == "carousel" || layout == "shelf3d";
 }
 
 ConsoleLook InterfaceSpec::LookFor(std::string_view system, std::string_view group) const {
@@ -140,6 +170,13 @@ Result<InterfaceSpec> ParseInterface(std::string_view manifest_json, const std::
     ReadNumber(covers, "bob", 0, 16, spec.bob);
     ReadNumber(covers, "speed", 4, 40, spec.speed);
 
+    const JsonValue* objects = look->Find("objects");
+    float side_degrees = 52, sway_degrees = 7;
+    ReadNumber(objects, "side_angle", 0, 80, side_degrees);
+    ReadNumber(objects, "sway", 0, 30, sway_degrees);
+    spec.side_angle = side_degrees * 0.0174533f;
+    spec.sway = sway_degrees * 0.0174533f;
+
     const JsonValue* tabs = look->Find("tabs");
     ReadBool(tabs, "recent", spec.tab_recent);
     ReadBool(tabs, "all", spec.tab_all);
@@ -157,6 +194,7 @@ Result<InterfaceSpec> ParseInterface(std::string_view manifest_json, const std::
             ReadColor(&value, "color", console.color);
             console.wallpaper = PackageImage(dir, value.String("wallpaper"));
             console.label = value.String("label").substr(0, 16);
+            ReadObject(value.Find("object"), console.object);
             spec.consoles[key] = std::move(console);
         }
     }
