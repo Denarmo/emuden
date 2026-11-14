@@ -240,6 +240,9 @@ public:
 
     std::vector<ui::Hint> Hints() const override {
         std::vector<ui::Hint> hints;
+        if (carousel_ && carousel_->Launching()) {
+            return hints; // the launch has the whole screen
+        }
         if (OnCarousel() && carousel_->Selected()) {
             hints = {{input::Nav::Confirm, Tr("hint.start")},
                      {input::Nav::Option, Tr("hint.details")},
