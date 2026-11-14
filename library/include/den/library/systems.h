@@ -48,6 +48,9 @@ struct SystemDef {
     /// Cover addresses (https) with "{id}" for the game file's own text, a short id such as a
     /// store's app id; tried in order. For consoles whose games are files naming an id.
     std::vector<std::string> cover_by_id;
+    /// The LaunchBox Games Database platform ("Nintendo Game Boy Advance"); when empty it is
+    /// found from `libretro_thumbnails`.
+    std::string launchbox;
 };
 
 /// The systems of a manifest: a whole plugin.json, its "systems" array, or one system object.

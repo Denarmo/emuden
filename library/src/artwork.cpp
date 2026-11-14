@@ -8,6 +8,8 @@
 #include "den/base/files.h"
 #include "den/library/artwork.h"
 #include "den/library/content.h"
+#include "den/library/launchbox_covers.h"
+#include "den/library/names.h"
 
 namespace den::library {
 
@@ -119,8 +121,55 @@ std::string WithId(std::string url, const std::string& id) {
 Artwork::Artwork(fs::path cache_dir, HttpFetcher fetcher, HeaderFetcher header_fetcher, int interval_ms)
     : cache_dir_(std::move(cache_dir)), fetcher_(std::move(fetcher)),
       sources_(cache_dir_ / "hacks", header_fetcher ? std::move(header_fetcher) : WithoutHeaders(fetcher_),
-               interval_ms) {
+               interval_ms),
+      launchbox_(std::make_unique<LaunchBoxCovers>(cache_dir_ / "launchbox", fetcher_)) {
     hack_options_.collections = DefaultHackCollections();
+}
+
+Artwork::~Artwork() = default;
+
+// The LaunchBox Games Database's front cover, matched by name on the console's platform.
+bool Artwork::ResolveLaunchBox(const Entry& entry, const SystemDef& system, const std::function<bool()>& stopping,
+                               ArtworkResult& result, std::string* title) {
+    if (system.launchbox.empty() && system.libretro_thumbnails.empty()) {
+        return false;
+    }
+    const std::string original = entry.original_name.empty() ? entry.name : entry.original_name;
+    const fs::path stem =
+        cache_dir_ / "launchbox-covers" / PathFromUtf8(system.id) / PathFromUtf8(CacheFileName(original));
+    if (fs::path cached = FindCached(stem); !cached.empty() && title == nullptr) {
+        result = {std::move(cached), ArtworkSource::Cache};
+        return true;
+    }
+    const fs::path miss = WithSuffix(stem, ".miss");
+    if (!fetcher_ || (stopping && stopping()) || (title == nullptr && IsFresh(miss, MISS_LIFETIME))) {
+        return false;
+    }
+    std::vector<std::string> titles{entry.name};
+    if (std::string base = ParseGameName(original).base; base != entry.name) {
+        titles.push_back(std::move(base));
+    }
+    bool answered = true;
+    const auto cover = launchbox_->Find(system, titles, RegionTags(original), answered);
+    if (!cover) {
+        if (answered) {
+            Touch(miss);
+        }
+        return false;
+    }
+    if (title != nullptr) {
+        *title = cover->title;
+    }
+    if (fs::path cached = FindCached(stem); !cached.empty()) {
+        result = {std::move(cached), ArtworkSource::Cache};
+        return true;
+    }
+    bool reached = false;
+    if (fs::path file; Download(cover->url, stem, file, reached)) {
+        result = {std::move(file), ArtworkSource::Downloaded};
+        return true;
+    }
+    return false;
 }
 
 void Artwork::SetHackOptions(HackCoverOptions options) {
@@ -279,6 +328,11 @@ bool Artwork::ResolveHack(const Entry& entry, const SystemDef& system, const Thu
 std::vector<CoverChoice> Artwork::Choices(const Entry& entry, const SystemDef* system,
                                           const std::function<bool()>& stopping) {
     std::vector<CoverChoice> out;
+    if (std::string title; system != nullptr) {
+        if (ArtworkResult found; ResolveLaunchBox(entry, *system, stopping, found, &title)) {
+            out.push_back({"launchbox", title, PathToUtf8(found.path)});
+        }
+    }
     if (system == nullptr || system->libretro_thumbnails.empty() || !fetcher_) {
         return out;
     }
@@ -352,6 +406,9 @@ ArtworkResult Artwork::Resolve(const Entry& entry, const SystemDef* system,
                 }
             }
         }
+    }
+    if (ArtworkResult result; system != nullptr && ResolveLaunchBox(entry, *system, stopping, result)) {
+        return result;
     }
     if (system != nullptr && !system->libretro_thumbnails.empty()) {
         const fs::path stem =

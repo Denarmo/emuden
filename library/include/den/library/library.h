@@ -73,7 +73,7 @@ struct Folder {
 
 /// A cover the user may pick for a game ("Find cover").
 struct CoverChoice {
-    std::string source; // "collection", "libretro", "retroachievements", "steamgriddb", "base"
+    std::string source; // "collection", "libretro", "launchbox", "retroachievements", "steamgriddb", "base"
     std::string title;  // the name at the source
     std::string image;  // UTF-8 path of the downloaded image
 };

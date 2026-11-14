@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <string_view>
@@ -22,6 +23,8 @@
 #include "den/library/systems.h"
 
 namespace den::library {
+
+class LaunchBoxCovers;
 
 /// The box art names of one system in the libretro thumbnail collection (without ".png"), with
 /// the match key of each (see MatchKey) worked out once.
@@ -88,6 +91,7 @@ public:
     /// `interval_ms` between two requests to one host.
     Artwork(std::filesystem::path cache_dir, HttpFetcher fetcher, HeaderFetcher header_fetcher = {},
             int interval_ms = 0);
+    ~Artwork();
 
     void SetHackOptions(HackCoverOptions options);
 
@@ -109,6 +113,8 @@ private:
     bool ResolveHack(const Entry& entry, const SystemDef& system, const ThumbnailIndex& index,
                      const std::string& original, const std::function<bool()>& stopping,
                      ArtworkResult& result);
+    bool ResolveLaunchBox(const Entry& entry, const SystemDef& system, const std::function<bool()>& stopping,
+                          ArtworkResult& result, std::string* title = nullptr);
     HackQuery QueryFor(const Entry& entry, const SystemDef& system, const ThumbnailIndex& index,
                        const std::string& original);
     HackCoverOptions HackOptions();
@@ -116,6 +122,7 @@ private:
     std::filesystem::path cache_dir_;
     HttpFetcher fetcher_;
     HackSources sources_;
+    std::unique_ptr<LaunchBoxCovers> launchbox_;
     std::mutex index_mutex_;
     std::map<std::string, ThumbnailIndex> indexes_;
     std::mutex options_mutex_;

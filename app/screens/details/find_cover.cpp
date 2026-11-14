@@ -35,6 +35,9 @@ std::string SourceName(const std::string& source) {
     if (source == "steamgriddb") {
         return "SteamGridDB";
     }
+    if (source == "launchbox") {
+        return "LaunchBox Games Database";
+    }
     return "Original game";
 }
 

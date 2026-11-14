@@ -1,0 +1,122 @@
+// SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include <filesystem>
+#include <map>
+#include <catch2/catch_test_macros.hpp>
+#include "den/base/files.h"
+#include "den/library/artwork.h"
+#include "den/library/launchbox_covers.h"
+#include "den/library/systems.h"
+
+using namespace den;
+using namespace den::library;
+namespace fs = std::filesystem;
+
+namespace {
+
+fs::path FreshDir(const char* name) {
+    const fs::path dir = fs::temp_directory_path() / "den_launchbox_tests" / name;
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+    return dir;
+}
+
+const std::string DATA(LAUNCHBOX_DATA);
+
+std::map<std::string, std::string> FakeData() {
+    return {
+        {DATA + "manifest.json",
+         R"({"format":1,"version":"2026-11-14","images":"https://images.example/",
+             "libretro":{"Nintendo - Game Boy Advance":"Nintendo Game Boy Advance"},
+             "platforms":{"Nintendo Game Boy Advance":{"dir":"nintendo-game-boy-advance","games":2,"buckets":["c","l"]}}})"},
+        {DATA + "covers/nintendo-game-boy-advance/c.json",
+         R"({"castlevaniaariaofsorrow":[[3349,"Castlevania: Aria of Sorrow",
+             [["Europe","eu.jpg"],["Japan","jp.png"],["North America","na.jpg"]]]]})"},
+        {DATA + "covers/nintendo-game-boy-advance/l.json",
+         R"({"legendofzeldaalinktothepastandfourswords":[[5,"The Legend of Zelda: A Link to the Past & Four Swords",[["","z.jpg"]]]]})"},
+        {"https://images.example/eu.jpg", "\xFF\xD8\xFF" "europe"},
+        {"https://images.example/na.jpg", "\xFF\xD8\xFF" "america"},
+    };
+}
+
+SystemDef Gba() {
+    SystemDef gba;
+    gba.id = "gba";
+    gba.libretro_thumbnails = "Nintendo - Game Boy Advance";
+    return gba;
+}
+
+} // namespace
+
+TEST_CASE("LaunchBox keys fold titles the way the data does") {
+    CHECK(LaunchBoxKey("The Legend of Zelda: A Link to the Past") == "legendofzeldaalinktothepast");
+    CHECK(LaunchBoxKey("Legend of Zelda, The - A Link to the Past") == "legendofzeldaalinktothepast");
+    CHECK(LaunchBoxKey("Pokémon Emerald") == "pokemonemerald");
+    CHECK(LaunchBoxKey("Mario & Luigi") == "marioandluigi");
+    CHECK(LaunchBoxKey("Theme Park") == "themepark");
+    CHECK(LaunchBoxKey("1942") == "1942");
+}
+
+TEST_CASE("LaunchBox covers come from the letter file the title needs, in the ROM's region") {
+    const fs::path dir = FreshDir("find");
+    const auto data = FakeData();
+    std::vector<std::string> asked;
+    LaunchBoxCovers covers(dir, [&](const std::string& url) -> HttpAnswer {
+        asked.push_back(url);
+        const auto found = data.find(url);
+        return found == data.end() ? HttpAnswer{404, {}} : HttpAnswer{200, found->second};
+    });
+    bool answered = true;
+    const auto europe = covers.Find(Gba(), {"Castlevania - Aria of Sorrow"}, {"Europe"}, answered);
+    REQUIRE(europe);
+    CHECK(europe->url == "https://images.example/eu.jpg");
+    CHECK(europe->title == "Castlevania: Aria of Sorrow");
+    const auto usa = covers.Find(Gba(), {"Castlevania - Aria of Sorrow"}, {"USA"}, answered);
+    REQUIRE(usa);
+    CHECK(usa->url == "https://images.example/na.jpg");
+    // No region tag: North America first.
+    CHECK(covers.Find(Gba(), {"Castlevania - Aria of Sorrow"}, {}, answered)->region == "North America");
+    // A letter the manifest does not list is not asked for.
+    CHECK_FALSE(covers.Find(Gba(), {"Metroid Fusion"}, {}, answered));
+    CHECK(answered);
+    CHECK(asked.size() == 2); // the manifest and c.json, each once
+    CHECK(covers.Find(Gba(), {"Legend of Zelda, The - A Link to the Past & Four Swords"}, {}, answered));
+
+    SystemDef unknown = Gba();
+    unknown.libretro_thumbnails = "Sega - Saturn";
+    CHECK_FALSE(covers.Find(unknown, {"Castlevania - Aria of Sorrow"}, {}, answered));
+
+    // A later run reads the files it already has.
+    asked.clear();
+    LaunchBoxCovers again(dir, [&](const std::string& url) -> HttpAnswer {
+        asked.push_back(url);
+        return {0, {}};
+    });
+    CHECK(again.Find(Gba(), {"Castlevania - Aria of Sorrow"}, {"Europe"}, answered));
+    CHECK(asked.empty());
+}
+
+TEST_CASE("the artwork takes a LaunchBox cover before the libretro collection") {
+    const fs::path dir = FreshDir("artwork");
+    const auto data = FakeData();
+    int requests = 0;
+    Artwork art(dir / "cache", [&](const std::string& url) -> HttpAnswer {
+        ++requests;
+        const auto found = data.find(url);
+        return found == data.end() ? HttpAnswer{404, {}} : HttpAnswer{200, found->second};
+    });
+    Entry entry;
+    entry.id = "aos";
+    entry.name = "Castlevania - Aria of Sorrow";
+    entry.original_name = "Castlevania - Aria of Sorrow (USA)";
+    entry.system = "gba";
+    const SystemDef gba = Gba();
+    const ArtworkResult first = art.Resolve(entry, &gba, {});
+    CHECK(first.source == ArtworkSource::Downloaded);
+    CHECK(ReadTextFile(first.path).value_or("").ends_with("america"));
+    const int after = requests;
+    CHECK(art.Resolve(entry, &gba, {}).source == ArtworkSource::Cache);
+    CHECK(requests == after);
+}
