@@ -410,3 +410,22 @@ TEST_CASE("the sample plugin installs a hack from a patch file") {
     REQUIRE(pages.size() == 2);
     CHECK(FindType(pages[1], ElementType::Input)->value == "Other Hack");
 }
+
+TEST_CASE("an interface manifest is data with nothing to grant") {
+    const std::string head = R"({"id":"tester.look","name":"Look","version":"1.0.0","kind":"interface",
+        "api":1,"needs":["kind.interface","interface.1"],)";
+    Result<FeatureManifest> look = ParseFeatureManifest(head + R"("interface":{"layout":"carousel","icon":"icon.png"}})");
+    REQUIRE(look.ok());
+    CHECK(look->kind == KIND_INTERFACE);
+    CHECK(look->entry.empty());
+    CHECK(look->icon == "icon.png");
+    CHECK(Empty(look->access));
+    CHECK(IsFeatureManifest(head + R"("interface":{}})"));
+    CHECK(CheckTrust(*look, FeaturePlugin::Trust::ThirdParty, "tester").ok);
+    CHECK_FALSE(CheckTrust(*look, FeaturePlugin::Trust::ThirdParty, "other").ok);
+
+    CHECK_FALSE(ParseFeatureManifest(head + "\"feature\":{\"entry\":\"main.lua\",\"permissions\":[\"http\"]},"
+                                            "\"interface\":{}}").ok());
+    CHECK_FALSE(ParseFeatureManifest(head + R"("interface":{"icon":"../x.png"}})").ok());
+    CHECK_FALSE(ParseFeatureManifest(head + R"("nothing":{}})").ok());
+}

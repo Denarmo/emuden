@@ -38,11 +38,15 @@ struct FeatureAccess {
     bool SeesSystem(std::string_view system) const;
 };
 
+/// KIND_FEATURE or KIND_INTERFACE (feature_host.h).
+bool IsPackageKind(std::string_view kind);
+
 struct FeatureManifest {
     std::string id, name, publisher, summary, license;
+    std::string kind = KIND_FEATURE;
     Version version;
     int api = 0;
-    std::string entry; // the script to run, relative to the package
+    std::string entry; // the script to run, relative to the package; empty for an interface
     std::string icon;
     FeatureAccess access;
     std::vector<std::string> file_types; // lower case, without the dot
@@ -51,11 +55,12 @@ struct FeatureManifest {
     int storage_mb = 512;
 };
 
-/// Reads plugin.json of kind "feature". Fails with the reason for anything refused: an
+/// Reads plugin.json of kind "feature" or "interface". An interface has no script and may ask
+/// for no permission. Fails with the reason for anything refused: an
 /// unknown permission, a host with a wildcard, a permission without its hosts or systems.
 Result<FeatureManifest> ParseFeatureManifest(std::string_view json);
 
-/// Whether the text is a manifest of kind "feature" at all (console manifests are not ours).
+/// Whether the text is a manifest of a package kind at all (console manifests are not ours).
 bool IsFeatureManifest(std::string_view json);
 
 /// The rules of a plugin's source: only the official one may see every system; a third-party

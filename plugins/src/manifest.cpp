@@ -398,7 +398,7 @@ const std::vector<std::string>& HostCapabilities() {
         "engine.libretro",    "engine.switch2", "settings.v1",
         "content.multi_file", "content.magic",  "presentation.buttons",
         "kind.feature",       "feature.lua.1",  "feature.web.1",
-        "core.engine-app.1",
+        "core.engine-app.1",  "kind.interface", "interface.1",
     };
     return capabilities;
 }

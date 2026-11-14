@@ -145,7 +145,7 @@ Result<Index> ParseIndex(std::string_view text) {
             if (plugin.kind.empty()) {
                 plugin.kind = "console";
             }
-            if (plugin.kind == "feature") {
+            if (plugin.kind == "feature" || plugin.kind == "interface") {
                 plugin.publisher = value.String("publisher");
                 plugin.summary = value.String("summary");
                 plugin.permissions = json::Strings(value, "permissions", false);

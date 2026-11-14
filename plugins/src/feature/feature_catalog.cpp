@@ -240,6 +240,8 @@ std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
         plugin.version = manifest.version.Text();
         plugin.publisher = manifest.publisher;
         plugin.summary = manifest.summary;
+        plugin.kind = manifest.kind;
+        plugin.dir = package.dir;
         plugin.source_name = TrustName(package, views, origin);
         plugin.trust = package.trust;
         plugin.installed = true;
@@ -258,7 +260,7 @@ std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
         // Only the plugin's own source updates it.
         const IndexPlugin* offered =
             origin < views.size() && views[origin].Offers() ? views[origin].index->Find(id) : nullptr;
-        if (offered != nullptr && offered->kind == "feature" &&
+        if (offered != nullptr && offered->kind == manifest.kind &&
             package.trust != FeaturePlugin::Trust::Developer &&
             offered->version > manifest.version &&
             !RevokedFor(views, origin, id, offered->version)) {
@@ -285,7 +287,7 @@ std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
     for (const Offer& offer : catalogue.offers) {
         const IndexPlugin& offered = *offer.plugin;
         const SourceView& view = views[offer.source];
-        if (offered.kind != "feature" || installed_.contains(offered.id)) {
+        if (!IsPackageKind(offered.kind) || installed_.contains(offered.id)) {
             continue;
         }
         FeaturePlugin plugin;
@@ -294,6 +296,7 @@ std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
         plugin.version = offered.version.Text();
         plugin.publisher = offered.publisher;
         plugin.summary = offered.summary;
+        plugin.kind = offered.kind;
         plugin.source_name = SourceName(view);
         plugin.trust = TrustOf(view);
         plugin.permissions = PermissionLines(AccessOf(offered));

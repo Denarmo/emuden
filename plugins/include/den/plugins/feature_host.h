@@ -24,13 +24,20 @@ class Library;
 
 namespace den::plugins {
 
+/// Package kinds the feature host installs: "feature" (a script) and "interface" (data only:
+/// a look for the Home screen, docs/interface-plugins.md in emuden-plugins).
+inline constexpr const char* KIND_FEATURE = "feature";
+inline constexpr const char* KIND_INTERFACE = "interface";
+
 struct PermissionLine {
     std::string permission, text;
 };
 
 struct FeaturePlugin {
     std::string id, name, version, publisher, summary, source_name;
+    std::string kind = KIND_FEATURE; // or KIND_INTERFACE: data for the Home screen, nothing to open
     std::filesystem::path icon; // empty until installed or fetched
+    std::filesystem::path dir;  // installed: the package's folder
     enum class Trust { Official, ThirdParty, Developer } trust = Trust::Official;
     bool installed = false, update_available = false, running = false;
     bool needs_consent = false; // install or update asks for permissions not yet granted
@@ -47,7 +54,8 @@ public:
     /// Fails without consent when the plugin needs it.
     virtual JobPtr Install(const std::string& id, bool consent) = 0;
     virtual JobPtr Remove(const std::string& id, bool delete_data, bool delete_hacks) = 0;
-    virtual Status Open(const std::string& id) = 0; // starts the script, runs plugin.open
+    /// Starts the script, runs plugin.open. Fails for an interface, which has none.
+    virtual Status Open(const std::string& id) = 0;
     virtual void Close(const std::string& id) = 0;  // the page left the stage
     virtual void Reload(const std::string& id) = 0; // developer plugins
     /// The plugin's page stack, top last; `revision` moves on every change.

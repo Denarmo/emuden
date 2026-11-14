@@ -11,6 +11,7 @@
 #include "den/app/pages.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
+#include "../interface/interfaces.h"
 #include "feature_api.h"
 #include "model_widgets.h"
 
@@ -85,10 +86,17 @@ public:
                 // A plugin whose files are there but that was never accepted (a developer
                 // folder) is accepted first; an update waiting for consent still opens.
                 const bool accept = plugin.needs_consent && !plugin.update_available;
-                tile->on_activate = [id = plugin.id, accept] {
-                    Svc().stage->Push(accept ? "plugin.consent" : "plugin.view", {{"id", id}});
+                if (plugin.kind == plugins::KIND_INTERFACE) {
+                    tile->on_activate = [id = plugin.id] { UseInterface(id); };
+                } else {
+                    tile->on_activate = [id = plugin.id, accept] {
+                        Svc().stage->Push(accept ? "plugin.consent" : "plugin.view", {{"id", id}});
+                    };
+                }
+                tile->on_focus = [this, id = plugin.id, look = plugin.kind == plugins::KIND_INTERFACE] {
+                    selected_ = id;
+                    selected_look_ = look;
                 };
-                tile->on_focus = [this, id = plugin.id] { selected_ = id; };
             }
         }
 
@@ -144,7 +152,7 @@ public:
 
     std::vector<ui::Hint> Hints() const override {
         if (OnTile()) {
-            return {{input::Nav::Confirm, "Open"}, {input::Nav::Option, "Manage"}, {input::Nav::Back, "Back"}};
+            return {{input::Nav::Confirm, selected_look_ ? "Use as Home" : "Open"}, {input::Nav::Option, "Manage"}, {input::Nav::Back, "Back"}};
         }
         return {{input::Nav::Confirm, "Select"}, {input::Nav::Back, "Back"}};
     }
@@ -179,6 +187,7 @@ private:
     }
 
     std::string selected_;
+    bool selected_look_ = false; // the selected tile is an interface: Confirm uses it
     std::uint64_t revision_ = 0;
     float width_ = 0;
 };

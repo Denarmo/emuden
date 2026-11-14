@@ -16,6 +16,7 @@
 #include "game_widgets.h"
 #include "games.h"
 #include "strings.h"
+#include "../interface/interfaces.h"
 
 namespace den::app {
 
@@ -226,7 +227,15 @@ private:
 
 } // namespace
 
-DEN_REGISTER_SCREEN("home", HomeScreen);
+// The chosen interface plugin draws Home when there is one (interface_choice.cpp).
+DEN_REGISTRAR([](Registry& r) {
+    r.AddScreen("home", []() -> std::unique_ptr<ui::Page> {
+        if (std::unique_ptr<ui::Page> chosen = MakeChosenHome()) {
+            return chosen;
+        }
+        return std::make_unique<HomeScreen>();
+    });
+});
 DEN_REGISTER_RAIL(0, "Home", "home");
 
 } // namespace den::app

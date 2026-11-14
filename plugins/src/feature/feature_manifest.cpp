@@ -111,7 +111,11 @@ bool IsFeatureManifest(std::string_view text) {
         return false;
     }
     const std::optional<JsonValue> root = ParseJson(text);
-    return root && root->kind == JsonValue::Kind::Object && root->String("kind") == "feature";
+    return root && root->kind == JsonValue::Kind::Object && IsPackageKind(root->String("kind"));
+}
+
+bool IsPackageKind(std::string_view kind) {
+    return kind == KIND_FEATURE || kind == KIND_INTERFACE;
 }
 
 Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
@@ -137,18 +141,35 @@ Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
         return Status::Fail("the manifest has no valid id, name, version or api");
     }
     manifest.version = *version;
-    if (root->String("kind") != "feature") {
+    manifest.kind = root->String("kind");
+    if (!IsPackageKind(manifest.kind)) {
         return Status::Fail(manifest.id + " is not a feature plugin");
     }
     const std::vector<std::string> needs = json::Strings(*root, "needs", false);
-    if (!Contains(needs, "kind.feature")) {
-        return Status::Fail(manifest.id + " does not ask for kind.feature");
+    if (!Contains(needs, "kind." + manifest.kind)) {
+        return Status::Fail(manifest.id + " does not ask for kind." + manifest.kind);
     }
     const auto& capabilities = HostCapabilities();
     for (const std::string& need : needs) {
         if (!Contains(capabilities, need)) {
             return Status::Fail("Needs a newer EmuDEN (" + need + ")");
         }
+    }
+    if (manifest.kind == KIND_INTERFACE) {
+        // Data only: what the app draws is the app's code, so there is nothing to grant.
+        const JsonValue* look = root->Find("interface");
+        if (look == nullptr || look->kind != JsonValue::Kind::Object) {
+            return Status::Fail(manifest.id + " has no interface object");
+        }
+        if (root->Find("feature") != nullptr) {
+            return Status::Fail("an interface plugin cannot ask for permissions");
+        }
+        manifest.icon = look->String("icon");
+        if (!manifest.icon.empty() &&
+            (!IsSafeRelativePath(manifest.icon) || !manifest.icon.ends_with(".png"))) {
+            return Status::Fail("the icon is not a PNG of the package");
+        }
+        return manifest;
     }
     const JsonValue* feature = root->Find("feature");
     if (feature == nullptr || feature->kind != JsonValue::Kind::Object) {

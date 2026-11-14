@@ -111,6 +111,10 @@ Result<std::shared_ptr<Runner>> RealFeatureHost::Start(const std::string& id) {
 
 Status RealFeatureHost::Open(const std::string& id) {
     std::lock_guard lock(mutex_);
+    if (const auto found = installed_.find(id);
+        found != installed_.end() && found->second.manifest.kind != KIND_FEATURE) {
+        return Status::Fail("An interface is chosen under Settings, Interface: it has nothing to open.");
+    }
     Result<std::shared_ptr<Runner>> runner = Start(id);
     if (!runner) {
         return runner.status();

@@ -131,7 +131,7 @@ Status RealFeatureHost::DoInstall(Job& job, const std::string& id, bool consent)
     const IndexPlugin* offered = usable ? view->index->Find(id) : nullptr;
     const FeaturePlugin::Trust trust =
         view == nullptr || view->official ? FeaturePlugin::Trust::Official : FeaturePlugin::Trust::ThirdParty;
-    if (offered == nullptr || offered->kind != "feature") {
+    if (offered == nullptr || !IsPackageKind(offered->kind)) {
         // A plugin that ships with the app and has no newer version: accepting it is enough.
         if (present && !Empty(AccessBeyond(present->manifest.access, present->granted))) {
             if (present->trust != FeaturePlugin::Trust::Official && !consent) {
@@ -185,7 +185,8 @@ Status RealFeatureHost::DoInstall(Job& job, const std::string& id, bool consent)
             text ? ParseFeatureManifest(*text) : Status::Fail("The plugin has no manifest.");
         if (!manifest) {
             status = manifest.status();
-        } else if (manifest->id != id || manifest->version != offered->version) {
+        } else if (manifest->id != id || manifest->version != offered->version ||
+                   manifest->kind != offered->kind) {
             status = Status::Fail("The plugin is not the one its source announced.");
         } else if (!Empty(AccessBeyond(manifest->access, announced))) {
             status = Status::Fail("The plugin asks for more than its source announced.");
