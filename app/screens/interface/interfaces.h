@@ -14,6 +14,10 @@
 
 namespace den::app {
 
+/// The setting that turns an interface's launch animation (the cartridge going into its
+/// console) on or off; on unless set.
+inline constexpr const char* LAUNCH_ANIMATION_KEY = "ui.home.launch_animation";
+
 /// The chosen interface plugin's look, or null for the standard Home (also while the chosen
 /// one is not installed or cannot be read).
 std::shared_ptr<const InterfaceSpec> ChosenInterface();

@@ -182,8 +182,8 @@ public:
         color_ = Mix(color_, tab ? tab->color : spec_->accent, std::min(1.0f, ctx.dt * 6));
         DrawBackdrop(themed, area, tab);
         ui::Page::Draw(themed, area);
-        if (carousel_ && carousel_->LaunchAmount() > 0) {
-            ctx.canvas->FillRect(area, color_.WithAlpha(carousel_->LaunchAmount() * 0.92f));
+        if (carousel_ && carousel_->LaunchCover() > 0) {
+            ctx.canvas->FillRect(area, color_.WithAlpha(carousel_->LaunchCover() * 0.92f));
         }
     }
 

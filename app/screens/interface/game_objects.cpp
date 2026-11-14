@@ -238,6 +238,15 @@ void BuildPhoto(Built& b, const GameObject& o) {
     gfx::AddSlab(b.solid, outline, d, std::min(0.012f, d * 0.2f), parts);
 }
 
+// A cardboard box: the cover printed on its front, the back's and spine's pictures on theirs.
+void BuildCarton(std::vector<gfx::MeshVertex>& out, const GameObject& o) {
+    SlabParts parts = All(Part::Shell);
+    parts.front = Part::Print;
+    parts.back = Part::Back;
+    parts.spine = Part::Spine;
+    gfx::AddSlab(out, RoundedOutline(o.aspect, 1, 0.006f, 0.006f), o.depth, 0.004f, parts, 0, 0, 0, 2);
+}
+
 void BuildCase(std::vector<gfx::MeshVertex>& out, const GameObject& o) {
     const float a = o.aspect, d = o.depth;
     SlabParts parts = All(Part::Shell);
@@ -294,6 +303,8 @@ const Meshes& MeshesFor(const GameObject& o) {
         Built b;
         if (o.photo) {
             BuildPhoto(b, o);
+        } else if (o.shape == "carton") {
+            BuildCarton(b.solid, o);
         } else if (o.shape == "disc") {
             BuildDisc(b.solid, o.depth);
         } else if (o.shape == "cartridge" && o.style != "plain") {
@@ -351,6 +362,20 @@ GameObject Resolve(const ObjectLook& look) {
     o.notch = look.notch >= 0 ? look.notch : shape->notch;
     o.grip = look.grip >= 0 ? look.grip : o.grip;
     o.disc = look.disc && (o.shape == "case" || o.shape == "jewel");
+    const bool cart = o.shape == "cartridge" || o.shape == "card";
+    o.box = look.box && cart;
+    o.box_aspect = look.box_aspect;
+    o.player = cart ? look.player : std::string();
+    o.player_color = look.player_color;
+    return o;
+}
+
+GameObject GameObject::Carton(float cover_aspect) const {
+    GameObject o;
+    o.shape = "carton";
+    o.aspect = std::round(std::clamp(cover_aspect > 0 ? cover_aspect : box_aspect, 0.4f, 2.0f) * 100.0f) / 100.0f;
+    o.depth = 0.2f;
+    o.shell = gfx::Color{236, 234, 228, 255};
     return o;
 }
 

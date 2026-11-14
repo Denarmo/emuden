@@ -34,6 +34,15 @@ struct ObjectLook {
     // panel and label well; "pocket_wide", a wide one with shoulders. Empty: plain.
     std::string style;
     std::string label_edge; // "none", "paper" or "foil" round the cover; empty: the style's own
+    // A cartridge's or card's cardboard box standing behind it, front width over height (its
+    // cover's own proportions once that is loaded).
+    bool box = false;
+    float box_aspect = 0.9f;
+    // The console a cartridge or card goes into when its game starts: "portrait" or
+    // "landscape" (a handheld), "clamshell" (one that folds open) or "home" (one under a
+    // television); empty for none. `player_color` is its plastic.
+    std::string player;
+    gfx::Color player_color{200, 200, 205, 255};
 };
 
 /// How one console looks: its colour, a wallpaper of the package and the label on its tab.

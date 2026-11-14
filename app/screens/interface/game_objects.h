@@ -29,6 +29,10 @@ struct GameObject {
     float radius = 0, notch = 0;
     int grip = 0;
     bool disc = false;
+    bool box = false;      // a cardboard box stands behind the cartridge or card
+    float box_aspect = 0.9f;
+    std::string player;    // the console it goes into when started (ObjectLook::player)
+    gfx::Color player_color;
 
     /// The opaque parts, one unit high, centred on the origin, front towards +z.
     const gfx::Mesh3D& Mesh() const;
@@ -41,6 +45,9 @@ struct GameObject {
     GameObject WithPhoto(gfx::Color plastic, float photo_aspect) const;
     /// A case or jewel case in the proportions of its own cover.
     GameObject WithCover(float cover_aspect) const;
+    /// The cardboard box of a cartridge or card: its cover on the front, `cover_aspect`
+    /// (0: the look's own) its proportions.
+    GameObject Carton(float cover_aspect) const;
     /// The part of the front the cover is printed on: the sticker inside its border.
     gfx::Rect CoverRect() const;
     /// The cover's width over its height, for cropping the cover onto it.

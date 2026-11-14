@@ -43,6 +43,8 @@ uniform sampler2D u_tex;
 // The other faces' pictures: back, spine, cart, disc; bit i of u_arts says art i is there.
 uniform sampler2D u_back_art; uniform sampler2D u_spine_art; uniform sampler2D u_cart_art;
 uniform sampler2D u_disc_art; uniform int u_arts; uniform vec4 u_cart_uv; uniform vec4 u_sticker;
+uniform float u_boot; uniform int u_foil;
+float grain(vec2 p) { return fract(sin(dot(floor(p), vec2(12.9898, 78.233))) * 43758.5453); }
 out vec4 o_color;
 vec4 cover(vec4 r) { return texture(u_tex, r.xy + clamp(v_uv, 0.0, 1.0) * r.zw); }
 bool has_art(int bit) { return (u_arts / bit) % 2 == 1; }
@@ -107,6 +109,40 @@ void main() {
         if (has_art(1)) {
             base = texture(u_back_art, clamp(v_uv, 0.0, 1.0)).rgb;
             gloss = 80.0; spec = 0.5; fresnel = 0.35;
+        }
+    } else if (part == 15) {
+        base = vec3(0.05, 0.06, 0.05);
+        gloss = 140.0; spec = 1.0; fresnel = 0.5;
+        if (u_boot >= 0.0) {
+            // The backlight comes up, then the cover slides down to the middle and rests.
+            vec3 lit = vec3(0.62, 0.7, 0.6) * clamp(u_boot, 0.0, 1.0);
+            float slide = clamp(u_boot - 1.0, 0.0, 1.0);
+            vec2 logo = vec2(0.5, mix(-0.3, 0.5, slide));
+            vec2 q = (v_uv - logo) / vec2(0.62, 0.62) + 0.5;
+            vec3 c = lit;
+            if (u_has_tex == 1 && slide > 0.0 && all(greaterThanEqual(q, vec2(0.0))) && all(lessThanEqual(q, vec2(1.0)))) {
+                c = mix(lit, texture(u_tex, u_label.xy + q * u_label.zw).rgb, clamp(u_boot, 0.0, 1.0));
+            }
+            o_color = vec4(c * u_light + vec3(0.04), 1.0);
+            return;
+        }
+    } else if (part == 16) {
+        base = u_boot >= 0.0 ? vec3(1.0, 0.18, 0.12) : vec3(0.25, 0.05, 0.04);
+        if (u_boot >= 0.0) {
+            o_color = vec4(base * u_light, 1.0);
+            return;
+        }
+    } else if (part == 17) {
+        base = u_has_tex == 1 ? cover(u_label).rgb : vec3(0.85);
+        float g = grain(v_uv * 900.0) - 0.5;
+        base *= 1.0 + g * 0.05;
+        gloss = 45.0; spec = 0.32; fresnel = 0.25;
+        if (u_foil == 1) {
+            // Holographic foil: a rainbow that moves with the angle, strongest on the light parts.
+            float k = dot(base, vec3(0.333));
+            vec3 rainbow = 0.5 + 0.5 * cos(6.2832 * (v_uv.x * 1.3 + v_uv.y * 0.7 + n.x * 1.6 + n.y + vec3(0.0, 0.33, 0.67)));
+            base = mix(base, base * 0.55 + rainbow * 0.6, 0.35 * k + 0.12);
+            gloss = 70.0; spec = 0.9; fresnel = 0.6;
         }
     } else if (part == 14) {
         vec4 p = has_art(4) ? texture(u_cart_art, u_cart_uv.xy + clamp(v_uv, 0.0, 1.0) * u_cart_uv.zw) : vec4(0.0);
@@ -244,6 +280,8 @@ Status Renderer3D::Init(Device& device) {
     u_arts_ = at("u_arts");
     u_cart_uv_ = at("u_cart_uv");
     u_sticker_ = at("u_sticker");
+    u_boot_ = at("u_boot");
+    u_foil_ = at("u_foil");
     const char* arts[] = {"u_back_art", "u_spine_art", "u_cart_art", "u_disc_art"};
     for (int i = 0; i < 4; ++i) {
         u_art_[i] = at(arts[i]);
@@ -362,6 +400,8 @@ void Renderer3D::Submit(const Mesh3D& mesh, const Mat4& model, const Material& m
     gl::Uniform4f(u_cart_uv_, cu.x, cu.y, cu.w, cu.h);
     const Rect& st = material.sticker;
     gl::Uniform4f(u_sticker_, st.x, st.y, st.w, st.h);
+    gl::Uniform1f(u_boot_, material.boot);
+    gl::Uniform1i(u_foil_, material.foil ? 1 : 0);
     gl::BindTexture(gl::TEXTURE_2D, material.cover.id);
     gl::BindVertexArray(mesh.vao_);
     gl::DrawArrays(gl::TRIANGLES, 0, mesh.count_);

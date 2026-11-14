@@ -23,6 +23,7 @@ struct LoadedFaces {
     library::GameFaces faces; // the cleaned pictures
     std::string cover;        // the front cover, its scan margins cropped off; "" for none
     float cover_aspect = 0;   // its width over its height
+    gfx::Color cover_color{214, 210, 202, 255}; // its mean colour: a cardboard box's sides
     // From the cartridge's photograph: the plastic's colour round its edge, the cartridge's
     // width over its height (0: no usable photograph) and where its label is, 0..1 of the
     // picture (empty when it could not be told).

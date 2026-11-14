@@ -91,6 +91,17 @@ LoadedFaces Load(const std::string& id, Job& job) {
         out.cover = Cleaned(entry->cover, FaceKind::Cover, &cover);
         if (!out.cover.empty()) {
             out.cover_aspect = static_cast<float>(cover.width) / static_cast<float>(cover.height);
+            double sum[3] = {0, 0, 0};
+            const std::size_t pixels = cover.rgba.size() / 4;
+            for (std::size_t i = 0; i < pixels; ++i) {
+                for (int c = 0; c < 3; ++c) {
+                    sum[c] += cover.rgba[i * 4 + c];
+                }
+            }
+            if (pixels > 0) {
+                const auto mean = [&](int c) { return static_cast<std::uint8_t>(sum[c] / static_cast<double>(pixels)); };
+                out.cover_color = gfx::Color{mean(0), mean(1), mean(2), 255};
+            }
         }
     }
     return out;

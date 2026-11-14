@@ -95,7 +95,12 @@ std::vector<ui::RowSpec> InterfaceRows() {
             }
         });
     choice.description = "How the first screen shows your games. Interfaces come from plugin sources, like consoles";
-    std::vector<ui::RowSpec> rows = {std::move(choice)};
+    ui::RowSpec animation = ToggleRow(
+        std::string(LAUNCH_ANIMATION_KEY), "Launch animation",
+        [] { return Svc().settings->GetBool(LAUNCH_ANIMATION_KEY, true); },
+        [](bool on) { Svc().settings->SetBool(LAUNCH_ANIMATION_KEY, on); });
+    animation.description = "In interfaces that have one: the cartridge goes into its console, which switches on";
+    std::vector<ui::RowSpec> rows = {std::move(choice), std::move(animation)};
     for (const plugins::FeaturePlugin& plugin : found) {
         ui::RowSpec row = ValueRow(
             "interface.about." + plugin.id, plugin.name,

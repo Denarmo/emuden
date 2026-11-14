@@ -49,6 +49,9 @@ enum class Part : int {
     Steel = 12,    // brushed metal: a battery, a label's foil edge
     Back = 13,     // a box's or cartridge's back: the back's art, else the shell colour
     Photo = 14,    // a cartridge's front as photographed: the cart's art over the shell colour
+    Screen = 15,   // a console's screen: dark glass, or lit and showing the boot (Material::boot)
+    Led = 16,      // a power light: dark, red once the console is on
+    Print = 17,    // the cover printed on cardboard: fine grain, a satin sheen, or foil
 };
 
 struct MeshVertex {
@@ -87,6 +90,10 @@ struct Material {
     // A sticker over the photographed cartridge's own label (a ROM hack on the cartridge of the
     // game it was made from): the cover through label_uv, over this part of the front, 0..1.
     Rect sticker{0, 0, 0, 0};
+    // A console switching on: below 0 off; 0..1 the screen lighting up, the cover (label_uv)
+    // sliding down onto it from 1 to 2 and resting there after.
+    float boot = -1;
+    bool foil = false; // Print as holographic foil instead of satin card
     float light = 1.0f; // multiplies the result: side objects are darker
 };
 
@@ -114,7 +121,7 @@ private:
     unsigned int program_ = 0, fbo_ = 0, color_ = 0, depth_ = 0;
     int fbo_w_ = 0, fbo_h_ = 0, draw_w_ = 0, draw_h_ = 0;
     int u_view_proj_ = -1, u_model_ = -1, u_rot_ = -1, u_shell_ = -1, u_label_ = -1, u_spine_ = -1,
-        u_light_ = -1, u_has_tex_ = -1, u_tex_ = -1, u_clear_ = -1, u_arts_ = -1, u_cart_uv_ = -1, u_sticker_ = -1;
+        u_light_ = -1, u_has_tex_ = -1, u_tex_ = -1, u_clear_ = -1, u_arts_ = -1, u_cart_uv_ = -1, u_sticker_ = -1, u_boot_ = -1, u_foil_ = -1;
     int u_art_[4] = {-1, -1, -1, -1};
     Rect clip_;
     Mat4 view_proj_;

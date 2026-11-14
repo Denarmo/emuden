@@ -37,6 +37,10 @@ public:
     }
     /// 0..1, eased, while the launch animation runs; else 0.
     float LaunchAmount() const;
+    /// How much the screen is covered by the console's colour as the game starts, 0..1.
+    virtual float LaunchCover() const {
+        return LaunchAmount();
+    }
     gfx::Color ConsoleColor() const {
         return color_;
     }
@@ -60,6 +64,10 @@ protected:
     Slot SlotAt(float offset) const;
     float CoverHeight() const;
     float Step() const; // centre-to-centre distance of two side covers
+    /// How long the launch animation of the selected game runs.
+    virtual float LaunchSeconds() const {
+        return spec_->launch_seconds;
+    }
     void DrawOne(ui::Context& ctx, const library::Entry& game, const Slot& slot, float lift);
 
     std::shared_ptr<const InterfaceSpec> spec_;
@@ -70,6 +78,7 @@ protected:
     gfx::Color color_;
     double time_ = 0;
     float launch_ = -1; // 0..1 while the launch animation runs
+    float launch_seconds_ = 0.32f;
     std::function<void()> after_launch_;
     // A drag is a swipe: the row follows the finger from where it was when the drag began.
     int ticks_ = 0, drag_tick_ = -10;

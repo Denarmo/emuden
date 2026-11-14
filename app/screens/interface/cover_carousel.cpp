@@ -69,6 +69,7 @@ void CoverCarousel::Launch(std::function<void()> then) {
     }
     after_launch_ = std::move(then);
     launch_ = 0;
+    launch_seconds_ = LaunchSeconds();
 }
 
 float CoverCarousel::CoverHeight() const {
@@ -155,7 +156,7 @@ void CoverCarousel::OnTick(ui::Context& ctx) {
     time_ = ctx.time;
     pos_ = ui::Approach(pos_, static_cast<float>(index_), ctx.dt, spec_->speed);
     if (launch_ >= 0) {
-        launch_ += ctx.dt / spec_->launch_seconds;
+        launch_ += ctx.dt / std::max(0.05f, launch_seconds_);
         if (launch_ >= 1) {
             launch_ = -1;
             if (auto then = std::move(after_launch_)) {

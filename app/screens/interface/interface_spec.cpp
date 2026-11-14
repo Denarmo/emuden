@@ -92,6 +92,13 @@ void ReadObject(const JsonValue* object, ObjectLook& out) {
     ReadChoice(object, "shape", {"cartridge", "card", "case", "jewel", "disc"}, out.shape);
     ReadChoice(object, "style", {"plain", "pocket", "pocket_wide"}, out.style);
     ReadChoice(object, "label_edge", {"none", "paper", "foil"}, out.label_edge);
+    ReadBool(object, "box", out.box);
+    ReadNumber(object, "box_aspect", 0.4f, 2.0f, out.box_aspect);
+    ReadChoice(object, "player", {"portrait", "landscape", "clamshell", "home"}, out.player);
+    if (const auto color = ParseColor(object->String("player_color"))) {
+        out.player_color = *color;
+        out.player_color.a = 255;
+    }
     ReadNumber(object, "aspect", 0.3f, 2.5f, out.aspect);
     ReadNumber(object, "depth", 0.01f, 0.6f, out.depth);
     if (const auto shell = ParseColor(object->String("shell"))) {

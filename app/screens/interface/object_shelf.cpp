@@ -9,6 +9,7 @@
 #include "den/app/app.h"
 #include "den/base/log.h"
 #include "den/gfx/canvas.h"
+#include "interfaces.h"
 
 namespace den::app {
 
@@ -16,6 +17,7 @@ namespace {
 
 constexpr float HALF_FIELD = 0.26f; // half of Renderer3D's field of view
 constexpr float PUSH_BACK = 0.45f;  // how far side objects stand behind, in object heights
+constexpr float CART_SHARE = 0.56f; // a cartridge before its box, in box heights
 // A case's disc, across, in case heights: a tall case holds a smaller disc than a jewel case.
 float DiscSize(const GameObject& object) {
     return std::min(0.95f, object.aspect * 0.9f);
@@ -43,6 +45,11 @@ gfx::Rect StickerRect(const gfx::Rect& found, const gfx::Rect& mould) {
     const float iy = std::max(0.0f, std::min(found.Bottom(), mould.Bottom()) - std::max(found.y, mould.y));
     const float common = ix * iy, area = mould.w * mould.h;
     return found.w > 0 && common > area * 0.8f && found.w * found.h < area * 1.25f ? found : mould;
+}
+
+// The front's width over its height of a game's objects together.
+float Footprint(const GameObject& object, const GameObject* box) {
+    return box == nullptr ? object.aspect : box->aspect + 0.23f * CART_SHARE * object.aspect;
 }
 
 } // namespace
@@ -79,6 +86,25 @@ const GameObject& ObjectShelf::ObjectAt(std::size_t index) const {
     return object;
 }
 
+const GameObject* ObjectShelf::BoxAt(std::size_t index) const {
+    const library::Entry& game = games_[index];
+    const GameObject& object = ObjectFor(game.system);
+    if (!object.box) {
+        return nullptr;
+    }
+    if (const auto found = boxes_.find(game.id); found != boxes_.end()) {
+        return &found->second;
+    }
+    if (const LoadedFaces* faces = faces_.Peek(game.id)) {
+        return &(boxes_[game.id] = object.Carton(faces->cover_aspect));
+    }
+    const std::string key = "system:" + game.system;
+    if (const auto found = boxes_.find(key); found != boxes_.end()) {
+        return &found->second;
+    }
+    return &(boxes_[key] = object.Carton(0));
+}
+
 float ObjectShelf::ObjectHeight() const {
     return std::max(40.0f, std::min(rect.h * spec_->cover_height, rect.w * 0.3f));
 }
@@ -87,10 +113,24 @@ float ObjectShelf::Floor() const {
     return rect.y + rect.h * 0.06f + spec_->bob + ObjectHeight();
 }
 
+ObjectShelf::Piece ObjectShelf::CartPiece(const Placed& p) {
+    if (p.box == nullptr) {
+        return {0, 0, p.height};
+    }
+    const float h = p.height * CART_SHARE;
+    return {p.height * p.box->aspect * 0.5f - h * p.object->aspect * 0.45f, p.height * 0.14f, h};
+}
+
+ObjectShelf::Piece ObjectShelf::BoxPiece(const Placed& p) {
+    return {-p.height * CART_SHARE * p.object->aspect * 0.18f, -p.height * 0.05f, p.height};
+}
+
 ObjectShelf::Placed ObjectShelf::Place(std::size_t index, float time) const {
     const GameObject& object = ObjectAt(index);
+    const GameObject* box = BoxAt(index);
+    const float footprint = Footprint(object, box);
     // A wide object (a landscape cart) is kept to a width that leaves its neighbours room.
-    const float h_main = std::min(ObjectHeight(), rect.w * 0.26f / object.aspect);
+    const float h_main = std::min(ObjectHeight(), rect.w * 0.26f / footprint);
     const float offset = static_cast<float>(index) - pos_;
     const float a = std::fabs(offset), side = offset < 0 ? -1.0f : 1.0f;
     const float weight = std::max(0.0f, 1.0f - a);
@@ -98,16 +138,17 @@ ObjectShelf::Placed ObjectShelf::Place(std::size_t index, float time) const {
     const float scale = spec_->side_scale + (1 - spec_->side_scale) * weight;
     const float h = h_main * scale;
     // Turned objects take less room across: the row packs them closer than flat covers.
-    const float w_main = h_main * object.aspect, w_side = h_main * spec_->side_scale * 0.8f;
+    const float w_main = h_main * footprint, w_side = h_main * spec_->side_scale * 0.8f;
     const float near = w_main * 0.5f + spec_->spacing + w_side * 0.62f;
     const float step = w_side * 0.55f + spec_->spacing * 0.5f;
     const float distance = a <= 1 ? a * near : near + (a - 1) * step;
 
-    Placed p{index, &object, rect.CenterX() + side * distance, Floor(), -h_main * PUSH_BACK * near_a, h, 0, 1, weight};
+    Placed p{index, &object, box, rect.CenterX() + side * distance, Floor(), -h_main * PUSH_BACK * near_a,
+             h,     0,       1,   weight, h * footprint};
     p.yaw = -side * spec_->side_angle * near_a + weight * spec_->sway * std::sin(time * 0.9f);
     p.light = 1.0f - spec_->side_dim * (1.0f - weight);
     p.y -= spec_->bob * (0.5f + 0.5f * std::sin(time * 2.2f)) * weight;
-    if (index == index_ && LaunchAmount() > 0) {
+    if (index == index_ && LaunchAmount() > 0 && !console_launch_) {
         const float t = LaunchAmount();
         p.yaw *= 1 - t;
         if (object.shape == "cartridge" || object.shape == "card") {
@@ -126,7 +167,7 @@ gfx::Rect ObjectShelf::FocusRect() const {
     const float distance = view_h_ * 0.5f / std::tan(HALF_FIELD);
     const float k = distance / std::max(1.0f, distance - p.z);
     // A bar on the floor under the object: a frame around it would hide its shape.
-    const float w = p.height * p.object->aspect * k * std::fabs(std::cos(p.yaw));
+    const float w = p.width * k * std::fabs(std::cos(p.yaw));
     const float cx = view_w_ * 0.5f + (p.x - view_w_ * 0.5f) * k;
     const float bottom = view_h_ * 0.5f + (Floor() - view_h_ * 0.5f) * k;
     return gfx::Rect{cx - w * 0.4f, bottom + 14, w * 0.8f, 4};
@@ -138,6 +179,57 @@ void ObjectShelf::OnTick(ui::Context& ctx) {
     const bool disc = !games_.empty() && ObjectFor(games_[index_].system).disc;
     const float target = still && disc ? 1.0f : 0.0f;
     slide_ = ui::Approach(slide_, target, ctx.dt, target > slide_ ? 4.0f : 12.0f);
+    if (!Launching()) {
+        console_launch_ = false;
+    }
+}
+
+gfx::Material ObjectShelf::MaterialFor(ui::Context& ctx, const Placed& p, bool box) const {
+    const library::Entry& game = games_[p.index];
+    const GameObject& object = box ? *p.box : *p.object;
+    gfx::Material m;
+    m.shell = object.shell;
+    const LoadedFaces* faces = faces_.Peek(game.id);
+    const std::string& cover = faces != nullptr && !faces->cover.empty() ? faces->cover : game.cover;
+    m.cover = cover.empty() ? gfx::Texture{} : ctx.textures->Get(cover, 1024);
+    const bool full = box || object.shape == "case" || object.shape == "jewel";
+    if (m.cover) {
+        const float aspect = full ? object.aspect : object.LabelAspect();
+        m.label_uv = gfx::CoverUv(m.cover.width, m.cover.height, gfx::Rect{0, 0, aspect * 100, 100});
+        m.spine_uv = gfx::Rect{m.label_uv.x, m.label_uv.y, m.label_uv.w * 0.07f, m.label_uv.h};
+    }
+    const auto art = [&](const std::string& path, int size) {
+        return path.empty() ? gfx::Texture{} : ctx.textures->Get(path, size);
+    };
+    const bool hack = !game.hack_of.empty() || (faces != nullptr && faces->faces.base_game);
+    if (box) {
+        // The box carries the game's own cover: a hack's on foil, so its art reads as printed.
+        m.foil = hack;
+        if (faces != nullptr) {
+            m.shell = faces->cover_color;
+            m.back_art = art(faces->faces.back, 1024);
+            m.spine_art = art(faces->faces.spine, 512);
+        }
+    } else if (faces != nullptr) {
+        if (object.photo) {
+            m.cart_art = art(faces->faces.cart, 1024);
+            m.back_art = art(faces->faces.cart_back, 512);
+            // A hack on the cartridge of the game it was made from: its own cover over the
+            // label (where the photo shows one, else where the mould has it).
+            if (faces->faces.base_game && m.cover) {
+                const gfx::Rect place = StickerRect(faces->cart_label, object.label);
+                m.sticker = place;
+                const float aspect = place.w * object.aspect / std::max(0.01f, place.h);
+                m.label_uv = gfx::CoverUv(m.cover.width, m.cover.height, gfx::Rect{0, 0, aspect * 100, 100});
+            }
+        } else if (p.box == nullptr) {
+            m.back_art = art(faces->faces.back, 1024);
+            m.spine_art = art(faces->faces.spine, 512);
+        }
+        m.disc_art = art(faces->faces.disc, 512);
+    }
+    m.light = p.light;
+    return m;
 }
 
 void ObjectShelf::DrawContent(ui::Context& ctx) {
@@ -171,56 +263,28 @@ void ObjectShelf::DrawContent(ui::Context& ctx) {
     }
     // Far first: there is no depth buffer, the nearer object is drawn over the farther.
     std::sort(placed.begin(), placed.end(), [](const Placed& a, const Placed& b) { return a.z < b.z; });
+    if (console_launch_ && Launching()) {
+        DrawLaunch(ctx, *renderer, placed);
+        return;
+    }
 
-    const auto material = [&](const Placed& p) {
-        const library::Entry& game = games_[p.index];
-        gfx::Material m;
-        m.shell = p.object->shell;
-        const LoadedFaces* faces = faces_.Peek(game.id);
-        const std::string& cover = faces != nullptr && !faces->cover.empty() ? faces->cover : game.cover;
-        m.cover = cover.empty() ? gfx::Texture{} : ctx.textures->Get(cover, 1024);
-        if (m.cover) {
-            const float aspect = p.object->shape == "case" || p.object->shape == "jewel" ? p.object->aspect
-                                                                                          : p.object->LabelAspect();
-            m.label_uv = gfx::CoverUv(m.cover.width, m.cover.height, gfx::Rect{0, 0, aspect * 100, 100});
-            m.spine_uv = gfx::Rect{m.label_uv.x, m.label_uv.y, m.label_uv.w * 0.07f, m.label_uv.h};
-        }
-        if (faces != nullptr) {
-            const auto art = [&](const std::string& path, int size) {
-                return path.empty() ? gfx::Texture{} : ctx.textures->Get(path, size);
-            };
-            if (p.object->photo) {
-                m.cart_art = art(faces->faces.cart, 1024);
-                m.back_art = art(faces->faces.cart_back, 512);
-                // A hack on the cartridge of the game it was made from: its own cover over the
-                // label (where the photo shows one, else where the mould has it).
-                if (faces->faces.base_game && m.cover) {
-                    const gfx::Rect label = StickerRect(faces->cart_label, p.object->label);
-                    m.sticker = label;
-                    const float aspect = label.w * p.object->aspect / std::max(0.01f, label.h);
-                    m.label_uv = gfx::CoverUv(m.cover.width, m.cover.height, gfx::Rect{0, 0, aspect * 100, 100});
-                }
-            } else {
-                m.back_art = art(faces->faces.back, 1024);
-                m.spine_art = art(faces->faces.spine, 512);
-            }
-            m.disc_art = art(faces->faces.disc, 512);
-        }
-        m.light = p.light;
-        return m;
+    const auto model = [&](const Placed& p, const Piece& piece) {
+        return gfx::Renderer3D::Model(p.x, p.y, p.z, p.yaw) * gfx::Mat4::Translate(piece.dx, piece.height * 0.5f, piece.dz) *
+               gfx::Mat4::Scale(piece.height, piece.height, piece.height);
     };
-    const auto model = [&](const Placed& p) {
-        return gfx::Renderer3D::Model(p.x, p.y - p.height * 0.5f, p.z, p.yaw) * gfx::Mat4::Scale(p.height, p.height, p.height);
-    };
-    // Everything an object is drawn with, in its place: the disc out of its case first.
+    // Everything a game is drawn with, in its place: its box, the disc out of its case, then
+    // the object itself.
     const auto draw = [&](const Placed& p, const gfx::Mat4& place, bool mirrored, bool clear) {
-        const gfx::Mat4 m = place * model(p);
-        const gfx::Material look = material(p);
+        const gfx::Mat4 m = place * model(p, CartPiece(p));
+        const gfx::Material look = MaterialFor(ctx, p, false);
         if (clear) {
             if (const gfx::Mesh3D* lid = p.object->ClearMesh()) {
                 renderer->DrawClear(*lid, m, look, mirrored);
             }
             return;
+        }
+        if (p.box != nullptr) {
+            renderer->Draw(p.box->Mesh(), place * model(p, BoxPiece(p)), MaterialFor(ctx, p, true), mirrored);
         }
         if (p.index == index_ && slide_ > 0.01f) {
             if (const gfx::Mesh3D* disc = p.object->DiscMesh()) {
@@ -242,9 +306,8 @@ void ObjectShelf::DrawContent(ui::Context& ctx) {
     const float floor = Floor();
     // Soft contact shadows: stacked, each wider and fainter.
     for (const Placed& p : placed) {
-        const float w = p.height * p.object->aspect;
         for (int i = 0; i < 4; ++i) {
-            const float spread = w * (0.8f + 0.12f * i), tall = 6.0f + 5.0f * i;
+            const float spread = p.width * (0.8f + 0.12f * i), tall = 6.0f + 5.0f * i;
             canvas.FillRect(gfx::Rect{p.x - spread * 0.5f, floor - tall * 0.5f, spread, tall},
                             gfx::Color{0, 0, 0, 255}.WithAlpha(0.13f * p.light), tall * 0.5f);
         }
