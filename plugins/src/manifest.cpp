@@ -109,6 +109,21 @@ Result<Component> ParseComponent(const JsonValue& value) {
             component.widescreen_restart = restart->kind == JsonValue::Kind::Bool && restart->boolean;
         }
     }
+    if (const JsonValue* games = value.Find("games")) {
+        const JsonValue* offset = games->Find("offset");
+        const JsonValue* length = games->Find("length");
+        if (offset != nullptr && length != nullptr && offset->kind == JsonValue::Kind::Number &&
+            length->kind == JsonValue::Kind::Number && offset->number >= 0 && offset->number < (1 << 24) &&
+            length->number >= 1 && length->number <= 64) {
+            component.games.offset = static_cast<std::uint64_t>(offset->number);
+            component.games.length = static_cast<std::uint32_t>(length->number);
+            for (std::string& code : json::Strings(*games, "codes", false)) {
+                if (code.size() == component.games.length) {
+                    component.games.codes.push_back(std::move(code));
+                }
+            }
+        }
+    }
     component.cores = json::Strings(value, "cores", false);
     if (const JsonValue* downloads = value.Find("downloads")) {
         for (const auto& [platform, entry] : downloads->members) {

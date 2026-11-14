@@ -150,6 +150,7 @@ Status RealHost::DoInstall(Job& job, const std::string& system) {
     Download download;
     bool from_index = false;
     bool have_core = false;
+    std::vector<std::pair<Component, Download>> companions; // cores chosen for listed games
     {
         std::lock_guard lock(mutex_);
         const Found found = Find(system);
@@ -178,6 +179,15 @@ Status RealHost::DoInstall(Job& job, const std::string& system) {
                 return Status::Fail(core.name + " must not be used: " + *reason);
             }
         }
+        for (const std::string& id : found.system->cores) {
+            const Component* other = manifest.FindComponent(id);
+            const Download* other_download = other != nullptr ? other->DownloadFor(deps_.platform_key) : nullptr;
+            if (other != nullptr && other->id != core.id && !other->games.Empty() && other_download != nullptr &&
+                !CoreGood(*other) &&
+                !(index_ && index_->BlockedReason(other_download->sha256))) {
+                companions.emplace_back(*other, *other_download);
+            }
+        }
         const CoreRecord* record = ledger_.Find(core.id);
         if (record != nullptr && record->download_sha256 == download.sha256 && CoreGood(core)) {
             ledger_.AddOwner(core.id, manifest.id);
@@ -193,6 +203,14 @@ Status RealHost::DoInstall(Job& job, const std::string& system) {
         }
     }
     InstallSystemFiles(job, manifest, core.id, result);
+    // A core some games are played with comes along; the console plays without it.
+    for (const auto& [other, other_download] : companions) {
+        if (const Status status = InstallCore(job, manifest, other, other_download, from_index); !status.ok) {
+            result.notes.push_back(other.name + " could not be installed: " + status.error);
+            continue;
+        }
+        InstallSystemFiles(job, manifest, other.id, result);
+    }
     job.SetProgress(1.0f);
     return result;
 }

@@ -351,6 +351,7 @@ private:
         info.option_hints = core.forced_core_options;
         info.widescreen_options = core.widescreen_options;
         info.widescreen_restart = core.widescreen_restart;
+        info.games = core.games;
         info.missing_bios = MissingBios(bios_dir_, system.console, core.id);
         info.installed = CoreGood(core);
         if (info.installed) {

@@ -34,6 +34,11 @@ std::vector<GameScreen> ScreensOf(const std::string& system, int frame_width, in
         return {GameScreen{gfx::Rect{0, 0, 1, 0.5f}, frame_width, half, false},
                 GameScreen{gfx::Rect{0.1f, 0.5f, 0.8f, 0.5f}, frame_width * 4 / 5, half, true}};
     }
+    if (system == "gba" && frame_width * 4 == frame_height * 3) {
+        // 240 x 320 (the GBA DS core): the game over its second screen, neither touched.
+        return {GameScreen{gfx::Rect{0, 0, 1, 0.5f}, frame_width, half, false},
+                GameScreen{gfx::Rect{0, 0.5f, 1, 0.5f}, frame_width, half, false}};
+    }
     return {};
 }
 

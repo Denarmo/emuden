@@ -21,6 +21,11 @@ TEST_CASE("a Nintendo DS picture is two screens only when they are stacked") {
     CHECK(ScreensOf("nds", 512, 768).size() == 2);
     CHECK(ScreensOf("nds", 512, 192).empty()); // the core laid them side by side
     CHECK(ScreensOf("gba", 256, 384).empty());
+    const auto gba = ScreensOf("gba", 240, 320); // the GBA DS core: game over second screen
+    REQUIRE(gba.size() == 2);
+    CHECK(gba[1].height == 160);
+    CHECK((!gba[0].touch && !gba[1].touch));
+    CHECK(ScreensOf("gba", 240, 160).empty());
     const auto wide = ScreensOf("3ds", 400, 480);
     REQUIRE(wide.size() == 2);
     CHECK(wide[1].width == 320);

@@ -111,6 +111,17 @@ struct SettingSpec {
     std::string default_value;
 };
 
+/// The games a core is chosen for without asking: those whose ROM holds one of `codes` at
+/// `offset` (a GBA game's code at 0xAC). Empty: none.
+struct GameMatch {
+    std::uint64_t offset = 0;
+    std::uint32_t length = 0;
+    std::vector<std::string> codes;
+    bool Empty() const {
+        return length == 0 || codes.empty();
+    }
+};
+
 /// The core that plays a system on this device.
 struct CoreInfo {
     std::string id;     // "mgba"
@@ -125,6 +136,7 @@ struct CoreInfo {
     /// The core options that make the picture widescreen (empty = the core cannot).
     std::vector<std::pair<std::string, std::string>> widescreen_options;
     bool widescreen_restart = false;
+    GameMatch games; // the games this core plays instead of the console's chosen core
     /// BIOS files the core needs and does not find (empty = ready).
     std::vector<std::string> missing_bios;
 };

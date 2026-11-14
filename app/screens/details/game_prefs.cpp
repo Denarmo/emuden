@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <fstream>
 
 #include "den/app/app.h"
 #include "den/app/registry.h"
@@ -25,6 +26,21 @@ const system::Key<std::string> ENGINE_SCREEN_KEY{
      .per_game = true}};
 
 namespace {
+
+// The game is one a core lists by the code its ROM holds (a GBA game's at 0xAC). Only loose
+// files: a zipped ROM keeps the console's core.
+bool CoreListsGame(const plugins::GameMatch& games, const library::Entry& game) {
+    if (games.Empty() || !game.archive_member.empty()) {
+        return false;
+    }
+    std::ifstream in(PathFromUtf8(game.path), std::ios::binary);
+    std::string code(games.length, ' ');
+    if (!in.seekg(static_cast<std::streamoff>(games.offset)) ||
+        !in.read(code.data(), static_cast<std::streamsize>(code.size()))) {
+        return false;
+    }
+    return std::find(games.codes.begin(), games.codes.end(), code) != games.codes.end();
+}
 
 std::string Plain(const std::string& text) {
     std::string out;
@@ -137,17 +153,21 @@ std::string OptionKey(const std::string& core_id, const std::string& option_key)
 std::optional<plugins::CoreInfo> CoreForGame(const library::Entry& game) {
     Services& svc = Svc();
     std::optional<plugins::CoreInfo> core = svc.plugins->CoreFor(game.system);
+    const std::string wanted =
+        system::HasStore() ? system::Store().Get(GAME_CORE_KEY, ScopeOf(game)) : std::string();
+    for (plugins::CoreInfo& other : svc.plugins->CoresFor(game.system)) {
+        if (!other.installed || other.library.empty()) {
+            continue;
+        }
+        if (wanted.empty() ? CoreListsGame(other.games, game) : other.id == wanted) {
+            core = std::move(other);
+            break;
+        }
+    }
     if (!system::HasStore()) {
         return core;
     }
     const system::Scope scope = ScopeOf(game);
-    if (const std::string wanted = system::Store().Get(GAME_CORE_KEY, scope); !wanted.empty()) {
-        for (plugins::CoreInfo& other : svc.plugins->CoresFor(game.system)) {
-            if (other.id == wanted && other.installed && !other.library.empty()) {
-                core = std::move(other);
-            }
-        }
-    }
     if (core) {
         // Before the core loads, for options that are read only then.
         for (const KnownOption& option : KnownOptions(core->id)) {
