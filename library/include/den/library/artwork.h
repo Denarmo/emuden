@@ -111,6 +111,11 @@ public:
     /// it (the library holds that game), else the game MatchBaseGame finds.
     GameFaces Faces(const Entry& entry, const SystemDef* system, const std::function<bool()>& stopping = {},
                     const std::string& base_title = {});
+    /// The picture of the system's console from the LaunchBox Games Database, downloaded once
+    /// and kept; a system without one is not asked about again for two weeks. `url`, when
+    /// given, is fetched instead (an https picture of the console from elsewhere).
+    std::string Device(const SystemDef* system, const std::string& url = {},
+                       const std::function<bool()>& stopping = {});
 
 private:
     const ThumbnailIndex& IndexFor(const SystemDef& system);

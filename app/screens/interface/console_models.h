@@ -10,6 +10,7 @@
 
 #include <string>
 
+#include "console_photo.h"
 #include "den/gfx/mesh3d.h"
 
 namespace den::app {
@@ -27,5 +28,9 @@ struct ConsoleModel {
 /// The console of that name ("portrait", "landscape", "clamshell", "home"); null mesh for
 /// another.
 ConsoleModel ConsoleFor(const std::string& name);
+
+/// The console of that name with the photograph's outline and front, its screen at `screen`
+/// (0..1 of the photograph; none when empty); null mesh when there is no photograph.
+ConsoleModel PhotoConsole(const ConsolePhoto& photo, const std::string& name, const gfx::Rect& screen);
 
 } // namespace den::app

@@ -30,7 +30,8 @@ std::map<std::string, std::string> FakeData() {
         {DATA + "manifest.json",
          R"({"format":1,"version":"2026-11-14","images":"https://images.example/","face_kinds":["back"],
              "libretro":{"Nintendo - Game Boy Advance":"Nintendo Game Boy Advance"},
-             "platforms":{"Nintendo Game Boy Advance":{"dir":"nintendo-game-boy-advance","games":2,"buckets":["c","l"]}}})"},
+             "platforms":{"Nintendo Game Boy Advance":{"dir":"nintendo-game-boy-advance","games":2,"buckets":["c","l"],
+                                                       "device":"Platforms/gba.png"}}})"},
         {DATA + "covers/nintendo-game-boy-advance/c.json",
          R"({"castlevaniaariaofsorrow":[[3349,"Castlevania: Aria of Sorrow",
              [["Europe","eu.jpg"],["Japan","jp.png"],["North America","na.jpg"]]]]})"},
@@ -96,6 +97,9 @@ TEST_CASE("LaunchBox covers come from the letter file the title needs, in the RO
     });
     CHECK(again.Find(Gba(), {"Castlevania - Aria of Sorrow"}, {"Europe"}, answered));
     CHECK(asked.empty());
+    // The console's picture, from the manifest.
+    CHECK(again.FindDevice(Gba(), answered) == "https://images.example/Platforms/gba.png");
+    CHECK(again.FindDevice(unknown, answered).empty());
 }
 
 TEST_CASE("the artwork takes a LaunchBox cover before the libretro collection") {

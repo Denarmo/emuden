@@ -85,6 +85,21 @@ std::string PackageImage(const std::filesystem::path& dir, const std::string& re
     return PathToUtf8(dir / PathFromUtf8(relative));
 }
 
+// [x, y, w, h] within 0..1.
+void ReadUnitRect(const JsonValue* rect, gfx::Rect& out) {
+    if (rect == nullptr || rect->kind != JsonValue::Kind::Array || rect->items.size() != 4) {
+        return;
+    }
+    float v[4];
+    for (int i = 0; i < 4; ++i) {
+        const JsonValue& item = rect->items[static_cast<std::size_t>(i)];
+        v[i] = item.kind == JsonValue::Kind::Number ? std::clamp(static_cast<float>(item.number), 0.0f, 1.0f) : 0;
+    }
+    if (v[2] > 0.05f && v[3] > 0.05f && v[0] + v[2] <= 1.001f && v[1] + v[3] <= 1.001f) {
+        out = gfx::Rect{v[0], v[1], v[2], v[3]};
+    }
+}
+
 void ReadObject(const JsonValue* object, ObjectLook& out) {
     if (object == nullptr || object->kind != JsonValue::Kind::Object) {
         return;
@@ -99,6 +114,18 @@ void ReadObject(const JsonValue* object, ObjectLook& out) {
         out.player_color = *color;
         out.player_color.a = 255;
     }
+    if (const JsonValue* colors = object->Find("player_colors"); colors && colors->kind == JsonValue::Kind::Array) {
+        for (const JsonValue& item : colors->items) {
+            if (const auto color = ParseColor(item.string); color && out.player_colors.size() < 16) {
+                out.player_colors.push_back(gfx::Color{color->r, color->g, color->b, 255});
+            }
+        }
+    }
+    if (const std::string photo = object->String("player_photo");
+        photo == "launchbox" || (photo.starts_with("https://") && photo.size() < 512)) {
+        out.player_photo = photo;
+    }
+    ReadUnitRect(object->Find("player_screen"), out.player_screen);
     ReadNumber(object, "aspect", 0.3f, 2.5f, out.aspect);
     ReadNumber(object, "depth", 0.01f, 0.6f, out.depth);
     if (const auto shell = ParseColor(object->String("shell"))) {
@@ -111,17 +138,7 @@ void ReadObject(const JsonValue* object, ObjectLook& out) {
     float grip = static_cast<float>(out.grip);
     ReadNumber(object, "grip", 0, 8, grip);
     out.grip = static_cast<int>(grip);
-    const JsonValue* label = object->Find("label");
-    if (label != nullptr && label->kind == JsonValue::Kind::Array && label->items.size() == 4) {
-        float v[4];
-        for (int i = 0; i < 4; ++i) {
-            const JsonValue& item = label->items[static_cast<std::size_t>(i)];
-            v[i] = item.kind == JsonValue::Kind::Number ? std::clamp(static_cast<float>(item.number), 0.0f, 1.0f) : 0;
-        }
-        if (v[2] > 0.05f && v[3] > 0.05f && v[0] + v[2] <= 1.001f && v[1] + v[3] <= 1.001f) {
-            out.label = gfx::Rect{v[0], v[1], v[2], v[3]};
-        }
-    }
+    ReadUnitRect(object->Find("label"), out.label);
 }
 
 } // namespace

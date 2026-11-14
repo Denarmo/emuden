@@ -169,8 +169,9 @@ const LaunchBoxCovers::Manifest* LaunchBoxCovers::LoadManifest(bool& answered) {
     std::optional<std::string> text;
     if (IsFresh(file, MANIFEST_LIFETIME)) {
         text = ReadTextFile(file);
-        // A copy from before the data had faces is asked for again, so the faces show now.
-        if (text && text->find("\"face_kinds\"") == std::string::npos) {
+        // A copy from before the data had faces or consoles is asked for again, so they show now.
+        if (text && (text->find("\"face_kinds\"") == std::string::npos ||
+                     text->find("\"device\"") == std::string::npos)) {
             text.reset();
         }
     }
@@ -212,6 +213,10 @@ const LaunchBoxCovers::Manifest* LaunchBoxCovers::LoadManifest(bool& answered) {
                 for (const JsonValue& bucket : faces->items) {
                     platform.faces.push_back(bucket.string);
                 }
+            }
+            if (const std::string device = value.String("device");
+                device.starts_with("Platforms/") && SafeFileName(device.substr(10))) {
+                platform.device = device;
             }
             if (SafeFileName(platform.dir)) {
                 manifest.platforms.emplace(name, std::move(platform));
@@ -265,22 +270,28 @@ const JsonValue* LaunchBoxCovers::LoadBucket(const Manifest& manifest, const Pla
     return slot.get();
 }
 
+const LaunchBoxCovers::Platform* LaunchBoxCovers::PlatformOf(const Manifest& manifest,
+                                                              const SystemDef& system) const {
+    std::string name = system.launchbox;
+    if (name.empty()) {
+        const auto mapped = manifest.libretro.find(system.libretro_thumbnails);
+        if (mapped == manifest.libretro.end()) {
+            return nullptr;
+        }
+        name = mapped->second;
+    }
+    const auto platform = manifest.platforms.find(name);
+    return platform == manifest.platforms.end() ? nullptr : &platform->second;
+}
+
 std::optional<LaunchBoxCovers::Match> LaunchBoxCovers::FindMatch(const Manifest& manifest_ref,
                                                                   const SystemDef& system,
                                                                   const std::vector<std::string>& titles,
                                                                   const std::vector<std::string>& order,
                                                                   bool& answered) {
     const Manifest* manifest = &manifest_ref;
-    std::string name = system.launchbox;
-    if (name.empty()) {
-        const auto mapped = manifest->libretro.find(system.libretro_thumbnails);
-        if (mapped == manifest->libretro.end()) {
-            return std::nullopt;
-        }
-        name = mapped->second;
-    }
-    const auto platform = manifest->platforms.find(name);
-    if (platform == manifest->platforms.end()) {
+    const Platform* platform = PlatformOf(*manifest, system);
+    if (platform == nullptr) {
         return std::nullopt;
     }
     for (const std::string& title : titles) {
@@ -289,11 +300,11 @@ std::optional<LaunchBoxCovers::Match> LaunchBoxCovers::FindMatch(const Manifest&
             continue;
         }
         const std::string bucket = key[0] >= '0' && key[0] <= '9' ? std::string("0") : key.substr(0, 1);
-        const auto& listed = platform->second.buckets;
+        const auto& listed = platform->buckets;
         if (std::find(listed.begin(), listed.end(), bucket) == listed.end()) {
             continue;
         }
-        const JsonValue* games = LoadBucket(*manifest, platform->second, bucket, answered);
+        const JsonValue* games = LoadBucket(*manifest, *platform, bucket, answered);
         const JsonValue* matches = games ? games->Find(key) : nullptr;
         if (matches == nullptr || matches->items.empty()) {
             continue;
@@ -302,7 +313,7 @@ std::optional<LaunchBoxCovers::Match> LaunchBoxCovers::FindMatch(const Manifest&
         for (const JsonValue& game : matches->items) {
             auto [region, image] = PickCover(game, order);
             if (SafeFileName(image)) {
-                return Match{&game, &platform->second, bucket, std::move(region), std::move(image)};
+                return Match{&game, platform, bucket, std::move(region), std::move(image)};
             }
         }
     }
@@ -362,6 +373,13 @@ std::optional<LaunchBoxFaces> LaunchBoxCovers::FindFaces(const SystemDef& system
         return std::nullopt;
     }
     return out;
+}
+
+std::string LaunchBoxCovers::FindDevice(const SystemDef& system, bool& answered) {
+    const std::lock_guard lock(mutex_);
+    const Manifest* manifest = LoadManifest(answered);
+    const Platform* platform = manifest ? PlatformOf(*manifest, system) : nullptr;
+    return platform == nullptr || platform->device.empty() ? std::string() : manifest->images + platform->device;
 }
 
 } // namespace den::library

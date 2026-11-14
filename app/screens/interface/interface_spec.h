@@ -11,6 +11,7 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "den/base/result.h"
 #include "den/gfx/types.h"
@@ -43,6 +44,13 @@ struct ObjectLook {
     // television); empty for none. `player_color` is its plastic.
     std::string player;
     gfx::Color player_color{200, 200, 205, 255};
+    // Its other colours: each start picks one of these or player_color at random.
+    std::vector<gfx::Color> player_colors;
+    // A photograph of the console's front to model it from: "launchbox" for the database's,
+    // or an https address; empty for the generic console. `player_screen` is where its
+    // screen is, 0..1 of the console in the photograph.
+    std::string player_photo;
+    gfx::Rect player_screen{0, 0, 0, 0};
 };
 
 /// How one console looks: its colour, a wallpaper of the package and the label on its tab.

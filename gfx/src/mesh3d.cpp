@@ -238,6 +238,10 @@ Mesh3D::~Mesh3D() {
 }
 
 void Mesh3D::Set(const std::vector<MeshVertex>& vertices) {
+    // Made mid-frame, it must leave the canvas's buffers bound, or the canvas writes into it.
+    gl::Int vao = 0, buffer = 0;
+    gl::GetIntegerv(gl::VERTEX_ARRAY_BINDING, &vao);
+    gl::GetIntegerv(gl::ARRAY_BUFFER_BINDING, &buffer);
     if (vao_ == 0) {
         gl::GenVertexArrays(1, &vao_);
         gl::GenBuffers(1, &vbo_);
@@ -257,7 +261,8 @@ void Mesh3D::Set(const std::vector<MeshVertex>& vertices) {
     }
     gl::BufferData(gl::ARRAY_BUFFER, static_cast<gl::Sizeiptr>(vertices.size() * sizeof(MeshVertex)),
                    vertices.data(), gl::STATIC_DRAW);
-    gl::BindVertexArray(0);
+    gl::BindVertexArray(static_cast<unsigned int>(vao));
+    gl::BindBuffer(gl::ARRAY_BUFFER, static_cast<unsigned int>(buffer));
     count_ = static_cast<int>(vertices.size());
 }
 

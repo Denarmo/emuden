@@ -132,6 +132,16 @@ public:
         (void)stopping;
         return {};
     }
+    /// A picture of the console of the game's system, seen from the front on a clear ground:
+    /// a UTF-8 path, "" for none. Blocking, like Faces.
+    /// `url`, when given, is the picture to use instead of the database's.
+    virtual std::string Device(const std::string& id, const std::string& url = {},
+                               const std::function<bool()>& stopping = {}) {
+        (void)id;
+        (void)url;
+        (void)stopping;
+        return {};
+    }
     /// Makes an image file the game's cover: it is copied into the library's own covers
     /// folder, where every later scan finds it first.
     virtual Status SetCover(const std::string& id, const std::string& image_path) = 0;

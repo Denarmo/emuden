@@ -3,6 +3,7 @@
 
 #include "console_models.h"
 
+#include <algorithm>
 #include <map>
 #include <memory>
 #include <vector>
@@ -192,6 +193,36 @@ ConsoleModel ConsoleFor(const std::string& name) {
         mesh->Set(build());
     }
     model.mesh = mesh.get();
+    return model;
+}
+
+ConsoleModel PhotoConsole(const ConsolePhoto& photo, const std::string& name, const gfx::Rect& screen) {
+    ConsoleModel model = ConsoleFor(name);
+    if (model.mesh == nullptr || photo.aspect <= 0 || photo.images.empty() || !model.turns) {
+        model.mesh = nullptr;
+        return model;
+    }
+    static std::map<std::string, std::unique_ptr<gfx::Mesh3D>> meshes;
+    auto& mesh = meshes[name + "|" + photo.images.front()];
+    const float a = photo.aspect, d = model.depth, z = d * 0.5f;
+    if (!mesh) {
+        Vertices out;
+        SlabParts parts = All(Part::Shell);
+        parts.front = Part::Photo;
+        gfx::AddSlab(out, photo.outline, d, std::min(0.03f, d * 0.2f), parts);
+        if (screen.w > 0) {
+            SlabParts glass = All(Part::Dark);
+            glass.front = Part::Screen;
+            gfx::AddSlab(out, RoundedOutline(screen.w * a, screen.h, 0, 0), 0.004f, 0, glass, z + 0.002f,
+                         -a * 0.5f + (screen.x + screen.w * 0.5f) * a, 0.5f - (screen.y + screen.h * 0.5f), 0);
+        }
+        gfx::AddBox(out, std::min(0.5f, a * 0.8f), 0.05f, 0.004f, Part::Dark, 0, 0.46f, -z - 0.002f);
+        Back(out, std::min(0.45f, a * 0.6f), 0.3f, -0.2f, z);
+        mesh = std::make_unique<gfx::Mesh3D>();
+        mesh->Set(out);
+    }
+    model.mesh = mesh.get();
+    model.aspect = a;
     return model;
 }
 

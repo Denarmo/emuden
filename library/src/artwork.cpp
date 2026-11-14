@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <format>
+#include <functional>
 
 #include "den/base/files.h"
 #include "den/library/artwork.h"
@@ -261,6 +263,33 @@ GameFaces Artwork::Faces(const Entry& entry, const SystemDef* system, const std:
     }
     cached();
     return faces;
+}
+
+std::string Artwork::Device(const SystemDef* system, const std::string& url, const std::function<bool()>& stopping) {
+    if (system == nullptr || (url.empty() && system->launchbox.empty() && system->libretro_thumbnails.empty()) ||
+        (!url.empty() && !url.starts_with("https://"))) {
+        return {};
+    }
+    const std::string name =
+        url.empty() ? system->id : std::format("{}-{:016x}", system->id, std::hash<std::string>{}(url));
+    const fs::path stem = cache_dir_ / "launchbox-devices" / PathFromUtf8(CacheFileName(name));
+    if (fs::path cached = FindCached(stem); !cached.empty()) {
+        return PathToUtf8(cached);
+    }
+    const fs::path miss = WithSuffix(stem, ".miss");
+    if (!fetcher_ || (stopping && stopping()) || IsFresh(miss, MISS_LIFETIME)) {
+        return {};
+    }
+    bool answered = true;
+    const std::string address = url.empty() ? launchbox_->FindDevice(*system, answered) : url;
+    fs::path file;
+    if (!address.empty() && Download(address, stem, file, answered)) {
+        return PathToUtf8(file);
+    }
+    if (answered) {
+        Touch(miss);
+    }
+    return {};
 }
 
 void Artwork::SetHackOptions(HackCoverOptions options) {

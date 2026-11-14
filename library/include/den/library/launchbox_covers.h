@@ -61,12 +61,16 @@ public:
     /// one there, else the region that fits best. Empty when the game has none.
     std::optional<LaunchBoxFaces> FindFaces(const SystemDef& system, const std::vector<std::string>& titles,
                                             const std::vector<std::string>& region_tags, bool& answered);
+    /// The address of the picture of the system's console seen from the front, on a clear
+    /// ground (README, "Devices"); "" when the data has none.
+    std::string FindDevice(const SystemDef& system, bool& answered);
 
 private:
     struct Platform {
         std::string dir;
         std::vector<std::string> buckets;
         std::vector<std::string> faces; // the face files that exist
+        std::string device;             // the console's picture, under the image server
     };
     struct Match {
         const JsonValue* game = nullptr; // [id, name, [[region, file], ...]]
@@ -82,6 +86,7 @@ private:
     const Manifest* LoadManifest(bool& answered);
     const JsonValue* LoadBucket(const Manifest& manifest, const Platform& platform, const std::string& bucket,
                                 bool& answered, bool faces = false);
+    const Platform* PlatformOf(const Manifest& manifest, const SystemDef& system) const;
     std::optional<Match> FindMatch(const Manifest& manifest, const SystemDef& system,
                                    const std::vector<std::string>& titles, const std::vector<std::string>& order,
                                    bool& answered);

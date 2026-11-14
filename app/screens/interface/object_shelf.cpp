@@ -249,7 +249,8 @@ void ObjectShelf::DrawContent(ui::Context& ctx) {
     for (int d = 0; d <= 3; ++d) {
         for (const int i : {static_cast<int>(index_) - d, static_cast<int>(index_) + d}) {
             if (i >= 0 && i < static_cast<int>(games_.size()) && (d > 0 || i == static_cast<int>(index_))) {
-                faces_.Get(games_[static_cast<std::size_t>(i)].id);
+                const GameObject& object = ObjectAt(static_cast<std::size_t>(i));
+                faces_.Get(games_[static_cast<std::size_t>(i)].id, {object.player_photo, object.player_colors});
             }
         }
     }

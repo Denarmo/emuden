@@ -13,6 +13,7 @@
 #include <memory>
 #include <string>
 
+#include "console_photo.h"
 #include "den/base/jobs.h"
 #include "den/gfx/types.h"
 #include "den/library/library.h"
@@ -30,19 +31,27 @@ struct LoadedFaces {
     gfx::Color plastic;
     float cart_aspect = 0;
     gfx::Rect cart_label{0, 0, 0, 0};
+    ConsolePhoto console; // the console the game starts in, from its photograph
+};
+
+/// The console photograph to prepare with a game's faces (GameObject::player_photo, colours).
+struct ConsoleAsk {
+    std::string photo;
+    std::vector<gfx::Color> colors;
 };
 
 class FaceLoader {
 public:
     ~FaceLoader();
     /// The game's faces once they are fetched; null until then (the fetch is queued).
-    const LoadedFaces* Get(const std::string& id);
+    const LoadedFaces* Get(const std::string& id, const ConsoleAsk& console = {});
     /// The same without asking for them.
     const LoadedFaces* Peek(const std::string& id) const;
 
 private:
     struct Slot {
         LoadedFaces result;
+        ConsoleAsk console;
         bool done = false;
     };
     void Pump();

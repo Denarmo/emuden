@@ -336,6 +336,20 @@ public:
         return artwork_.Faces(*entry, systems.Find(entry->system), stopping, base);
     }
 
+    std::string Device(const std::string& id, const std::string& url,
+                       const std::function<bool()>& stopping) override {
+        const std::optional<Entry> entry = Find(id);
+        if (!entry) {
+            return {};
+        }
+        SystemTable systems;
+        {
+            std::lock_guard lock(mutex_);
+            systems = systems_;
+        }
+        return artwork_.Device(systems.Find(entry->system), url, stopping);
+    }
+
     Status SetCover(const std::string& id, const std::string& image_path) override {
         std::lock_guard lock(mutex_);
         for (Entry& entry : entries_) {

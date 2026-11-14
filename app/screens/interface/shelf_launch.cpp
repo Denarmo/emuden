@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <random>
 
 #include "console_models.h"
 #include "den/app/app.h"
@@ -41,6 +42,8 @@ float ObjectShelf::LaunchSeconds() const {
         return spec_->launch_seconds;
     }
     console_launch_ = true;
+    static std::mt19937 random{std::random_device{}()};
+    launch_pick_ = static_cast<std::size_t>(random());
     return LAUNCH_SECONDS;
 }
 
@@ -57,7 +60,16 @@ void ObjectShelf::DrawLaunch(ui::Context& ctx, gfx::Renderer3D& renderer, const 
         return;
     }
     const Placed& sel = *selected;
-    const ConsoleModel console = ConsoleFor(sel.object->player);
+    const library::Entry& game = games_[sel.index];
+    const LoadedFaces* faces = faces_.Peek(game.id);
+    // The console from its photograph when there is one, in one of its colours.
+    ConsoleModel console = ConsoleFor(sel.object->player);
+    const ConsolePhoto* photo = faces != nullptr && !faces->console.images.empty() ? &faces->console : nullptr;
+    if (photo != nullptr) {
+        const ConsoleModel shaped = PhotoConsole(*photo, sel.object->player, sel.object->player_screen);
+        console = shaped.mesh != nullptr ? shaped : console;
+        photo = shaped.mesh != nullptr ? photo : nullptr;
+    }
     if (console.mesh == nullptr) {
         return;
     }
@@ -119,9 +131,15 @@ void ObjectShelf::DrawLaunch(ui::Context& ctx, gfx::Renderer3D& renderer, const 
 
     // The console, its light and screen coming on once it faces the front.
     gfx::Material body;
-    body.shell = sel.object->player_color;
-    const library::Entry& game = games_[sel.index];
-    const LoadedFaces* faces = faces_.Peek(game.id);
+    if (photo != nullptr) {
+        const std::size_t pick = launch_pick_ % photo->images.size();
+        body.shell = photo->colors[pick];
+        body.cart_art = ctx.textures->Get(photo->images[pick], 1024);
+    } else {
+        const std::vector<gfx::Color>& others = sel.object->player_colors;
+        const std::size_t pick = launch_pick_ % (others.size() + 1);
+        body.shell = pick == 0 ? sel.object->player_color : others[pick - 1];
+    }
     const std::string& cover = faces != nullptr && !faces->cover.empty() ? faces->cover : game.cover;
     body.cover = cover.empty() ? gfx::Texture{} : ctx.textures->Get(cover, 1024);
     if (body.cover) {
