@@ -143,8 +143,8 @@ TEST_CASE("every bundled manifest is read") {
             CHECK(console.scan.loose_members);
             CHECK(console.bios.empty()); // only cores that need no BIOS are offered
         } else if (manifest->id == "emuden.ps2") {
-            // Play! needs no BIOS; its Android build is not offered yet.
-            CHECK(manifest->CoresFor(manifest->systems.front(), "android-arm64").empty());
+            // Play! needs no BIOS and is offered everywhere, Android included.
+            REQUIRE(manifest->CoresFor(manifest->systems.front(), "android-arm64").size() == 1);
             const auto cores = manifest->CoresFor(manifest->systems.front(), "windows-x86_64");
             REQUIRE(cores.size() == 1);
             CHECK(cores[0]->id == "play");
