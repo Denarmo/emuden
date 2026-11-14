@@ -149,6 +149,10 @@ TEST_CASE("every bundled manifest is read") {
             REQUIRE(cores.size() == 1);
             CHECK(cores[0]->id == "play");
             CHECK(console.bios.empty());
+        } else if (manifest->id == "emuden.msx") {
+            // blueMSX runs on the free C-BIOS, which comes as system files.
+            CHECK(console.bios.empty());
+            CHECK(manifest->SystemFilesFor("bluemsx", "android-arm64").size() == 2);
         } else if (manifest->id == "emuden.switch2") {
             saw_switch2 = true;
             CHECK(console.runner == Runner::Engine);

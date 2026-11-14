@@ -45,6 +45,7 @@ const char* const BUILTIN_SYSTEMS_JSON[] = {
     R"json({"id":"wonderswan","name":"WonderSwan","short_name":"WS","order":2600,"content":{"extensions":["ws"],"folder_aliases":["ws","bandai wonderswan"],"zip":"unpack"},"artwork":{"libretro_thumbnails":"Bandai - WonderSwan"}})json",
     R"json({"id":"wsc","name":"WonderSwan Color","short_name":"WSC","order":2610,"content":{"extensions":["wsc"],"folder_aliases":["wonderswancolor","wonderswan color","bandai wonderswan color"],"zip":"unpack"},"artwork":{"libretro_thumbnails":"Bandai - WonderSwan Color"}})json",
     R"json({"id":"vectrex","name":"Vectrex","short_name":"Vectrex","order":2900,"content":{"extensions":["vec","bin","gam"],"folder_only_extensions":["bin","gam"],"folder_aliases":["gce vectrex"],"zip":"unpack"},"artwork":{"libretro_thumbnails":"GCE - Vectrex"}})json",
+    R"json({"id":"msx","name":"MSX","short_name":"MSX","order":2950,"content":{"extensions":["mx1","mx2","rom"],"folder_only_extensions":["rom"],"folder_aliases":["msx1","msx2","microsoft msx"],"zip":"unpack"},"artwork":{"libretro_thumbnails":"Microsoft - MSX"}})json",
     R"json({"id":"arcade","name":"Arcade","short_name":"Arcade","order":3000,"content":{"extensions":["zip","7z"],"folder_only_extensions":["zip","7z"],"folder_aliases":["fbneo","mame","fba","cps1","cps2","cps3"],"zip":"pass"},"artwork":{"libretro_thumbnails":"FBNeo - Arcade Games"}})json",
     nullptr,
 };

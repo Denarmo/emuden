@@ -440,7 +440,8 @@ Racing Lagoon pictures were looked at.
 Only cores that need no BIOS are offered (owner's decision, 2026-11-14). Removed: PCSX2,
 Beetle PSX, SwanStation, Beetle Saturn, Beetle Lynx, every BIOS set, and the consoles whose
 every core needs a BIOS (Sega CD, PC Engine CD, PC-FX, Neo Geo, 3DO, ColecoVision,
-Intellivision, MSX). PS2 has Play!, built from the fork Denarmo/Play- so that it also runs on
+Intellivision; MSX came back the same day with blueMSX on the free C-BIOS, cartridges only).
+PS2 has Play!, built from the fork Denarmo/Play- so that it also runs on
 Android (GT4 PAL reaches its language menu at 50 fps on the Retroid Pocket Duo, and its save
 states load). The PCSX2 notes below are history.
 

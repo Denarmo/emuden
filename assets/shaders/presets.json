@@ -26,6 +26,7 @@
     "atari7800": "crt",
     "jaguar": "crt",
     "pce": "crt",
+    "msx": "crt",
     "arcade": "crt"
   },
   "presets": [
