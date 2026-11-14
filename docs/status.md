@@ -496,7 +496,8 @@ A console installed before such a core existed shows an update that installs it.
 PSX2 ECP (Denarmo/PSX2, a fork of izzy2lost/PSX2) is an optional Android PS2 core since PS2 1.1.0:
 a standalone app driven over the Emulator Control Protocol (Denarmo/emulator-control-protocol), the
 worked example for emulator developers. It needs the player's own BIOS, so Play! stays the default.
-It passed ecp-probe on the Retroid; starting it from EmuDEN on the device is not tested yet.
+Started from EmuDEN on the Retroid, CMR3 runs in it; Start+Select and the bottom panel's Pause open
+EmuDEN's menu over the paused frame, and save/load state, resume and exit work (PS2 1.1.2, PSX2 ECP 1.3.2-ecp2).
 PS2 has Play!, built from the fork Denarmo/Play- so that it also runs on
 Android (GT4 PAL reaches its language menu at 50 fps on the Retroid Pocket Duo, and its save
 states load). Since 1.0.6 its OpenGL renderer streams draws and texture uploads through persistent
