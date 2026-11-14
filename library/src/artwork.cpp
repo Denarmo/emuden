@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 
 #include "den/base/files.h"
@@ -83,6 +85,33 @@ fs::path FindCached(const fs::path& file_stem) {
         }
     }
     return {};
+}
+
+// The short id a game file holds as its whole text ("620"), or "" when it holds something else.
+std::string GameFileId(const fs::path& file) {
+    std::error_code ec;
+    if (fs::file_size(file, ec) > 64 || ec) {
+        return {};
+    }
+    const auto text = ReadTextFile(file);
+    if (!text) {
+        return {};
+    }
+    std::string id = *text;
+    while (!id.empty() && std::isspace(static_cast<unsigned char>(id.back()))) {
+        id.pop_back();
+    }
+    const bool plain = !id.empty() && id.size() <= 32 && std::all_of(id.begin(), id.end(), [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
+    });
+    return plain ? id : std::string();
+}
+
+std::string WithId(std::string url, const std::string& id) {
+    for (std::size_t at = url.find("{id}"); at != std::string::npos; at = url.find("{id}", at + id.size())) {
+        url.replace(at, 4, id);
+    }
+    return url;
 }
 
 } // namespace
@@ -304,6 +333,26 @@ ArtworkResult Artwork::Resolve(const Entry& entry, const SystemDef* system,
     }
     const auto stopped = [&] { return stopping && stopping(); };
     const std::string original = entry.original_name.empty() ? entry.name : entry.original_name;
+    if (system != nullptr && !system->cover_by_id.empty()) {
+        if (const std::string id = GameFileId(PathFromUtf8(entry.path)); !id.empty()) {
+            const fs::path stem = cache_dir_ / "ids" / PathFromUtf8(system->id) / PathFromUtf8(id);
+            if (fs::path cached = FindCached(stem); !cached.empty()) {
+                return {std::move(cached), ArtworkSource::Cache};
+            }
+            const fs::path miss = WithSuffix(stem, ".miss");
+            if (fetcher_ && !stopped() && !IsFresh(miss, MISS_LIFETIME)) {
+                bool answered = false;
+                for (const std::string& url : system->cover_by_id) {
+                    if (fs::path file; Download(WithId(url, id), stem, file, answered)) {
+                        return {std::move(file), ArtworkSource::Downloaded};
+                    }
+                }
+                if (answered) {
+                    Touch(miss);
+                }
+            }
+        }
+    }
     if (system != nullptr && !system->libretro_thumbnails.empty()) {
         const fs::path stem =
             cache_dir_ / "roms" / PathFromUtf8(system->id) / PathFromUtf8(CacheFileName(original));

@@ -57,7 +57,8 @@ Result<EngineAppSpec> ParseEngineApp(const JsonValue& component) {
     }
     spec.ecp_id = ecp->String("id");
     spec.level = static_cast<int>(json::Number(*ecp, "level", 1));
-    if (spec.level < 1 || spec.level > 2) {
+    // Level 0: an app that is only handed the game (Android) or given it on its command line.
+    if (spec.level < 0 || spec.level > 2) {
         return Status::Fail("an engine app has an unknown protocol level");
     }
     spec.capabilities = json::Strings(*ecp, "capabilities", false);

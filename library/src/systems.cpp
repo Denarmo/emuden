@@ -75,6 +75,14 @@ std::optional<SystemDef> ParseSystem(const JsonValue& json) {
     }
     if (const JsonValue* artwork = json.Find("artwork"); artwork != nullptr) {
         def.libretro_thumbnails = artwork->String("libretro_thumbnails");
+        if (const JsonValue* urls = artwork->Find("cover_by_id"); urls != nullptr) {
+            for (const JsonValue& url : urls->items) {
+                if (url.kind == JsonValue::Kind::String && url.string.starts_with("https://") &&
+                    url.string.find("{id}") != std::string::npos) {
+                    def.cover_by_id.push_back(url.string);
+                }
+            }
+        }
     }
     return def;
 }

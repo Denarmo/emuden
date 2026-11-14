@@ -401,6 +401,11 @@ public class EmuDenActivity extends SDLActivity {
                 : "error:The app is closing";
     }
 
+    public static String engineOpen(String pkg, String cert, String path, int display) {
+        EmuDenActivity activity = self;
+        return activity != null ? EngineApps.open(activity, pkg, cert, path, display) : "error:The app is closing";
+    }
+
     public static String engineResume(String pkg, int display) {
         EmuDenActivity activity = self;
         return activity != null ? EngineApps.resume(activity, pkg, display) : "error:The app is closing";

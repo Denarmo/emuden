@@ -50,6 +50,9 @@ struct PlayRequest {
 /// Starts the engine's PLAY activity for a game (the game goes to it as a content URI it
 /// may read, and the menu intent points back at this app). Main thread.
 Status Play(const PlayRequest& request);
+/// Level 0: hands the game to the app's launcher activity to view (port, token and session
+/// are not used). Main thread.
+Status Open(const PlayRequest& request);
 /// Brings the engine's PLAY activity back to the front after the menu. Main thread.
 Status Resume(const std::string& package, apps::Display display);
 

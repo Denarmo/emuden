@@ -27,6 +27,10 @@ Status Play(const PlayRequest&) {
     return Status::Fail("This device starts no apps.");
 }
 
+Status Open(const PlayRequest&) {
+    return Status::Fail("This device starts no apps.");
+}
+
 Status Resume(const std::string&, apps::Display) {
     return Status::Fail("This device starts no apps.");
 }

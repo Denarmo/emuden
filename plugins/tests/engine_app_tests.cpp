@@ -83,6 +83,12 @@ TEST_CASE("an engine app that is not pinned is refused", "[plugins][engine-app]"
     CHECK_FALSE(with(CERT, "not a digest"));
     CHECK_FALSE(with(R"("package":"io.github.example.testengine")", R"("package":"1bad")"));
     CHECK_FALSE(with(R"("level":2)", R"("level":3)"));
+    CHECK_FALSE(with(R"("level":2)", R"("level":-1)"));
+    // Level 0: an app that is only handed the game.
+    auto plain = with(R"("level":2)", R"("level":0)");
+    REQUIRE(plain);
+    REQUIRE(plain->FindComponent("testengine") != nullptr);
+    CHECK(plain->FindComponent("testengine")->engine_app.level == 0);
     CHECK_FALSE(with(R"("TestEngine/test-engine.exe")", R"("../test-engine.exe")"));
     CHECK_FALSE(with(R"("archive":"none")", R"("archive":"zip")"));
     CHECK_FALSE(with(R"("store":"https://)", R"("store":"http://)"));

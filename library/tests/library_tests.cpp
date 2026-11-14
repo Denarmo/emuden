@@ -12,6 +12,7 @@
 #include "den/base/jobs.h"
 #include "den/library/artwork.h"
 #include "den/library/library.h"
+#include "den/library/systems.h"
 
 using namespace den;
 using namespace den::library;
@@ -198,6 +199,39 @@ TEST_CASE("placeholder covers are images") {
     REQUIRE(data);
     CHECK(data->size() > 200u * 300u * 3u);
     CHECK((*data)[1] == 'P');
+}
+
+TEST_CASE("a game file naming an id gets its cover by that id") {
+    const fs::path dir = FreshDir("cover-by-id");
+    Put(dir / "Some Game.steam", "620\n");
+    Put(dir / "Odd.steam", "not an id!");
+    std::vector<std::string> asked;
+    Artwork art(dir / "cache", [&asked](const std::string& url) -> HttpAnswer {
+        asked.push_back(url);
+        if (url == "https://img.example/620/header.jpg") {
+            return {200, "\xFF\xD8\xFFpicture"};
+        }
+        return {404, {}};
+    });
+    const std::vector<SystemDef> systems = ParseSystems(R"({"id":"steam","name":"Steam","extensions":["steam"],
+        "artwork":{"cover_by_id":["https://img.example/{id}/tall.jpg","https://img.example/{id}/header.jpg",
+                                  "http://plain.example/{id}.jpg"]}})");
+    REQUIRE(systems.size() == 1);
+    CHECK(systems[0].cover_by_id.size() == 2);
+    Entry entry;
+    entry.id = "a";
+    entry.name = "Some Game";
+    entry.system = "steam";
+    entry.path = PathToUtf8(dir / "Some Game.steam");
+    const ArtworkResult first = art.Resolve(entry, &systems[0], {});
+    CHECK(first.source == ArtworkSource::Downloaded);
+    CHECK(first.path.extension() == ".jpg");
+    CHECK(asked.size() == 2);
+    CHECK(art.Resolve(entry, &systems[0], {}).source == ArtworkSource::Cache);
+    CHECK(asked.size() == 2);
+    entry.path = PathToUtf8(dir / "Odd.steam");
+    CHECK(art.Resolve(entry, &systems[0], {}).source == ArtworkSource::Placeholder);
+    CHECK(asked.size() == 2);
 }
 
 // Prints what the library finds in real folders: den_library_tests "[.live]".

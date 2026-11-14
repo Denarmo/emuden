@@ -221,6 +221,30 @@ final class EngineApps {
         return start(activity, intent, display);
     }
 
+    /**
+     * Level 0: the app speaks no protocol, so its launcher activity is handed the game to view.
+     * The session is over when this app is in front again.
+     */
+    static String open(Activity activity, String pkg, String cert, String path, int display) {
+        String installed = query(activity, pkg);
+        if (installed.isEmpty()) {
+            return "error:The app is not installed";
+        }
+        if (cert.isEmpty() || !installed.startsWith(cert + "|")) {
+            return "error:The app is not the one the plugin names (its signature differs)";
+        }
+        Intent launch = activity.getPackageManager().getLaunchIntentForPackage(pkg);
+        ComponentName target = launch != null ? launch.getComponent() : null;
+        if (target == null) {
+            return "error:The app cannot be started by EmuDEN";
+        }
+        Intent intent = new Intent(Intent.ACTION_VIEW)
+                .setComponent(target)
+                .setDataAndType(GameProvider.uriFor(activity, new File(path)), "application/octet-stream")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        return start(activity, intent, display);
+    }
+
     /** After the menu: the engine's activity comes back to the front (section 6.2). */
     static String resume(Activity activity, String pkg, int display) {
         ComponentName target = playActivity(activity.getPackageManager(), pkg);

@@ -199,7 +199,7 @@ public:
                 return Status::Fail("The installed engine app is not the one the plugin names (it is signed by "
                                     "someone else). Remove it and install it from EmuDEN again.");
             }
-            if (!found.plays) {
+            if (install.level >= 1 && !found.plays) {
                 return Status::Fail("The installed engine app cannot be started by EmuDEN (it is too old).");
             }
             return {};

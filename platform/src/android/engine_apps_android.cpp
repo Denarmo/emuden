@@ -108,6 +108,25 @@ Status Play(const PlayRequest& request) {
     return Answer(call, answer);
 }
 
+Status Open(const PlayRequest& request) {
+    const jni::ActivityCall call;
+    const jmethodID method =
+        call.Method("engineOpen", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/String;");
+    if (!method) {
+        return Status::Fail("This build cannot start apps for games.");
+    }
+    JNIEnv* env = call.env;
+    jstring package = env->NewStringUTF(request.package.c_str());
+    jstring cert = env->NewStringUTF(request.cert_sha256.c_str());
+    jstring content = env->NewStringUTF(PathToUtf8(request.content).c_str());
+    jobject answer =
+        env->CallStaticObjectMethod(call.activity_class, method, package, cert, content, Where(request.display));
+    for (jstring text : {package, cert, content}) {
+        env->DeleteLocalRef(text);
+    }
+    return Answer(call, answer);
+}
+
 Status Resume(const std::string& package, apps::Display display) {
     const jni::ActivityCall call;
     const jmethodID method = call.Method("engineResume", "(Ljava/lang/String;I)Ljava/lang/String;");
