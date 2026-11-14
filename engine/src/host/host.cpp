@@ -8,6 +8,7 @@
 #include "den/base/files.h"
 #include "den/base/log.h"
 #include "den/engine/host.h"
+#include "den/platform/engine_apps.h"
 #include "den/platform/pal.h"
 #include "den/store/settings.h"
 #include "host/locate.h"
@@ -92,22 +93,32 @@ public:
         if (link_) {
             return Fail(request, "Another game is still running.");
         }
-        const auto install = Find(request.system);
+        const auto install = request.install ? request.install : Find(request.system);
         if (!install) {
             return Fail(request, UnavailableReason(request.system));
+        }
+        if (const Status checked = Check(*install); !checked) {
+            return Fail(request, checked.error);
         }
         if (!IsRegularFile(request.content) && !IsDirectory(request.content)) {
             return Fail(request, "The game file is missing: " + PathToUtf8(request.content));
         }
-        auto link = OpenLink(*install, request, LaunchArgs(*install, request, config_.settings));
+        LinkContext context;
+        context.log_dir = config_.data_dir / "logs" / "engines";
+        context.window = hooks_.window;
+        context.app_version = config_.app_version;
+        auto link = OpenLink(*install, request, LaunchArgs(*install, request, config_.settings), context);
         if (!link) {
             log::Error("engine", "{}", link.error());
             return Fail(request, "The engine could not be started (" + link.error() + ").");
         }
-        log::Info("engine", "started {} for {} (level {}, {})", PathToUtf8(install->executable),
-                  request.game_id, install->level, install->source);
+        log::Info("engine", "started {} for {} (level {}, {})",
+                  install->package.empty() ? PathToUtf8(install->executable) : install->package, request.game_id,
+                  install->level, install->source);
         link_ = link.take();
         request_ = request;
+        app_engine_ = !install->package.empty();
+        ecp_ = install->level >= 1;
         started_ = pal::NowSeconds();
         started_unix_ = UnixNow();
         stop_deadline_ = 0;
@@ -153,7 +164,7 @@ public:
             Finish(link_->Exited());
             return;
         }
-        if (!window_hidden_ && hooks_.window && now - started_ >= HIDE_AFTER_SECONDS) {
+        if (!window_hidden_ && !app_engine_ && hooks_.window && now - started_ >= HIDE_AFTER_SECONDS) {
             hooks_.window->Hide();
             window_hidden_ = true;
         }
@@ -164,6 +175,42 @@ public:
         std::vector<Event> out;
         out.swap(events_);
         return out;
+    }
+
+    engine::Control* Control() override {
+        return link_ ? link_->GetControl() : nullptr;
+    }
+
+    Status Check(const Install& install) const override {
+        if (install.attach) {
+            return {};
+        }
+        if (!install.package.empty()) {
+            if (!pal::engine_apps::Available()) {
+                return Status::Fail("This device does not start engine apps.");
+            }
+            const pal::engine_apps::Installed found = pal::engine_apps::Query(install.package);
+            if (!found.present) {
+                return Status::Fail("The engine app is not installed.");
+            }
+            if (install.cert_sha256.empty() || found.cert_sha256 != install.cert_sha256) {
+                log::Warn("engine", "{} is signed with {}, not {}", install.package, found.cert_sha256,
+                          install.cert_sha256);
+                return Status::Fail("The installed engine app is not the one the plugin names (it is signed by "
+                                    "someone else). Remove it and install it from EmuDEN again.");
+            }
+            if (!found.plays) {
+                return Status::Fail("The installed engine app cannot be started by EmuDEN (it is too old).");
+            }
+            return {};
+        }
+        if (!pal::GetCaps().child_processes) {
+            return Status::Fail("This console is not available on this device yet.");
+        }
+        if (!IsRegularFile(install.executable)) {
+            return Status::Fail("The engine is missing: " + PathToUtf8(install.executable));
+        }
+        return {};
     }
 
 private:
@@ -192,16 +239,22 @@ private:
     }
 
     void Finish(std::optional<int> code) {
+        link_first_frame_ = link_ ? link_->FirstFrameAt() : 0;
         link_.reset(); // ends the engine if it somehow still runs
         const double seconds = std::max(0.0, pal::NowSeconds() - started_);
-        if (window_hidden_ && hooks_.window) {
+        // An engine that speaks the protocol hides the window itself while the game runs.
+        if ((window_hidden_ || ecp_) && !app_engine_ && hooks_.window) {
             hooks_.window->Show();
         }
         window_hidden_ = false;
         log::Info("engine", "{} ended after {:.0f} s (exit code {})", request_.game_id, seconds,
                   code.value_or(-1));
-        if (hooks_.record_play && seconds >= 1.0) {
-            hooks_.record_play(request_.game_id, started_unix_, std::llround(seconds));
+        // Play time counts from the game's first frame when the engine tells it.
+        const double first = link_first_frame_ > 0 ? link_first_frame_ : started_;
+        const double played = std::max(0.0, pal::NowSeconds() - first);
+        if (hooks_.record_play && played >= 1.0) {
+            hooks_.record_play(request_.game_id, started_unix_ + std::llround(first - started_),
+                               std::llround(played));
         }
         Event event;
         event.type = Event::Type::Exited;
@@ -221,6 +274,9 @@ private:
     double confirm_until_ = 0;
     double confirm_next_ = 0;
     bool window_hidden_ = false;
+    double link_first_frame_ = 0;
+    bool app_engine_ = false; // an app of its own (Android): there is no window to hide
+    bool ecp_ = false;
     std::vector<Event> events_;
 };
 

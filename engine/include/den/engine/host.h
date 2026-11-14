@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Facade of the engine host: games that run in an engine outside the app (Switch 2). This
-// stage is protocol level 0 of contracts/engine-contract.md: start the engine for a game
-// and wait for it to exit. Higher levels add events and requests here; what exists stays.
+// Facade of the engine host: games that run in an engine outside the app. Level 0 starts
+// the engine for a game and waits for it to exit (Switch 2); levels 1 and 2 speak the
+// Emulator Control Protocol (docs/engines.md), and Control() drives such a session.
 
 #pragma once
 
@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "den/base/result.h"
+#include "den/engine/control.h"
 
 namespace den::store {
 class Settings;
@@ -26,40 +27,62 @@ class Window;
 
 namespace den::engine {
 
+/// An engine found on this device, or named by a plugin manifest.
+struct Install {
+    std::filesystem::path executable; // desktop
+    std::string source;               // "setting", "plugin", "desktop" or "manifest"
+    int level = 0;                    // the protocol level it is driven at
+    std::string core_id;              // the plugin component it comes from (engine apps)
+    std::string package;              // Android: the app's package name
+    std::string cert_sha256;          // Android: its pinned signing certificate
+    std::vector<std::string> args;    // desktop: more arguments after "--ecp stdio"
+    /// An engine that is started by someone else (a test, a tool): the host listens on
+    /// loopback and calls this with the port and token the engine connects with.
+    std::function<void(int port, const std::string& token)> attach;
+};
+
 struct LaunchRequest {
     std::string system;  // "switch2"
     std::string game_id; // library entry id, echoed in events
     std::string title;
     std::filesystem::path content; // the game file
     bool fullscreen = true;
+    /// The engine to use; empty: the one Find gives for the system.
+    std::optional<Install> install;
+    /// Level 2: setting values by key (as text), sent with the launch.
+    std::vector<std::pair<std::string, std::string>> settings;
+    /// A player::Session drives the session (the player screen shows it), so the app covers
+    /// it with no page of its own. The host still books its play time.
+    bool controlled = false;
+    std::string locale = "en";
 };
 
 struct Event {
     enum class Type {
-        Started, // the engine process is running
-        Exited,  // it ended; exit_code says how
-        Failed,  // it could not be started; message says why (user-facing)
+        Started,       // the engine process is running
+        Exited,        // it ended; exit_code says how
+        Failed,        // it could not be started or stopped for an error; message says why
+        Loading,       // level 1: it loads the game (progress 0..1 when known, message)
+        FirstFrame,    // level 1: the game is on screen
+        Paused,        // level 2: message is the reason (frontend, menu, focus)
+        Resumed,       // level 2
+        MenuRequested, // level 2: it paused and handed the menu over (Control::TakeMenuRequest)
     };
     Type type = Type::Started;
     std::string game_id;
     int exit_code = 0;
     double seconds = 0; // how long it ran (Exited)
+    double progress = -1;
     std::string message;
-};
-
-/// An engine found on this device.
-struct Install {
-    std::filesystem::path executable;
-    std::string source; // "setting", "plugin" or "desktop"
-    int level = 0;      // the protocol level it is driven at
 };
 
 /// What the host does by itself around a session, so no screen has to.
 struct Hooks {
     /// Hidden while a game runs, shown again when the engine exits.
     pal::Window* window = nullptr;
-    /// Books the play time when the engine exits (the library's RecordPlay). Screens must
-    /// not book engine sessions a second time.
+    /// Books the play time when the engine exits (the library's RecordPlay), from the
+    /// game's first frame when the engine reports one. Screens must not book engine
+    /// sessions a second time.
     std::function<void(const std::string& game_id, std::int64_t started_unix, std::int64_t seconds)>
         record_play;
 };
@@ -89,11 +112,20 @@ public:
     virtual void Pump() = 0;
     /// The events since the last call. Main thread.
     virtual std::vector<Event> PollEvents() = 0;
+    /// The controls of the running session when its engine speaks the protocol (level 1
+    /// and up); null otherwise. Valid until the session ends (Running() is false).
+    virtual engine::Control* Control() {
+        return nullptr;
+    }
+    /// Checks an engine app before it is started: installed, and signed with the pinned
+    /// certificate. Desktop installs: the executable is there.
+    virtual Status Check(const Install& install) const = 0;
 };
 
 struct Config {
     std::filesystem::path data_dir;
     store::Settings* settings = nullptr;
+    std::string app_version = "0.1.0"; // told to engines in the hello
 };
 
 std::unique_ptr<Host> CreateHost(const Config& config);

@@ -34,9 +34,11 @@ private:
 
 } // namespace
 
-Result<std::unique_ptr<Link>> OpenLink(const Install& install, const LaunchRequest&,
-                                       const std::vector<std::string>& args) {
-    // Every install is driven at level 0 until the level-2 link exists.
+Result<std::unique_ptr<Link>> OpenLink(const Install& install, const LaunchRequest& request,
+                                       const std::vector<std::string>& args, const LinkContext& context) {
+    if (install.level >= 1) {
+        return OpenEcpLink(install, request, context);
+    }
     pal::ChildDesc desc;
     desc.executable = install.executable;
     desc.args = args;
