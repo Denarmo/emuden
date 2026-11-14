@@ -468,6 +468,11 @@ Only cores that need no BIOS are offered (owner's decision, 2026-11-14). Removed
 Beetle PSX, SwanStation, Beetle Saturn, Beetle Lynx, every BIOS set, and the consoles whose
 every core needs a BIOS (Sega CD, PC Engine CD, PC-FX, Neo Geo, 3DO, ColecoVision,
 Intellivision; MSX came back the same day with blueMSX on the free C-BIOS, cartridges only).
+GBA DS (Denarmo/gba-ds, a libretro port of kyannon/gba-ds) is the GBA core for the 146 games it
+has a second-screen profile for, picked by the ROM code at 0xAC; every other GBA game keeps mGBA.
+Its picture is 240x320, the game over its second screen, so it uses the DS dual-screen layout.
+Aria of Sorrow ran on the Retroid at 60 fps with no gaps, the second screen on the top display.
+A console installed before such a core existed shows an update that installs it.
 PS2 has Play!, built from the fork Denarmo/Play- so that it also runs on
 Android (GT4 PAL reaches its language menu at 50 fps on the Retroid Pocket Duo, and its save
 states load). Since 1.0.6 its OpenGL renderer streams draws and texture uploads through persistent

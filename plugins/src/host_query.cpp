@@ -280,6 +280,14 @@ Console RealHost::Describe(const Loaded& loaded, const SystemDef& system) const 
             for (const Component* files : loaded.manifest.SystemFilesFor(core->id, deps_.platform_key)) {
                 console.update_available = console.update_available || !SystemFilesGood(loaded.manifest, *files);
             }
+            // A core chosen for some games (GBA DS) that came after the console was installed.
+            for (const std::string& id : system.cores) {
+                const Component* other = loaded.manifest.FindComponent(id);
+                if (other != nullptr && other != core && !other->games.Empty() &&
+                    other->DownloadFor(deps_.platform_key) != nullptr && !CoreGood(loaded, *other)) {
+                    console.update_available = true;
+                }
+            }
         }
     }
     // Only the plugin's own source updates it.
