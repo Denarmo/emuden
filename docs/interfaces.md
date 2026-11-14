@@ -170,7 +170,7 @@ A runnable folder: `powershell -ExecutionPolicy Bypass -File tools\package.ps1` 
   `audio_queued_ms`, `audio_underruns` and `picture`. While playing, Select + R1 holds
   fast-forward and Select + L1 rewind on every pad; button glyphs per pad family are drawn
   by `app/screens/player/glyphs.h` (`DrawGlyph`, `HintLine`).
-- **Engine** (level 0, real; see `contracts/engine-contract.md`): `Available(system)`,
+- **Engine** (level 0 and the Emulator Control Protocol, levels 1 and 2; see `docs/engines.md`): `Available(system)`,
   `UnavailableReason`, `Find(system)` (the `Install` it would use), `Start(LaunchRequest)`,
   `Running`, `Current`, `Stop` (polite, forced after 5 s), `PollEvents()` giving `Started`,
   `Exited` (exit code, seconds) and `Failed` (message). Settings `engine.<system>.path` and

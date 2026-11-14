@@ -156,7 +156,7 @@ std::optional<plugins::CoreInfo> CoreForGame(const library::Entry& game) {
     const std::string wanted =
         system::HasStore() ? system::Store().Get(GAME_CORE_KEY, ScopeOf(game)) : std::string();
     for (plugins::CoreInfo& other : svc.plugins->CoresFor(game.system)) {
-        if (!other.installed || other.library.empty()) {
+        if (!other.Ready()) {
             continue;
         }
         if (wanted.empty() ? CoreListsGame(other.games, game) : other.id == wanted) {

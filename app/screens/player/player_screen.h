@@ -66,9 +66,7 @@ public:
     }
     void SetFpsMode(int mode);
     /// The core can make the picture widescreen (a hack or the game's own patch).
-    bool CanWidescreen() const {
-        return !core_.widescreen_options.empty();
-    }
+    bool CanWidescreen() const;
     bool Widescreen() const {
         return widescreen_;
     }

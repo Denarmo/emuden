@@ -103,32 +103,40 @@ void PlayerScreen::BuildMenu() {
 
 void PlayerScreen::BuildMain(ui::Node* list) {
     const player::Snapshot snapshot = Svc().player->GetSnapshot();
+    // An engine app draws the game and has the pads: only what it can do is offered.
+    const bool external = snapshot.external;
     std::vector<ui::RowSpec> rows;
     rows.push_back(ActionRow("menu.resume", "Resume", [this] { CloseMenu(); }));
     if (snapshot.can_save_states) {
         rows.push_back(ActionRow("menu.save", "Save state", [this] { Show(View::Save); }));
         rows.push_back(ActionRow("menu.load", "Load state", [this] { Show(View::Load); }));
-    } else {
+    } else if (!external) {
         rows.push_back(ValueRow("menu.save", "Save states", [] { return std::string("Not with this core"); }));
     }
-    rows.push_back(ToggleRow("menu.fast", "Fast-forward", [this] { return fast_toggle_; },
-                             [this](bool on) { fast_toggle_ = on; }));
-    rows.push_back(ValueRow("menu.rewind", "Rewind", [this, can = snapshot.can_rewind] {
-        if (!can) {
-            return std::string("Not with this core");
-        }
-        if (PadFamilyShown() == input::PadFamily::Keyboard) {
-            return std::string("Hold R while playing");
-        }
-        const input::PadFamily family = PadFamilyShown();
-        return console_.right_stick_holds
-                   ? std::string("Hold the right stick left")
-                   : "Hold " + PadButtonText(family, input::PadButton::Select) + " + " +
-                         PadButtonText(family, input::PadButton::L1);
-    }));
-    rows.push_back(ChoiceRow(
-        "menu.size", "Screen size", ScreenSizeNames(), [this] { return static_cast<int>(size_); },
-        [this](int index) { SetScreenSize(index); }));
+    if (snapshot.can_fast_forward) {
+        rows.push_back(ToggleRow("menu.fast", "Fast-forward", [this] { return fast_toggle_; },
+                                 [this](bool on) { fast_toggle_ = on; }));
+    }
+    if (!external) {
+        rows.push_back(ValueRow("menu.rewind", "Rewind", [this, can = snapshot.can_rewind] {
+            if (!can) {
+                return std::string("Not with this core");
+            }
+            if (PadFamilyShown() == input::PadFamily::Keyboard) {
+                return std::string("Hold R while playing");
+            }
+            const input::PadFamily family = PadFamilyShown();
+            return console_.right_stick_holds
+                       ? std::string("Hold the right stick left")
+                       : "Hold " + PadButtonText(family, input::PadButton::Select) + " + " +
+                             PadButtonText(family, input::PadButton::L1);
+        }));
+    }
+    if (snapshot.can_picture) {
+        rows.push_back(ChoiceRow(
+            "menu.size", "Screen size", ScreenSizeNames(), [this] { return static_cast<int>(size_); },
+            [this](int index) { SetScreenSize(index); }));
+    }
     if (CanWidescreen()) {
         ui::RowSpec wide = ToggleRow("menu.widescreen", "Widescreen", [this] { return Widescreen(); },
                                      [this](bool on) {
@@ -150,35 +158,46 @@ void PlayerScreen::BuildMain(ui::Node* list) {
         }));
         rows.push_back(ValueRow(
             "menu.screens", "Screens", [this] { return dual_.Summary(); }, [this] { Show(View::Screens); }));
-    } else if (SecondScreenReady()) {
+    } else if (SecondScreenReady() && !external) {
         // Two displays: the game and the quick settings change places.
         rows.push_back(ActionRow("menu.swap", "Swap screens", [this] { SwapDisplays(); }));
     }
-    rows.push_back(ValueRow(
-        "menu.picture", "Picture", [this] { return PictureName(picture_, game_.system); },
-        [this] { Show(View::Picture, "picture." + picture_); }));
-    rows.push_back(ValueRow(
-        "menu.options", "Core options", [this] { return std::format("{}", options_.size()); },
-        [this] {
-            OpenPage("options");
-            direct_ = false;
-        }));
-    rows.push_back(ActionRow("menu.buttons", "Buttons", [this] { Show(View::Buttons); }));
-    rows.push_back(ValueRow(
-        "menu.players", "Players",
-        [] { return std::format("{}", std::max(1, std::min(4, Svc().input->PadCount()))); },
-        [this] { Show(View::Players); }));
+    if (snapshot.can_picture) {
+        rows.push_back(ValueRow(
+            "menu.picture", "Picture", [this] { return PictureName(picture_, game_.system); },
+            [this] { Show(View::Picture, "picture." + picture_); }));
+    }
+    if (snapshot.can_options) {
+        rows.push_back(ValueRow(
+            "menu.options", external ? "Engine settings" : "Core options",
+            [this] { return std::format("{}", options_.size()); },
+            [this] {
+                OpenPage("options");
+                direct_ = false;
+            }));
+    }
+    if (!external) {
+        rows.push_back(ActionRow("menu.buttons", "Buttons", [this] { Show(View::Buttons); }));
+        rows.push_back(ValueRow(
+            "menu.players", "Players",
+            [] { return std::format("{}", std::max(1, std::min(4, Svc().input->PadCount()))); },
+            [this] { Show(View::Players); }));
+    }
     // The volumes sit between the rows above and below, a little taller for their second line.
     AddRows(list, std::move(rows), ROW_HEIGHT);
-    AddRows(list, VolumeRows("menu", pal::audio::HasSystemVolume()), VOLUME_HEIGHT);
+    if (snapshot.can_volume) {
+        AddRows(list, VolumeRows("menu", pal::audio::HasSystemVolume()), VOLUME_HEIGHT);
+    }
     rows.clear();
-    rows.push_back(ActionRow("menu.reset", "Reset", [this] {
-        GetStage().Confirm("Reset the game?", "The game starts again. Progress that is not saved is lost.",
-                           "Reset", [this] {
-                               Svc().player->Reset();
-                               CloseMenu();
-                           });
-    }));
+    if (snapshot.can_reset) {
+        rows.push_back(ActionRow("menu.reset", "Reset", [this] {
+            GetStage().Confirm("Reset the game?", "The game starts again. Progress that is not saved is lost.",
+                               "Reset", [this] {
+                                   Svc().player->Reset();
+                                   CloseMenu();
+                               });
+        }));
+    }
     if (AppsAvailable() && !SecondScreenReady()) {
         // One display: an app takes it and the game waits, paused as it is now. With two
         // the quick settings have the button, and the app opens beside the game.

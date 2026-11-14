@@ -6,6 +6,26 @@ hacks. The fourth round took the owner's six notes (table below). Everything was
 through automation, adb and screenshots: nobody held a device, dragged a real finger or
 listened.
 
+## Engine apps through the Emulator Control Protocol (branch feat/ecp)
+
+A console's core can be an engine app (`"type": "engine-app"` in a plugin manifest) that
+speaks ECP level 1 or 2; the player screen, pause menu and companion panel drive it through
+`player::CreateEngineSession` (`docs/engines.md`). Desktop: installed from a pinned download,
+run as a child on `--ecp stdio`. Android: a pinned APK through the system installer (or the
+store page), checked against its pinned signing certificate, started with the PLAY intent and
+a loopback connection.
+
+| What | What was run |
+|---|---|
+| Manifest parsing, desktop install and verify | `den_plugins_tests [engine-app]` |
+| Link (auth, hello, schema, launch, pause, menu request, states, stop, typed errors, level 1) | `den_engine_tests [ecp]`, an engine in the test's process |
+| Session adapter (options, slots, resume state, volume, menu request) | `den_player_tests [engine]` |
+| End to end on Windows | `den_engine_try` against the ECP repo's `test-engine.exe --menu-after 1`: launch, first frame in 0.3 s, menu request, pause, save and load slot 3, 7 settings, resume, stop with the resume state in slot 0 |
+| Android | The release APK builds; not run on a device |
+
+Not run: the app itself with an engine core from a real manifest (no published plugin offers
+one yet), and anything on Android.
+
 ## Fifth round
 
 | Item | State | What was run |

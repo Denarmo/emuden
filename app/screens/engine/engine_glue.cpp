@@ -55,9 +55,12 @@ void Frame() {
     svc.engine->Pump();
     const ui::Page* top = svc.stage->Top();
     const bool covered = top && top->Route() == RUNNING_ROUTE;
-    if (svc.engine->Running() && !covered) {
+    // A session the player screen drives is shown there.
+    const engine::LaunchRequest* current = svc.engine->Current();
+    const bool own = svc.engine->Running() && !(current && current->controlled);
+    if (own && !covered) {
         svc.stage->Push(RUNNING_ROUTE);
-    } else if (!svc.engine->Running() && covered) {
+    } else if (!own && covered) {
         svc.stage->Pop();
     }
 }

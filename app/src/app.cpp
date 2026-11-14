@@ -177,7 +177,10 @@ int Run(int argc, char** argv) {
         auto library = library::CreateLibrary({svc.data_dir, &jobs, &settings});
         auto plugins = plugins::CreateHost({svc.data_dir, &jobs, &settings});
         auto engine = engine::CreateHost({svc.data_dir, &settings});
-        auto player = player::CreateSession({svc.data_dir, &jobs, &device, &settings});
+        // Libretro cores in the app, and engine apps through the engine host.
+        const player::Config player_config{svc.data_dir, &jobs, &device, &settings};
+        auto player = player::CreateRoutedSession(player::CreateSession(player_config),
+                                                  player::CreateEngineSession(player_config, *engine));
         svc.library = library.get();
         svc.plugins = plugins.get();
         svc.engine = engine.get();

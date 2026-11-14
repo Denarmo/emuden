@@ -216,12 +216,14 @@ private:
                 Svc().player->SetRewind(rewind_);
             });
         }
-        control("companion.fast", "Fast-forward", snapshot.fast_forward, [this] {
-            fast_ = !Svc().player->GetSnapshot().fast_forward;
-            rewind_ = false;
-            Svc().player->SetRewind(false);
-            Svc().player->SetFastForward(fast_);
-        });
+        if (snapshot.can_fast_forward) {
+            control("companion.fast", "Fast-forward", snapshot.fast_forward, [this] {
+                fast_ = !Svc().player->GetSnapshot().fast_forward;
+                rewind_ = false;
+                Svc().player->SetRewind(false);
+                Svc().player->SetFastForward(fast_);
+            });
+        }
         control("companion.exit", "Exit", false, [] {
             // The player screen saves the game and books its play time.
             if (PlayerScreen* screen = PlayerScreen::Current()) {
@@ -253,11 +255,16 @@ private:
             size = index < names.size() ? names[index] : std::string();
         }
         const std::string screen_value = size.empty() || picture.empty() ? size + picture : size + " · " + picture;
-        rows.push_back(ValueRow("companion.section.screen", "Screen and picture",
-                                [screen_value] { return screen_value; }, [this] { Open(View::Screen); }));
+        // An engine app draws the game and reads the pads itself.
+        if (snapshot.can_picture) {
+            rows.push_back(ValueRow("companion.section.screen", "Screen and picture",
+                                    [screen_value] { return screen_value; }, [this] { Open(View::Screen); }));
+        }
         if (screen) {
-            rows.push_back(ActionRow("companion.section.controls", "Controls and core",
-                                     [this] { Open(View::Controls); }));
+            if (!snapshot.external) {
+                rows.push_back(ActionRow("companion.section.controls", "Controls and core",
+                                         [this] { Open(View::Controls); }));
+            }
             if (AppsAvailable()) {
                 const std::string beside = other_volume_ ? Beside().App().label : std::string();
                 rows.push_back(ValueRow("companion.section.apps", "Apps", [beside] { return beside; }, [this] {

@@ -11,6 +11,21 @@
 
 namespace den::app {
 
+bool PlayerScreen::CanWidescreen() const {
+    if (core_.widescreen_options.empty()) {
+        return false;
+    }
+    if (core_.runner != plugins::Runner::Engine) {
+        return true;
+    }
+    // An engine app has the row when its settings have the standard key.
+    const std::vector<player::CoreOption> options = Svc().player->Options();
+    return std::all_of(core_.widescreen_options.begin(), core_.widescreen_options.end(), [&](const auto& wanted) {
+        return std::any_of(options.begin(), options.end(),
+                           [&](const player::CoreOption& o) { return o.key == wanted.first; });
+    });
+}
+
 void PlayerScreen::ReadWidescreen() {
     widescreen_ = false;
     if (!CanWidescreen() || phase_ != Phase::Running) {

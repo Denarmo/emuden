@@ -73,7 +73,7 @@ void PlayerScreen::Open() {
     game_ = *game;
     const auto console = svc.plugins->FindConsole(game_.system);
     const auto core = CoreForGame(game_);
-    if (!console || !core || !core->installed || core->library.empty()) {
+    if (!console || !core || !core->Ready()) {
         return Fail((console ? console->name : game_.name) + ": its core is not installed. Open Consoles to install it.");
     }
     console_ = *console;
@@ -112,6 +112,19 @@ void PlayerScreen::Begin(const std::filesystem::path& content, bool resume) {
     request.system = game_.system;
     request.option_hints = core_.option_hints;
     request.resume = resume && Param("resume") != "0";
+    request.title = game_.name;
+    if (core_.runner == plugins::Runner::Engine) {
+        // An engine app runs it; the session talks to it through the engine host.
+        engine::Install install;
+        install.executable = core_.engine.executable;
+        install.source = "manifest";
+        install.level = core_.engine.level;
+        install.core_id = core_.id;
+        install.package = core_.engine.package;
+        install.cert_sha256 = core_.engine.cert_sha256;
+        request.engine = install;
+        request.fullscreen = EngineFullscreenFor(game_, svc.window->Fullscreen());
+    }
     log::Info("player", "open {} with {}", game_.name, core_.id);
     if (const Status opened = svc.player->Open(request); !opened) {
         return Fail(opened.error.empty() ? game_.name + " could not be started." : opened.error);
@@ -156,8 +169,10 @@ void PlayerScreen::Leave() {
         log::Info("player", "leave {} at frame {} ({}x{})", game_.name, snapshot.frames,
                   snapshot.frame_width, snapshot.frame_height);
         // Close writes the battery save and the state the next start resumes from.
-        svc.library->RecordPlay(game_.id, started_unix_,
-                                static_cast<std::int64_t>(pal::NowSeconds() - started_));
+        if (!snapshot.external) {
+            svc.library->RecordPlay(game_.id, started_unix_,
+                                    static_cast<std::int64_t>(pal::NowSeconds() - started_));
+        }
         svc.player->Close();
     }
     phase_ = Phase::Left;
@@ -341,10 +356,13 @@ void PlayerScreen::Update(ui::Context& ctx) {
     }
     const player::Snapshot snapshot = svc.player->GetSnapshot();
     if (snapshot.state == player::State::Closed || snapshot.game_id != game_.id) {
-        // Another page opened a game over this one; the session closed this game and kept its
-        // saves. Leave quietly, without closing what runs now.
-        svc.library->RecordPlay(game_.id, started_unix_,
-                                static_cast<std::int64_t>(pal::NowSeconds() - started_));
+        // Another page opened a game over this one, or the engine app ended; the session
+        // closed this game and kept its saves. Leave quietly, without closing what runs now.
+        // The engine host books an engine's play time itself, from its first frame.
+        if (!snapshot.external) {
+            svc.library->RecordPlay(game_.id, started_unix_,
+                                    static_cast<std::int64_t>(pal::NowSeconds() - started_));
+        }
         StopDisplays();
         phase_ = Phase::Left;
         svc.input->SetNavFromPads(true);
@@ -372,6 +390,10 @@ void PlayerScreen::Update(ui::Context& ctx) {
     }
     ApplySpeed();
     svc.player->Advance(ctx.dt);
+    // An engine app paused and handed its menu over.
+    if (svc.player->TakeMenuRequest() && view_ == View::Closed) {
+        OpenMenu();
+    }
     if (fps_mode_ == 2) {
         // The time between the game's frames (not the display's), for the overlay's graph.
         const std::uint64_t frames = svc.player->GetSnapshot().frames;
