@@ -3,6 +3,7 @@
 
 #include "retro_compile.h"
 
+#include <cstdlib>
 #include <exception>
 #include <mutex>
 #include <sstream>
@@ -32,6 +33,19 @@ std::string WithoutVersion(const std::string& source) {
         out += '\n';
     }
     return out;
+}
+
+// The number of the shader's own "#version" line; 0 without one.
+int DeclaredVersion(const std::string& source) {
+    std::istringstream lines(source);
+    std::string line;
+    while (std::getline(lines, line)) {
+        const std::size_t first = line.find_first_not_of(" \t");
+        if (first != std::string::npos && line.compare(first, 8, "#version") == 0) {
+            return std::atoi(line.c_str() + first + 8);
+        }
+    }
+    return 0;
 }
 
 struct Spirv {
@@ -160,7 +174,11 @@ unsigned LinkRetroProgram(const std::string& vertex, const std::string& fragment
     return program;
 }
 
-GlslStages PrepareRetroGlsl(const std::string& source, const std::string& header) {
+GlslStages PrepareRetroGlsl(const std::string& source, std::string header, bool gles) {
+    if (gles && DeclaredVersion(source) < 130) {
+        header = "#version 100\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\n"
+                 "precision mediump float;\n#endif\n";
+    }
     const std::string body = WithoutVersion(source);
     const std::string common = "#define PARAMETER_UNIFORM 1\n";
     return GlslStages{header + "#define VERTEX 1\n" + common + body, header + "#define FRAGMENT 1\n" + common + body};

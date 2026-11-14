@@ -16,8 +16,10 @@ struct GlslStages {
 };
 
 /// An older GLSL shader (both stages in one file): its own #version lines out, this
-/// device's header in, and VERTEX or FRAGMENT defined for each stage.
-GlslStages PrepareRetroGlsl(const std::string& source, const std::string& header);
+/// device's header in, and VERTEX or FRAGMENT defined for each stage. On GL ES a shader
+/// without "#version 130" or later is GLSL ES 1.00, as RetroArch has it: such shaders use
+/// "varying" and "texture2D", which GLSL ES 3.00 refuses.
+GlslStages PrepareRetroGlsl(const std::string& source, std::string header, bool gles);
 
 /// A Slang pass's two stages (Vulkan GLSL 450) as GLSL 3.00 ES or 3.30. Uniform blocks and
 /// push constants become plain uniform structs, read by "<instance>.<member>"; what passes

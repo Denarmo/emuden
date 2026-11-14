@@ -290,7 +290,7 @@ Status RetroChain::Load(Device& device, const RetroSpec& spec) {
             }
             stages = compiled.take();
         } else {
-            stages = PrepareRetroGlsl(pass.spec.vertex, device.ShaderHeader());
+            stages = PrepareRetroGlsl(pass.spec.vertex, device.ShaderHeader(), state->gles);
         }
         std::string log;
         pass.program = LinkRetroProgram(stages.vertex, stages.fragment, log);

@@ -43,3 +43,15 @@ TEST_CASE("a Slang pass becomes GLSL ES with full precision samplers and named u
     CHECK(fragment.find("ra_io0") != std::string::npos);
     CHECK(stages.value().vertex.find("ra_io0") != std::string::npos);
 }
+
+TEST_CASE("an older GLSL shader is GLSL ES 1.00 on GL ES unless it asks for 1.30") {
+    const std::string header = "#version 300 es\nprecision highp float;\n";
+    const GlslStages old = PrepareRetroGlsl("varying vec2 uv;\n", header, true);
+    CHECK(old.vertex.find("#version 100") == 0);
+    CHECK(old.fragment.find("#define FRAGMENT 1") != std::string::npos);
+    const GlslStages newer = PrepareRetroGlsl("#version 130\nout vec2 uv;\n", header, true);
+    CHECK(newer.vertex.find("#version 300 es") == 0);
+    CHECK(newer.vertex.find("#version 130") == std::string::npos);
+    const GlslStages desktop = PrepareRetroGlsl("varying vec2 uv;\n", "#version 330 core\n", false);
+    CHECK(desktop.vertex.find("#version 330 core") == 0);
+}
