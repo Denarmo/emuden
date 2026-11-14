@@ -506,7 +506,9 @@ buffers: on the Retroid a Colin McRae Rally 3 stage went from 2.3 to 27 fps and 
 Android (HUD fine), before and after. Since 1.0.7 the core fills the frame it reports
 at PAL's 512 lines (before, PAL pictures were shifted down, cut off and letterboxed twice). Since 1.1.1 the core carries Play!'s game configs, idles through
 Colin McRae Rally 3's timer wait and skips framebuffer fetch on Adreno: a CMR3 stage runs at 68% of
-full speed on the Retroid (in-game timer against the wall clock), up from 54%. The PCSX2 notes below are history.
+full speed on the Retroid (in-game timer against the wall clock), up from 54%. Since 1.1.4 the core's
+GS work runs on a thread of its own on Android, with an EGL context shared with the player's: about 70%.
+That thread is now the limit, at 100% of a CPU core inside the Adreno driver's per-draw work. The PCSX2 notes below are history.
 
 The 24 consoles added on 2026-11-14 (Atari 2600/5200/7800/Lynx/Jaguar, Sega CD/32X/SG-1000,
 PC Engine/CD/PC-FX, Neo Geo/Pocket/Color, WonderSwan/Color, Virtual Boy, Pokémon mini, 3DO,
