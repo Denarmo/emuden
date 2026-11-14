@@ -41,6 +41,11 @@ public:
     virtual float LaunchCover() const {
         return LaunchAmount();
     }
+    /// How far the launch has taken the screen over, 0..1: the page moves what is under the
+    /// carousel out of the way.
+    virtual float LaunchStage() const {
+        return 0;
+    }
     gfx::Color ConsoleColor() const {
         return color_;
     }

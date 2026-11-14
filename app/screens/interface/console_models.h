@@ -23,6 +23,8 @@ struct ConsoleModel {
     float slot_y = 0.5f, slot_z = -0.05f, cart_height = 0.44f, sink = 0.55f;
     bool turns = true; // the slot is at the back: shown from behind, turned round to start
     float bottom = 0.5f; // how far below its origin it reaches, in console heights
+    // The screen's middle and size on the front, in console heights (y up); none when 0.
+    float screen_x = 0, screen_y = 0, screen_w = 0, screen_h = 0;
 };
 
 /// The console of that name ("portrait", "landscape", "clamshell", "home"); null mesh for

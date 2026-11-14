@@ -143,7 +143,8 @@ public:
             }
         };
 
-        ui::Node* info = root.Add(ui::MakeBox(ui::Axis::Column, 4));
+        below_ = root.Add(ui::MakeBox(ui::Axis::Column, 6));
+        ui::Node* info = below_->Add(ui::MakeBox(ui::Axis::Column, 4));
         info->align = ui::Align::Center;
         info->pad_bottom = 8;
         name_ = info->Emplace<ui::Label>(" ", theme_.text_title, gfx::FONT_BOLD);
@@ -154,7 +155,7 @@ public:
         position_ = info->Emplace<ui::Label>(" ", theme_.text_small);
         position_->tone = ui::Tone::Dim;
         position_->text_align = ui::Align::Center;
-        AddScreens(root);
+        AddScreens(*below_);
 
         std::size_t chosen = 0;
         for (std::size_t i = 0; i < tabs_.size(); ++i) {
@@ -181,7 +182,18 @@ public:
         const TabData* tab = tab_ < tabs_.size() ? &tabs_[tab_] : nullptr;
         color_ = Mix(color_, tab ? tab->color : spec_->accent, std::min(1.0f, ctx.dt * 6));
         DrawBackdrop(themed, area, tab);
+        // A launch into a console slides the title and buttons down out of sight, its stage
+        // taking their room.
+        const float away = carousel_ ? carousel_->LaunchStage() : 0;
+        if (below_ != nullptr) {
+            // Its room shrinks while what it holds moves down past the bottom.
+            below_->height = away > 0 ? below_height_ * (1 - away) : ui::AUTO;
+            below_->pad_top = below_height_ * away * 1.5f;
+        }
         ui::Page::Draw(themed, area);
+        if (below_ != nullptr && away <= 0) {
+            below_height_ = below_->rect.h;
+        }
         if (carousel_ && carousel_->LaunchCover() > 0) {
             ctx.canvas->FillRect(area, color_.WithAlpha(carousel_->LaunchCover() * 0.92f));
         }
@@ -380,6 +392,8 @@ private:
     std::vector<Tab*> tab_nodes_;
     std::size_t tab_ = 0;
     CoverCarousel* carousel_ = nullptr;
+    ui::Node* below_ = nullptr; // the game's name and the buttons under the carousel
+    float below_height_ = 0;
     ui::Label* name_ = nullptr;
     ui::Label* records_ = nullptr;
     ui::Label* position_ = nullptr;

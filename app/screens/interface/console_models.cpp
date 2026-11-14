@@ -174,13 +174,13 @@ ConsoleModel ConsoleFor(const std::string& name) {
     Vertices (*build)() = nullptr;
     if (name == "portrait") {
         build = Portrait;
-        model = {nullptr, 0.6f, 0.2f, 0.5f, -0.045f, 0.44f, 0.55f, true};
+        model = {nullptr, 0.6f, 0.2f, 0.5f, -0.045f, 0.44f, 0.55f, true, 0.5f, 0, 0.248f, 0.3f, 0.27f};
     } else if (name == "landscape") {
         build = Landscape;
-        model = {nullptr, 1.75f, 0.24f, 0.5f, -0.06f, 0.43f, 0.6f, true};
+        model = {nullptr, 1.75f, 0.24f, 0.5f, -0.06f, 0.43f, 0.6f, true, 0.5f, 0, 0.063f, 0.62f, 0.44f};
     } else if (name == "clamshell") {
         build = Clamshell;
-        model = {nullptr, 0.95f, 0.07f, 0.04f, -0.09f, 0.4f, 0.55f, true, 0.36f};
+        model = {nullptr, 0.95f, 0.07f, 0.04f, -0.09f, 0.4f, 0.55f, true, 0.36f, 0, 0.263f, 0.52f, 0.36f};
     } else if (name == "home") {
         build = Home;
         model = {nullptr, 2.4f, 1.6f, 0.5f, 0.0f, 1.3f, 0.45f, false};
@@ -223,6 +223,12 @@ ConsoleModel PhotoConsole(const ConsolePhoto& photo, const std::string& name, co
     }
     model.mesh = mesh.get();
     model.aspect = a;
+    if (screen.w > 0) {
+        model.screen_x = -a * 0.5f + (screen.x + screen.w * 0.5f) * a;
+        model.screen_y = 0.5f - (screen.y + screen.h * 0.5f);
+        model.screen_w = screen.w * a;
+        model.screen_h = screen.h;
+    }
     return model;
 }
 

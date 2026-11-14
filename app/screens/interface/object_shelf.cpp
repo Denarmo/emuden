@@ -163,6 +163,9 @@ gfx::Rect ObjectShelf::FocusRect() const {
     if (games_.empty()) {
         return rect;
     }
+    if (console_launch_ && Launching()) {
+        return gfx::Rect{view_w_ * 0.5f, view_h_ + 100, 1, 1}; // out of sight: the console has the screen
+    }
     const Placed p = Place(index_, static_cast<float>(time_));
     const float distance = view_h_ * 0.5f / std::tan(HALF_FIELD);
     const float k = distance / std::max(1.0f, distance - p.z);

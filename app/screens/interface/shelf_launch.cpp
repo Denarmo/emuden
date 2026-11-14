@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// The "shelf3d" layout's launch into a console: the other games and the box go, a console
-// rises, shown from behind; the cartridge goes up over its slot and drops in; the console
-// turns round, its light comes on and its screen lights up while the game's cover slides
-// down onto it; then the console's colour covers everything and the game starts.
+// The "shelf3d" layout's launch into a console: the other games, the box and the page's
+// title and buttons go, a console rises, shown from behind; the cartridge goes up over its
+// slot and drops in; the console turns round, its light comes on and its screen lights up
+// while the game's cover slides down onto it; then the view flies into the screen until it
+// fills the display, and the game starts.
 
 #include <algorithm>
 #include <cmath>
@@ -20,7 +21,7 @@ namespace den::app {
 
 namespace {
 
-constexpr float LAUNCH_SECONDS = 3.4f;
+constexpr float LAUNCH_SECONDS = 4.2f;
 constexpr float PI = 3.14159265f;
 
 // 0 before `a`, 1 after `b`, eased between.
@@ -48,10 +49,12 @@ float ObjectShelf::LaunchSeconds() const {
 }
 
 float ObjectShelf::LaunchCover() const {
-    if (!console_launch_ || !Launching()) {
-        return LaunchAmount();
-    }
-    return Ease(launch_, 0.88f, 1.0f);
+    // A console launch ends inside its screen, going dark itself.
+    return console_launch_ && Launching() ? 0 : LaunchAmount();
+}
+
+float ObjectShelf::LaunchStage() const {
+    return console_launch_ && Launching() ? Ease(launch_, 0.0f, 0.12f) : 0;
 }
 
 void ObjectShelf::DrawLaunch(ui::Context& ctx, gfx::Renderer3D& renderer, const std::vector<Placed>& placed) {
@@ -82,10 +85,10 @@ void ObjectShelf::DrawLaunch(ui::Context& ctx, gfx::Renderer3D& renderer, const 
     // turns round once the cartridge is in.
     const float hover = console.slot_y + console.cart_height + 0.2f;
     const float hc = std::min((floor - rect.y) * 0.94f / (hover + console.bottom), rect.w * 0.55f / console.aspect);
-    const float rise = Ease(t, 0.04f, 0.26f);
+    const float rise = Ease(t, 0.03f, 0.21f);
     const float cx = rect.CenterX(), cz = 0;
     const float cy = floor - hc * console.bottom + (1 - rise) * hc * 1.4f;
-    const float turn = console.turns ? PI * (1 - Ease(t, 0.44f, 0.64f)) : 0;
+    const float turn = console.turns ? PI * (1 - Ease(t, 0.36f, 0.52f)) : 0;
 
     // A point of the console (in its heights, y up) on the screen.
     const auto attached = [&](float ly, float lz, float& x, float& y, float& z) {
@@ -107,9 +110,21 @@ void ObjectShelf::DrawLaunch(ui::Context& ctx, gfx::Renderer3D& renderer, const 
                         gfx::Color{0, 0, 0, 255}.WithAlpha(0.13f * rise), tall * 0.5f);
     }
 
-    renderer.Begin(canvas, gfx::Rect{0, rect.y, view_w_, floor - rect.y + 2});
+    // Into the screen: the whole scene grows about the screen's middle, which moves to the
+    // middle of the display, until the screen fills it.
+    const float zoom = console.screen_w > 0 ? Ease(t, 0.74f, 0.97f) : 0;
+    gfx::Mat4 into = gfx::Mat4::Scale(1, 1, 1);
+    if (zoom > 0) {
+        const float px = cx + console.screen_x * hc, py = cy - console.screen_y * hc;
+        const float fill = std::max(view_w_ / (console.screen_w * hc), view_h_ / (console.screen_h * hc)) * 1.03f;
+        const float s = std::pow(fill, zoom);
+        into = gfx::Mat4::Translate(Lerp(px, view_w_ * 0.5f, zoom), Lerp(py, view_h_ * 0.5f, zoom), 0) *
+               gfx::Mat4::Scale(s, s, 1) * gfx::Mat4::Translate(-px, -py, 0);
+    }
+    // Under the floor until the console has risen; the whole display once flying in.
+    renderer.Begin(canvas, zoom > 0 ? gfx::Rect{0, 0, view_w_, view_h_} : gfx::Rect{0, rect.y, view_w_, floor - rect.y + 2});
     // The other games slide away to the sides; the box goes back behind the cartridge.
-    const float fade = 1 - Ease(t, 0.0f, 0.18f);
+    const float fade = 1 - Ease(t, 0.0f, 0.15f);
     for (const Placed& p : placed) {
         if (p.index == index_ || fade <= 0.01f) {
             continue;
@@ -145,13 +160,13 @@ void ObjectShelf::DrawLaunch(ui::Context& ctx, gfx::Renderer3D& renderer, const 
     if (body.cover) {
         body.label_uv = gfx::CoverUv(body.cover.width, body.cover.height, gfx::Rect{0, 0, 110, 100});
     }
-    body.boot = t < 0.64f ? -1.0f : t < 0.7f ? (t - 0.64f) / 0.06f : 1 + Ease(t, 0.7f, 0.84f);
-    renderer.Draw(*console.mesh, gfx::Renderer3D::Model(cx, cy, cz, turn) * gfx::Mat4::Scale(hc, hc, hc), body);
+    body.boot = t < 0.54f ? -1.0f : t < 0.6f ? (t - 0.54f) / 0.06f : 1 + Ease(t, 0.6f, 0.72f);
+    renderer.Draw(*console.mesh, into * gfx::Renderer3D::Model(cx, cy, cz, turn) * gfx::Mat4::Scale(hc, hc, hc), body);
 
     // The cartridge: up from its place over the slot, then down into it.
     const Piece piece = CartPiece(sel);
-    const float lift = Ease(t, 0.02f, 0.26f);
-    const float fall = std::clamp((t - 0.28f) / 0.14f, 0.0f, 1.0f);
+    const float lift = Ease(t, 0.02f, 0.21f);
+    const float fall = std::clamp((t - 0.23f) / 0.11f, 0.0f, 1.0f);
     const float above = hover - console.cart_height * 0.5f; // the cartridge's middle, held over the slot
     const float in = console.slot_y + console.cart_height * (0.5f - console.sink);
     float ax = 0, ay = 0, az = 0;
@@ -166,13 +181,16 @@ void ObjectShelf::DrawLaunch(ui::Context& ctx, gfx::Renderer3D& renderer, const 
     const float h = Lerp(piece.height, hc * console.cart_height, lift);
     Placed lit = sel;
     lit.light = 1;
-    renderer.Draw(sel.object->Mesh(), gfx::Renderer3D::Model(x, y, z, yaw) * gfx::Mat4::Scale(h, h, h),
-                  MaterialFor(ctx, lit, false));
+    const gfx::Mat4 cart = into * gfx::Renderer3D::Model(x, y, z, yaw) * gfx::Mat4::Scale(h, h, h);
+    renderer.Draw(sel.object->Mesh(), cart, MaterialFor(ctx, lit, false));
     if (const gfx::Mesh3D* clear = sel.object->ClearMesh()) {
-        renderer.DrawClear(*clear, gfx::Renderer3D::Model(x, y, z, yaw) * gfx::Mat4::Scale(h, h, h),
-                           MaterialFor(ctx, lit, false));
+        renderer.DrawClear(*clear, cart, MaterialFor(ctx, lit, false));
     }
     renderer.End(canvas);
+    // The screen goes dark as the game takes it over.
+    if (const float dark = Ease(t, 0.95f, 1.0f); dark > 0) {
+        canvas.FillRect(gfx::Rect{0, 0, view_w_, view_h_}, gfx::Color{0, 0, 0, 255}.WithAlpha(dark));
+    }
 }
 
 } // namespace den::app

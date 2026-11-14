@@ -24,6 +24,7 @@ public:
 
     gfx::Rect FocusRect() const override;
     float LaunchCover() const override;
+    float LaunchStage() const override;
 
 protected:
     void DrawContent(ui::Context& ctx) override;
