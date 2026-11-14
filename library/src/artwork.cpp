@@ -191,9 +191,11 @@ GameFaces Artwork::Faces(const Entry& entry, const SystemDef* system, const std:
             *path = PathToUtf8(FindCached(WithSuffix(stem, suffix)));
         }
     };
-    // ".faces" marks a game whose faces were all fetched, ".faces.miss" one without any.
-    const fs::path done = WithSuffix(stem, ".faces"), miss = WithSuffix(stem, ".faces.miss");
-    const fs::path base_mark = WithSuffix(stem, ".faces.base");
+    // ".faces2" marks a game whose faces were all fetched, ".faces2.miss" one without any (the
+    // number goes up when the rules change, so earlier answers are asked again; pictures
+    // already downloaded are kept).
+    const fs::path done = WithSuffix(stem, ".faces2"), miss = WithSuffix(stem, ".faces2.miss");
+    const fs::path base_mark = WithSuffix(stem, ".faces2.base");
     if (IsRegularFile(done)) {
         cached();
         faces.base_game = IsRegularFile(base_mark);
