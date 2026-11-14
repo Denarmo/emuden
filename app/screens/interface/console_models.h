@@ -25,6 +25,9 @@ struct ConsoleModel {
     float bottom = 0.5f; // how far below its origin it reaches, in console heights
     // The screen's middle and size on the front, in console heights (y up); none when 0.
     float screen_x = 0, screen_y = 0, screen_w = 0, screen_h = 0;
+    // The pocket in the top of the back the cartridge stands in: its width and depth, and
+    // the height of the lip it rests behind; none when 0.
+    float pocket_w = 0, pocket_depth = 0, lip_y = 0;
 };
 
 /// The console of that name ("portrait", "landscape", "clamshell", "home"); null mesh for

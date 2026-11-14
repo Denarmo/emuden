@@ -66,6 +66,52 @@ void Speaker(Vertices& out, float x, float y, float z, int count) {
     }
 }
 
+// The part of the convex `outline` where a * x + b * y <= limit (Sutherland-Hodgman).
+std::vector<gfx::Vec2> Clip(const std::vector<gfx::Vec2>& outline, float a, float b, float limit) {
+    std::vector<gfx::Vec2> out;
+    const std::size_t n = outline.size();
+    for (std::size_t i = 0; i < n; ++i) {
+        const gfx::Vec2 p = outline[i], q = outline[(i + 1) % n];
+        const float dp = a * p.x + b * p.y - limit, dq = a * q.x + b * q.y - limit;
+        if (dp <= 0) {
+            out.push_back(p);
+        }
+        if ((dp < 0 && dq > 0) || (dp > 0 && dq < 0)) {
+            const float t = dp / (dp - dq);
+            out.push_back({p.x + (q.x - p.x) * t, p.y + (q.y - p.y) * t});
+        }
+    }
+    // Points the cut put on top of each other would give an edge without a direction.
+    std::vector<gfx::Vec2> kept;
+    for (const gfx::Vec2& p : out) {
+        if (kept.empty() || std::abs(p.x - kept.back().x) + std::abs(p.y - kept.back().y) > 1e-4f) {
+            kept.push_back(p);
+        }
+    }
+    while (kept.size() > 1 &&
+           std::abs(kept.front().x - kept.back().x) + std::abs(kept.front().y - kept.back().y) <= 1e-4f) {
+        kept.pop_back();
+    }
+    return kept.size() >= 3 ? kept : std::vector<gfx::Vec2>{};
+}
+
+// A console's body `depth` thick with the pocket of `model` in the top of its back: the
+// front part whole, the back part round the pocket (below its lip, and the shoulders
+// beside it), so the cartridge stands in it with its back flush with the console's.
+void PocketBody(Vertices& out, const std::vector<gfx::Vec2>& outline, float depth, float bevel, SlabParts front,
+                const ConsoleModel& model) {
+    const float pd = model.pocket_depth, half = model.pocket_w * 0.5f;
+    gfx::AddSlab(out, outline, depth - pd, bevel, front, pd * 0.5f);
+    const float cz = -depth * 0.5f + pd * 0.5f, b = std::min(bevel, pd * 0.3f);
+    const std::vector<gfx::Vec2> upper = Clip(outline, 0, -1, -model.lip_y);
+    for (const std::vector<gfx::Vec2>& piece :
+         {Clip(outline, 0, 1, model.lip_y), Clip(upper, 1, 0, -half), Clip(upper, -1, 0, -half)}) {
+        if (!piece.empty()) {
+            gfx::AddSlab(out, piece, pd, b, All(Part::Shell), cz);
+        }
+    }
+}
+
 // The back's battery lid (a slightly darker panel with a groove round it) and four screws.
 void Back(Vertices& out, float w, float h, float y, float z) {
     SlabParts lid = All(Part::Dark);
@@ -81,10 +127,10 @@ void Back(Vertices& out, float w, float h, float y, float z) {
     }
 }
 
-Vertices Portrait() {
+Vertices Portrait(const ConsoleModel& model) {
     Vertices out;
     const float w = 0.6f, d = 0.2f, z = d * 0.5f;
-    gfx::AddSlab(out, RoundedOutline(w, 1, 0.03f, 0.07f), d, 0.03f, All(Part::Shell));
+    PocketBody(out, RoundedOutline(w, 1, 0.03f, 0.07f), d, 0.03f, All(Part::Shell), model);
     Screen(out, 0.24f, 0.5f, 0.42f, 0.3f, 0.27f, z);
     Button(out, -0.2f, 0.29f, 0.011f, z + 0.004f, Part::Led);
     Pad(out, -0.15f, -0.13f, 0.13f, z);
@@ -93,16 +139,15 @@ Vertices Portrait() {
     Key(out, -0.05f, -0.3f, 0.07f, z);
     Key(out, 0.05f, -0.3f, 0.07f, z);
     Speaker(out, 0.11f, -0.4f, z, 5);
-    // The slot at the top of the back, the battery lid and the screws.
-    gfx::AddBox(out, 0.5f, 0.05f, 0.004f, Part::Dark, 0, 0.47f, -z - 0.002f);
+    // The battery lid and the screws.
     Back(out, 0.4f, 0.3f, -0.2f, z);
     return out;
 }
 
-Vertices Landscape() {
+Vertices Landscape(const ConsoleModel& model) {
     Vertices out;
     const float w = 1.75f, d = 0.24f, z = d * 0.5f;
-    gfx::AddSlab(out, RoundedOutline(w, 1, 0.12f, 0.32f), d, 0.05f, All(Part::Shell));
+    PocketBody(out, RoundedOutline(w, 1, 0.12f, 0.32f), d, 0.05f, All(Part::Shell), model);
     Screen(out, 0.05f, 0.82f, 0.66f, 0.62f, 0.44f, z);
     Button(out, -0.62f, 0.32f, 0.016f, z + 0.004f, Part::Led);
     Pad(out, -0.6f, 0.02f, 0.2f, z);
@@ -111,12 +156,11 @@ Vertices Landscape() {
     Key(out, -0.62f, -0.3f, 0.09f, z);
     Key(out, -0.5f, -0.36f, 0.09f, z);
     Speaker(out, 0.55f, -0.3f, z, 4);
-    gfx::AddBox(out, 0.8f, 0.06f, 0.004f, Part::Dark, 0, 0.46f, -z - 0.002f);
     Back(out, 0.5f, 0.32f, -0.15f, z);
     return out;
 }
 
-Vertices Clamshell() {
+Vertices Clamshell(const ConsoleModel&) {
     Vertices out;
     const float w = 0.95f, h = 0.47f, d = 0.07f, z = d * 0.5f;
     // The lid, upright above the hinge.
@@ -152,7 +196,7 @@ Vertices Clamshell() {
     return out;
 }
 
-Vertices Home() {
+Vertices Home(const ConsoleModel&) {
     Vertices out;
     const float w = 2.4f, d = 1.6f, z = d * 0.5f;
     gfx::AddSlab(out, RoundedOutline(w, 1, 0.1f, 0.06f), d, 0.06f, All(Part::Shell));
@@ -171,13 +215,17 @@ Vertices Home() {
 ConsoleModel ConsoleFor(const std::string& name) {
     static std::map<std::string, std::unique_ptr<gfx::Mesh3D>> meshes;
     ConsoleModel model;
-    Vertices (*build)() = nullptr;
+    Vertices (*build)(const ConsoleModel&) = nullptr;
     if (name == "portrait") {
         build = Portrait;
-        model = {nullptr, 0.6f, 0.2f, 0.5f, -0.045f, 0.44f, 0.55f, true, 0.5f, 0, 0.248f, 0.3f, 0.27f};
+        // A cartridge about half the console's height, a third of it standing out of a pocket
+        // as deep as it is thick.
+        model = {nullptr, 0.6f, 0.2f, 0.5f, -0.069f, 0.47f, 0.64f, true, 0.5f, 0, 0.248f, 0.3f, 0.27f,
+                 0.44f, 0.062f, 0.33f};
     } else if (name == "landscape") {
         build = Landscape;
-        model = {nullptr, 1.75f, 0.24f, 0.5f, -0.06f, 0.43f, 0.6f, true, 0.5f, 0, 0.063f, 0.62f, 0.44f};
+        model = {nullptr, 1.75f, 0.24f, 0.5f, -0.078f, 0.43f, 0.64f, true, 0.5f, 0, 0.063f, 0.62f, 0.44f,
+                 0.76f, 0.084f, 0.345f};
     } else if (name == "clamshell") {
         build = Clamshell;
         model = {nullptr, 0.95f, 0.07f, 0.04f, -0.09f, 0.4f, 0.55f, true, 0.36f, 0, 0.263f, 0.52f, 0.36f};
@@ -190,7 +238,7 @@ ConsoleModel ConsoleFor(const std::string& name) {
     auto& mesh = meshes[name];
     if (!mesh) {
         mesh = std::make_unique<gfx::Mesh3D>();
-        mesh->Set(build());
+        mesh->Set(build(model));
     }
     model.mesh = mesh.get();
     return model;
@@ -209,14 +257,13 @@ ConsoleModel PhotoConsole(const ConsolePhoto& photo, const std::string& name, co
         Vertices out;
         SlabParts parts = All(Part::Shell);
         parts.front = Part::Photo;
-        gfx::AddSlab(out, photo.outline, d, std::min(0.03f, d * 0.2f), parts);
+        PocketBody(out, photo.outline, d, std::min(0.03f, d * 0.2f), parts, model);
         if (screen.w > 0) {
             SlabParts glass = All(Part::Dark);
             glass.front = Part::Screen;
             gfx::AddSlab(out, RoundedOutline(screen.w * a, screen.h, 0, 0), 0.004f, 0, glass, z + 0.002f,
                          -a * 0.5f + (screen.x + screen.w * 0.5f) * a, 0.5f - (screen.y + screen.h * 0.5f), 0);
         }
-        gfx::AddBox(out, std::min(0.5f, a * 0.8f), 0.05f, 0.004f, Part::Dark, 0, 0.46f, -z - 0.002f);
         Back(out, std::min(0.45f, a * 0.6f), 0.3f, -0.2f, z);
         mesh = std::make_unique<gfx::Mesh3D>();
         mesh->Set(out);
