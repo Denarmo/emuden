@@ -32,6 +32,7 @@ struct IndexPlugin {
     Version version;
     FileRef package;
     std::string kind; // "console" (also when the entry names none) or "feature"
+    std::string engine; // a console's, as the entry announces it
     /// Feature plugins: what the package will ask for, shown before any download.
     std::string publisher;
     std::string summary;
@@ -53,6 +54,12 @@ struct BlockedHash {
     std::string reason;
 };
 
+/// A source key EmuDEN withdrew (official index only): by its fingerprint, 16 hex digits.
+struct RevokedKey {
+    std::string fingerprint;
+    std::string reason;
+};
+
 struct Index {
     std::string source_name;
     std::int64_t sequence = 0;
@@ -61,11 +68,14 @@ struct Index {
     std::vector<IndexPlugin> plugins;
     std::vector<Revocation> revoked;
     std::vector<BlockedHash> blocked_sha256;
+    std::vector<RevokedKey> revoked_keys;
 
     const IndexPlugin* Find(std::string_view plugin_id) const;
     std::optional<std::string> RevokedReason(std::string_view plugin_id,
                                              const Version& version) const;
     std::optional<std::string> BlockedReason(std::string_view sha256) const;
+    /// `fingerprint` in any form CompactFingerprint reads.
+    std::optional<std::string> RevokedKeyReason(std::string_view fingerprint) const;
 };
 
 Result<Index> ParseIndex(std::string_view json);

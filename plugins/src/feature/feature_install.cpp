@@ -10,6 +10,7 @@
 #include "den/base/log.h"
 #include "den/base/zip.h"
 #include "feature/host_impl.h"
+#include "feature/index_source.h"
 
 namespace den::plugins::feature {
 
@@ -110,9 +111,26 @@ Status RealFeatureHost::DoInstall(Job& job, const std::string& id, bool consent)
                    ? Status()
                    : Status::Fail("The plugin's permissions could not be saved.");
     }
-    bool expired = false;
-    const std::optional<Index> index = CurrentIndex(expired);
-    const IndexPlugin* offered = index ? index->Find(id) : nullptr;
+    // An installed plugin comes from its own source only; a new one from the source that
+    // offers it first.
+    const std::vector<SourceView> views = Views();
+    std::size_t origin = views.size();
+    if (present) {
+        origin = ViewOf(views, *present);
+    } else if (const Offer* offer = MergeCatalogue(views).Find(id)) {
+        origin = offer->source;
+    } else {
+        for (std::size_t i = 0; i < views.size() && origin == views.size(); ++i) {
+            const bool listed = views[i].enabled && views[i].revoked.empty() && views[i].index &&
+                                views[i].index->Find(id) != nullptr;
+            origin = listed && (views[i].official || CheckSourceNamespace(id, views[i].ns).ok) ? i : origin;
+        }
+    }
+    const SourceView* view = origin < views.size() ? &views[origin] : nullptr;
+    const bool usable = view != nullptr && view->enabled && view->revoked.empty() && view->index;
+    const IndexPlugin* offered = usable ? view->index->Find(id) : nullptr;
+    const FeaturePlugin::Trust trust =
+        view == nullptr || view->official ? FeaturePlugin::Trust::Official : FeaturePlugin::Trust::ThirdParty;
     if (offered == nullptr || offered->kind != "feature") {
         // A plugin that ships with the app and has no newer version: accepting it is enough.
         if (present && !Empty(AccessBeyond(present->manifest.access, present->granted))) {
@@ -124,13 +142,13 @@ Status RealFeatureHost::DoInstall(Job& job, const std::string& id, bool consent)
         }
         return present ? Status() : Status::Fail("The plugin list does not offer this plugin.");
     }
-    if (expired) {
+    if (view->expired) {
         return Status::Fail("The plugin list is out of date. Check for updates first.");
     }
-    if (const auto reason = index->RevokedReason(id, offered->version)) {
+    if (const auto reason = RevokedFor(views, origin, id, offered->version)) {
         return Status::Fail(reason->empty() ? "This plugin was withdrawn by its source." : *reason);
     }
-    if (const auto reason = index->BlockedReason(offered->package.sha256)) {
+    if (const auto reason = BlockedFor(views, origin, offered->package.sha256)) {
         return Status::Fail(reason->empty() ? "This plugin was blocked by its source." : *reason);
     }
     if (present && !present->bundled && present->manifest.version >= offered->version) {
@@ -140,7 +158,7 @@ Status RealFeatureHost::DoInstall(Job& job, const std::string& id, bool consent)
     const FeatureAccess announced = AccessOf(*offered);
     const FeatureAccess granted = ReadGrant(id);
     const bool first = !present || Empty(granted);
-    const bool asks = first ? deps_.source_trust != FeaturePlugin::Trust::Official
+    const bool asks = first ? trust != FeaturePlugin::Trust::Official
                             : !Empty(AccessBeyond(announced, granted));
     if (asks && !consent) {
         return Status::Fail("The plugin asks for permissions you have not accepted.");
@@ -154,7 +172,7 @@ Status RealFeatureHost::DoInstall(Job& job, const std::string& id, bool consent)
     fs::create_directories(temp, ec);
     job.SetMessage("Getting " + offered->name);
     Status status =
-        DownloadPinned(deps_.http, ResolveSourceUrl(IndexUrl(), offered->package.url),
+        DownloadPinned(deps_.http, ResolveSourceUrl(view->index_url, offered->package.url),
                        offered->package.sha256, offered->package.size, archive, &job);
     if (status.ok) {
         status = UnpackFeaturePackage(archive, unpacked, &job);
@@ -172,8 +190,8 @@ Status RealFeatureHost::DoInstall(Job& job, const std::string& id, bool consent)
         } else if (!Empty(AccessBeyond(manifest->access, announced))) {
             status = Status::Fail("The plugin asks for more than its source announced.");
         } else {
-            status = CheckTrust(*manifest, deps_.source_trust, deps_.source_owner);
-            package = Package{manifest.take(), {}, deps_.source_trust, false, {}, 0};
+            status = CheckTrust(*manifest, trust, view->ns);
+            package = Package{manifest.take(), {}, trust, false, {}, 0, view->address};
         }
     }
     if (!status.ok) {
@@ -183,6 +201,13 @@ Status RealFeatureHost::DoInstall(Job& job, const std::string& id, bool consent)
     const fs::path home = plugins_dir_ / PathOf(id);
     const fs::path final_dir = home / PathFromUtf8(version);
     fs::create_directories(home, ec);
+    // The origin goes first: a folder without it would count as the official source's.
+    if (trust == FeaturePlugin::Trust::Official) {
+        fs::remove(home / ORIGIN_FILE, ec);
+    } else if (!WriteOrigin(home, view->address)) {
+        fs::remove_all(unpacked, ec);
+        return Status::Fail("The plugin could not be saved.");
+    }
     fs::remove_all(final_dir, ec);
     fs::rename(unpacked, final_dir, ec);
     if (ec) {
@@ -196,7 +221,7 @@ Status RealFeatureHost::DoInstall(Job& job, const std::string& id, bool consent)
     // the next start.
     if (!running) {
         for (const fs::path& other : ListDirectory(home)) {
-            if (other != final_dir) {
+            if (other != final_dir && other.filename() != ORIGIN_FILE) {
                 fs::remove_all(other, ec);
             }
         }
