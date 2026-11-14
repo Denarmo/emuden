@@ -437,6 +437,12 @@ Racing Lagoon pictures were looked at.
 | PS1 | Racing Lagoon | PCSX-ReARMed (no BIOS) | 621 | black for the first ~12 s, then the intro plays |
 | Switch 2 | Ocarina of Time | installed emulator (engine level 0) | - | in the engine's own window |
 
+The 24 consoles added on 2026-11-14 (Atari 2600/5200/7800/Lynx/Jaguar, Sega CD/32X/SG-1000,
+PC Engine/CD/PC-FX, Neo Geo/Pocket/Color, WonderSwan/Color, Virtual Boy, Pokémon mini, 3DO,
+ColecoVision, Intellivision, Vectrex, MSX, arcade) have no game in the test library. Only
+their downloads (checksums and sizes) and the Windows cores loading and naming themselves
+were checked; none of them has run a game on any platform.
+
 Pause, save state and exit to home were confirmed on one game per console in the first
 round (Tetris, Mario Tennis, Pokemon - Lazarus, Explorers of Skies, Gran Turismo 2,
 PoPoLoCrois).
