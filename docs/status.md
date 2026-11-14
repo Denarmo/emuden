@@ -470,7 +470,10 @@ every core needs a BIOS (Sega CD, PC Engine CD, PC-FX, Neo Geo, 3DO, ColecoVisio
 Intellivision; MSX came back the same day with blueMSX on the free C-BIOS, cartridges only).
 PS2 has Play!, built from the fork Denarmo/Play- so that it also runs on
 Android (GT4 PAL reaches its language menu at 50 fps on the Retroid Pocket Duo, and its save
-states load). The PCSX2 notes below are history.
+states load). Since 1.0.6 its OpenGL renderer streams draws and texture uploads through persistent
+buffers: on the Retroid a Colin McRae Rally 3 stage went from 2.3 to 27 fps and a GT4 race from
+9.7 to 27 fps, both still short of full speed (50/60). GT4's race view is noise with Play! on
+Android (HUD fine), before and after. The PCSX2 notes below are history.
 
 The 24 consoles added on 2026-11-14 (Atari 2600/5200/7800/Lynx/Jaguar, Sega CD/32X/SG-1000,
 PC Engine/CD/PC-FX, Neo Geo/Pocket/Color, WonderSwan/Color, Virtual Boy, Pokémon mini, 3DO,
