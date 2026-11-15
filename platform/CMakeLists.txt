@@ -7,6 +7,8 @@ endif()
 if(ANDROID)
     # HTTP comes from the platform through JNI (src/android).
     list(APPEND platform_exclude "/src/posix/http_curl.cpp")
+    # Secrets are a Keystore-encrypted file of the shell (src/android).
+    list(APPEND platform_exclude "/src/posix/secrets_file.cpp")
     # The second screen is an activity on the other display (src/android), not a second window.
     list(APPEND platform_exclude "/src/sdl/second_display_sdl.cpp")
     # Other apps and the system keyboard exist on Android only (src/android).
@@ -30,7 +32,7 @@ endif()
 den_module(platform DEPS den_base PRIVATE_DEPS SDL3::SDL3-static EXCLUDE ${platform_exclude})
 
 if(WIN32)
-    target_link_libraries(den_platform PRIVATE winhttp ws2_32 dwmapi den_webview2)
+    target_link_libraries(den_platform PRIVATE winhttp advapi32 ws2_32 dwmapi den_webview2)
 elseif(ANDROID)
     target_link_libraries(den_platform PRIVATE EGL android)
 else()

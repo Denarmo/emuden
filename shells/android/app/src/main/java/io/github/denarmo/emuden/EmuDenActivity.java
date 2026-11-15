@@ -502,8 +502,28 @@ public class EmuDenActivity extends SDLActivity {
     private static native void nativeStopped(boolean stopped);
 
     /** Called from native code (platform/src/android). */
-    public static HttpCall httpOpen(String url, String[] headers, int timeoutSeconds) {
-        return HttpCall.open(url, headers, timeoutSeconds);
+    public static HttpCall httpOpen(String url, String method, String[] headers, int timeoutSeconds,
+                                    byte[] body, String bodyFile, long fileOffset, long fileLength,
+                                    boolean follow, boolean anyCertificate) {
+        return HttpCall.open(url, method, headers, timeoutSeconds, body, bodyFile, fileOffset, fileLength,
+                             follow, anyCertificate);
+    }
+
+    public static byte[] secretGet(String name) {
+        EmuDenActivity activity = self;
+        return activity == null ? null : SecretStore.get(activity.getFilesDir(), name);
+    }
+
+    public static boolean secretSet(String name, byte[] value) {
+        EmuDenActivity activity = self;
+        return activity != null && SecretStore.set(activity.getFilesDir(), name, value);
+    }
+
+    public static void secretRemove(String name) {
+        EmuDenActivity activity = self;
+        if (activity != null) {
+            SecretStore.remove(activity.getFilesDir(), name);
+        }
     }
 
     // The native code reads its assets as files: <files>/assets mirrors the APK's assets.

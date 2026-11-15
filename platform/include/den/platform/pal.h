@@ -113,13 +113,26 @@ std::string GetEnv(const char* name);
 // HTTP.
 struct HttpRequest {
     std::string url;
+    /// GET, POST, PUT, PATCH, DELETE or HEAD.
+    std::string method = "GET";
     std::vector<std::pair<std::string, std::string>> headers;
+    /// The request's body: `body` from memory, or the file `body_file` streamed (set one).
+    std::string body;
+    std::filesystem::path body_file;
+    /// Of `body_file`, only `body_length` bytes from `body_offset` (0: up to its end).
+    std::uint64_t body_offset = 0;
+    std::uint64_t body_length = 0;
     /// When set the body is streamed to this file (written as "<file>.part", renamed when
     /// complete) and HttpResponse::body stays empty.
     std::filesystem::path to_file;
     /// Bodies kept in memory are cut off here.
     std::uint64_t max_body = 64u << 20;
     int timeout_seconds = 30;
+    /// False: a 3xx answer is returned as it is.
+    bool follow_redirects = true;
+    /// Accepts any certificate, for https to 127.0.0.1 or localhost only (an app on this
+    /// device with a self-signed certificate). Ignored for every other host.
+    bool loopback_any_certificate = false;
     /// Called while the body arrives (total is 0 when unknown); returning false cancels.
     std::function<bool(std::uint64_t received, std::uint64_t total)> progress;
 };
@@ -129,12 +142,30 @@ struct HttpResponse {
     std::string body;
     std::string error;
     std::uint64_t received = 0;
+    /// The answer's headers (of the last answer after redirects), names in lower case.
+    std::vector<std::pair<std::string, std::string>> headers;
     bool ok() const {
         return status >= 200 && status < 300 && error.empty();
     }
+    /// The first value of a header (`name` in lower case), "" when there is none.
+    std::string Header(const std::string& name) const {
+        for (const auto& [key, value] : headers) {
+            if (key == name) {
+                return value;
+            }
+        }
+        return {};
+    }
 };
 
-/// A blocking GET that follows redirects. Run it from a job.
+/// The bytes a request sends: `body`, or the slice of `body_file`.
+std::uint64_t HttpBodySize(const HttpRequest& request);
+
+/// Whether the URL's host is 127.0.0.1 or localhost.
+bool IsLoopbackUrl(const std::string& url);
+
+/// A blocking request (GET unless `method` says otherwise) that follows redirects. Run it
+/// from a job.
 HttpResponse HttpGet(const HttpRequest& request);
 
 // Child processes.
@@ -156,8 +187,9 @@ public:
 
 Result<std::unique_ptr<Process>> StartProcess(const ProcessDesc& desc);
 
-/// Secrets (tokens). This stage keeps them in memory only; the shells replace it with DPAPI,
-/// Secret Service and Keystore.
+/// Secrets (tokens, keys) in the platform's credential store: Windows Credential Manager,
+/// a Keystore-encrypted file on Android, a file only the user may read elsewhere. Values are
+/// at most 2 KiB; they never leave the device.
 class Secrets {
 public:
     virtual ~Secrets() = default;

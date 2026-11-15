@@ -54,13 +54,15 @@ void Transfer(JNIEnv* env, const HttpRequest& request, HttpResponse& response) {
     jclass activity_class = env->GetObjectClass(activity);
     jmethodID open = env->GetStaticMethodID(
         activity_class, "httpOpen",
-        "(Ljava/lang/String;[Ljava/lang/String;I)Lio/github/denarmo/emuden/HttpCall;");
+        "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;I[BLjava/lang/String;JJZZ)"
+        "Lio/github/denarmo/emuden/HttpCall;");
     if (Threw(env, response) || !open) {
         response.error = "this build has no HTTP client";
         return;
     }
+    jclass string_class = env->FindClass("java/lang/String");
     jobjectArray headers = env->NewObjectArray(static_cast<jsize>(request.headers.size() * 2),
-                                               env->FindClass("java/lang/String"), nullptr);
+                                               string_class, nullptr);
     jsize index = 0;
     for (const auto& [name, value] : request.headers) {
         jstring n = env->NewStringUTF(name.c_str());
@@ -70,9 +72,31 @@ void Transfer(JNIEnv* env, const HttpRequest& request, HttpResponse& response) {
         env->DeleteLocalRef(n);
         env->DeleteLocalRef(v);
     }
+    jbyteArray body = nullptr;
+    if (!request.body.empty()) {
+        body = env->NewByteArray(static_cast<jsize>(request.body.size()));
+        if (Threw(env, response) || !body) {
+            response.error = "the request is too large";
+            return;
+        }
+        env->SetByteArrayRegion(body, 0, static_cast<jsize>(request.body.size()),
+                                reinterpret_cast<const jbyte*>(request.body.data()));
+    }
+    jstring body_file = request.body_file.empty()
+                            ? nullptr
+                            : env->NewStringUTF(PathToUtf8(request.body_file).c_str());
+    const std::string method = request.method.empty() ? "GET" : request.method;
     jobject call = env->CallStaticObjectMethod(activity_class, open,
-                                               env->NewStringUTF(request.url.c_str()), headers,
-                                               static_cast<jint>(request.timeout_seconds));
+                                               env->NewStringUTF(request.url.c_str()),
+                                               env->NewStringUTF(method.c_str()), headers,
+                                               static_cast<jint>(request.timeout_seconds), body,
+                                               body_file,
+                                               static_cast<jlong>(request.body_offset),
+                                               static_cast<jlong>(HttpBodySize(request)),
+                                               static_cast<jboolean>(request.follow_redirects),
+                                               static_cast<jboolean>(
+                                                   request.loopback_any_certificate &&
+                                                   IsLoopbackUrl(request.url)));
     if (Threw(env, response) || !call) {
         return;
     }
@@ -82,9 +106,21 @@ void Transfer(JNIEnv* env, const HttpRequest& request, HttpResponse& response) {
     jmethodID error = env->GetMethodID(call_class, "error", "()Ljava/lang/String;");
     jmethodID read = env->GetMethodID(call_class, "read", "([B)I");
     jmethodID close = env->GetMethodID(call_class, "close", "()V");
+    jmethodID answer_headers = env->GetMethodID(call_class, "headers", "()[Ljava/lang/String;");
 
     response.status = env->CallIntMethod(call, status);
     response.error = TakeString(env, env->CallObjectMethod(call, error));
+    if (answer_headers) {
+        if (auto pairs = static_cast<jobjectArray>(env->CallObjectMethod(call, answer_headers))) {
+            const jsize count = env->GetArrayLength(pairs);
+            for (jsize i = 0; i + 1 < count; i += 2) {
+                std::string name = TakeString(env, env->GetObjectArrayElement(pairs, i));
+                std::string value = TakeString(env, env->GetObjectArrayElement(pairs, i + 1));
+                response.headers.emplace_back(std::move(name), std::move(value));
+            }
+        }
+        env->ExceptionClear();
+    }
     const jlong announced = env->CallLongMethod(call, length);
     const std::uint64_t total = announced > 0 ? static_cast<std::uint64_t>(announced) : 0;
 
@@ -146,7 +182,7 @@ HttpResponse HttpGet(const HttpRequest& request) {
     HttpResponse response;
     // SDL attaches the calling thread to the Java VM and detaches it when the thread ends.
     auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
-    if (!env || env->PushLocalFrame(32) != 0) {
+    if (!env || env->PushLocalFrame(256) != 0) {
         response.error = "no Java environment";
         return response;
     }

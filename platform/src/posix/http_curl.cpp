@@ -5,6 +5,9 @@
 // any distribution whichever TLS flavour of libcurl it ships; without it requests fail with a
 // clear error.
 
+#include <algorithm>
+#include <cctype>
+#include <cstring>
 #include <fstream>
 #include <system_error>
 
@@ -68,7 +71,53 @@ struct Transfer {
     HttpResponse* response;
     std::ofstream file;
     bool to_file = false;
+    std::ifstream upload;   // body_file
+    std::uint64_t left = 0; // of its slice
+    std::size_t sent = 0;   // of an in-memory body
 };
+
+size_t OnRead(char* data, size_t size, size_t count, void* user) {
+    auto& t = *static_cast<Transfer*>(user);
+    const size_t room = size * count;
+    if (!t.request->body_file.empty()) {
+        t.upload.read(data, static_cast<std::streamsize>(std::min<std::uint64_t>(room, t.left)));
+        const auto got = static_cast<size_t>(t.upload.gcount());
+        t.left -= got;
+        return got;
+    }
+    const size_t n = std::min(room, t.request->body.size() - t.sent);
+    std::memcpy(data, t.request->body.data() + t.sent, n);
+    t.sent += n;
+    return n;
+}
+
+// One header line; a status line starts the headers of the next answer (redirects).
+size_t OnHeader(char* data, size_t size, size_t count, void* user) {
+    auto& t = *static_cast<Transfer*>(user);
+    const size_t bytes = size * count;
+    std::string line(data, bytes);
+    while (!line.empty() && (line.back() == '
+' || line.back() == '
+')) {
+        line.pop_back();
+    }
+    if (line.rfind("HTTP/", 0) == 0) {
+        t.response->headers.clear();
+        return bytes;
+    }
+    const std::size_t colon = line.find(':');
+    if (colon == std::string::npos || colon == 0) {
+        return bytes;
+    }
+    std::string name = line.substr(0, colon);
+    std::transform(name.begin(), name.end(), name.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::string value = line.substr(colon + 1);
+    const std::size_t first = value.find_first_not_of(' ');
+    value = first == std::string::npos ? std::string() : value.substr(first);
+    t.response->headers.emplace_back(std::move(name), std::move(value));
+    return bytes;
+}
 
 size_t OnData(char* data, size_t size, size_t count, void* user) {
     auto& t = *static_cast<Transfer*>(user);
@@ -120,8 +169,41 @@ HttpResponse HttpGet(const HttpRequest& request) {
     for (const auto& [name, value] : request.headers) {
         headers = api.slist_append(headers, (name + ": " + value).c_str());
     }
+    const std::string method = request.method.empty() ? "GET" : request.method;
+    const bool has_body = !request.body.empty() || !request.body_file.empty() ||
+                          (method != "GET" && method != "HEAD" && method != "DELETE");
+    if (has_body) {
+        const std::uint64_t length = HttpBodySize(request);
+        transfer.left = length;
+        if (!request.body_file.empty()) {
+            transfer.upload.open(request.body_file, std::ios::binary);
+            transfer.upload.seekg(static_cast<std::streamoff>(request.body_offset));
+            if (!transfer.upload) {
+                response.error = "could not read " + request.body_file.string();
+                api.slist_free_all(headers);
+                api.cleanup(curl);
+                return response;
+            }
+        }
+        headers = api.slist_append(headers, "Expect:");
+        api.setopt(curl, CURLOPT_POST, 1L);
+        api.setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(length));
+        api.setopt(curl, CURLOPT_READFUNCTION, OnRead);
+        api.setopt(curl, CURLOPT_READDATA, &transfer);
+    }
+    if (method == "HEAD") {
+        api.setopt(curl, CURLOPT_NOBODY, 1L);
+    } else if (method != "GET" && method != "POST") {
+        api.setopt(curl, CURLOPT_CUSTOMREQUEST, method.c_str());
+    }
+    api.setopt(curl, CURLOPT_HEADERFUNCTION, OnHeader);
+    api.setopt(curl, CURLOPT_HEADERDATA, &transfer);
     api.setopt(curl, CURLOPT_URL, request.url.c_str());
-    api.setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    api.setopt(curl, CURLOPT_FOLLOWLOCATION, request.follow_redirects ? 1L : 0L);
+    if (request.loopback_any_certificate && IsLoopbackUrl(request.url)) {
+        api.setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        api.setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    }
     api.setopt(curl, CURLOPT_MAXREDIRS, 10L);
     api.setopt(curl, CURLOPT_USERAGENT, "EmuDEN");
     api.setopt(curl, CURLOPT_ACCEPT_ENCODING, "");

@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <algorithm>
+#include <cctype>
 #include <map>
 #include <mutex>
 
@@ -190,28 +192,6 @@ public:
 private:
     SDL_Process* process_;
     std::optional<int> exit_;
-};
-
-class MemorySecrets final : public Secrets {
-public:
-    std::optional<std::string> Get(const std::string& key) override {
-        std::lock_guard lock(mutex_);
-        const auto it = values_.find(key);
-        return it == values_.end() ? std::nullopt : std::optional<std::string>(it->second);
-    }
-    Status Set(const std::string& key, const std::string& value) override {
-        std::lock_guard lock(mutex_);
-        values_[key] = value;
-        return {};
-    }
-    void Remove(const std::string& key) override {
-        std::lock_guard lock(mutex_);
-        values_.erase(key);
-    }
-
-private:
-    std::mutex mutex_;
-    std::map<std::string, std::string> values_;
 };
 
 } // namespace
@@ -415,9 +395,34 @@ Result<std::unique_ptr<Process>> StartProcess(const ProcessDesc& desc) {
     return std::unique_ptr<Process>(new SdlProcess(process));
 }
 
-Secrets& GetSecrets() {
-    static MemorySecrets secrets;
-    return secrets;
+std::uint64_t HttpBodySize(const HttpRequest& request) {
+    if (request.body_file.empty()) {
+        return request.body.size();
+    }
+    std::error_code ec;
+    const std::uint64_t size = std::filesystem::file_size(request.body_file, ec);
+    if (ec || request.body_offset >= size) {
+        return 0;
+    }
+    const std::uint64_t left = size - request.body_offset;
+    return request.body_length == 0 ? left : std::min(left, request.body_length);
+}
+
+bool IsLoopbackUrl(const std::string& url) {
+    const std::size_t scheme = url.find("://");
+    if (scheme == std::string::npos) {
+        return false;
+    }
+    std::string host = url.substr(scheme + 3);
+    host = host.substr(0, host.find_first_of("/?#"));
+    if (host.find('@') != std::string::npos) {
+        return false;
+    }
+    host = host.substr(0, host.rfind(':'));
+    for (char& c : host) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return host == "127.0.0.1" || host == "localhost";
 }
 
 } // namespace den::pal

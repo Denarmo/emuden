@@ -4,6 +4,8 @@
 #include <windows.h>
 #include <winhttp.h>
 
+#include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <system_error>
 
@@ -23,6 +25,18 @@ std::wstring Widen(const std::string& text) {
     return out;
 }
 
+std::string Narrow(const std::wstring& text) {
+    if (text.empty()) {
+        return {};
+    }
+    const int size = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0,
+                                         nullptr, nullptr);
+    std::string out(static_cast<std::size_t>(size), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), size, nullptr,
+                        nullptr);
+    return out;
+}
+
 struct Handle {
     HINTERNET h = nullptr;
     ~Handle() {
@@ -36,6 +50,90 @@ HttpResponse Fail(const char* what) {
     HttpResponse response;
     response.error = std::string(what) + " failed (" + std::to_string(GetLastError()) + ")";
     return response;
+}
+
+// The raw header block after the status line: "Name: value" lines.
+void ReadHeaders(HINTERNET call, HttpResponse& response) {
+    DWORD size = 0;
+    WinHttpQueryHeaders(call, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, nullptr, &size,
+                        WINHTTP_NO_HEADER_INDEX);
+    if (size == 0) {
+        return;
+    }
+    std::wstring raw(size / sizeof(wchar_t) + 1, L'\0');
+    if (!WinHttpQueryHeaders(call, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, raw.data(),
+                             &size, WINHTTP_NO_HEADER_INDEX)) {
+        return;
+    }
+    raw.resize(size / sizeof(wchar_t));
+    const std::string text = Narrow(raw);
+    std::size_t at = text.find("\r\n"); // skips the status line
+    while (at != std::string::npos && at + 2 < text.size()) {
+        const std::size_t start = at + 2;
+        at = text.find("\r\n", start);
+        const std::string line = text.substr(start, at == std::string::npos ? std::string::npos : at - start);
+        const std::size_t colon = line.find(':');
+        if (colon == std::string::npos || colon == 0) {
+            continue;
+        }
+        std::string name = line.substr(0, colon);
+        std::transform(name.begin(), name.end(), name.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        std::string value = line.substr(colon + 1);
+        const std::size_t first = value.find_first_not_of(' ');
+        value = first == std::string::npos ? std::string() : value.substr(first);
+        response.headers.emplace_back(std::move(name), std::move(value));
+    }
+}
+
+// Sends the request with its body (from memory or streamed from a file).
+bool Send(HINTERNET call, const HttpRequest& request, std::wstring headers, HttpResponse& response) {
+    std::ifstream file;
+    const std::uint64_t length = HttpBodySize(request);
+    if (!request.body_file.empty()) {
+        file.open(request.body_file, std::ios::binary);
+        file.seekg(static_cast<std::streamoff>(request.body_offset));
+        if (!file) {
+            response.error = "could not read " + request.body_file.string();
+            return false;
+        }
+    }
+    DWORD total = static_cast<DWORD>(length);
+    if (length > 0xFFFFFFFFull) {
+        headers += L"Content-Length: " + std::to_wstring(length) + L"\r\n";
+        total = WINHTTP_IGNORE_REQUEST_TOTAL_LENGTH;
+    }
+    const bool streamed = !request.body_file.empty();
+    LPVOID optional = !streamed && !request.body.empty() ? const_cast<char*>(request.body.data())
+                                                           : WINHTTP_NO_REQUEST_DATA;
+    const DWORD optional_size = !streamed ? static_cast<DWORD>(request.body.size()) : 0;
+    if (!WinHttpSendRequest(call, headers.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : headers.c_str(),
+                            static_cast<DWORD>(-1), optional, optional_size, total, 0)) {
+        response = Fail("the request");
+        return false;
+    }
+    if (streamed) {
+        std::string buffer(1u << 16, '\0');
+        std::uint64_t left = length;
+        while (file && left > 0) {
+            file.read(buffer.data(), static_cast<std::streamsize>(std::min<std::uint64_t>(buffer.size(), left)));
+            const auto got = static_cast<DWORD>(file.gcount());
+            if (got == 0) {
+                break;
+            }
+            left -= got;
+            DWORD written = 0;
+            if (got > 0 && !WinHttpWriteData(call, buffer.data(), got, &written)) {
+                response = Fail("sending the file");
+                return false;
+            }
+        }
+    }
+    if (!WinHttpReceiveResponse(call, nullptr)) {
+        response = Fail("the request");
+        return false;
+    }
+    return true;
 }
 
 } // namespace
@@ -68,14 +166,21 @@ HttpResponse HttpGet(const HttpRequest& request) {
     if (!connect.h) {
         return Fail("connecting");
     }
+    const std::wstring method = Widen(request.method.empty() ? "GET" : request.method);
     Handle call;
-    call.h = WinHttpOpenRequest(connect.h, L"GET", path, nullptr, WINHTTP_NO_REFERER,
+    call.h = WinHttpOpenRequest(connect.h, method.c_str(), path, nullptr, WINHTTP_NO_REFERER,
                                 WINHTTP_DEFAULT_ACCEPT_TYPES, https ? WINHTTP_FLAG_SECURE : 0);
     if (!call.h) {
         return Fail("opening the request");
     }
-    DWORD redirect = WINHTTP_OPTION_REDIRECT_POLICY_ALWAYS;
+    DWORD redirect = request.follow_redirects ? WINHTTP_OPTION_REDIRECT_POLICY_ALWAYS
+                                              : WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
     WinHttpSetOption(call.h, WINHTTP_OPTION_REDIRECT_POLICY, &redirect, sizeof(redirect));
+    if (https && request.loopback_any_certificate && IsLoopbackUrl(request.url)) {
+        DWORD flags = SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_CERT_DATE_INVALID |
+                      SECURITY_FLAG_IGNORE_CERT_CN_INVALID | SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE;
+        WinHttpSetOption(call.h, WINHTTP_OPTION_SECURITY_FLAGS, &flags, sizeof(flags));
+    }
     DWORD decompress = WINHTTP_DECOMPRESSION_FLAG_ALL;
     WinHttpSetOption(call.h, WINHTTP_OPTION_DECOMPRESSION, &decompress, sizeof(decompress));
 
@@ -83,18 +188,17 @@ HttpResponse HttpGet(const HttpRequest& request) {
     for (const auto& [name, value] : request.headers) {
         headers += Widen(name) + L": " + Widen(value) + L"\r\n";
     }
-    if (!WinHttpSendRequest(call.h, headers.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : headers.c_str(),
-                            static_cast<DWORD>(-1), WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
-        !WinHttpReceiveResponse(call.h, nullptr)) {
-        return Fail("the request");
+    HttpResponse response;
+    if (!Send(call.h, request, std::move(headers), response)) {
+        return response;
     }
 
-    HttpResponse response;
     DWORD status = 0;
     DWORD size = sizeof(status);
     WinHttpQueryHeaders(call.h, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
                         WINHTTP_HEADER_NAME_BY_INDEX, &status, &size, WINHTTP_NO_HEADER_INDEX);
     response.status = static_cast<int>(status);
+    ReadHeaders(call.h, response);
     std::uint64_t total = 0;
     wchar_t length[32];
     size = sizeof(length);
