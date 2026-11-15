@@ -216,6 +216,16 @@ std::unique_ptr<Provider> EngineImpl::MakeProvider(const std::string& id, const 
     if (config_.provider_factory) {
         return config_.provider_factory(id);
     }
+    // A provider runs only once its plugin is installed and the user allowed it, even when
+    // its folder or settings are already there.
+    if (config_.features != nullptr) {
+        const auto plugins = config_.features->Plugins();
+        const auto found = std::find_if(plugins.begin(), plugins.end(),
+                                        [&](const plugins::FeaturePlugin& p) { return p.id == id; });
+        if (found == plugins.end() || !found->installed || found->needs_consent) {
+            return nullptr;
+        }
+    }
     if (const fs::path folder = Folder(id); !folder.empty()) {
         return CreateFolderStore(id, folder);
     }
