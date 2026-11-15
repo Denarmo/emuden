@@ -32,7 +32,7 @@ endif()
 den_module(platform DEPS den_base PRIVATE_DEPS SDL3::SDL3-static EXCLUDE ${platform_exclude})
 
 if(WIN32)
-    target_link_libraries(den_platform PRIVATE winhttp advapi32 ws2_32 dwmapi den_webview2)
+    target_link_libraries(den_platform PRIVATE winhttp advapi32 ws2_32 iphlpapi dwmapi den_webview2)
 elseif(ANDROID)
     target_link_libraries(den_platform PRIVATE EGL android)
 else()
