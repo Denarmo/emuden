@@ -73,6 +73,13 @@ private:
     static void SetSignalSemaphore(void* handle, VkSemaphore semaphore);
     static VkInstance CreateInstanceWrapper(void* opaque, const VkInstanceCreateInfo* info);
     static VkDevice CreateDeviceWrapper(VkPhysicalDevice gpu, void* opaque, const VkDeviceCreateInfo* info);
+    // Given to the core as its vkGetInstanceProcAddr, so a core that calls vkCreateDevice itself
+    // still gets the sharing extensions.
+    static PFN_vkVoidFunction VKAPI_CALL CoreGetInstanceProcAddr(VkInstance instance, const char* name);
+    static VkResult VKAPI_CALL CoreCreateDevice(VkPhysicalDevice gpu, const VkDeviceCreateInfo* info,
+                                                const VkAllocationCallbacks* allocator, VkDevice* device);
+    VkResult CreateDeviceWithSharing(VkPhysicalDevice gpu, const VkDeviceCreateInfo* info,
+                                     const VkAllocationCallbacks* allocator, VkDevice* device);
 
     static constexpr int SLOTS = gfx::VkShare::SLOTS;
 
@@ -82,6 +89,7 @@ private:
     HwRenderRequest request_;
     const retro_hw_render_context_negotiation_interface_vulkan* negotiation_ = nullptr;
     bool core_made_device_ = false;
+    bool sharing_added_ = false;
 
     vk::Functions fn_;
     VkApplicationInfo app_{VK_STRUCTURE_TYPE_APPLICATION_INFO};

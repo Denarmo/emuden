@@ -197,11 +197,11 @@ std::vector<const char*> VulkanHost::SharingExtensions(VkPhysicalDevice gpu) con
     return out;
 }
 
-VkDevice VulkanHost::CreateDeviceWrapper(VkPhysicalDevice gpu, void* opaque, const VkDeviceCreateInfo* info) {
-    auto* self = static_cast<VulkanHost*>(opaque);
+VkResult VulkanHost::CreateDeviceWithSharing(VkPhysicalDevice gpu, const VkDeviceCreateInfo* info,
+                                             const VkAllocationCallbacks* allocator, VkDevice* device) {
     std::vector<const char*> names(info->ppEnabledExtensionNames,
                                    info->ppEnabledExtensionNames + info->enabledExtensionCount);
-    for (const char* name : self->SharingExtensions(gpu)) {
+    for (const char* name : SharingExtensions(gpu)) {
         if (std::none_of(names.begin(), names.end(), [&](const char* n) { return std::strcmp(n, name) == 0; })) {
             names.push_back(name);
         }
@@ -209,12 +209,47 @@ VkDevice VulkanHost::CreateDeviceWrapper(VkPhysicalDevice gpu, void* opaque, con
     VkDeviceCreateInfo copy = *info;
     copy.enabledExtensionCount = static_cast<std::uint32_t>(names.size());
     copy.ppEnabledExtensionNames = names.data();
+    const VkResult result = fn_.CreateDevice(gpu, &copy, allocator, device);
+    if (result == VK_SUCCESS) {
+        device_extensions_.assign(names.begin(), names.end());
+        sharing_added_ = true;
+    }
+    return result;
+}
+
+VkDevice VulkanHost::CreateDeviceWrapper(VkPhysicalDevice gpu, void* opaque, const VkDeviceCreateInfo* info) {
     VkDevice device = VK_NULL_HANDLE;
-    if (self->fn_.CreateDevice(gpu, &copy, nullptr, &device) != VK_SUCCESS) {
+    if (static_cast<VulkanHost*>(opaque)->CreateDeviceWithSharing(gpu, info, nullptr, &device) != VK_SUCCESS) {
         return VK_NULL_HANDLE;
     }
-    self->device_extensions_.assign(names.begin(), names.end());
     return device;
+}
+
+namespace {
+// The host whose core is making its device; cores make it on the thread that loads the game.
+VulkanHost* g_making_device = nullptr;
+// Cores keep the vkGetInstanceProcAddr they were given, so it forwards for good.
+PFN_vkGetInstanceProcAddr g_instance_proc_addr = nullptr;
+} // namespace
+
+PFN_vkVoidFunction VKAPI_CALL VulkanHost::CoreGetInstanceProcAddr(VkInstance instance, const char* name) {
+    if (name && std::strcmp(name, "vkCreateDevice") == 0) {
+        return reinterpret_cast<PFN_vkVoidFunction>(&CoreCreateDevice);
+    }
+    if (name && std::strcmp(name, "vkGetInstanceProcAddr") == 0) {
+        return reinterpret_cast<PFN_vkVoidFunction>(&CoreGetInstanceProcAddr);
+    }
+    return g_instance_proc_addr ? g_instance_proc_addr(instance, name) : nullptr;
+}
+
+VkResult VKAPI_CALL VulkanHost::CoreCreateDevice(VkPhysicalDevice gpu, const VkDeviceCreateInfo* info,
+                                                 const VkAllocationCallbacks* allocator, VkDevice* device) {
+    if (g_making_device) {
+        return g_making_device->CreateDeviceWithSharing(gpu, info, allocator, device);
+    }
+    auto create = reinterpret_cast<PFN_vkCreateDevice>(
+        g_instance_proc_addr ? g_instance_proc_addr(VK_NULL_HANDLE, "vkCreateDevice") : nullptr);
+    return create ? create(gpu, info, allocator, device) : VK_ERROR_INITIALIZATION_FAILED;
 }
 
 bool VulkanHost::MakeDevice() {
@@ -227,23 +262,28 @@ bool VulkanHost::MakeDevice() {
         return false;
     }
     device_extensions_.clear();
+    sharing_added_ = false;
     retro_vulkan_context context{};
+    g_making_device = this;
+    g_instance_proc_addr = fn_.GetInstanceProcAddr;
     if (negotiation_ && negotiation_->interface_version >= 2 && negotiation_->create_device2) {
         core_made_device_ = negotiation_->create_device2(&context, instance_, gpu_, VK_NULL_HANDLE,
-                                                          fn_.GetInstanceProcAddr, CreateDeviceWrapper, this);
+                                                          CoreGetInstanceProcAddr, CreateDeviceWrapper, this);
         if (!core_made_device_) {
             core_made_device_ = negotiation_->create_device2(&context, instance_, VK_NULL_HANDLE, VK_NULL_HANDLE,
-                                                              fn_.GetInstanceProcAddr, CreateDeviceWrapper, this);
+                                                              CoreGetInstanceProcAddr, CreateDeviceWrapper, this);
         }
     } else if (negotiation_ && negotiation_->create_device) {
         std::vector<const char*> required = SharingExtensions(gpu_);
         core_made_device_ = negotiation_->create_device(
-            &context, instance_, gpu_, VK_NULL_HANDLE, fn_.GetInstanceProcAddr, required.data(),
+            &context, instance_, gpu_, VK_NULL_HANDLE, CoreGetInstanceProcAddr, required.data(),
             static_cast<unsigned>(required.size()), nullptr, 0, nullptr);
-        if (core_made_device_) {
+        if (core_made_device_ && !sharing_added_) {
+            // Made without the hook (the core loaded Vulkan itself): it was asked for them.
             device_extensions_.assign(required.begin(), required.end());
         }
     }
+    g_making_device = nullptr;
     if (core_made_device_) {
         gpu_ = context.gpu;
         device_ = context.device;

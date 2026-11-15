@@ -324,6 +324,7 @@ std::unique_ptr<VkShare> MakeMemoryObject(const VkShareDevice& d, gl::ProcLoader
 #endif
     (void)gles;
     if (!d.Has(vk_memory) || !d.Has(vk_semaphore) || !have_calls) {
+        log::Info("gfx", "the Vulkan device has no {} / {}: the Vulkan picture is copied", vk_memory, vk_semaphore);
         return nullptr;
     }
     if (!HasGlExtension("GL_EXT_memory_object") || !HasGlExtension("GL_EXT_semaphore") ||
