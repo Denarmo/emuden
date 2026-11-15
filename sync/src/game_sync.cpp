@@ -7,6 +7,7 @@
 // full run's game uploads, and a full run's other files give way to it between two files.
 
 #include <algorithm>
+#include <chrono>
 #include <system_error>
 
 #include "den/base/files.h"
@@ -70,11 +71,14 @@ Status Run::GoGame(const GameScope& scope) {
     // Only the game's system folders where the provider lists one folder quickly; else the
     // categories.
     std::map<std::string, RemoteFile> listed;
+    const auto started = std::chrono::steady_clock::now();
     const bool reached = engine_.ListsFolders(provider_.Id()) ? ListFolders(*game, categories, scope.before, listed)
                                                               : List(categories, listed);
     if (!reached) {
         return Status::Fail("The provider could not be reached.");
     }
+    log::Info("sync", "{} {}: listed in {} ms", scope.before ? "before" : "after", scope.game_id,
+              std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count());
     if (scope.out != nullptr) {
         scope.out->reached = true;
     }
