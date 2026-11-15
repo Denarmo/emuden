@@ -7,7 +7,8 @@ the page. A feature plugin can then, for example, patch the user's own base ROM 
 
 ## Rules
 
-These hold for every backend and every opener.
+These hold for every backend and every opener, except where "Browser plugin" below says
+otherwise: the browser plugin's page goes to any site and takes every file.
 
 - **The user browses, not the app.** The app loads the address the opener gave and nothing
   else. It makes no request of its own to the site, follows no link by itself and starts no
@@ -265,6 +266,52 @@ the same route shows the fallback instead, so an opener needs no special case:
 
 `EMUDEN_WEB_FALLBACK=1` shows the fallback where an engine exists (tests).
 
+## Browser plugin
+
+One plugin (`emuden.browser`, permissions `browse.any` and `downloads.setup`, official only;
+`docs/feature-plugins.md` section 4.4) is a browser for any site, so no plugin per site is
+needed: the app looks at the files, not the pages. The user is assumed to own what they
+download. Its page is the same route with `mode=browser`:
+
+- **Any site.** The allowed list is `*` (`WebHostAllowed`): every https host, and plain http
+  too; no leaving question. `file:`, `javascript:` and the like stay refused.
+- **Every file is taken**, ROM images included (`Opener::extensions = {"*"}`), and saved in
+  EmuDEN's Downloads folder `<data>/downloads` (`Opener::folder`), where it stays until it is
+  set up. `Download::title` is the title of the page the download started on.
+- **Address bar.** Y, a tap on the title, or "Go to an address or search" in the menu opens the
+  text entry with the page's address. `example.com` becomes `https://example.com`, words a
+  search on DuckDuckGo (`AddressFor`, `web_address.cpp`).
+- **Menu** (Start, or the three dots in the bar; `web_menu.cpp`): address, bookmark or remove
+  the bookmark of this page, the bookmarks, reload, close. The view is hidden while it is
+  open; Up, Down, A, B by pad, a tap by touch. Bookmarks are `<data>/browser/bookmarks.json`
+  (`{title, url}`); the plugin lists them on its first page (`den.web.bookmarks`).
+- Pad otherwise as above: the left stick moves the pointer, A clicks, the right stick scrolls,
+  X types into the page, LB and RB go back and forward, B goes back and closes at the start.
+  Touch goes to the page.
+
+### Setting a download up
+
+`library/include/den/library/downloads.h`, `library/src/downloads_*.cpp`. The plugin asks for
+each file (`den.downloads.setup`); the app decides, on a worker, without asking the user:
+
+| What | How it is recognised | What happens |
+|---|---|---|
+| BIOS file | Its name: `scph*.bin`, `gba_bios.bin`, `bios7.bin`, `dc_boot.bin`, `[BIOS] ...`, `neogeo.zip` and the rest of `IsBiosName` | Left in Downloads: "EmuDEN doesn't use BIOS files". An archive of BIOS files likewise; BIOS files inside an archive with games are left out |
+| Archive | `zip`, `7z` (also by its first bytes) | Unpacked into `Downloads/.unpacked-<name>`, then every file is looked at (an archive inside, one level). When games came out of it the archive is deleted (their files are the copy now). A password or an unusual method: left, with the reason. `rar` is not opened: left, "EmuDEN can't open rar archives" |
+| Patch | `ips bps ups xdelta vcdiff aps ppf`, or their magic under another name | The base game: the checksum a BPS or UPS carries (`OpenPatchFile`, every form of section 7.2 of `docs/feature-plugins.md`); without one, the user's game whose name fits the hack's (`NameScore`: "Fire Red" fits "FireRed") when one fits better than the rest; else the plugin asks the user to pick from the games it may be for. A copy is patched (`Hacks::InstallHack`): its own game, filed under the base game (`hack_of`), with the base game's box art, named after the hack. The name (`HackTitle`) is the page's title without the site's name and the version ("Release 1.1.4 · owner/Space_Quest · GitHub" -> "Space Quest"), or the file's when the page says nothing; the version (`HackVersion`) comes from the file or the page. Installing the same name again (a newer version) replaces the copy and keeps the entry, so its saves stay ("Updated ... to 1.1.4"). A patch for a game the user does not have stays in Downloads |
+| Game | The console: the extension when one console takes it; else the file's first bytes (GB/GBC/GBA/NDS logos, iNES, N64 byte orders, `SEGA` at 0x100, `TMR SEGA`, Lynx, Vectrex, Atari 7800, GameCube and Wii disc magic, PBP, the ISO 9660 volume of PlayStation, PS2 and PSP discs, Saturn and Dreamcast IP, a CHD's track metadata); else a console's name in the folders around it, the archive's name or the page's title (`Identify`, `SniffSystem`) | Moved into that console's folder of the library: a library folder of that console, else the console's folder in a game folder (made when missing), else `<data>/games/<console>`, which is then added to the library. A cue sheet goes with the tracks it names, a GD-ROM list with its tracks, a disc list with its discs, and the discs of one game ("(Disc 1)", "(Disc 2)") share a folder named after the set. A cue sheet that arrives before its tracks waits ("waiting") and is set up with the track that completes it. The library scans; the game gets its box art like any scanned game. A file of the same name and size already there is not copied twice |
+| Anything else | | Left in Downloads, with why ("it could be a game for PlayStation, Saturn, ... and nothing in it says which") |
+
+Every setup is recorded in `<data>/library/downloads.json` (the last 200): outcome, message,
+the files moved, the hacks made. Undo moves the games' files back to Downloads and removes the
+hacks; saves stay. A question (`needs_base`) or a wait is replaced by the setup that answers
+it.
+
+The plugin's pages (in emuden-plugins): Browse (address, Open the browser, bookmarks), Downloads
+(every setup with its message; a setup's page has Play, Undo, "Choose the game" or "Try again";
+files of the folder no setup took are listed with "set up"), About. Each setup is told in a
+toast while the user browses on.
+
 ## Test endpoint
 
 With `EMUDEN_AUTOMATION=<port>` the page's endpoint listens on `<port>+3`, one line in and one
@@ -274,7 +321,7 @@ line out (`app/screens/web/web_endpoint.cpp`):
 |---|---|
 | `open url=<url> [hosts=a,b] [ext=bps,zip] [title=<text>]` | `ok`; opens the page for a test opener |
 | (`state` without an engine) | also `fallback` (true), `watching` (the folders), `offered` (the last file asked about), `offers` |
-| `state` | JSON: `open`, `available`, `ready`, `view_visible`, `url`, `title`, `loading`, `can_go_back`, `can_go_forward`, `view` (x, y, w, h in logical units), `pointer`, `cursor`, `downloading`, `progress`, `downloads`, `last_download`, `refused_downloads`, `last_refused_download`, `refused_navigations`, `last_refused_host`, `leave_asked` (the last host the user was asked about), `left_to` (the last host the user allowed), and what the test opener was handed (`opener_calls`, `opener_file`, `opener_name`, `opener_host`) |
+| `state` | JSON: `open`, `available`, `ready`, `view_visible`, `url`, `title`, `loading`, `can_go_back`, `can_go_forward`, `view` (x, y, w, h in logical units), `pointer`, `cursor`, `downloading`, `progress`, `downloads`, `last_download`, `refused_downloads`, `last_refused_download`, `refused_navigations`, `last_refused_host`, `leave_asked` (the last host the user was asked about), `left_to` (the last host the user allowed), `browser` (the browser plugin's page), `menu` (its open menu's items, `|` between them), and what the test opener was handed (`opener_calls`, `opener_file`, `opener_name`, `opener_host`) |
 | `cursor <x> <y>` | `ok`; puts the pad's pointer at a point of the view (logical units) |
 | `close` | `ok`; closes the page |
 

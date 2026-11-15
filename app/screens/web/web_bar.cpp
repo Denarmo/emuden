@@ -15,9 +15,9 @@ namespace den::app::web {
 std::vector<BarHit> DrawWebBar(ui::Context& ctx, const gfx::Rect& area, const BarInput& in) {
     const ui::Theme& theme = *ctx.theme;
     gfx::Canvas& canvas = *ctx.canvas;
-    canvas.FillRect(gfx::Rect{area.x, 0, area.w, BAR_HEIGHT}, theme.panel);
+    canvas.FillRect(gfx::Rect{area.x, area.y, area.w, BAR_HEIGHT}, theme.panel);
     std::vector<BarHit> hits;
-    const float y = (BAR_HEIGHT - BAR_BUTTON) * 0.5f;
+    const float y = area.y + (BAR_HEIGHT - BAR_BUTTON) * 0.5f;
     const auto button = [&](float x, bool enabled, BarAction action) {
         const gfx::Rect rect{x, y, BAR_BUTTON, BAR_BUTTON};
         canvas.FillRect(rect, theme.panel, theme.radius);
@@ -60,11 +60,11 @@ std::vector<BarHit> DrawWebBar(ui::Context& ctx, const gfx::Rect& area, const Ba
         canvas.FillRect(field, theme.panel, theme.radius_small);
         hits.push_back({field, true, BarAction::Address});
     }
-    canvas.DrawText(ctx.Text().Elide(in.title, theme.text_body, text_w, gfx::FONT_BOLD), text_x, 12, theme.text_body,
+    canvas.DrawText(ctx.Text().Elide(in.title, theme.text_body, text_w, gfx::FONT_BOLD), text_x, area.y + 12, theme.text_body,
                     theme.fg, gfx::FONT_BOLD);
-    canvas.DrawText(ctx.Text().Elide(in.line, theme.text_small, text_w), text_x, 42, theme.text_small, theme.text_dim);
+    canvas.DrawText(ctx.Text().Elide(in.line, theme.text_small, text_w), text_x, area.y + 42, theme.text_small, theme.text_dim);
     if (in.progress >= 0) {
-        canvas.FillRect(gfx::Rect{area.x, BAR_HEIGHT - 3, area.w * std::clamp(in.progress, 0.0f, 1.0f), 3}, theme.fg);
+        canvas.FillRect(gfx::Rect{area.x, area.y + BAR_HEIGHT - 3, area.w * std::clamp(in.progress, 0.0f, 1.0f), 3}, theme.fg);
     }
     return hits;
 }

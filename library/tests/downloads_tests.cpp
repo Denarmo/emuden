@@ -156,7 +156,10 @@ TEST_CASE("downloads: a hack's name and version from the page and the file") {
     // A file host's page says nothing of the hack: the file does.
     REQUIRE(HackTitle("Radical_Red_4.1.zip - MediaFire", "Radical Red 4.1.bps") == "Radical Red");
     REQUIRE(HackTitle("Glazed - PokeCommunity Forums", "patch.ips") == "Glazed");
+    REQUIRE(HackTitle("Release Release 1.1.4 \xC2\xB7 someone/Space_Quest_Legacy \xC2\xB7 GitHub",
+                      "Space Quest Legacy V1.1.4 Patch.bps") == "Space Quest Legacy");
     REQUIRE(HackVersion("", "Pokemon_Unbound_v2.1.1.bps") == "2.1.1");
+    REQUIRE(HackVersion("", "Space Quest Legacy V1.1.4 Patch.bps") == "1.1.4");
     REQUIRE(HackVersion("Gaia Version 3.2", "gaia.ips") == "3.2");
     REQUIRE(HackVersion("", "Radical Red 4.1.bps") == "4.1");
     REQUIRE(HackVersion("", "hack.ips").empty());

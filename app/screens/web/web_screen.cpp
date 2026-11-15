@@ -183,8 +183,9 @@ public:
         const float scale = canvas.Scale();
         scale_ = scale;
         // Toasts are drawn from 24 units down, 52 apart: the view starts below them.
-        const float top = std::max(BAR_HEIGHT, 16.0f + 52.0f * static_cast<float>(ToastCount()));
-        view_rect_ = gfx::Rect{area.x, top, area.w, std::max(0.0f, area.h - top)};
+        // The page area starts below a window title bar the app draws in a window.
+        const float top = std::max(area.y + BAR_HEIGHT, 16.0f + 52.0f * static_cast<float>(ToastCount()));
+        view_rect_ = gfx::Rect{area.x, top, area.w, std::max(0.0f, area.Bottom() - top)};
         DrawBar(ctx, area);
         g_state.menu.clear();
         for (const std::string& label : menu_.Labels()) {

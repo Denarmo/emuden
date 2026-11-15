@@ -117,13 +117,28 @@ std::string TitleOfPage(const std::string& page_title, const std::string& file_n
     const std::string file_lower = ToLower(file_name);
     static const std::regex FILE_NAME(R"(\S\.[A-Za-z0-9]{2,4}$)");
     for (; it != end; ++it) {
-        const std::string segment = Trim(it->str());
+        std::string segment = Trim(it->str());
+        // A code host names a project "owner/project".
+        if (const std::size_t slash = segment.find('/');
+            slash != std::string::npos && segment.find(' ') == std::string::npos && slash + 1 < segment.size()) {
+            segment = segment.substr(slash + 1);
+            std::replace(segment.begin(), segment.end(), '-', ' ');
+        }
         // A file host's page is named after the file.
         if (segment.empty() || IsSiteText(segment) || std::regex_search(segment, FILE_NAME) ||
             ToLower(segment).find(file_lower) != std::string::npos) {
             continue;
         }
-        return CleanName(segment);
+        std::string name = CleanName(segment);
+        // "Release 1.1.4", "Downloads": words about the page, not a name.
+        const std::vector<std::string> words = Words(name);
+        const bool says_nothing = std::all_of(words.begin(), words.end(), [](const std::string& word) {
+            return IsCommon(word) || word == "release" || word == "releases" || word == "download" ||
+                   word == "downloads" || word == "files" || word == "page" || word == "tag";
+        });
+        if (!says_nothing) {
+            return name;
+        }
     }
     return {};
 }

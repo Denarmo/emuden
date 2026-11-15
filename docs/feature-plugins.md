@@ -66,7 +66,9 @@ compiled as C with warnings off.
 The common fields (`id`, `name`, `version`, `api`, `needs`, `publisher`, `license`, `summary`)
 are those of console plugins. `needs` must contain `kind.feature`; `HostCapabilities()` adds
 `kind.feature`, `feature.lua.1` and `feature.web.1` (`den.web`; a plugin that uses it lists it
-in `needs`, so an app without it refuses the plugin instead of failing in the script). The
+in `needs`, so an app without it refuses the plugin instead of failing in the script) and
+`feature.browser.1` (`den.web.open{any = true}`, `den.web.bookmarks`, `den.downloads`; section
+4.4). The
 `feature` object:
 
 | Field | Type | Required | Meaning |
@@ -103,6 +105,8 @@ Permissions (the sentence is what the install page shows):
 | `game.settings` | `den.game.settings`, `den.game.set` for games of `systems` (needs `feature.tune.1`) | "Change the settings of single games of these consoles: ..." |
 | `steam` | `den.steam.*` (needs `feature.tune.1`) | "See your Steam games and change their launch options and Proton version" |
 | `achievements` | `den.achievements.*` (needs `feature.achievements.1`) | "Sign in to RetroAchievements and track achievements while you play" |
+| `browse.any` | `den.web.open{any = true}`, `den.web.bookmarks()`: the in-app browser on any site; every file the user downloads there is kept in EmuDEN's Downloads folder. Official plugins only (needs `feature.browser.1`) | "Show any website inside EmuDEN and keep what you download there in EmuDEN's Downloads folder" |
+| `downloads.setup` | `den.downloads.*`: the files of EmuDEN's Downloads folder set up as games and hacks, the list of setups and undo. Official plugins only (needs `feature.browser.1`) | "Add the games and patches you download to your library" |
 
 `den.http.request` (any method, bodies, multipart, answer headers) needs `http`,
 `http.user_host` or `http.local`; see `docs/sync.md`, section 4.
@@ -310,6 +314,40 @@ permission.
   pause menu has an "Achievements" page for the running game.
 - Progress lives on RetroAchievements; EmuDEN sync carries none of it. `EMUDEN_RA_HOST`
   points the app at a test server.
+
+### 4.4 The browser: `den.web.open{any = true}` and `den.downloads`
+
+For one plugin that is a browser for every site (`emuden.browser` in emuden-plugins), instead
+of a plugin per site. The app sets the downloads up; the script only says which file and shows
+the result. `docs/in-app-browser.md`, "Browser plugin", has the page and the setup rules.
+
+| Call | Result |
+|---|---|
+| `den.web.open{any = true, url?, title?}` (wait) | the browser page on `url` (https; default a search page). Any https or http site; no leaving question; every file is taken, ROM images too, and saved in `<data>/downloads`. Returns the next file: `{download, name, source_host, page_title, path}`, `download` being its name in the Downloads folder. Called again while the page is open, it waits for the next file. `nil, "closed"` once the user closed the page |
+| `den.web.bookmarks()` | `{ {title, url} }`, the bookmarks the user made in the browser's menu |
+| `den.downloads.folder()` | the Downloads folder's path, to show the user |
+| `den.downloads.files()` | `{ {name, size, modified} }` of the files in it, newest first |
+| `den.downloads.setup{file, page_title?, source_host?, base?}` (wait) | sets the file up (below) and returns `{id, outcome, message, download, console, time, replaced, undone, games = {game...}, choices = {game...}}`. `base`: the game id the user picked after `needs_base` |
+| `den.downloads.history()` | the setups, newest first, in the same form (`undone` true for those taken back) |
+| `den.downloads.undo(id)` (wait) | true: games go back to the Downloads folder, hacks are removed (saves stay) |
+
+`outcome` is one of `added`, `hack_added`, `needs_base` (a patch without a checksum and no game
+whose name fits: `choices` lists the games it may be for, best first), `missing_base`, `waiting`
+(a cue sheet whose tracks have not arrived), `bios` (left alone: EmuDEN doesn't use BIOS
+files), `unknown` (left in Downloads) and `failed`. `message` is the sentence for the user
+("Added uCity to Game Boy Color", "Updated Pokemon Emerald Legacy to 1.1.4"). `file` is a plain
+name of a file in the Downloads folder; anything else is refused. The script never reads a
+file and never sees the page.
+
+```lua
+while true do
+  local file = den.web.open{ any = true }
+  if not file then break end
+  local done = den.downloads.setup{ file = file.download, page_title = file.page_title,
+                                    source_host = file.source_host }
+  den.ui.toast(done and done.message or "Not set up")
+end
+```
 
 ## 5. UI model
 
