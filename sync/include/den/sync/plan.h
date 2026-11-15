@@ -161,4 +161,10 @@ std::vector<Action> MakePlan(const PlanRequest& request);
 /// else it is a conflict (Compare and Conflict alike). `journal` may be null.
 Op AfterFetch(const std::string& local_hash, const std::string& remote_hash, const JournalEntry* journal);
 
+/// A game's settings layer that synced before and is now empty here (its overrides were
+/// cleared) is in `local` as an empty settings file, so the clearing goes up like any other
+/// change instead of the old layer coming back down. Only for games this library has: a
+/// game missing here says nothing about its settings.
+void AddClearedGameLayers(Catalog& local, const Journal& journal, const GameIndex& games);
+
 } // namespace den::sync

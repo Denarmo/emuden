@@ -240,6 +240,38 @@ TEST_CASE("the journal and the plan agree on what changed") {
     CHECK(ops.at("saves/gba/Gone.srm") == Op::Forget);
 }
 
+TEST_CASE("a game's settings cleared here go up empty instead of coming back down") {
+    Scratch scratch;
+    const GameIndex games({Game("ps2:01", "ps2", "D:/ROMS/ps2/Racer.iso")}, {});
+    Journal journal(scratch.dir / "journal.json");
+    journal.entries["config/games/ps2/Racer.json"] = {"h1", "r1", 1, 5};
+    journal.entries["config/games/ps2/Elsewhere.json"] = {"h1", "r1", 1, 5}; // not in this library
+    Catalog local;
+    AddClearedGameLayers(local, journal, games);
+    REQUIRE(local.size() == 1);
+    REQUIRE(local.contains("config/games/ps2/Racer.json"));
+    CHECK(ParseJson(local.at("config/games/ps2/Racer.json").text)->members.empty());
+
+    std::map<std::string, RemoteFile> remote;
+    remote["config/games/ps2/Racer.json"] = {"config/games/ps2/Racer.json", 1, 1, "r1"};
+    remote["config/games/ps2/Elsewhere.json"] = {"config/games/ps2/Elsewhere.json", 1, 1, "r1"};
+    PlanRequest request{&local, &remote, &journal, {"config"}, false};
+    std::map<std::string, Op> ops;
+    for (const Action& action : MakePlan(request)) {
+        ops[action.path] = action.op;
+    }
+    CHECK(ops.at("config/games/ps2/Racer.json") == Op::Upload);
+    CHECK(ops.at("config/games/ps2/Elsewhere.json") != Op::Upload);
+
+    // Once the empty layer is agreed on, nothing more happens.
+    journal.entries["config/games/ps2/Racer.json"].hash = local.at("config/games/ps2/Racer.json").hash;
+    ops.clear();
+    for (const Action& action : MakePlan(request)) {
+        ops[action.path] = action.op;
+    }
+    CHECK_FALSE(ops.contains("config/games/ps2/Racer.json"));
+}
+
 TEST_CASE("the journal is written after every file, so a run cut short loses nothing") {
     Cloud cloud;
     Device a(cloud, "A");

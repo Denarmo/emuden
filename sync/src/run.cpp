@@ -110,6 +110,9 @@ Status Run::Go(const std::vector<std::string>& first_games) {
     files_ = std::unique_lock(engine_.files_mutex_);
     Journal journal(sync_dir_ / "journal.json");
     journal_ = &journal;
+    if (categories.contains(CONFIG)) {
+        AddClearedGameLayers(local_, journal, games_);
+    }
     PlanRequest plan;
     plan.local = &local_;
     plan.remote = &remote;

@@ -8,6 +8,7 @@
 
 #include "den/base/files.h"
 #include "den/base/json.h"
+#include "den/base/hash.h"
 #include "den/sync/plan.h"
 
 namespace den::sync {
@@ -168,6 +169,26 @@ std::vector<Action> MakePlan(const PlanRequest& request) {
         return Rank(a.path) < Rank(b.path);
     });
     return out;
+}
+
+void AddClearedGameLayers(Catalog& local, const Journal& journal, const GameIndex& games) {
+    constexpr std::string_view PREFIX = "config/games/";
+    const std::string empty = WriteJson(JsonObject());
+    for (const auto& [path, entry] : journal.entries) {
+        if (!path.starts_with(PREFIX) || !path.ends_with(".json") || local.contains(path)) {
+            continue;
+        }
+        const std::string name = path.substr(path.rfind('/') + 1);
+        if (games.Find(SystemOf(path), name.substr(0, name.size() - 5)) == nullptr) {
+            continue;
+        }
+        LocalItem item;
+        item.path = path;
+        item.text = empty;
+        item.size = empty.size();
+        item.hash = Sha256Hex(empty.data(), empty.size());
+        local[path] = std::move(item);
+    }
 }
 
 Op AfterFetch(const std::string& local_hash, const std::string& remote_hash, const JournalEntry* journal) {
