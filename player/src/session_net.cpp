@@ -9,7 +9,9 @@
 //   state mends it.
 
 #include <cstring>
+#include <format>
 
+#include "den/base/files.h"
 #include "den/base/hash.h"
 #include "den/base/log.h"
 #include "den/net/party.h"
@@ -23,6 +25,17 @@ namespace {
 constexpr double WAIT_SHOWN_SECONDS = 0.25;
 constexpr int MAX_OWED_FRAMES = 3;
 constexpr double LOCK_TOLERANCE = 0.012;
+constexpr std::uint64_t MAX_ALIGN_FRAMES = 1200;
+
+// EMUDEN_NET_DUMP=<folder>: every checked state is written there, to find what differs
+// after a desync.
+void DumpCheckedState(std::uint64_t frame, bool host, std::span<const std::uint8_t> state) {
+    static const std::string folder = pal::GetEnv("EMUDEN_NET_DUMP");
+    if (!folder.empty()) {
+        WriteFileAtomic(PathFromUtf8(folder) / std::format("{}-{}.state", host ? "host" : "guest", frame),
+                        std::string_view(reinterpret_cast<const char*>(state.data()), state.size()));
+    }
+}
 
 } // namespace
 
@@ -187,6 +200,7 @@ void PlayerSession::SendStateToPeer(std::uint64_t frame) {
     net::StateTransfer transfer;
     transfer.frame = frame;
     transfer.delay = party.Sync().Started() ? party.Sync().Delay() : party.ChooseDelay();
+    transfer.core_frames = core_->FrameCount();
     transfer.state = std::move(state);
     if (!party.Sync().Started()) {
         party.Sync().Start(frame, 0, transfer.delay);
@@ -201,6 +215,15 @@ void PlayerSession::TakeStateFromPeer() {
     auto transfer = party.TakeState();
     if (!transfer) {
         return;
+    }
+    // As many frames run as the host's core has (they are undone by the state).
+    if (transfer->core_frames > core_->FrameCount() &&
+        transfer->core_frames - core_->FrameCount() <= MAX_ALIGN_FRAMES) {
+        core_->SetAudioMuted(true);
+        while (core_->FrameCount() < transfer->core_frames) {
+            core_->RunFrame();
+        }
+        core_->SetAudioMuted(false);
     }
     std::span<const std::uint8_t> payload = transfer->state;
     const std::size_t size = core_->StateSize();
@@ -294,6 +317,7 @@ void PlayerSession::AdvanceLockstep(double frames) {
             state_scratch_.resize(core_->StateSize());
             if (!state_scratch_.empty() && core_->SaveState(state_scratch_)) {
                 const std::uint32_t crc = Crc32Update(0, state_scratch_.data(), state_scratch_.size());
+                DumpCheckedState(sync.Next() - 1, party.IsHost(), state_scratch_);
                 sync.LocalCrc(sync.Next() - 1, crc);
                 party.SendCrc(sync.Next() - 1, crc);
             }

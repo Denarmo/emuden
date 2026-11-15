@@ -247,6 +247,7 @@ void Party::Handle(const Message& message) {
         StateTransfer transfer;
         transfer.frame = reader.U64();
         transfer.delay = reader.U8();
+        transfer.core_frames = reader.U64();
         transfer.state = reader.Bytes();
         if (!reader.Failed()) {
             state_in_ = std::move(transfer);
@@ -347,7 +348,8 @@ void Party::SendState(const StateTransfer& transfer) {
         return;
     }
     Writer body;
-    body.U64(transfer.frame).U8(static_cast<std::uint8_t>(transfer.delay)).Bytes(transfer.state);
+    body.U64(transfer.frame).U8(static_cast<std::uint8_t>(transfer.delay)).U64(transfer.core_frames);
+    body.Bytes(transfer.state);
     channel_->Send(STATE, body.Data());
 }
 

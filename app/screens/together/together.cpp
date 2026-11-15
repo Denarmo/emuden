@@ -49,6 +49,10 @@ std::vector<std::uint8_t> ReadSave(const library::Entry& game) {
 
 std::string DeviceLabel() {
     static const std::string label = [] {
+        // Two copies on one computer (tests) tell themselves apart with it.
+        if (std::string name = pal::GetEnv("EMUDEN_DEVICE_NAME"); !name.empty()) {
+            return name;
+        }
         const pal::DeviceFacts facts = pal::GetDeviceFacts();
         if (!facts.device_name.empty()) {
             return facts.device_name;

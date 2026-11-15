@@ -63,10 +63,10 @@ struct Peer {
             if (party->Joined() && !sync.Started()) {
                 const int delay = party->ChooseDelay();
                 sync.Start(0, 0, delay);
-                party->SendState({0, delay, machine.Save()});
+                party->SendState({.frame = 0, .delay = delay, .state = machine.Save()});
             }
             if (party->TakeResyncRequest()) {
-                party->SendState({sync.Next(), sync.Delay(), machine.Save()});
+                party->SendState({.frame = sync.Next(), .delay = sync.Delay(), .state = machine.Save()});
             }
         } else if (auto transfer = party->TakeState()) {
             machine.Load(transfer->state);

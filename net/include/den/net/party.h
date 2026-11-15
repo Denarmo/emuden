@@ -48,6 +48,10 @@ struct PartyEvent {
 struct StateTransfer {
     std::uint64_t frame = 0;
     int delay = 2;
+    /// Frames the host's core has run since it loaded the game. A core may keep something
+    /// outside its state that changes every frame (TGB Dual's sound timing); the guest's
+    /// core runs as many before it takes the state, so the two stay alike.
+    std::uint64_t core_frames = 0;
     std::vector<std::uint8_t> state;
 };
 
