@@ -246,6 +246,15 @@ public:
     virtual void ClearGameOptions() {}
     /// Reads the remapped buttons from the settings again (after the remap page changed them).
     virtual void ReloadButtons() {}
+    /// The RetroPad button (bit number) the core names as its microphone, such as melonDS's
+    /// "Make microphone noise"; -1 when it has none.
+    virtual int MicrophoneButton() const {
+        return -1;
+    }
+    /// RetroPad buttons of port 1 held down besides the pad's, for a shortcut (0 = none).
+    virtual void SetHeldButtons(std::uint16_t buttons) {
+        (void)buttons;
+    }
     /// Chooses a picture preset by id for the running game: "auto" is the console's default,
     /// an unknown id is "plain". Its sliders start at the user's values
     /// (player.shader.<preset>.<param>). The choice itself is not saved here: the screen

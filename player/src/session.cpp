@@ -288,6 +288,21 @@ void PlayerSession::ReloadButtons() {
     }
 }
 
+int PlayerSession::MicrophoneButton() const {
+    if (!core_) {
+        return -1;
+    }
+    for (const ButtonName& button : core_->ButtonNames()) {
+        std::string name = button.name;
+        std::transform(name.begin(), name.end(), name.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (button.port == 0 && name.find("microphone") != std::string::npos) {
+            return static_cast<int>(button.button);
+        }
+    }
+    return -1;
+}
+
 void PlayerSession::SaveResumeState() {
     if (core_ && resume_enabled_ && snapshot_.can_save_states && snapshot_.frames > 0) {
         if (const Status status = WriteStateFile(paths_.Resume()); !status) {
@@ -317,8 +332,11 @@ void PlayerSession::SetPad(int port, const input::PadState& pad) {
         return;
     }
     const auto family = std::min(static_cast<std::size_t>(pad.family), button_maps_.size() - 1);
-    const RetroPad mapped = MapPad(pad, system_, button_maps_[family]);
+    RetroPad mapped = MapPad(pad, system_, button_maps_[family]);
     const auto index = static_cast<unsigned>(port);
+    if (index == 0) {
+        mapped.buttons |= held_buttons_;
+    }
     core_->SetButtons(index, mapped.buttons);
     if (index < snapshot_.game_buttons.size()) {
         snapshot_.game_buttons[index] = mapped.buttons;

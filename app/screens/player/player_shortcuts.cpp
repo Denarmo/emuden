@@ -54,6 +54,8 @@ std::string ShortcutLabel(Shortcut shortcut) {
         return "Swap screens";
     case Shortcut::FrameRate:
         return "Frame rate";
+    case Shortcut::Microphone:
+        return "Microphone (hold)";
     default:
         return {};
     }
@@ -118,6 +120,9 @@ std::vector<Shortcut> PlayerScreen::ShortcutsHere() const {
     if (dual_.Active()) {
         here.push_back(Shortcut::SwapScreens);
     }
+    if (Svc().player->MicrophoneButton() >= 0) {
+        here.push_back(Shortcut::Microphone);
+    }
     here.push_back(Shortcut::FrameRate);
     return here;
 }
@@ -131,9 +136,18 @@ std::string PlayerScreen::ControlText(PadButton control) const {
     const player::ButtonMap map = player::LoadButtons(Svc().settings, game_.system, PadFamilyShown(),
                                                       Svc().settings->GetBool("player.pad_by_label", true));
     std::string text;
-    for (const auto& [index, name] : GameButtons(console_)) {
-        if (map[static_cast<std::size_t>(index)] == control) {
-            text += (text.empty() ? "" : ", ") + name;
+    const auto buttons = GameButtons(console_);
+    const int mic = Svc().player->MicrophoneButton();
+    for (int index = 0; index < player::GAME_BUTTONS; ++index) {
+        if (map[static_cast<std::size_t>(index)] != control) {
+            continue;
+        }
+        const auto named = std::find_if(buttons.begin(), buttons.end(),
+                                         [index](const auto& button) { return button.first == index; });
+        if (named != buttons.end()) {
+            text += (text.empty() ? "" : ", ") + named->second;
+        } else if (index == mic) {
+            text += (text.empty() ? "" : ", ") + std::string("Microphone");
         }
     }
     return text.empty() ? "Nothing" : text;
@@ -248,6 +262,11 @@ void PlayerScreen::FeedShortcuts(input::PadState* pads, int count) {
     }
     const std::uint32_t pressed = down & ~shortcut_down_;
     shortcut_down_ = down;
+    // The microphone is held, not pressed: the core hears noise while the control is down.
+    const PadButton mic_control = shortcuts_[static_cast<std::size_t>(Shortcut::Microphone)];
+    const int mic = Svc().player->MicrophoneButton();
+    const bool blowing = mic >= 0 && mic_control != PadButton::Count && (down & Bit(mic_control));
+    Svc().player->SetHeldButtons(blowing ? static_cast<std::uint16_t>(1u << mic) : 0);
     for (int i = 0; i < player::SHORTCUTS; ++i) {
         const PadButton control = shortcuts_[static_cast<std::size_t>(i)];
         if (control != PadButton::Count && (pressed & Bit(control))) {

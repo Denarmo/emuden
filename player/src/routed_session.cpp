@@ -100,6 +100,12 @@ public:
     void ReloadButtons() override {
         active_->ReloadButtons();
     }
+    int MicrophoneButton() const override {
+        return active_->MicrophoneButton();
+    }
+    void SetHeldButtons(std::uint16_t buttons) override {
+        active_->SetHeldButtons(buttons);
+    }
     void SetPicture(const std::string& id) override {
         active_->SetPicture(id);
     }

@@ -58,6 +58,10 @@ public:
     void SetOption(const std::string& key, const std::string& value, OptionScope scope) override;
     void ClearGameOptions() override;
     void ReloadButtons() override;
+    int MicrophoneButton() const override;
+    void SetHeldButtons(std::uint16_t buttons) override {
+        held_buttons_ = buttons;
+    }
     void SetPicture(const std::string& id) override;
     std::vector<PictureParam> PictureParams() const override;
     void SetPictureParam(const std::string& param, float value) override;
@@ -163,6 +167,7 @@ private:
 
     // Input: the button map per pad family, with the user's remap.
     std::array<ButtonMap, 4> button_maps_{};
+    std::uint16_t held_buttons_ = 0; // port 1, for a shortcut
     std::string game_key_;
 };
 

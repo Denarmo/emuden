@@ -41,7 +41,8 @@ std::int16_t Axis(float value) {
 }
 
 constexpr std::array<std::string_view, SHORTCUTS> SHORTCUT_NAMES = {
-    "menu", "fast_forward", "rewind", "save_state", "load_state", "next_picture", "swap_screens", "frame_rate"};
+    "menu",         "fast_forward", "rewind",     "save_state", "load_state",
+    "next_picture", "swap_screens", "frame_rate", "microphone"};
 
 std::string RemapKey(std::string_view system, int button) {
     return std::format("player.buttons.{}.{}", system, GAME_NAMES[static_cast<std::size_t>(button)]);

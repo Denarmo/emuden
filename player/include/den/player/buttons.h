@@ -47,7 +47,18 @@ void ResetButtons(store::Settings& settings, std::string_view system);
 bool HasRemap(const store::Settings& settings, std::string_view system);
 
 /// What a pad button can do in a game besides pressing a game button.
-enum class Shortcut { Menu, FastForward, Rewind, SaveState, LoadState, NextPicture, SwapScreens, FrameRate, Count };
+enum class Shortcut {
+    Menu,
+    FastForward,
+    Rewind,
+    SaveState,
+    LoadState,
+    NextPicture,
+    SwapScreens,
+    FrameRate,
+    Microphone, // held: the core's microphone button (Session::MicrophoneButton)
+    Count
+};
 inline constexpr int SHORTCUTS = static_cast<int>(Shortcut::Count);
 /// "menu", "fast_forward", ... as kept in the settings.
 const char* ShortcutName(Shortcut shortcut);
