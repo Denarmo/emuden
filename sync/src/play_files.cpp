@@ -200,4 +200,22 @@ std::vector<std::string> OtherDeviceNames(const fs::path& dir, const std::string
     return names;
 }
 
+std::string LastPlayedBy(const fs::path& dir, const std::string& own_id, const std::string& key) {
+    std::string name;
+    double latest = 0;
+    for (const fs::path& file : ListDirectory(dir)) {
+        if (file.extension() != ".json" || PathToUtf8(file.stem()) == own_id) {
+            continue;
+        }
+        const auto root = ParseJson(ReadTextFile(file).value_or(""));
+        const JsonValue* list = root ? root->Find("games") : nullptr;
+        const JsonValue* game = list != nullptr && list->kind == JsonValue::Kind::Object ? list->Find(key) : nullptr;
+        if (game != nullptr && game->kind == JsonValue::Kind::Object && Number(*game, "last_played") > latest) {
+            latest = Number(*game, "last_played");
+            name = root->String("device");
+        }
+    }
+    return name;
+}
+
 } // namespace den::sync

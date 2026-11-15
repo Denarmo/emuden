@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // The engine: settings and triggers (engine.cpp), one run (run.cpp), conflicts and games
-// (engine_files.cpp), den.sync (engine_link.cpp).
+// (engine_files.cpp), den.sync (engine_link.cpp), a game's own sync (game_sync.cpp).
 
 #pragma once
 
@@ -31,6 +31,21 @@ std::unique_ptr<ConfigFiles> CombineConfigFiles(std::unique_ptr<ConfigFiles> set
                                                 std::unique_ptr<ConfigFiles> play);
 /// The names of the other devices whose play time files are in `dir`.
 std::vector<std::string> OtherDeviceNames(const std::filesystem::path& dir, const std::string& own_id);
+/// The other device that played `key` ("gba/Pokemon - Lazarus") last, by its play time file
+/// in `dir`; "" when none did.
+std::string LastPlayedBy(const std::filesystem::path& dir, const std::string& own_id, const std::string& key);
+
+/// A file CheckGame found changed on both sides, for ResolveGame.
+struct PendingConflict {
+    std::string path;
+    std::filesystem::path fetched; // the online copy, under <sync dir>/pending
+    std::string fetched_hash;
+    RemoteFile remote;
+    std::filesystem::path local;
+    std::string local_hash;        // as it was at the check
+    std::string journal_hash, journal_rev; // the journal's entry then ("" when none)
+    std::string from;              // the device the online copy came from, "" when not known
+};
 
 class EngineImpl final : public Engine, public std::enable_shared_from_this<EngineImpl> {
 public:
@@ -53,6 +68,10 @@ public:
 
     void SyncNow() override;
     void SyncGame(const std::string& game_id) override;
+    bool SyncsSaves() const override;
+    GameCheck CheckGame(const std::string& game_id, CheckGate& gate, double seconds) override;
+    Status ResolveGame(const std::string& game_id, bool use_online) override;
+    Status SyncGameOnce(const std::string& game_id, const std::atomic<bool>* cancel) override;
     void Pump(const std::string& running_game) override;
     void NoteDeleted(const std::filesystem::path& local_file) override;
 
@@ -107,6 +126,15 @@ public:
             run_cancel_.store(true);
         }
     }
+    /// Takes the files lock (the journal, and the saves, states and settings files) for a
+    /// game's own run or a conflict swap: a full run's actions give way to it between two files.
+    /// Waits at most `seconds` (negative: as long as it takes) and while `give_up` is not set.
+    bool LockFiles(std::unique_lock<std::timed_mutex>& lock, const std::atomic<bool>* give_up, double seconds = -1);
+    /// A game's own run did `path`: the full run that gave way to it leaves it out.
+    void NoteTouched(const std::string& path) {
+        std::lock_guard lock(mutex_);
+        touched_.insert(path);
+    }
     /// Keeps a conflict's losing copy: `copy` is moved under <data>/sync/conflicts.
     void KeepLoser(const std::string& path, const std::filesystem::path& copy, const std::string& from,
                    const std::string& game_id);
@@ -125,6 +153,10 @@ private:
     std::atomic<bool> run_cancel_{false}; // the current run's provider calls give up
     std::atomic<bool> games_pass_{false};
     std::mutex run_mutex_; // one run (or game download) at a time
+    // The journal and the files of saves, states and settings: held by a run's regular part
+    // (not its game uploads), a game's own run and conflict swaps.
+    std::timed_mutex files_mutex_;
+    std::atomic<int> files_wanted_{0}; // a game's own run waits for files_mutex_
 
     mutable std::mutex mutex_; // everything below
     SyncState state_;
@@ -132,6 +164,8 @@ private:
     std::vector<RemoteGame> remote_games_;
     std::map<std::string, std::int64_t> game_synced_; // game id -> last synced, of the active provider
     std::string running_game_;
+    std::set<std::string> touched_; // by games' own runs since the full run's catalog
+    std::map<std::string, std::vector<PendingConflict>> pending_conflicts_; // game id -> CheckGame's conflicts
     bool job_running_ = false, pending_ = false;
     std::vector<std::string> pending_games_;
     JobPtr job_;

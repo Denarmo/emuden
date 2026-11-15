@@ -48,6 +48,9 @@ void Add(Catalog& out, HashCache* hashes, std::string path, const fs::path& file
 void AddGameFiles(const CatalogRequest& request, HashCache& hashes, const char* category, Catalog& out) {
     std::map<std::string, std::map<std::string, const GameRef*>> by_system;
     for (const GameRef& game : request.games->Games()) {
+        if (!request.only_game.empty() && game.id != request.only_game) {
+            continue;
+        }
         by_system[game.system][SafeFileName(game.id) + "."] = &game;
     }
     for (const auto& [system, bases] : by_system) {

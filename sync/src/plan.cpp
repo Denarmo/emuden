@@ -170,4 +170,14 @@ std::vector<Action> MakePlan(const PlanRequest& request) {
     return out;
 }
 
+Op AfterFetch(const std::string& local_hash, const std::string& remote_hash, const JournalEntry* journal) {
+    if (!remote_hash.empty() && remote_hash == local_hash) {
+        return Op::Adopt;
+    }
+    if (journal != nullptr && !remote_hash.empty() && remote_hash == journal->hash) {
+        return Op::Upload;
+    }
+    return Op::Conflict;
+}
+
 } // namespace den::sync

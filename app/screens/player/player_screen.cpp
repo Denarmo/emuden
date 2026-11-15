@@ -48,6 +48,7 @@ PlayerScreen::~PlayerScreen() {
     if (prepare_) {
         prepare_->Cancel();
     }
+    AbandonSaveCheck();
     StopDisplays();
     if (phase_ == Phase::Running) {
         Svc().player->Close();
@@ -58,6 +59,9 @@ PlayerScreen::~PlayerScreen() {
 void PlayerScreen::Build() {
     if (phase_ == Phase::New) {
         Open();
+    }
+    if (InSaveCheck()) {
+        return BuildSaveCheck();
     }
     if (view_ != View::Closed && phase_ == Phase::Running) {
         BuildMenu();
@@ -83,7 +87,17 @@ void PlayerScreen::Open() {
     fps_mode_ = std::clamp(static_cast<int>(svc.settings->GetNumber(
                                FPS_KEY, svc.settings->GetBool(OLD_FPS_KEY, false) ? 1 : 0)),
                            0, FPS_MODES - 1);
+    if (!StartSaveCheck()) {
+        Proceed();
+    }
+}
 
+void PlayerScreen::Proceed() {
+    Services& svc = Svc();
+    if (InSaveCheck()) {
+        phase_ = Phase::Preparing;
+        Rebuild();
+    }
     if (game_.archive_member.empty()) {
         return Begin(PathFromUtf8(game_.path));
     }
@@ -163,6 +177,7 @@ void PlayerScreen::Leave() {
     if (prepare_) {
         prepare_->Cancel();
     }
+    AbandonSaveCheck();
     StopDisplays();
     if (phase_ == Phase::Running) {
         const player::Snapshot snapshot = svc.player->GetSnapshot();
@@ -334,6 +349,16 @@ void PlayerScreen::SetFpsMode(int mode) {
 
 void PlayerScreen::Update(ui::Context& ctx) {
     Services& svc = Svc();
+    if (InSaveCheck()) {
+        TickSaveCheck();
+        if (!focus_after_build_.empty()) {
+            if (ui::Node* node = Root().FindById(focus_after_build_)) {
+                SetFocus(node, false);
+                focus_after_build_.clear();
+            }
+        }
+        return;
+    }
     if (phase_ == Phase::Preparing && prepare_ && prepare_->Finished()) {
         const JobPtr job = std::move(prepare_);
         prepare_ = nullptr;
@@ -439,6 +464,9 @@ bool PlayerScreen::OnEvent(const input::Event& event) {
         }
         return event.type == Type::Nav || event.type == Type::PointerDown || event.type == Type::PointerUp;
     }
+    if (InSaveCheck()) {
+        return false; // the page's rows have the input; Back leaves (OnNav)
+    }
     if (phase_ == Phase::Preparing) {
         if (event.type == Type::Nav && event.nav == Nav::Back && !event.repeat) {
             Leave();
@@ -519,6 +547,13 @@ bool PlayerScreen::WrapFocus(Nav nav) {
 }
 
 bool PlayerScreen::OnNav(Nav nav) {
+    if (InSaveCheck()) {
+        if (nav == Nav::Back) {
+            Leave(); // the game does not start
+            return true;
+        }
+        return false;
+    }
     if ((nav == Nav::Up || nav == Nav::Down) && view_ != View::Closed) {
         return WrapFocus(nav);
     }

@@ -99,11 +99,12 @@ public:
     bool External() const;
 
 private:
-    enum class Phase { New, Preparing, Running, Left };
+    enum class Phase { New, Checking, Choosing, Preparing, Running, Left };
     enum class View { Closed, Main, Save, Load, Options, Buttons, Players, Picture, PictureAdjust, Screens };
 
     // player_screen.cpp: the session.
     void Open();
+    void Proceed(); // after the save check: unpacks the game, or starts it
     void Begin(const std::filesystem::path& content, bool resume = true);
     void Fail(const std::string& message);
     void Leave();
@@ -115,6 +116,18 @@ private:
     void FeedPads();
     void ApplySpeed();
     bool WrapFocus(input::Nav nav);
+
+    // launch_sync.cpp: the saves checked against the sync provider before the game starts.
+    struct SaveCheck;
+    bool StartSaveCheck();
+    void TickSaveCheck();
+    void SkipSaveCheck();
+    void AbandonSaveCheck(); // the screen goes: the check writes nothing more
+    void Choose(bool online);
+    void BuildSaveCheck();
+    bool InSaveCheck() const {
+        return phase_ == Phase::Checking || phase_ == Phase::Choosing;
+    }
 
     // player_displays.cpp: what is drawn where, on one display or two.
     void PlaceDisplays();
@@ -153,6 +166,7 @@ private:
     plugins::Console console_;
     plugins::CoreInfo core_;
     JobPtr prepare_;
+    std::shared_ptr<SaveCheck> check_;
     std::shared_ptr<std::filesystem::path> prepared_;
     std::filesystem::path content_; // what the core was given
     bool widescreen_ = false;

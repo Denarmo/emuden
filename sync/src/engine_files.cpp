@@ -119,8 +119,10 @@ Status EngineImpl::UseConflict(std::size_t index) {
         }
     }
     const GameIndex games = Games();
-    YieldGames();
-    std::lock_guard run(run_mutex_);
+    std::unique_lock<std::timed_mutex> held;
+    if (!LockFiles(held, &stop_)) {
+        return Status::Fail("The app is closing.");
+    }
     const auto target = TargetOf(conflict.path, games, config_.data_dir, GamesFolder());
     if (!target) {
         return Status::Fail("This device does not have that game any more.");
@@ -324,7 +326,6 @@ Status EngineImpl::DownloadGame(const std::string& provider_id, const std::vecto
     YieldGames();
     std::lock_guard run(run_mutex_);
     // A game from the library is never uploaded back: the journal knows it from here on.
-    Journal journal(SyncDir(provider_id) / "journal.json");
     for (const std::string& path : paths) {
         // games/<system>/<file> lands as <games folder>/<system>/<file>: never in a folder
         // the user's own games are in.
@@ -349,6 +350,8 @@ Status EngineImpl::DownloadGame(const std::string& provider_id, const std::vecto
         }
         if (got.ok && !ec) {
             const std::uint64_t size = fs::file_size(target, ec);
+            std::lock_guard files(files_mutex_);
+            Journal journal(SyncDir(provider_id) / "journal.json");
             journal.entries[path] = {GameHash(size), std::string(), size, Now()};
             journal.Save();
         }

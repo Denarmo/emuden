@@ -288,10 +288,6 @@ void EngineImpl::SyncNow() {
     Request({});
 }
 
-void EngineImpl::SyncGame(const std::string& game_id) {
-    Request(game_id);
-}
-
 void EngineImpl::Request(const std::string& first_game, bool timer) {
     if (Active().empty() || config_.jobs == nullptr) {
         return;
@@ -339,32 +335,34 @@ void EngineImpl::StartRun() {
 }
 
 void EngineImpl::Pump(const std::string& running_game) {
+    std::string ended;
     {
         std::lock_guard lock(mutex_);
         if (running_game_ != running_game) {
-            const std::string ended = running_game_;
-            running_game_ = running_game;
-            if (!ended.empty() && running_game.empty()) {
-                pending_games_.push_back(ended);
+            if (!running_game_.empty() && running_game.empty()) {
+                ended = running_game_;
             }
+            running_game_ = running_game;
             if (!running_game.empty() && games_pass_.load()) {
                 run_cancel_.store(true); // no game uploads while the user plays
             }
         }
     }
+    if (!ended.empty()) {
+        SyncGame(ended); // its saves go up now, then the rest
+    }
     const int minutes = IntervalMinutes();
     const double now = pal::NowSeconds();
-    bool ended = false, timer = false;
+    bool timer = false;
     {
         std::lock_guard lock(mutex_);
-        ended = !pending_games_.empty() && (!job_running_ || games_pass_.load());
         if (minutes > 0 && now - last_timer_ >= minutes * 60.0) {
             last_timer_ = now;
             timer = true;
         }
     }
-    if (ended || timer) {
-        Request({}, !ended);
+    if (timer) {
+        Request({}, true);
     }
 }
 
@@ -374,7 +372,10 @@ void EngineImpl::NoteDeleted(const fs::path& local_file) {
         return;
     }
     const GameIndex games = Games();
-    std::lock_guard run(run_mutex_);
+    std::unique_lock<std::timed_mutex> files;
+    if (!LockFiles(files, &stop_)) {
+        return;
+    }
     Journal journal(SyncDir(active) / "journal.json");
     for (const auto& [path, entry] : journal.entries) {
         const auto target = TargetOf(path, games, config_.data_dir, GamesFolder());

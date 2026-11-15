@@ -57,7 +57,10 @@ same stem (rare) sync under the first and the conflict is logged. Device-only se
   settings and BIOS files; a game that just ended goes first.
   Once these are done the run counts as a sync: the last sync time and the games' "Saves
   synced" marks are set then, not when the game uploads end.
-- **Conflicts:** the newer file by modification time wins; the loser is kept beside it as
+- **Conflicts:** a file both sides changed is fetched and compared by content first: the
+  same content is agreed on, and a remote copy that is still the one both last agreed on (its
+  rev moved without a change) means only this device changed it. Only then is it a conflict:
+  before a game starts the user chooses (section 3.3); otherwise the newer file by modification time wins; the loser is kept beside it as
   `<name>.conflict-<device>-<yyyymmdd-hhmmss>` (locally under `<data>/sync/conflicts/`) and
   the sync page lists it with "Use this one instead". A remote copy is named after the other
   device when only one other is known (from the play time files), else "another device".
@@ -68,8 +71,9 @@ same stem (rare) sync under the first and the conflict is logged. Device-only se
   does not make the file differ.
 - Downloads land in a temporary file and replace the target atomically; a save or state of a
   game that is running is never replaced (it waits for the session to end).
-- **When:** on app start, when a game session ends (that game's saves and states first), on
-  "Sync now", and every 15 minutes while the app is open (setting). Games only download
+- **When:** on app start, before a game starts and when it ends (that game's own sync,
+  section 3.3, then the rest), on "Sync now", and every 15 minutes while the app is open
+  (setting). Games only download
   when the user asks; uploads of games happen only when the user turns on "Upload my games"
   on that device.
 - One provider at a time is the active one; the others can be set up but stay idle.
@@ -112,6 +116,29 @@ counting a session twice:
   others', and the latest of the last plays. A new file from a device replaces that device's
   part, so syncing again adds nothing.
 - Games of `pc` consoles are never in these files.
+
+### 3.3 A game's own sync
+
+Before a game of the player starts (with `saves` or `states` on), its saves and states alone
+are checked against the remote (`Engine::CheckGame`); the screen shows "Checking for newer
+saves…" with Skip, and after 3 s, offline or skipped, the game starts as it is and the check
+writes nothing more (`CheckGate`).
+
+- Changed only online since the last sync: downloaded, no question.
+- Changed only here: the game starts; it goes up when the game ends.
+- Changed on both sides (different content): "Which save do you want?" names the device the
+  online copy came from (the other device that played the game last, by the play time files)
+  and both times, with "Use the online save" and "Keep this device's save"; Back does not
+  start the game. The other copy is kept as a conflict copy (section 3), and either way the
+  journal takes the online copy as agreed on, so a kept local save simply goes up at the end.
+
+When the game ends, its saves and states (and this device's play time file) go up at once on
+a job of their own (`Engine::SyncGame`), then the regular run follows.
+
+Neither waits for a run's game uploads: the journal and the save, state and settings files
+have a lock of their own (`files_mutex_`), held by a run's regular part but not by its game
+uploads. A run's regular part gives the lock to a waiting game between two files and leaves
+out what the game's sync did meanwhile.
 
 ## 4. HTTP for plugins (platform and `den.http`)
 

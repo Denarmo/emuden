@@ -13,6 +13,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -83,6 +84,49 @@ struct GameSync {
     bool waiting = false;    // it runs: its files sync when the session ends
 };
 
+/// What a game's check before it starts found (docs/sync.md, section 3.3).
+struct GameCheck {
+    bool reached = false;   // the provider answered
+    int downloaded = 0;     // changed only online: taken, without asking
+    int waiting = 0;        // changed only here: they go up when the game ends
+    /// Changed on both sides since the last sync: the user chooses (ResolveGame).
+    std::vector<std::string> conflicts;
+    std::string online_device;     // where the online copies came from; "" when not known
+    std::int64_t online_time = 0;  // the newest online copy of them, Unix seconds
+    std::int64_t local_time = 0;   // the newest copy of them here
+    std::string error;
+};
+
+/// Ends a game's check early (the user skipped it, or it took too long): once Abandon has
+/// returned, the check writes no more files, so the game can start.
+class CheckGate {
+public:
+    void Abandon() {
+        std::lock_guard lock(mutex_);
+        flag_.store(true);
+    }
+    bool Abandoned() const {
+        return flag_.load();
+    }
+    const std::atomic<bool>* Flag() const {
+        return &flag_;
+    }
+    /// Runs `write` unless the check was abandoned; false when it was.
+    template <typename Fn>
+    bool Write(Fn&& write) {
+        std::lock_guard lock(mutex_);
+        if (flag_.load()) {
+            return false;
+        }
+        write();
+        return true;
+    }
+
+private:
+    std::mutex mutex_;
+    std::atomic<bool> flag_{false};
+};
+
 struct EngineConfig {
     std::filesystem::path data_dir;
     Jobs* jobs = nullptr;
@@ -128,8 +172,21 @@ public:
 
     // Triggers. From any thread; a run that is asked for while one goes on follows it.
     virtual void SyncNow() = 0;
-    /// A game session ended: that game's files go first.
+    /// A game session ended: that game's saves and states go up at once on a job of their
+    /// own (not behind a run's game uploads), then the rest syncs.
     virtual void SyncGame(const std::string& game_id) = 0;
+    /// Whether games' saves or states sync on this device.
+    virtual bool SyncsSaves() const = 0;
+    /// Blocking, before a game starts: its saves and states only, against the remote. What
+    /// changed only online comes down; what changed only here waits for the game's end; files
+    /// changed on both sides are left for ResolveGame. Waits at most `seconds` for a full run
+    /// to give way; `gate` stops it. Never waits for game uploads.
+    virtual GameCheck CheckGame(const std::string& game_id, CheckGate& gate, double seconds) = 0;
+    /// The user's answer to the conflicts CheckGame found: the online copies (`use_online`) or
+    /// this device's, which then go up when the game ends. The other is kept as a conflict copy.
+    virtual Status ResolveGame(const std::string& game_id, bool use_online) = 0;
+    /// Blocking: one game's saves and states after it ended (SyncGame runs it on a job).
+    virtual Status SyncGameOnce(const std::string& game_id, const std::atomic<bool>* cancel) = 0;
     /// Main thread, every frame: the timer. `running_game` is the library id of the game
     /// that runs now ("" for none): its files are never replaced while it does.
     virtual void Pump(const std::string& running_game) = 0;

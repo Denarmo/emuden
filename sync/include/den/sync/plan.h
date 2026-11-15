@@ -92,6 +92,7 @@ struct CatalogRequest {
     const GameIndex* games = nullptr;
     ConfigFiles* config = nullptr;
     const std::atomic<bool>* cancel = nullptr;
+    std::string only_game; // saves and states: only this game's (library id), when set
 };
 
 /// The local files of the request's categories.
@@ -153,5 +154,11 @@ struct PlanRequest {
 /// plan, and uploaded only with `upload_games`, once: never when the remote has the path or
 /// the journal knows it (uploaded or downloaded before).
 std::vector<Action> MakePlan(const PlanRequest& request);
+
+/// A Compare or Conflict once the remote copy was fetched, by its content: the same as here
+/// is agreed on (Adopt); the content both last agreed on, whose rev only moved (a provider
+/// that renumbers a file without a change), means only this device changed it (Upload);
+/// else it is a conflict (Compare and Conflict alike). `journal` may be null.
+Op AfterFetch(const std::string& local_hash, const std::string& remote_hash, const JournalEntry* journal);
 
 } // namespace den::sync
