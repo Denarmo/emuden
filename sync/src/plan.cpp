@@ -85,7 +85,12 @@ void PlanGame(const PlanRequest& request, const std::string& path, const LocalIt
     }
 }
 
-int Rank(const std::string& category) {
+// Play time files first: they are small and name the other devices for conflict copies.
+int Rank(const std::string& path) {
+    const std::string category = CategoryOf(path);
+    if (path.starts_with("config/playtime/")) {
+        return -1;
+    }
     if (category == SAVES) {
         return 0;
     }
@@ -160,7 +165,7 @@ std::vector<Action> MakePlan(const PlanRequest& request) {
     }
     // Saves first, games last: a game upload can take hours.
     std::stable_sort(out.begin(), out.end(), [](const Action& a, const Action& b) {
-        return Rank(CategoryOf(a.path)) < Rank(CategoryOf(b.path));
+        return Rank(a.path) < Rank(b.path);
     });
     return out;
 }

@@ -53,7 +53,8 @@ same stem (rare) sync under the first and the conflict is logged. Device-only se
 - A **plan** compares catalog, journal and the provider's listing:
   local changed only → upload; remote changed only → download; both → conflict; new on one
   side → copy to the other. Deletes only as in section 1.
-- **Order:** saves, then states, settings and BIOS files; a game that just ended goes first.
+- **Order:** the play time files (small; they name the other devices), saves, then states,
+  settings and BIOS files; a game that just ended goes first.
   Once these are done the run counts as a sync: the last sync time and the games' "Saves
   synced" marks are set then, not when the game uploads end.
 - **Conflicts:** the newer file by modification time wins; the loser is kept beside it as
