@@ -285,7 +285,7 @@ bool VulkanHost::MakeDevice() {
     }
     VkPhysicalDeviceProperties props{};
     fn_.GetPhysicalDeviceProperties(gpu_, &props);
-    log::Info("player", "Vulkan device for the core: {} (API {}.{}, {})", props.deviceName,
+    log::Info("player", "Vulkan device for the core: {} (API {}.{}, {})", static_cast<const char*>(props.deviceName),
               VK_API_VERSION_MAJOR(props.apiVersion), VK_API_VERSION_MINOR(props.apiVersion),
               core_made_device_ ? "made by the core" : "made by the player");
     return MakeFrameObjects();

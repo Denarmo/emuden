@@ -8,6 +8,21 @@ listened.
 
 SteamOS (Legion Go S) feature by feature, with the Linux fixes it needed: `docs/steamos.md`.
 
+## Vulkan cores (2026-11-15)
+
+Libretro cores can render with Vulkan; the picture reaches the GL interface through shared
+memory. Design: `docs/vulkan.md`. The renderer is a core option (Auto / OpenGL / Vulkan, per core
+or per game); Auto keeps GL unless the core only asks for Vulkan.
+
+| Where | Core and game | Result |
+|---|---|---|
+| Windows, RTX 5070 | PPSSPP (Vulkan) | Device made by the core, shared memory, 60 fps, picture right |
+| Windows, RTX 5070 | Play! Vulkan GS, Gran Turismo 4 (PAL) | 49.7 of 50 fps, as on GL; save and load state work |
+| Retroid Pocket Duo, Adreno 722 | Play! Vulkan GS, Gran Turismo 4 race | Hardware buffer share, picture right, but 4.8 fps with the GPU 99% busy (GL: 33 fps, GPU 26%). The cost is Play!'s mobile Vulkan GS, not the share (one 640x512 blit a frame). Keep Auto/GL there. |
+| Legion Go S, RADV | Play! Vulkan GS | Device and shared memory set up; the game then crashes in Play!'s JIT, as it does on GL with current Play! builds (0.77-30 is fine) |
+
+Play!'s Vulkan GS for libretro is on the Play! fork's branch `emuden-vulkan`.
+
 ## Engine apps through the Emulator Control Protocol (branch feat/ecp)
 
 A console's core can be an engine app (`"type": "engine-app"` in a plugin manifest) that
