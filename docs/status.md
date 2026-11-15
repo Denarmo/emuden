@@ -57,7 +57,7 @@ or per game); Auto gives each core the API it asks for first.
 |---|---|---|
 | Windows, RTX 5070 | PPSSPP (Vulkan) | Device made by the core, shared memory, 60 fps, picture right |
 | Windows, RTX 5070 | Play! Vulkan GS, Gran Turismo 4 (PAL) | 49.7 of 50 fps, as on GL; save and load state work |
-| Retroid Pocket Duo, Adreno 722 | Play! Vulkan GS, Gran Turismo 4 race | Hardware buffer share, picture right. Play! 0.77-53 (PS2 1.1.13) fixed its mobile Vulkan GS (passes limited to the area drawn, no pass end per CLUT load, 24-bit stores without atomics): 4.6 to 35-43 fps, OpenGL 30-41 in the same runs. The EE thread (~100%, JIT) is now the limit for 50. Colin McRae Rally 3: ~50 fps. |
+| Retroid Pocket Duo, Adreno 722 | Play! Vulkan GS, Gran Turismo 4 race | Hardware buffer share, picture right. Play! 0.77-53 (PS2 1.1.13) fixed its mobile Vulkan GS (passes limited to the area drawn, no pass end per CLUT load, 24-bit stores without atomics): 4.6 to 35-43 fps, OpenGL 30-41 in the same runs. Play! 0.77-56 (PS2 1.1.14) made the EE/VU JIT faster (shared code regions, single-op memory accesses, direct jr/jalr jumps, one frame for all blocks on AArch64): the race holds 50 fps. Colin McRae Rally 3: ~50 fps. |
 | Legion Go S, RADV | Play! Vulkan GS, Colin McRae Rally 3 | Shared memory, 50 of 50 fps, logo screen right (with Play!'s fix for its static C++ runtime, 0.77-41) |
 
 Play! asks for Vulkan first where the GPU can run its Vulkan GS (desktop GPUs with fragment shader
