@@ -26,6 +26,8 @@ constexpr double WAIT_SHOWN_SECONDS = 0.25;
 constexpr int MAX_OWED_FRAMES = 3;
 constexpr double LOCK_TOLERANCE = 0.012;
 constexpr std::uint64_t MAX_ALIGN_FRAMES = 1200;
+constexpr int QUICK_RESYNCS = 3;
+constexpr double RESYNC_PAUSE = 10.0;
 
 // EMUDEN_NET_DUMP=<folder>: every checked state is written there, to find what differs
 // after a desync.
@@ -264,8 +266,15 @@ void PlayerSession::TickLockstep() {
     } else {
         TakeStateFromPeer();
         if (sync.Started() && sync.TakeDesync()) {
-            log::Warn("player", "the games differ (desync): asking the host for its state");
-            party.RequestResync();
+            // A core whose states never compare alike would ask every second: after a few
+            // quick ones, at most every RESYNC_PAUSE seconds.
+            const double now = pal::NowSeconds();
+            quick_resyncs_ = now - last_resync_ < RESYNC_PAUSE ? quick_resyncs_ + 1 : 0;
+            if (quick_resyncs_ < QUICK_RESYNCS || now - last_resync_ >= RESYNC_PAUSE) {
+                last_resync_ = now;
+                log::Warn("player", "the games differ (desync): asking the host for its state");
+                party.RequestResync();
+            }
         }
     }
 }
