@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <random>
 #include <system_error>
+#include <tuple>
 
 #include "den/base/files.h"
 #include "den/base/log.h"
@@ -212,6 +213,24 @@ GameIndex EngineImpl::Games() const {
         return GameIndex(config_.entries(), PcSystems());
     }
     return config_.library ? GameIndex(config_.library->Entries(), PcSystems()) : GameIndex({}, PcSystems());
+}
+
+bool EngineImpl::ListsFolders(const std::string& id) const {
+    if (config_.provider_factory || !Folder(id).empty()) {
+        return true;
+    }
+    if (id != GDRIVE_PROVIDER || config_.features == nullptr) {
+        return false;
+    }
+    // Google Drive lists one folder by itself from 1.0.4; before, every call lists everything.
+    for (const plugins::FeaturePlugin& plugin : config_.features->Plugins()) {
+        if (plugin.id == id && plugin.installed) {
+            int major = 0, minor = 0, patch = 0;
+            std::sscanf(plugin.version.c_str(), "%d.%d.%d", &major, &minor, &patch);
+            return std::make_tuple(major, minor, patch) >= std::make_tuple(1, 0, 4);
+        }
+    }
+    return false;
 }
 
 std::unique_ptr<Provider> EngineImpl::MakeProvider(const std::string& id, const std::atomic<bool>* cancel) const {

@@ -101,6 +101,8 @@ public:
     // For the run and the link.
     std::set<std::string> PcSystems() const;
     GameIndex Games() const;
+    /// Whether the provider lists one system folder ("saves/gba/") quickly, by itself.
+    bool ListsFolders(const std::string& id) const;
     std::unique_ptr<Provider> MakeProvider(const std::string& id, const std::atomic<bool>* cancel) const;
     std::filesystem::path SyncDir(const std::string& provider) const;
     std::filesystem::path Home() const;

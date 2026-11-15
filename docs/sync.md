@@ -122,7 +122,9 @@ counting a session twice:
 Before a game of the player starts (with `saves` or `states` on), its saves and states alone
 are checked against the remote (`Engine::CheckGame`); the screen shows "Checking for newer
 saves…" with Skip, and after 3 s, offline or skipped, the game starts as it is and the check
-writes nothing more (`CheckGate`).
+writes nothing more (`CheckGate`). Only the game's system folders are listed
+(`list("saves/<system>/")`) where the provider does that quickly: the folder store, and
+Google Drive from 1.0.4; else its categories.
 
 - Changed only online since the last sync: downloaded, no question.
 - Changed only here: the game starts; it goes up when the game ends.
@@ -318,6 +320,8 @@ devices are merged rather than a conflict.
   plugin's storage (`upload:<path>`, with the file's size and time), so an upload cut by the
   app closing, a game starting or the network goes on from the offset Google reports, in
   the same run or a later one; a session Google dropped (after a week) starts once more.
+- `list("<category>/<system>/")` (1.0.4) searches that one folder, whose id is kept from the
+  last full listing, instead of listing everything.
 - Hosts: `oauth2.googleapis.com`, `www.googleapis.com`. Categories: all of section 1, and the
   host refuses any PC/Steam file to this provider regardless.
 

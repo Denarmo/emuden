@@ -67,8 +67,12 @@ Status Run::GoGame(const GameScope& scope) {
             }
         }
     }
+    // Only the game's system folders where the provider lists one folder quickly; else the
+    // categories.
     std::map<std::string, RemoteFile> listed;
-    if (!List(categories, listed)) {
+    const bool reached = engine_.ListsFolders(provider_.Id()) ? ListFolders(*game, categories, scope.before, listed)
+                                                              : List(categories, listed);
+    if (!reached) {
         return Status::Fail("The provider could not be reached.");
     }
     if (scope.out != nullptr) {
@@ -127,6 +131,39 @@ Status Run::GoGame(const GameScope& scope) {
               own_state_.uploaded, own_state_.downloaded,
               scope.out != nullptr && !scope.out->conflicts.empty() ? ", changed on both sides" : "");
     return own_state_.errors.empty() ? Status() : Status::Fail(own_state_.errors.front());
+}
+
+bool Run::ListFolders(const GameRef& game, const std::set<std::string>& categories, bool before,
+                      std::map<std::string, RemoteFile>& remote) {
+    std::vector<std::string> prefixes;
+    for (const char* category : {SAVES, STATES}) {
+        if (categories.contains(category)) {
+            prefixes.push_back(std::string(category) + "/" + game.system + "/");
+        }
+    }
+    if (!before && categories.contains(CONFIG)) {
+        prefixes.emplace_back(PLAY_PREFIX); // this device's goes up; before, the kept ones name devices
+    }
+    const std::set<std::string> pc = engine_.PcSystems();
+    bool listed = false;
+    for (const std::string& prefix : prefixes) {
+        Result<std::vector<RemoteFile>> files = provider_.List(prefix);
+        if (!files) {
+            Error("Listing " + prefix + ": " + files.error());
+            continue;
+        }
+        listed = true;
+        for (RemoteFile& file : files.value()) {
+            if (!file.path.starts_with(prefix) || !IsPortablePath(file.path) || IsPcPath(file.path, pc)) {
+                continue;
+            }
+            if (file.rev.empty()) {
+                file.rev = std::to_string(file.size) + "@" + std::to_string(file.modified);
+            }
+            remote[file.path] = std::move(file);
+        }
+    }
+    return listed;
 }
 
 void Run::GameAction(const GameScope& scope, const Action& action) {

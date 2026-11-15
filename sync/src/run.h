@@ -75,6 +75,8 @@ private:
     void Resolve(const LocalItem& local, const RemoteFile& remote, const std::filesystem::path& temp);
 
     // game_sync.cpp
+    bool ListFolders(const GameRef& game, const std::set<std::string>& categories, bool before,
+                     std::map<std::string, RemoteFile>& remote);
     void GameAction(const GameScope& scope, const Action& action);
 
     EngineImpl& engine_;
