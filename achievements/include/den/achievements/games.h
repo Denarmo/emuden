@@ -24,6 +24,9 @@ std::uint32_t ConsoleFor(std::string_view system);
 /// "EmuDEN/<version> rcheevos/<version>": the User-Agent of every request to the server.
 std::string UserAgent(std::string_view client_name, std::string_view client_version);
 
+/// Requests through the platform's HTTP client (pal::HttpGet) with that User-Agent.
+HttpFn PlatformHttp(std::string user_agent);
+
 /// The hash RetroAchievements identifies the game by: of the whole ROM, of its part without a
 /// header, or of a disc's boot files, as the console wants. The file is the one the core is
 /// given (an unpacked ROM, not its zip). Paths are UTF-8 safe.
