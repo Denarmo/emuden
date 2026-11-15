@@ -257,6 +257,7 @@ Status RealFeatureHost::DoRemove(const std::string& id, bool delete_data, bool d
     std::error_code ec;
     fs::remove_all(plugins_dir_ / PathOf(id), ec);
     if (delete_data) {
+        RemoveSecrets(id, DataDir(id));
         fs::remove_all(DataDir(id), ec);
     } else {
         fs::remove(DataDir(id) / "grant.json", ec); // installing again asks again

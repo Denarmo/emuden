@@ -41,9 +41,15 @@ UrlParts ParseUrl(std::string_view url);
 /// Fine when `url` is https on its default port to one of `hosts`, without a user name.
 Status CheckUrl(std::string_view url, const std::vector<std::string>& hosts);
 
+/// Who an address of den.http.request belongs to.
+enum class Route { Declared, UserServer, Local };
+
 struct HttpSettings {
     HttpGetter http;
     std::vector<std::string> hosts;
+    bool local = false; // http.local
+    /// http.user_host: the server the user confirmed, "scheme://host[:port]" (empty: none).
+    std::function<std::string()> user_server;
     int min_interval_ms = 500;
     std::filesystem::path cache_dir;
     std::string user_agent;
@@ -54,6 +60,7 @@ struct HttpSettings {
 struct HttpAnswer {
     int status = 0;
     std::string body;
+    std::vector<std::pair<std::string, std::string>> headers; // names in lower case
     std::string error; // set when there is no usable answer
     bool cached = false;
 };
@@ -71,16 +78,26 @@ public:
                    const std::vector<std::pair<std::string, std::string>>& headers,
                    int cache_seconds);
 
+    /// Where den.http.request may send `url`: a declared https host, the user's server or an
+    /// app on this device.
+    Result<Route> AllowedRequest(std::string_view url) const;
+
+    /// Blocking. The request as the script made it (url, method, headers, body); the policy
+    /// adds the user agent and limits. `max_file` bounds `to_file`.
+    HttpAnswer Request(pal::HttpRequest request, std::uint64_t max_file,
+                       const std::function<void(float)>& progress);
+
     /// Blocking. Streams to `destination`; `progress` gets 0..1 (negative: size unknown).
     Status Download(const std::string& url, const std::filesystem::path& destination,
                     std::uint64_t max_size, const std::function<void(float)>& progress);
 
 private:
     // Waits for a free slot and the host's pause. Fails when cancelled or the host is blocked.
-    Status Enter(const std::string& host);
-    void Leave(const std::string& host, int status);
+    Status Enter(const std::string& host, int interval_ms);
+    void Leave(const std::string& host, int status, int interval_ms);
     std::vector<std::pair<std::string, std::string>> Headers(
-        const std::vector<std::pair<std::string, std::string>>& extra) const;
+        const std::vector<std::pair<std::string, std::string>>& extra,
+        bool authorization = false) const;
     bool Cancelled() const {
         return settings_.cancel != nullptr && settings_.cancel->load();
     }

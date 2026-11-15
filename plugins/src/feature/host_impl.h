@@ -66,6 +66,12 @@ public:
     fs::path ImagePath(const std::string& id, const std::string& image) override;
     std::string RouteFile(const fs::path& file) override;
     void Pump() override;
+    void SetSyncLink(std::shared_ptr<SyncLink> link) override;
+    void Invoke(const std::string& id, std::vector<std::string> path, std::vector<JsonValue> args,
+                std::function<void(Result<std::vector<JsonValue>>)> done,
+                std::function<void(double, double)> progress) override;
+    std::string LendFile(const std::string& id, const fs::path& file) override;
+    void ReturnFile(const std::string& token) override;
 
 private:
     struct Running {
@@ -110,6 +116,9 @@ private:
     std::map<std::string, Package> installed_;
     std::map<std::string, Running> running_;
     std::set<std::string> fetching_images_;
+    std::shared_ptr<SyncLink> sync_link_;
+    std::map<std::string, std::pair<std::string, fs::path>> lent_; // token -> plugin, file
+    std::uint64_t next_lend_ = 1;
     std::uint64_t host_revision_ = 0; // the console host's, when the catalogue was last read
     std::string state_signature_;
     std::atomic<std::uint64_t> revision_{1};

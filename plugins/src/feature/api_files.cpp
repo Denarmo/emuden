@@ -179,15 +179,22 @@ int Exists(lua_State* L) {
     return 1;
 }
 
+// A file the sync engine lent for a provider call ("sync:<token>") is read as it is, binary
+// included, up to 8 MiB.
 int Read(lua_State* L) {
     fs::path path;
-    if (const Status found = Runner::Of(L).Resolve(luaL_checkstring(L, 1), true, path);
-        !found.ok) {
+    const std::string name = luaL_checkstring(L, 1);
+    bool lent = false;
+    const Status found = name.starts_with("sync:") ? Runner::Of(L).ResolveFile(name, path, lent)
+                                                   : Runner::Of(L).Resolve(name, true, path);
+    if (!found.ok) {
         return Refuse(L, found.error);
     }
+    const std::uint64_t limit = lent ? 8ull << 20 : MAX_READ;
     std::error_code ec;
-    if (!fs::is_regular_file(path, ec) || fs::file_size(path, ec) > MAX_READ) {
-        return Refuse(L, "there is no such file of at most 4 MiB");
+    if (!fs::is_regular_file(path, ec) || fs::file_size(path, ec) > limit) {
+        return Refuse(L, lent ? "there is no such file of at most 8 MiB"
+                              : "there is no such file of at most 4 MiB");
     }
     const auto text = ReadTextFile(path);
     if (!text) {

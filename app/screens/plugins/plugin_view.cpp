@@ -269,8 +269,10 @@ private:
                 break;
             case AskKind::PickFile: {
                 PickOptions options;
-                options.title = ask.title.empty() ? "Choose a file" : ask.title;
-                options.files = true;
+                // A value of "folder" asks for a folder (den.sync.use_folder).
+                options.files = ask.value != "folder";
+                options.title = !ask.title.empty() ? ask.title : options.files ? "Choose a file" : "Choose a folder";
+                options.start = ask.message;
                 options.extensions = ask.extensions;
                 pick_ask_ = ask.id;
                 pick_gone_ = 0;

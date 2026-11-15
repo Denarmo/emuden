@@ -9,11 +9,13 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "den/base/jobs.h"
+#include "den/base/json.h"
 #include "den/base/result.h"
 #include "den/plugins/feature_ui.h"
 #include "den/plugins/host.h"
@@ -23,6 +25,8 @@ class Library;
 }
 
 namespace den::plugins {
+
+class SyncLink;
 
 /// Package kinds the feature host installs: "feature" (a script) and "interface" (data only:
 /// a look for the Home screen, docs/interface-plugins.md in emuden-plugins).
@@ -42,6 +46,7 @@ struct FeaturePlugin {
     bool installed = false, update_available = false, running = false;
     bool needs_consent = false; // install or update asks for permissions not yet granted
     std::vector<PermissionLine> permissions, new_permissions;
+    std::vector<std::string> sync_categories; // a sync provider: what it can keep in step
     std::uint64_t data_bytes = 0;
     std::string error; // last script failure, user-facing
 };
@@ -71,6 +76,34 @@ public:
     virtual std::string RouteFile(const std::filesystem::path& file) = 0;
     /// Main thread, every frame: applies what the workers produced.
     virtual void Pump() = 0;
+
+    // Sync providers (docs/sync.md). From any thread.
+    /// What den.sync of every provider reaches. Set once, before a provider runs.
+    virtual void SetSyncLink(std::shared_ptr<SyncLink> link) {
+        (void)link;
+    }
+    /// Runs plugin.<path...>(args...) of an installed plugin, starting its script without its
+    /// page when needed, and hands the results to `done` (on the script's thread). With
+    /// `progress` the function gets a progress function (done, total) as its last argument.
+    virtual void Invoke(const std::string& id, std::vector<std::string> path, std::vector<JsonValue> args,
+                        std::function<void(Result<std::vector<JsonValue>>)> done,
+                        std::function<void(double, double)> progress = {}) {
+        (void)id;
+        (void)path;
+        (void)args;
+        (void)progress;
+        done(Status::Fail("this app runs no plugins"));
+    }
+    /// Lends a file to a plugin until ReturnFile: the text its script names it by
+    /// ("sync:<token>"), which den.http.request and den.files.read take.
+    virtual std::string LendFile(const std::string& id, const std::filesystem::path& file) {
+        (void)id;
+        (void)file;
+        return {};
+    }
+    virtual void ReturnFile(const std::string& token) {
+        (void)token;
+    }
 };
 
 struct FeatureConfig {

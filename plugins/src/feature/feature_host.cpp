@@ -101,6 +101,17 @@ Result<std::shared_ptr<Runner>> RealFeatureHost::Start(const std::string& id) {
     config.services = deps_.services;
     config.now = deps_.now;
     config.instruction_limit = deps_.instruction_limit;
+    if (package.manifest.access.Has(PERMISSION_SYNC)) {
+        config.sync = sync_link_;
+    }
+    config.lent = [this, id](const std::string& token) -> std::optional<fs::path> {
+        std::lock_guard lock(mutex_);
+        const auto found = lent_.find(token);
+        if (found == lent_.end() || found->second.first != id) {
+            return std::nullopt;
+        }
+        return found->second.second;
+    };
     Running entry;
     entry.runner = std::make_shared<Runner>(std::move(config));
     const std::shared_ptr<Runner> runner = entry.runner;
@@ -330,6 +341,9 @@ void RealFeatureHost::Pump() {
                 package != installed_.end() &&
                 RevokedFor(views, ViewOf(views, package->second), it->first, package->second.manifest.version)
                     .has_value();
+            if (it->second.runner->Invoking() > 0) {
+                it->second.closed_at = now; // the sync engine uses it: it stays a while after
+            }
             const bool idle = !it->second.open &&
                               now - it->second.closed_at >= std::chrono::seconds(deps_.idle_seconds);
             if (revoked || idle || package == installed_.end()) {
@@ -349,6 +363,47 @@ void RealFeatureHost::Pump() {
     for (std::shared_ptr<Runner>& runner : retired) {
         Retire(std::move(runner));
     }
+}
+
+void RealFeatureHost::SetSyncLink(std::shared_ptr<SyncLink> link) {
+    std::lock_guard lock(mutex_);
+    sync_link_ = std::move(link);
+}
+
+void RealFeatureHost::Invoke(const std::string& id, std::vector<std::string> path, std::vector<JsonValue> args,
+                             std::function<void(Result<std::vector<JsonValue>>)> done,
+                             std::function<void(double, double)> progress) {
+    std::shared_ptr<Runner> runner;
+    {
+        std::lock_guard lock(mutex_);
+        const auto found = installed_.find(id);
+        if (found == installed_.end() || found->second.manifest.kind != KIND_FEATURE) {
+            done(Status::Fail("The plugin is not installed."));
+            return;
+        }
+        Result<std::shared_ptr<Runner>> started = Start(id);
+        if (!started) {
+            done(started.status());
+            return;
+        }
+        runner = started.take();
+        running_[id].closed_at = std::chrono::steady_clock::now();
+    }
+    runner->Invoke(std::move(path), std::move(args), std::move(done), std::move(progress));
+}
+
+std::string RealFeatureHost::LendFile(const std::string& id, const fs::path& file) {
+    std::lock_guard lock(mutex_);
+    const std::string token =
+        "sync:" + std::to_string(next_lend_++) + "-" +
+        Sha256Hex(PathToUtf8(file).data(), PathToUtf8(file).size()).substr(0, 12);
+    lent_[token] = {id, file};
+    return token;
+}
+
+void RealFeatureHost::ReturnFile(const std::string& token) {
+    std::lock_guard lock(mutex_);
+    lent_.erase(token);
 }
 
 } // namespace den::plugins::feature

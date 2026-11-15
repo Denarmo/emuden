@@ -25,6 +25,15 @@ inline constexpr const char* PERMISSION_DOWNLOADS_WATCH = "downloads.watch";
 inline constexpr const char* PERMISSION_LIBRARY_READ = "library.read";
 inline constexpr const char* PERMISSION_PATCH = "patch";
 inline constexpr const char* PERMISSION_LIBRARY_WRITE = "library.write";
+/// A sync provider (docs/sync.md): den.sync, plugin.provider, feature.sync.categories.
+inline constexpr const char* PERMISSION_SYNC = "sync";
+/// den.http.request to the one server the user entered (den.sync.set_server).
+inline constexpr const char* PERMISSION_HTTP_USER_HOST = "http.user_host";
+/// den.http.request to 127.0.0.1 and localhost on any port, http or https.
+inline constexpr const char* PERMISSION_HTTP_LOCAL = "http.local";
+
+/// The categories a sync provider may offer, in the order the sync page shows them.
+inline constexpr const char* SYNC_CATEGORIES[] = {"saves", "states", "config", "games", "bios"};
 
 /// What a plugin may reach: the part of a manifest (or of an index entry) the user agrees to.
 struct FeatureAccess {
@@ -50,6 +59,7 @@ struct FeatureManifest {
     std::string icon;
     FeatureAccess access;
     std::vector<std::string> file_types; // lower case, without the dot
+    std::vector<std::string> sync_categories; // feature.sync.categories, with PERMISSION_SYNC
     int min_interval_ms = 500;
     int memory_mb = 32;
     int storage_mb = 512;
@@ -69,7 +79,8 @@ Status CheckTrust(const FeatureManifest& manifest, FeaturePlugin::Trust trust,
                   std::string_view source_owner);
 
 /// One sentence per permission, as the install page shows them.
-std::vector<PermissionLine> PermissionLines(const FeatureAccess& access);
+std::vector<PermissionLine> PermissionLines(const FeatureAccess& access,
+                                            const std::vector<std::string>& sync_categories = {});
 
 /// What `wanted` asks for beyond `granted`: new permissions, hosts or systems.
 FeatureAccess AccessBeyond(const FeatureAccess& wanted, const FeatureAccess& granted);

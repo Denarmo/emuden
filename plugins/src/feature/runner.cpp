@@ -24,12 +24,17 @@ constexpr std::size_t MAX_SCRIPT = 1u << 20;
 
 std::atomic<std::uint64_t> g_next_ask{1};
 
-HttpSettings HttpSettingsOf(const RunnerConfig& config, const std::atomic<bool>* cancel) {
+HttpSettings HttpSettingsOf(const RunnerConfig& config, const std::atomic<bool>* cancel,
+                            const Runner* runner) {
     HttpSettings settings;
     settings.http = config.http;
     const FeatureAccess& access = config.manifest.access;
     if (access.Has(PERMISSION_HTTP) || access.Has(PERMISSION_DOWNLOAD)) {
         settings.hosts = access.http_hosts;
+    }
+    settings.local = access.Has(PERMISSION_HTTP_LOCAL);
+    if (access.Has(PERMISSION_HTTP_USER_HOST)) {
+        settings.user_server = [runner] { return runner->UserServer(); };
     }
     settings.min_interval_ms = config.manifest.min_interval_ms;
     settings.cache_dir = config.data_dir / "cache" / "http";
@@ -78,7 +83,12 @@ std::uint64_t NextAskId() {
 }
 
 Runner::Runner(RunnerConfig config)
-    : config_(std::move(config)), http_(HttpSettingsOf(config_, &cancel_)) {
+    : config_(std::move(config)), http_(HttpSettingsOf(config_, &cancel_, this)) {
+    if (const auto text = ReadTextFile(config_.data_dir / "server.json")) {
+        if (const auto stored = ParseJson(*text)) {
+            user_server_ = stored->String("server");
+        }
+    }
     busy_ = true; // until the script has loaded
     thread_ = std::thread([this] { ThreadMain(); });
 }
@@ -137,6 +147,9 @@ void Runner::ThreadMain() {
             }
         }
     }
+    for (auto& [id, co] : coroutines_) {
+        Answer(co, 0, "the plugin was stopped");
+    }
     coroutines_.clear();
     waiting_asks_.clear();
     streams_.clear();
@@ -170,6 +183,11 @@ void Runner::Boot() {
     RegisterUi(L, *this);
     RegisterLibrary(L, *this);
     RegisterWeb(L, *this);
+    RegisterRequest(L, *this);
+    RegisterSecrets(L, *this);
+    if (config_.manifest.access.Has(PERMISSION_SYNC)) {
+        RegisterSync(L, *this);
+    }
     lua_getfield(L, -1, "log");
     lua_setglobal(L, "print");
     lua_setglobal(L, "den");
@@ -222,8 +240,23 @@ void Runner::Call(std::vector<std::string> path, std::vector<JsonValue> args) {
     Post([this, path = std::move(path), args = std::move(args)] { StartCall(path, args); });
 }
 
-void Runner::StartCall(const std::vector<std::string>& path, const std::vector<JsonValue>& args) {
+void Runner::Invoke(std::vector<std::string> path, std::vector<JsonValue> args, InvokeDone done,
+                    InvokeProgress progress) {
+    ++invoking_;
+    Post([this, path = std::move(path), args = std::move(args), done = std::move(done),
+          progress = std::move(progress)]() mutable {
+        StartCall(path, args, std::move(done), std::move(progress));
+    });
+}
+
+void Runner::StartCall(const std::vector<std::string>& path, const std::vector<JsonValue>& args,
+                       InvokeDone done, InvokeProgress progress) {
     if (plugin_ref_ == 0 || Stopped()) {
+        if (done) {
+            const std::string error = Error();
+            done(Status::Fail(error.empty() ? "the plugin is not running" : error));
+            --invoking_;
+        }
         return;
     }
     lua_State* L = sandbox_->L();
@@ -245,6 +278,10 @@ void Runner::StartCall(const std::vector<std::string>& path, const std::vector<J
         if (!path.empty() && path.front() == "actions") {
             log::Warn("plugins", "{} has no {}", config_.manifest.id, name);
         }
+        if (done) {
+            done(Status::Fail("the plugin has no " + name));
+            --invoking_;
+        }
         return;
     }
     Coroutine call;
@@ -254,10 +291,10 @@ void Runner::StartCall(const std::vector<std::string>& path, const std::vector<J
     call.remaining = sandbox_->InstructionLimit();
     call.thread = lua_newthread(L);
     call.ref = luaL_ref(L, LUA_REGISTRYINDEX);
+    call.done = std::move(done);
     lua_xmove(L, call.thread, 1);
     const std::uint64_t id = call.id;
     lua_State* thread = call.thread;
-    coroutines_.emplace(id, std::move(call));
     for (const JsonValue& arg : args) {
         if (arg.kind == JsonValue::Kind::Null) {
             lua_pushnil(thread); // an argument that was not given
@@ -265,7 +302,16 @@ void Runner::StartCall(const std::vector<std::string>& path, const std::vector<J
             PushJson(thread, arg);
         }
     }
-    Resume(id, static_cast<int>(args.size()));
+    int count = static_cast<int>(args.size());
+    if (progress) {
+        call.progress_key = next_progress_++;
+        progress_fns_[call.progress_key] = std::move(progress);
+        lua_pushinteger(thread, call.progress_key);
+        lua_pushcclosure(thread, &Runner::ProgressThunk, 1);
+        ++count;
+    }
+    coroutines_.emplace(id, std::move(call));
+    Resume(id, count);
 }
 
 void Runner::CallProgress(int ref, float fraction) {
@@ -310,11 +356,14 @@ void Runner::Resume(std::uint64_t id, int arguments) {
     sandbox_->SetBudget(nullptr);
     if (status == LUA_OK) {
         Succeeded();
+        Answer(co, results, {});
         Drop(id);
         return;
     }
     if (status != LUA_YIELD) {
-        Failed(co.name, ErrorText(co.thread));
+        const std::string message = ErrorText(co.thread);
+        Failed(co.name, message);
+        Answer(co, 0, message);
         Drop(id);
         return;
     }
@@ -342,6 +391,7 @@ void Runner::Resume(std::uint64_t id, int arguments) {
         }).detach();
     } else if (!co.waits_for_ask) {
         Failed(co.name, "The script paused outside a den call.");
+        Answer(co, 0, "The script paused outside a den call.");
         Drop(id);
     }
 }
@@ -530,50 +580,6 @@ void Runner::AddLog(std::string line) {
 std::vector<std::string> Runner::Log() const {
     std::lock_guard lock(mutex_);
     return {log_.begin(), log_.end()};
-}
-
-Status Runner::Resolve(std::string_view script_path, bool package, fs::path& out) const {
-    fs::path root = config_.data_dir;
-    if (script_path == "package" || script_path.starts_with("package/")) {
-        if (!package) {
-            return Status::Fail("the package cannot be changed");
-        }
-        root = config_.package_dir;
-        script_path.remove_prefix(script_path.size() > 7 ? 8 : 7);
-    }
-    if (script_path == ".") {
-        script_path = {};
-    }
-    if (!script_path.empty() && !IsSafeRelativePath(script_path)) {
-        return Status::Fail("the path leaves the plugin's folder");
-    }
-    out = script_path.empty() ? root : root / PathFromUtf8(script_path);
-    // A link inside the folder must not lead out of it either.
-    std::error_code ec;
-    const fs::path real_root = fs::weakly_canonical(root, ec);
-    const fs::path real = fs::weakly_canonical(out, ec);
-    const fs::path relative = real.lexically_relative(real_root);
-    if (ec || relative.empty() || *relative.begin() == "..") {
-        return Status::Fail("the path leaves the plugin's folder");
-    }
-    return {};
-}
-
-std::uint64_t Runner::StorageLeft() const {
-    std::uint64_t used = 0;
-    std::error_code ec;
-    for (fs::recursive_directory_iterator it(config_.data_dir, ec), end; !ec && it != end;
-         it.increment(ec)) {
-        if (it->is_regular_file(ec)) {
-            used += it->file_size(ec);
-        }
-    }
-    const std::uint64_t limit = static_cast<std::uint64_t>(config_.manifest.storage_mb) << 20;
-    return used >= limit ? 0 : limit - used;
-}
-
-bool Runner::SaveStorage() {
-    return WriteFileAtomic(config_.data_dir / "storage.json", CompactJson(storage_));
 }
 
 } // namespace den::plugins::feature

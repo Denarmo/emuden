@@ -16,7 +16,24 @@ const char* const PERMISSIONS[] = {
     PERMISSION_HTTP,         PERMISSION_DOWNLOAD,        PERMISSION_OPEN_URL,
     PERMISSION_BROWSE,       PERMISSION_FILES_IMPORT,    PERMISSION_DOWNLOADS_WATCH,
     PERMISSION_LIBRARY_READ, PERMISSION_PATCH,           PERMISSION_LIBRARY_WRITE,
+    PERMISSION_SYNC,         PERMISSION_HTTP_USER_HOST,  PERMISSION_HTTP_LOCAL,
 };
+
+const char* CategoryName(std::string_view category) {
+    if (category == "saves") {
+        return "saves";
+    }
+    if (category == "states") {
+        return "save states";
+    }
+    if (category == "config") {
+        return "settings";
+    }
+    if (category == "games") {
+        return "games";
+    }
+    return "BIOS files";
+}
 
 bool Contains(const std::vector<std::string>& list, std::string_view item) {
     return std::find(list.begin(), list.end(), item) != list.end();
@@ -263,6 +280,29 @@ Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
         }
         manifest.file_types.push_back(type);
     }
+    const JsonValue* sync = feature->Find("sync");
+    if (access.Has(PERMISSION_SYNC)) {
+        const JsonValue* categories = sync ? sync->Find("categories") : nullptr;
+        if (categories == nullptr || categories->kind != JsonValue::Kind::Array ||
+            categories->items.empty()) {
+            return Status::Fail("sync needs feature.sync.categories");
+        }
+        for (const JsonValue& item : categories->items) {
+            const bool known =
+                item.kind == JsonValue::Kind::String &&
+                std::any_of(std::begin(SYNC_CATEGORIES), std::end(SYNC_CATEGORIES),
+                            [&](const char* name) { return item.string == name; });
+            if (!known) {
+                return Status::Fail("feature.sync.categories has an unknown category");
+            }
+            if (Contains(manifest.sync_categories, item.string)) {
+                return Status::Fail("feature.sync.categories names a category twice");
+            }
+            manifest.sync_categories.push_back(item.string);
+        }
+    } else if (sync != nullptr) {
+        return Status::Fail("feature.sync needs the sync permission");
+    }
     if (access.Has(PERMISSION_DOWNLOADS_WATCH) && manifest.file_types.empty()) {
         return Status::Fail("downloads.watch needs file_types");
     }
@@ -302,7 +342,8 @@ Status CheckTrust(const FeatureManifest& manifest, FeaturePlugin::Trust trust,
     return {};
 }
 
-std::vector<PermissionLine> PermissionLines(const FeatureAccess& access) {
+std::vector<PermissionLine> PermissionLines(const FeatureAccess& access,
+                                            const std::vector<std::string>& sync_categories) {
     std::vector<PermissionLine> lines;
     for (const char* permission : PERMISSIONS) {
         if (!access.Has(permission)) {
@@ -328,6 +369,17 @@ std::vector<PermissionLine> PermissionLines(const FeatureAccess& access) {
                        : "See which games of these consoles you have: " + Join(access.systems);
         } else if (name == PERMISSION_PATCH) {
             text = "Create patched copies of your games";
+        } else if (name == PERMISSION_SYNC) {
+            std::vector<std::string> names;
+            for (const std::string& category : sync_categories) {
+                names.push_back(CategoryName(category));
+            }
+            text = names.empty() ? "Keep your files in step between your devices"
+                                 : "Keep these in step between your devices: " + Join(names);
+        } else if (name == PERMISSION_HTTP_USER_HOST) {
+            text = "Connect to the server you enter";
+        } else if (name == PERMISSION_HTTP_LOCAL) {
+            text = "Connect to apps on this device";
         } else {
             text = "Change the hacks it installed";
         }

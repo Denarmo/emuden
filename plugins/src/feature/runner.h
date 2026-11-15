@@ -25,8 +25,13 @@
 #include "den/plugins/feature_manifest.h"
 #include "den/plugins/feature_services.h"
 #include "den/plugins/feature_ui.h"
+#include "den/plugins/sync_link.h"
 #include "feature/http.h"
 #include "feature/sandbox.h"
+
+namespace den::pal {
+class Secrets;
+}
 
 namespace den::plugins::feature {
 
@@ -43,7 +48,17 @@ struct RunnerConfig {
     std::shared_ptr<FeatureServices> services; // may be null
     std::function<std::int64_t()> now;
     long long instruction_limit = 200'000'000;
+    pal::Secrets* secrets = nullptr;      // den.secrets; null: pal::GetSecrets()
+    std::shared_ptr<SyncLink> sync;       // den.sync, for a plugin with the sync permission
+    /// A file the host lent for one provider call ("sync:<token>"), or nothing.
+    std::function<std::optional<std::filesystem::path>(const std::string& token)> lent;
 };
+
+/// What an invoked function returned: its values, or why there are none (it failed, or
+/// returned nil and a message).
+using InvokeDone = std::function<void(Result<std::vector<JsonValue>>)>;
+/// A progress function handed to an invoked function: (done, total).
+using InvokeProgress = std::function<void(double, double)>;
 
 /// Pushes the results of a finished wait on the coroutine's stack; returns how many.
 using Outcome = std::function<int(lua_State*)>;
@@ -76,6 +91,14 @@ public:
     // From any thread.
     /// Runs plugin.<path...>(args...) in a fresh coroutine; a missing function is skipped.
     void Call(std::vector<std::string> path, std::vector<JsonValue> args);
+    /// The same, and hands what it returned to `done` (on the worker thread). With `progress`
+    /// the function gets a progress function as its last argument.
+    void Invoke(std::vector<std::string> path, std::vector<JsonValue> args, InvokeDone done,
+                InvokeProgress progress = {});
+    /// Invoked functions that have not returned yet.
+    int Invoking() const {
+        return invoking_.load();
+    }
     std::vector<PageModel> Pages(std::uint64_t& revision) const;
     std::uint64_t Revision() const {
         return revision_.load();
@@ -137,6 +160,12 @@ public:
     /// The file a script path names: under the data folder, or under the package for
     /// "package/..." when `package` allows it. Fails for anything that leaves the folder.
     Status Resolve(std::string_view script_path, bool package, std::filesystem::path& out) const;
+    /// A file den.http.request and den.files.read take: a host file lent for this call
+    /// ("sync:<token>", `lent` true) or one of the plugin's folder.
+    Status ResolveFile(std::string_view script_path, std::filesystem::path& out, bool& lent) const;
+    /// The server the user confirmed for http.user_host, "scheme://host[:port]", or empty.
+    std::string UserServer() const;
+    bool SetUserServer(const std::string& origin);
     /// Bytes the data folder may still take within the plugin's storage limit.
     std::uint64_t StorageLeft() const;
     JsonValue& Storage() {
@@ -159,6 +188,8 @@ private:
         AsyncOp pending;
         bool waits_for_ask = false;
         bool from_user = false; // started by something the user pressed (plugin.actions.*)
+        InvokeDone done;        // Invoke: who waits for the results
+        int progress_key = 0;   // Invoke: its entry in progress_fns_
     };
 
     void ThreadMain();
@@ -168,7 +199,11 @@ private:
     void AnswerStream(std::uint64_t ask_id, bool accepted, const std::string& value);
     void Post(std::function<void()> task);
     void Boot();
-    void StartCall(const std::vector<std::string>& path, const std::vector<JsonValue>& args);
+    void StartCall(const std::vector<std::string>& path, const std::vector<JsonValue>& args,
+                   InvokeDone done = {}, InvokeProgress progress = {});
+    /// Hands an invoked coroutine's `results` values (or its failure) to its waiter.
+    void Answer(Coroutine& co, int results, const std::string& failure);
+    static int ProgressThunk(lua_State* L);
     void Resume(std::uint64_t id, int arguments);
     void ResumeWith(std::uint64_t id, const Outcome& outcome);
     void Drop(std::uint64_t id);
@@ -190,7 +225,10 @@ private:
     WebVisit web_;
     JsonValue storage_;
     std::map<std::string, std::filesystem::path> inbox_tokens_;
+    std::map<int, InvokeProgress> progress_fns_;
+    int next_progress_ = 1;
     int failures_ = 0;
+    std::atomic<int> invoking_{0};
 
     mutable std::mutex mutex_; // everything below
     std::condition_variable wake_;
@@ -206,6 +244,7 @@ private:
     std::string error_;
     bool stopped_ = false;
     std::deque<std::string> log_;
+    std::string user_server_;
     std::atomic<std::uint64_t> revision_{1};
 
     std::thread thread_;
@@ -226,6 +265,14 @@ void RegisterFiles(lua_State* L, Runner& runner);   // files
 void RegisterUi(lua_State* L, Runner& runner);      // ui, app
 void RegisterLibrary(lua_State* L, Runner& runner); // patch, library
 void RegisterWeb(lua_State* L, Runner& runner);     // web
+void RegisterRequest(lua_State* L, Runner& runner); // http.request (after RegisterNetwork)
+void RegisterSecrets(lua_State* L, Runner& runner); // secrets
+void RegisterSync(lua_State* L, Runner& runner);    // sync, for the sync permission
+
+/// The credential store's name of a plugin's secret.
+std::string SecretName(const std::string& plugin, const std::string& key);
+/// Removes every secret the plugin kept (it is removed with its data).
+void RemoveSecrets(const std::string& plugin, const std::filesystem::path& data_dir);
 
 /// Sets `name` in the table on top of the stack to the function, with the runner as upvalue.
 void SetFunction(lua_State* L, Runner& runner, const char* name, lua_CFunction function);

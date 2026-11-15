@@ -17,8 +17,12 @@ namespace fs = std::filesystem;
 
 constexpr int MAX_IN_FLIGHT = 2;
 
-// Headers a script may not set: the host writes them, or never sends them.
-bool Reserved(std::string_view name) {
+// Headers a script may not set: the host writes them, or never sends them. den.http.request
+// may send Authorization (tokens of the provider's own sign-in).
+bool Reserved(std::string_view name, bool authorization) {
+    if (authorization && EqualsNoCase(name, "authorization")) {
+        return false;
+    }
     for (const char* reserved : {"user-agent", "cookie", "referer", "host", "authorization",
                                  "proxy-authorization", "content-length"}) {
         if (EqualsNoCase(name, reserved)) {
@@ -26,6 +30,15 @@ bool Reserved(std::string_view name) {
         }
     }
     return false;
+}
+
+std::string OriginOf(const UrlParts& parts) {
+    std::string origin = parts.scheme + "://" + parts.host;
+    const int fallback = parts.scheme == "https" ? 443 : 80;
+    if (parts.port != 0 && parts.port != fallback) {
+        origin += ":" + std::to_string(parts.port);
+    }
+    return origin;
 }
 
 std::string CacheKey(const std::string& url) {
@@ -83,7 +96,7 @@ Status CheckUrl(std::string_view url, const std::vector<std::string>& hosts) {
 
 HttpPolicy::HttpPolicy(HttpSettings settings) : settings_(std::move(settings)) {}
 
-Status HttpPolicy::Enter(const std::string& host) {
+Status HttpPolicy::Enter(const std::string& host, int interval_ms) {
     std::unique_lock lock(mutex_);
     for (;;) {
         if (Cancelled()) {
@@ -103,16 +116,14 @@ Status HttpPolicy::Enter(const std::string& host) {
     }
     ++in_flight_;
     // The pause runs from the start of a request, and again from its end (Leave).
-    next_[host] = std::chrono::steady_clock::now() +
-                  std::chrono::milliseconds(settings_.min_interval_ms);
+    next_[host] = std::chrono::steady_clock::now() + std::chrono::milliseconds(interval_ms);
     return {};
 }
 
-void HttpPolicy::Leave(const std::string& host, int status) {
+void HttpPolicy::Leave(const std::string& host, int status, int interval_ms) {
     std::lock_guard lock(mutex_);
     --in_flight_;
-    next_[host] = std::chrono::steady_clock::now() +
-                  std::chrono::milliseconds(settings_.min_interval_ms);
+    next_[host] = std::chrono::steady_clock::now() + std::chrono::milliseconds(interval_ms);
     if (status == 429) {
         blocked_until_[host] = settings_.now() + BLOCKED_AFTER_429_SECONDS;
     }
@@ -120,14 +131,14 @@ void HttpPolicy::Leave(const std::string& host, int status) {
 }
 
 std::vector<std::pair<std::string, std::string>> HttpPolicy::Headers(
-    const std::vector<std::pair<std::string, std::string>>& extra) const {
+    const std::vector<std::pair<std::string, std::string>>& extra, bool authorization) const {
     std::vector<std::pair<std::string, std::string>> headers;
     headers.emplace_back("User-Agent", settings_.user_agent);
     for (const auto& [name, value] : extra) {
         const bool plain = !name.empty() &&
                            name.find_first_of("\r\n: ") == std::string::npos &&
                            value.find_first_of("\r\n") == std::string::npos;
-        if (plain && !Reserved(name)) {
+        if (plain && !Reserved(name, authorization)) {
             headers.emplace_back(name, value);
         }
     }
@@ -159,7 +170,7 @@ HttpAnswer HttpPolicy::Get(const std::string& url,
         }
     }
     const std::string host = ParseUrl(url).host;
-    if (const Status entered = Enter(host); !entered.ok) {
+    if (const Status entered = Enter(host, settings_.min_interval_ms); !entered.ok) {
         answer.error = entered.error;
         return answer;
     }
@@ -171,7 +182,7 @@ HttpAnswer HttpPolicy::Get(const std::string& url,
         return !Cancelled() && received <= MAX_HTTP_BODY;
     };
     const pal::HttpResponse response = settings_.http(request);
-    Leave(host, response.status);
+    Leave(host, response.status, settings_.min_interval_ms);
     if (response.status == 0 || (!response.error.empty() && response.body.empty())) {
         answer.error = response.error.empty() ? "no answer from " + host : response.error;
         return answer;
@@ -182,6 +193,7 @@ HttpAnswer HttpPolicy::Get(const std::string& url,
     }
     answer.status = response.status;
     answer.body = response.body;
+    answer.headers = response.headers;
     if (response.status == 200 && cache_seconds > 0 && !settings_.cache_dir.empty()) {
         std::error_code ec;
         fs::create_directories(settings_.cache_dir, ec);
@@ -203,7 +215,7 @@ Status HttpPolicy::Download(const std::string& url, const fs::path& destination,
         return allowed;
     }
     const std::string host = ParseUrl(url).host;
-    if (const Status entered = Enter(host); !entered.ok) {
+    if (const Status entered = Enter(host, settings_.min_interval_ms); !entered.ok) {
         return entered;
     }
     bool too_large = false;
@@ -224,7 +236,7 @@ Status HttpPolicy::Download(const std::string& url, const fs::path& destination,
         return !Cancelled();
     };
     const pal::HttpResponse response = settings_.http(request);
-    Leave(host, response.status);
+    Leave(host, response.status, settings_.min_interval_ms);
     std::error_code ec;
     const std::uintmax_t size = fs::file_size(destination, ec);
     if (too_large || (!ec && size > max_size)) {
@@ -242,6 +254,85 @@ Status HttpPolicy::Download(const std::string& url, const fs::path& destination,
                                                           : response.error));
     }
     return {};
+}
+
+Result<Route> HttpPolicy::AllowedRequest(std::string_view url) const {
+    const UrlParts parts = ParseUrl(url);
+    if (!parts.valid || (parts.scheme != "https" && parts.scheme != "http")) {
+        return Status::Fail("that is not a web address");
+    }
+    if (settings_.local && (parts.host == "127.0.0.1" || parts.host == "localhost")) {
+        if (parts.port == 0) {
+            return Status::Fail("an app on this device is reached with its port");
+        }
+        return Route::Local;
+    }
+    if (settings_.user_server) {
+        const std::string server = settings_.user_server();
+        if (!server.empty() && OriginOf(parts) == server) {
+            return Route::UserServer;
+        }
+    }
+    if (const Status declared = CheckUrl(url, settings_.hosts); !declared.ok) {
+        return declared;
+    }
+    return Route::Declared;
+}
+
+HttpAnswer HttpPolicy::Request(pal::HttpRequest request, std::uint64_t max_file,
+                               const std::function<void(float)>& progress) {
+    HttpAnswer answer;
+    const Result<Route> route = AllowedRequest(request.url);
+    if (!route) {
+        answer.error = route.error();
+        return answer;
+    }
+    // The pause between requests is for public sites; the user's own server and apps on
+    // this device get none, and their redirects are handed to the script as they are.
+    const bool own = route.value() != Route::Declared;
+    const int interval = own ? 0 : settings_.min_interval_ms;
+    request.follow_redirects = !own;
+    request.loopback_any_certificate = route.value() == Route::Local;
+    request.headers = Headers(request.headers, true);
+    request.max_body = MAX_HTTP_BODY;
+    const std::string host = ParseUrl(request.url).host;
+    if (const Status entered = Enter(host, interval); !entered.ok) {
+        answer.error = entered.error;
+        return answer;
+    }
+    bool too_large = false;
+    request.progress = [&](std::uint64_t received, std::uint64_t total) {
+        const std::uint64_t limit = request.to_file.empty() ? MAX_HTTP_BODY : max_file;
+        if (received > limit || total > limit) {
+            too_large = true;
+            return false;
+        }
+        if (progress) {
+            progress(total > 0 ? static_cast<float>(received) / static_cast<float>(total) : -1.0f);
+        }
+        return !Cancelled();
+    };
+    const pal::HttpResponse response = settings_.http(request);
+    Leave(host, response.status, interval);
+    if (too_large) {
+        std::error_code ec;
+        fs::remove(request.to_file, ec);
+        answer.error = request.to_file.empty() ? "the answer is larger than 8 MiB"
+                                               : "the file is larger than allowed";
+        return answer;
+    }
+    if (response.status == 0) {
+        answer.error = response.error.empty() ? "no answer from " + host : response.error;
+        return answer;
+    }
+    if (!response.error.empty() && response.body.empty() && request.to_file.empty()) {
+        answer.error = response.error;
+        return answer;
+    }
+    answer.status = response.status;
+    answer.body = response.body;
+    answer.headers = response.headers;
+    return answer;
 }
 
 } // namespace den::plugins::feature

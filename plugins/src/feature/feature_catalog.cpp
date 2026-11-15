@@ -245,7 +245,8 @@ std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
         plugin.source_name = TrustName(package, views, origin);
         plugin.trust = package.trust;
         plugin.installed = true;
-        plugin.permissions = PermissionLines(manifest.access);
+        plugin.permissions = PermissionLines(manifest.access, manifest.sync_categories);
+        plugin.sync_categories = manifest.sync_categories;
         plugin.data_bytes = package.data_bytes;
         std::error_code ec;
         if (!manifest.icon.empty() && fs::is_regular_file(package.dir / PathFromUtf8(manifest.icon), ec)) {
@@ -255,7 +256,7 @@ std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
         FeatureAccess beyond = AccessBeyond(manifest.access, package.granted);
         if (package.trust != FeaturePlugin::Trust::Official && !Empty(beyond)) {
             plugin.needs_consent = true;
-            plugin.new_permissions = PermissionLines(beyond);
+            plugin.new_permissions = PermissionLines(beyond, manifest.sync_categories);
         }
         // Only the plugin's own source updates it.
         const IndexPlugin* offered =
