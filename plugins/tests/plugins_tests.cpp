@@ -133,10 +133,10 @@ TEST_CASE("every bundled manifest is read") {
             CHECK(console.scan.header_title[0].offset == 308);
             CHECK(console.buttons.size() == 4);
             const auto cores = manifest->CoresFor(manifest->systems.front(), "windows-x86_64");
-            REQUIRE(cores.size() == 3);
+            REQUIRE(cores.size() == 4);
             CHECK(cores[0]->id == "mgba");
             CHECK(cores[0]->DownloadFor("windows-x86_64")->entry == "mgba_libretro.dll");
-            CHECK(manifest->CoresFor(manifest->systems.front(), "android-arm64").size() == 3);
+            CHECK(manifest->CoresFor(manifest->systems.front(), "android-arm64").size() == 4);
         } else if (manifest->id == "emuden.psx") {
             saw_psx = true;
             CHECK(console.scan.index_extensions == std::vector<std::string>{"m3u", "cue"});
