@@ -118,6 +118,7 @@ TEST_CASE("an installation lists its games, shortcuts, tools and their settings"
     const AppConfig hades = install.ConfigFromFiles("1145350");
     CHECK(hades.launch_options == "gamemoderun %command%");
     CHECK(hades.compat_tool == "proton_11");
+    CHECK(hades.compat_tool_chosen);
     CHECK(install.ConfigFromFiles("4105511571").launch_options == "EMUDEN_AUTOMATION=5577 %command%");
 }
 
@@ -151,13 +152,14 @@ TEST_CASE("the client sends fixed scripts with the values quoted") {
     Client client([&](const std::string& script) -> den::Result<std::string> {
         scripts.push_back(script);
         if (script.find("RegisterForAppDetails") != std::string::npos) {
-            return std::string(R"({"launch":"-dx11","tool":"proton_11","display":"Proton 11.0-2"})");
+            return std::string(R"({"launch":"-dx11","tool":"proton_11","display":"Proton 11.0-2","priority":85})");
         }
         return std::string("ok");
     });
     const auto config = client.Config("1145350");
     REQUIRE(config);
     CHECK(config.value().compat_tool_display == "Proton 11.0-2");
+    CHECK_FALSE(config.value().compat_tool_chosen); // Steam's own choice for the game
     CHECK(client.Set("1145350", std::string("DXVK_HUD=fps %command%"), std::string("proton_9")).ok);
     CHECK(scripts.back().find("SetAppLaunchOptions(1145350, \"DXVK_HUD=fps %command%\")") != std::string::npos);
     CHECK(scripts.back().find("SpecifyCompatTool(1145350, \"proton_9\")") != std::string::npos);

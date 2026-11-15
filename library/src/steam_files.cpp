@@ -484,6 +484,7 @@ AppConfig Install::ConfigFromFiles(const std::string& appid) const {
         const Vdf* mapping = Walk(*vdf, {"InstallConfigStore", "Software", "Valve", "Steam", "CompatToolMapping"});
         if (const Vdf* app = mapping ? mapping->Find(appid) : nullptr) {
             config.compat_tool = app->Value("name");
+            config.compat_tool_chosen = !config.compat_tool.empty();
         }
     }
     return config;

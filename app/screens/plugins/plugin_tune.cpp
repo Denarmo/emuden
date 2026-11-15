@@ -260,7 +260,8 @@ public:
                 config = live.value();
             }
         }
-        return plugins::SteamConfig{config.launch_options, config.compat_tool, config.compat_tool_display};
+        return plugins::SteamConfig{config.launch_options, config.compat_tool, config.compat_tool_display,
+                                    config.compat_tool_chosen};
     }
 
     Status SetSteamApp(const std::string& appid, const std::optional<std::string>& launch_options,

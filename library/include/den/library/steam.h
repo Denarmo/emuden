@@ -48,6 +48,7 @@ struct AppConfig {
     std::string launch_options;
     std::string compat_tool;         // internal name ("proton_9", "GE-Proton9-20"); empty = default
     std::string compat_tool_display; // when the client told it
+    bool compat_tool_chosen = false; // the user picked it; otherwise Steam's own choice
 };
 
 struct Tool {

@@ -166,7 +166,7 @@ Paths are relative to the plugin's data folder; `..` and absolute paths are erro
 | `den.game.settings(id)` (wait) | `{id, name, system, core, core_name, known, options = { {key, label, value, values, own} }}` |
 | `den.game.set(id, {key = value or den.json.null})` (wait) | the game's own values before (`den.json.null` for none), after the app asked the user |
 | `den.steam.status()` (wait) | `{installed, can_change, note, apps = { {appid, name, shortcut} }, tools = { {name, display} }}` |
-| `den.steam.config(appid)` (wait) | `{launch_options, compat_tool, compat_tool_display}` |
+| `den.steam.config(appid)` (wait) | `{launch_options, compat_tool, compat_tool_display, compat_tool_chosen}`; `compat_tool_chosen` is false when Steam picked the tool itself, and `compat_tool = ""` in `set` gives the choice back to Steam |
 | `den.steam.set{appid, name?, launch_options?, compat_tool?}` (wait) | true, after the app asked the user |
 
 `cover` is a path in the plugin's folder, an https URL of an allowed host, or nil (the base

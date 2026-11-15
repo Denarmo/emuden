@@ -38,6 +38,7 @@ struct SteamApp {
 
 struct SteamConfig {
     std::string launch_options, compat_tool, compat_tool_display;
+    bool compat_tool_chosen = false; // the user picked it; otherwise Steam chose it ("" undoes to that)
 };
 
 struct SteamTool {

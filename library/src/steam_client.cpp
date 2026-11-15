@@ -235,7 +235,7 @@ Result<AppConfig> Client::Config(const std::string& appid) {
         "new Promise((ok, no) => { const t = setTimeout(() => no('no answer'), 4000);"
         " const h = SteamClient.Apps.RegisterForAppDetails(" + appid + ", d => { clearTimeout(t); h.unregister();"
         " ok(JSON.stringify({launch: d.strLaunchOptions || '', tool: d.strCompatToolName || '',"
-        " display: d.strCompatToolDisplayName || ''})); }); })";
+        " display: d.strCompatToolDisplayName || '', priority: d.nCompatToolPriority || 0})); }); })";
     const Result<std::string> text = evaluate_(script);
     if (!text) {
         return text.status();
@@ -244,7 +244,10 @@ Result<AppConfig> Client::Config(const std::string& appid) {
     if (!parsed) {
         return Status::Fail("Steam gave no details for the app");
     }
-    return AppConfig{parsed->String("launch"), parsed->String("tool"), parsed->String("display")};
+    // Steam ranks a tool the user picked at 250; lower ones are its own choice for the game.
+    const JsonValue* priority = parsed->Find("priority");
+    return AppConfig{parsed->String("launch"), parsed->String("tool"), parsed->String("display"),
+                     priority != nullptr && priority->number >= 250};
 }
 
 Status Client::Set(const std::string& appid, const std::optional<std::string>& launch_options,

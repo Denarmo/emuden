@@ -214,7 +214,8 @@ int SteamAppConfig(lua_State* L) {
             }
             PushJson(T, JsonObject({{"launch_options", JsonString(config.value().launch_options)},
                                     {"compat_tool", JsonString(config.value().compat_tool)},
-                                    {"compat_tool_display", JsonString(config.value().compat_tool_display)}}));
+                                    {"compat_tool_display", JsonString(config.value().compat_tool_display)},
+                                    {"compat_tool_chosen", JsonBool(config.value().compat_tool_chosen)}}));
             return 1;
         };
     });
