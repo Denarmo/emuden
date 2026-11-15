@@ -19,3 +19,7 @@ wraps it into `EmuDEN-x86_64.AppImage`.
   the AppImage to `~/Games/EmuDEN/`, adds a desktop entry with the icon to the menu and the
   desktop, and with `--portable` creates the `user` folder there; `--steam` also adds it to
   Steam as a non-Steam game. Under gamescope the app starts full screen with the handheld layout.
+- `AppRun` sets `GLIBC_TUNABLES=glibc.rtld.execstack=2`: glibc 2.41 and later (SteamOS)
+  refuse to load a core that asks for an executable stack (melonDS) without it.
+- In Game Mode only what Steam starts is shown, and links open in Steam's own browser.
+  Results on the Legion Go S: `docs/steamos.md`.

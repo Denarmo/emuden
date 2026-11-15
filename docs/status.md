@@ -6,6 +6,8 @@ hacks. The fourth round took the owner's six notes (table below). Everything was
 through automation, adb and screenshots: nobody held a device, dragged a real finger or
 listened.
 
+SteamOS (Legion Go S) feature by feature, with the Linux fixes it needed: `docs/steamos.md`.
+
 ## Engine apps through the Emulator Control Protocol (branch feat/ecp)
 
 A console's core can be an engine app (`"type": "engine-app"` in a plugin manifest) that
@@ -638,9 +640,7 @@ per pad family, system files of a core, and Back trapped on Android.
   clean stop on Linux, and the engine copy on the Desktop.
 - The text entry, Controllers page and glyph sheet with a real pad or touch.
 - The Desktop copy of this build: mirrored, not started.
-- Linux on real hardware (GPU drivers, gamescope, the handheld), `install-steamos.sh` on
-  real SteamOS and its `--steam` option, the PNG icon (`rsvg-convert` is not in WSL), any
-  start of the final AppImage, and pads and sound on Linux.
+- Linux on the handheld: since run in Game Mode, see `docs/steamos.md`.
 - Fifth round: a touch-only device (no hint bar there: unit-tested only); Screen size
   "Pixel perfect" in a room smaller than the frame; the controller test page; the Settings >
   Covers rows, "Choose an image file" and "Choose automatically"; RetroAchievements and
