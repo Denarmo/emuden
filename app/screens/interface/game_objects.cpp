@@ -10,6 +10,7 @@
 #include <map>
 
 #include "den/gfx/mesh_shapes.h"
+#include "object_build.h"
 
 namespace den::app {
 
@@ -51,17 +52,11 @@ constexpr StyleDefaults STYLES[] = {
     {"pocket_wide", 1.64f, 0.18f, {0.11f, 0.29f, 0.78f, 0.64f}, 0, "none"},
 };
 
-constexpr SlabParts All(Part part) {
+} // namespace
+
+SlabParts All(Part part) {
     return SlabParts{part, part, part, part, part};
 }
-
-struct Built {
-    std::vector<gfx::MeshVertex> solid, clear;
-    // The shell's surfaces: see-through ones go to the transparent pass.
-    std::vector<gfx::MeshVertex>& Shell(const GameObject& o) {
-        return o.smoke ? clear : solid;
-    }
-};
 
 Part ShellPart(const GameObject& o) {
     return o.smoke ? Part::Smoke : Part::Shell;
@@ -90,6 +85,35 @@ void AddSticker(std::vector<gfx::MeshVertex>& out, const GameObject& o, float z)
     gfx::AddSlab(out, RoundedOutline(o.label.w * a, o.label.h, 0.01f, 0.01f), 0.004f, 0.0012f, All(edge), z + 0.002f,
                  sc.x, sc.y, 2);
     gfx::AddSlab(out, RoundedOutline(c.w * a, c.h, 0, 0), 0.0015f, 0, All(Part::Label), z + 0.0045f, cc.x, cc.y, 0);
+}
+
+void PaintFrom(std::vector<gfx::MeshVertex>& out, std::size_t from, gfx::Color color) {
+    for (std::size_t i = from; i < out.size(); ++i) {
+        out[i].u = static_cast<float>(color.r * 256 + color.g);
+        out[i].v = static_cast<float>(color.b);
+        out[i].part = static_cast<float>(Part::Paint);
+    }
+}
+
+void AddHackSticker(std::vector<gfx::MeshVertex>& out, const GameObject& o, float z) {
+    // Over the label's top right corner, tilted a little, as if put on by hand.
+    const float w = std::clamp(o.aspect * 0.32f, 0.16f, 0.3f), h = w * 104.0f / 256.0f;
+    const gfx::Rect& l = o.label;
+    const float x = (l.x + l.w - 0.5f) * o.aspect - w * 0.38f, y = 0.5f - l.y - h * 0.3f;
+    SlabParts parts = All(Part::Steel);
+    parts.front = Part::Sticker;
+    const std::size_t from = out.size();
+    gfx::AddSlab(out, RoundedOutline(w, h, 0, 0), 0.003f, 0, parts, 0, 0, 0, 0);
+    const float c = std::cos(-0.12f), s = std::sin(-0.12f);
+    for (std::size_t i = from; i < out.size(); ++i) {
+        gfx::MeshVertex& v = out[i];
+        const float vx = v.x, vy = v.y, nx = v.nx, ny = v.ny;
+        v.x = vx * c - vy * s + x;
+        v.y = vx * s + vy * c + y;
+        v.z += z + 0.009f;
+        v.nx = nx * c - ny * s;
+        v.ny = nx * s + ny * c;
+    }
 }
 
 // The board inside a see-through shell: chips, a battery and the traces.
@@ -124,6 +148,8 @@ void AddBack(std::vector<gfx::MeshVertex>& out, const GameObject& o, bool screw)
                     -d * 0.5f - 0.004f);
     }
 }
+
+namespace {
 
 void BuildCartridge(Built& b, const GameObject& o) {
     const float a = o.aspect, d = o.depth, front = d * 0.5f;
@@ -231,8 +257,10 @@ void BuildPhoto(Built& b, const GameObject& o) {
     SlabParts parts = All(Part::Shell);
     parts.front = Part::Photo;
     parts.back = Part::Back;
+    const std::optional<std::vector<gfx::Vec2>> mould = MouldOutline(o);
     const std::vector<gfx::Vec2> outline =
-        o.style == "pocket"        ? gfx::ShoulderedOutline(a, 1, a * 0.105f, 0.035f, 0.01f, 0.022f, 0.02f)
+        mould                      ? *mould
+        : o.style == "pocket"      ? gfx::ShoulderedOutline(a, 1, a * 0.105f, 0.035f, 0.01f, 0.022f, 0.02f)
         : o.style == "pocket_wide" ? gfx::ShoulderedOutline(a, 1, 0.07f, 0.21f, 0.03f, 0.06f, 0.04f)
                                    : RoundedOutline(a, 1, o.radius, std::max(0.02f, o.radius), o.notch);
     gfx::AddSlab(b.solid, outline, d, std::min(0.012f, d * 0.2f), parts);
@@ -275,8 +303,15 @@ void BuildJewel(std::vector<gfx::MeshVertex>& out, const GameObject& o) {
     gfx::AddSlab(out, RoundedOutline(hinge, 1, 0.01f, 0.01f), d, 0.008f, spine, 0, -a * 0.5f + hinge * 0.5f, 0);
 }
 
-void BuildDisc(std::vector<gfx::MeshVertex>& out, float depth) {
+void BuildDisc(std::vector<gfx::MeshVertex>& out, float depth, bool hack = false) {
     gfx::AddRing(out, 0.075f, 0.5f, depth, Part::DiscPrint, Part::DiscData);
+    if (hack) {
+        // On the print near the rim, turning with the disc.
+        GameObject spot;
+        spot.aspect = 1;
+        spot.label = {0.3f, 0.06f, 0.4f, 0.4f};
+        AddHackSticker(out, spot, depth * 0.5f - 0.007f);
+    }
 }
 
 std::unique_ptr<gfx::Mesh3D> Upload(const std::vector<gfx::MeshVertex>& vertices) {
@@ -295,9 +330,9 @@ struct Meshes {
 const Meshes& MeshesFor(const GameObject& o) {
     static std::map<std::string, Meshes> cache;
     const std::string key =
-        std::format("{} {} {} {} {} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {}", o.shape, o.style,
+        std::format("{} {} {} {} {} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {} {}", o.shape, o.style,
                     o.label_edge, o.smoke, o.photo, o.aspect, o.depth, o.label.x, o.label.y, o.label.w, o.label.h, o.radius,
-                    o.notch, o.grip);
+                    o.notch, o.grip, o.hack);
     Meshes& meshes = cache[key];
     if (!meshes.solid) {
         Built b;
@@ -307,6 +342,7 @@ const Meshes& MeshesFor(const GameObject& o) {
             BuildCarton(b.solid, o);
         } else if (o.shape == "disc") {
             BuildDisc(b.solid, o.depth);
+        } else if (BuildMould(b, o)) {
         } else if (o.shape == "cartridge" && o.style != "plain") {
             BuildPocket(b, o);
         } else if (o.shape == "cartridge") {
@@ -319,6 +355,9 @@ const Meshes& MeshesFor(const GameObject& o) {
                          All(Part::Clear), o.depth * 0.5f - o.depth * 0.13f);
         } else {
             BuildCase(b.solid, o);
+        }
+        if (o.hack && (o.shape == "cartridge" || o.shape == "card")) {
+            AddHackSticker(b.solid, o, o.depth * 0.5f);
         }
         meshes.solid = Upload(b.solid);
         meshes.clear = Upload(b.clear);
@@ -341,6 +380,7 @@ GameObject Resolve(const ObjectLook& look) {
     o.grip = shape->grip;
     o.style = "plain";
     o.label_edge = "none";
+    const std::optional<gfx::Color> mould_shell = ApplyMould(o, look.style);
     for (const StyleDefaults& s : STYLES) {
         if (o.shape == "cartridge" && look.style == s.style) {
             o.style = s.style;
@@ -353,7 +393,7 @@ GameObject Resolve(const ObjectLook& look) {
     }
     o.aspect = look.aspect > 0 ? look.aspect : o.aspect;
     o.depth = look.depth > 0 ? look.depth : o.depth;
-    o.shell = look.has_shell ? look.shell : shape->shell;
+    o.shell = look.has_shell ? look.shell : mould_shell.value_or(shape->shell);
     o.smoke = o.shell.a < 250 && (o.shape == "cartridge" || o.shape == "card");
     o.shell.a = o.smoke ? std::max<std::uint8_t>(o.shell.a, 60) : 255;
     o.label = look.label.w > 0 ? look.label : o.label;
@@ -362,6 +402,7 @@ GameObject Resolve(const ObjectLook& look) {
     o.notch = look.notch >= 0 ? look.notch : shape->notch;
     o.grip = look.grip >= 0 ? look.grip : o.grip;
     o.disc = look.disc && (o.shape == "case" || o.shape == "jewel");
+    o.umd = o.disc && look.umd;
     const bool cart = o.shape == "cartridge" || o.shape == "card";
     o.box = look.box && cart;
     o.box_aspect = look.box_aspect;
@@ -417,13 +458,37 @@ const gfx::Mesh3D* GameObject::DiscMesh() const {
     if (!disc) {
         return nullptr;
     }
-    static std::unique_ptr<gfx::Mesh3D> mesh;
+    static std::unique_ptr<gfx::Mesh3D> meshes[2];
+    std::unique_ptr<gfx::Mesh3D>& mesh = meshes[hack ? 1 : 0];
     if (!mesh) {
         std::vector<gfx::MeshVertex> vertices;
-        BuildDisc(vertices, 0.012f);
+        BuildDisc(vertices, 0.012f, hack);
         mesh = Upload(vertices);
     }
     return mesh.get();
+}
+
+namespace {
+
+const Meshes& Umd() {
+    static Meshes meshes;
+    if (!meshes.solid) {
+        std::vector<gfx::MeshVertex> solid, clear;
+        BuildUmdShell(solid, clear);
+        meshes.solid = Upload(solid);
+        meshes.clear = Upload(clear);
+    }
+    return meshes;
+}
+
+} // namespace
+
+const gfx::Mesh3D* GameObject::UmdMesh() const {
+    return umd ? Umd().solid.get() : nullptr;
+}
+
+const gfx::Mesh3D* GameObject::UmdClearMesh() const {
+    return umd ? Umd().clear.get() : nullptr;
 }
 
 } // namespace den::app

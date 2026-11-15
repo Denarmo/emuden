@@ -15,29 +15,34 @@ namespace den::app {
 
 namespace {
 
-// The usual media of the consoles, for the standard Home: shape, mould, width over height.
+// The usual media of the consoles, for the standard Home: shape and mould (game_moulds.cpp).
 struct Usual {
     std::string_view system, shape, style;
     float aspect;
-    bool disc;
+    bool disc, umd;
 };
 constexpr Usual USUAL[] = {
-    {"gb", "cartridge", "pocket", 0, false},       {"gbc", "cartridge", "pocket", 0, false},
-    {"gba", "cartridge", "pocket_wide", 0, false}, {"nds", "card", "", 1.05f, false},
-    {"3ds", "card", "", 1.05f, false},             {"nes", "cartridge", "", 0.89f, false},
-    {"snes", "cartridge", "", 1.35f, false},       {"n64", "cartridge", "", 1.5f, false},
-    {"switch", "card", "", 0.68f, false},          {"switch2", "card", "", 0.68f, false},
-    {"genesis", "cartridge", "", 0.84f, false},    {"sms", "cartridge", "", 0.74f, false},
-    {"gg", "cartridge", "", 1.25f, false},         {"32x", "cartridge", "", 0.84f, false},
-    {"sg1000", "cartridge", "", 0.74f, false},     {"pce", "card", "", 0.64f, false},
-    {"lynx", "card", "", 1.4f, false},             {"ngp", "cartridge", "", 0.95f, false},
-    {"ngpc", "cartridge", "", 0.95f, false},       {"wonderswan", "cartridge", "", 1.35f, false},
-    {"wsc", "cartridge", "", 1.35f, false},        {"virtualboy", "cartridge", "", 0.86f, false},
-    {"gamecube", "case", "", 0.72f, true},         {"wii", "case", "", 0.7f, true},
-    {"wiiu", "case", "", 0.7f, true},              {"psx", "jewel", "", 0, true},
-    {"ps2", "case", "", 0.7f, true},               {"psp", "case", "", 0.58f, true},
-    {"saturn", "jewel", "", 0, true},              {"dreamcast", "jewel", "", 0, true},
-    {"segacd", "jewel", "", 0, true},              {"3do", "jewel", "", 0, true},
+    {"gb", "cartridge", "pocket", 0, false, false},       {"gbc", "cartridge", "pocket", 0, false, false},
+    {"gba", "cartridge", "pocket_wide", 0, false, false}, {"nds", "card", "", 1.05f, false, false},
+    {"3ds", "card", "", 1.05f, false, false},             {"nes", "cartridge", "nes", 0, false, false},
+    {"snes", "cartridge", "snes", 0, false, false},       {"n64", "cartridge", "n64", 0, false, false},
+    {"switch", "card", "", 0.68f, false, false},          {"switch2", "card", "", 0.68f, false, false},
+    {"genesis", "cartridge", "megadrive", 0, false, false}, {"sms", "cartridge", "mastersystem", 0, false, false},
+    {"gg", "cartridge", "gamegear", 0, false, false},     {"32x", "cartridge", "32x", 0, false, false},
+    {"sg1000", "card", "mycard", 0, false, false},        {"pce", "card", "hucard", 0, false, false},
+    {"lynx", "card", "lynx", 0, false, false},            {"ngp", "cartridge", "neogeopocket", 0, false, false},
+    {"ngpc", "cartridge", "neogeopocket", 0, false, false}, {"wonderswan", "cartridge", "wonderswan", 0, false, false},
+    {"wsc", "cartridge", "wonderswan", 0, false, false},  {"virtualboy", "cartridge", "virtualboy", 0, false, false},
+    {"pokemini", "cartridge", "pokemini", 0, false, false}, {"atari2600", "cartridge", "atari", 0, false, false},
+    {"atari7800", "cartridge", "atari", 0, false, false}, {"atari5200", "cartridge", "atari5200", 0, false, false},
+    {"jaguar", "cartridge", "jaguar", 0, false, false},   {"vectrex", "cartridge", "vectrex", 0, false, false},
+    {"colecovision", "cartridge", "colecovision", 0, false, false},
+    {"intellivision", "cartridge", "intellivision", 0, false, false},
+    {"gamecube", "case", "", 0.72f, true, false},         {"wii", "case", "", 0.7f, true, false},
+    {"wiiu", "case", "", 0.7f, true, false},              {"psx", "jewel", "", 0, true, false},
+    {"ps2", "case", "", 0.7f, true, false},               {"psp", "case", "", 0.58f, true, true},
+    {"saturn", "jewel", "", 0, true, false},              {"dreamcast", "jewel", "", 0, true, false},
+    {"segacd", "jewel", "", 0, true, false},              {"3do", "jewel", "", 0, true, false},
 };
 
 } // namespace
@@ -55,6 +60,7 @@ GameObject MediaFor(const library::Entry& game) {
                 look.style = std::string(usual.style);
                 look.aspect = usual.aspect;
                 look.disc = usual.disc;
+                look.umd = usual.umd;
             }
         }
     }
@@ -93,12 +99,18 @@ void DrawMedia(ui::Context& ctx, const library::Entry& game, const GameObject& m
     }
     renderer->Begin(canvas, clip);
     if (disc != nullptr) {
-        if (look.cover) {
-            look.label_uv = gfx::CoverUv(look.cover.width, look.cover.height, gfx::Rect{0, 0, 100, 100});
+        // A UMD's shell stays still; only its disc turns.
+        const gfx::Material d = DiscMaterial(ctx, game, media, faces);
+        const float size = media.umd ? h / 1.12f : h;
+        const gfx::Mat4 at = gfx::Renderer3D::Model(pose.x, pose.bottom - h * 0.5f, 0, pose.yaw) *
+                             gfx::Mat4::Scale(size, size, size);
+        if (const gfx::Mesh3D* shell = media.UmdMesh()) {
+            renderer->Draw(*shell, at, d);
         }
-        const gfx::Mat4 model = gfx::Renderer3D::Model(pose.x, pose.bottom - h * 0.5f, 0, pose.yaw) *
-                                gfx::Mat4::RotateZ(pose.spin) * gfx::Mat4::Scale(h, h, 1);
-        renderer->Draw(*disc, model, look);
+        renderer->Draw(*disc, at * gfx::Mat4::RotateZ(pose.spin), d);
+        if (const gfx::Mesh3D* window = media.UmdClearMesh()) {
+            renderer->DrawClear(*window, at, d);
+        }
     } else {
         const float spin = media.shape == "disc" ? pose.spin : 0;
         const gfx::Mat4 model = gfx::Renderer3D::Model(pose.x, pose.bottom, 0, pose.yaw) *

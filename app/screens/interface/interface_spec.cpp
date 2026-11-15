@@ -9,6 +9,7 @@
 #include "den/base/files.h"
 #include "den/base/json.h"
 #include "den/plugins/manifest.h"
+#include "object_build.h"
 
 namespace den::app {
 
@@ -105,9 +106,14 @@ void ReadObject(const JsonValue* object, ObjectLook& out) {
         return;
     }
     ReadChoice(object, "shape", {"cartridge", "card", "case", "jewel", "disc"}, out.shape);
-    ReadChoice(object, "style", {"plain", "pocket", "pocket_wide"}, out.style);
+    if (const std::string style = object->String("style");
+        style == "plain" || style == "pocket" || style == "pocket_wide" ||
+        std::find(MouldNames().begin(), MouldNames().end(), style) != MouldNames().end()) {
+        out.style = style;
+    }
     ReadChoice(object, "label_edge", {"none", "paper", "foil"}, out.label_edge);
     ReadBool(object, "box", out.box);
+    ReadBool(object, "umd", out.umd);
     ReadNumber(object, "box_aspect", 0.4f, 2.0f, out.box_aspect);
     ReadNumber(object, "aspect", 0.3f, 2.5f, out.aspect);
     ReadNumber(object, "depth", 0.01f, 0.6f, out.depth);

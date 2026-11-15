@@ -53,6 +53,7 @@ enum class Part : int {
     Led = 16,      // a power light: dark, red once the console is on
     Print = 17,    // the cover printed on cardboard: fine grain, a satin sheen, or foil
     Paint = 18,    // plastic in the vertex's own colour: u = red * 256 + green, v = blue (0..255)
+    Sticker = 19,  // a small foil sticker: Material::sticker_art over a holographic sheen
 };
 
 struct MeshVertex {
@@ -87,6 +88,7 @@ struct Material {
     Rect spine_uv{0, 0, 0.08f, 1};
     // Pictures of the other faces, each optional: what Back, Spine, Photo and DiscPrint show.
     Texture back_art, spine_art, cart_art, disc_art;
+    Texture sticker_art; // what Sticker shows (a ROM hack's "HACK")
     Rect cart_uv{0, 0, 1, 1}; // the part of cart_art the cartridge fills
     // A sticker over the photographed cartridge's own label (a ROM hack on the cartridge of the
     // game it was made from): the cover through label_uv, over this part of the front, 0..1.
@@ -123,7 +125,7 @@ private:
     int fbo_w_ = 0, fbo_h_ = 0, draw_w_ = 0, draw_h_ = 0;
     int u_view_proj_ = -1, u_model_ = -1, u_rot_ = -1, u_shell_ = -1, u_label_ = -1, u_spine_ = -1,
         u_light_ = -1, u_has_tex_ = -1, u_tex_ = -1, u_clear_ = -1, u_arts_ = -1, u_cart_uv_ = -1, u_sticker_ = -1, u_boot_ = -1, u_foil_ = -1;
-    int u_art_[4] = {-1, -1, -1, -1};
+    int u_art_[5] = {-1, -1, -1, -1, -1};
     Rect clip_;
     Mat4 view_proj_;
 };

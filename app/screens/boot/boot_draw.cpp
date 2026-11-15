@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "boot_draw.h"
+#include "../interface/shelf_parts.h"
 #include "boot_media.h"
 #include "den/app/app.h"
 #include "den/base/files.h"
@@ -51,6 +52,7 @@ void BootDraw::Begin(const library::Entry& entry, bool animated, std::optional<g
     from_ = from;
     media_ = MediaFor(game);
     faces_ = std::make_unique<FaceLoader>();
+    shaped_ = false;
 }
 
 const BootTimes& BootDraw::Times() const {
@@ -133,7 +135,15 @@ void BootDraw::DrawDrop(ui::Context& ctx) {
         pose.spin = -t * (5 + 14 * fall);
         pose.cut = slot_y;
         pose.alpha = from_ ? 1 : Ease(t, 0, 0.12f);
-        DrawMedia(ctx, game, media_, faces_->Get(game.id), pose);
+        const LoadedFaces* faces = faces_->Get(game.id);
+        if (faces != nullptr && !shaped_) {
+            // Its own photographed cartridge, or a hack's, once the pictures are in.
+            shaped_ = true;
+            if (std::optional<GameObject> own = OwnObject(media_, *faces)) {
+                media_ = std::move(*own);
+            }
+        }
+        DrawMedia(ctx, game, media_, faces, pose);
     }
 
     // The slit closes over it, and the light beside it comes on.

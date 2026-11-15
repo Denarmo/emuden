@@ -43,6 +43,10 @@ ShelfPiece BoxPieceOf(float height, const GameObject& object);
 gfx::Material ShelfMaterial(ui::Context& ctx, const library::Entry& game, const GameObject& object,
                             const LoadedFaces* faces, bool box, bool beside_box);
 
+/// What a game's disc is drawn with (a hack's: the original game's), and a UMD's shell.
+gfx::Material DiscMaterial(ui::Context& ctx, const library::Entry& game, const GameObject& object,
+                           const LoadedFaces* faces);
+
 /// Shelf's object of a game, standing still, slightly turned, in its rect: for a page that
 /// shows the game when Shelf is the Home interface.
 std::unique_ptr<ui::Node> MakeShelfPreview(const library::Entry& game, float width, float height);

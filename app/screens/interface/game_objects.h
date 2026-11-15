@@ -29,6 +29,8 @@ struct GameObject {
     float radius = 0, notch = 0;
     int grip = 0;
     bool disc = false;
+    bool umd = false;      // the disc is a UMD
+    bool hack = false;     // a ROM hack's: a "HACK" sticker on the cartridge or disc
     bool box = false;      // a cardboard box stands behind the cartridge or card
     float box_aspect = 0.9f;
 
@@ -38,6 +40,10 @@ struct GameObject {
     const gfx::Mesh3D* ClearMesh() const;
     /// The disc that slides out of a case, one unit across; null when the object has none.
     const gfx::Mesh3D* DiscMesh() const;
+    /// A UMD's shell round that disc (which turns inside it) and its clear window; null for
+    /// other discs.
+    const gfx::Mesh3D* UmdMesh() const;
+    const gfx::Mesh3D* UmdClearMesh() const;
     /// The same cartridge or card with a photograph of the real one as its front, in the
     /// photograph's proportions and the plastic's colour.
     GameObject WithPhoto(gfx::Color plastic, float photo_aspect) const;

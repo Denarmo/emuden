@@ -73,6 +73,25 @@ LoadedFaces Load(const std::string& id, Job& job) {
     library::Library& library = *Svc().library;
     const auto stopping = [&job] { return job.CancelRequested(); };
     out.faces = library.Faces(id, stopping);
+    const std::optional<library::Entry> self = library.Find(id);
+    out.hack = out.faces.base_game || (self && !self->hack_of.empty());
+    if (self && !self->hack_of.empty()) {
+        // The cartridge and disc of the game it was made from, with that game's cover.
+        if (const std::optional<library::Entry> base = library.Find(self->hack_of)) {
+            const library::GameFaces from = library.Faces(base->id, stopping);
+            if (!from.cart.empty()) {
+                out.faces.cart = from.cart;
+                out.faces.cart_back = from.cart_back;
+            }
+            if (!from.disc.empty()) {
+                out.faces.disc = from.disc;
+            }
+            out.faces.base_game = true;
+            if (!base->placeholder_cover) {
+                out.base_cover = Cleaned(base->cover, FaceKind::Cover);
+            }
+        }
+    }
     library::GameFaces& f = out.faces;
     f.back = Cleaned(f.back, FaceKind::Back);
     f.spine = Cleaned(f.spine, FaceKind::Spine);

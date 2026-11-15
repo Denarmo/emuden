@@ -6,6 +6,7 @@
 #include <algorithm>
 
 #include "den/app/app.h"
+#include "den/base/files.h"
 #include "den/base/log.h"
 #include "den/gfx/device.h"
 
@@ -13,14 +14,21 @@ namespace den::app {
 
 namespace {
 
-// Where a hack's sticker goes on a photographed cartridge: the label found in the photo when
-// it agrees with where the console's labels are, else that place (a label coloured like its
-// plastic is not found whole).
-gfx::Rect StickerRect(const gfx::Rect& found, const gfx::Rect& mould) {
-    const float ix = std::max(0.0f, std::min(found.Right(), mould.Right()) - std::max(found.x, mould.x));
-    const float iy = std::max(0.0f, std::min(found.Bottom(), mould.Bottom()) - std::max(found.y, mould.y));
-    const float common = ix * iy, area = mould.w * mould.h;
-    return found.w > 0 && common > area * 0.8f && found.w * found.h < area * 1.25f ? found : mould;
+bool IsHack(const library::Entry& game, const LoadedFaces* faces) {
+    return !game.hack_of.empty() || (faces != nullptr && faces->hack);
+}
+
+gfx::Texture HackSticker(ui::Context& ctx) {
+    static const std::string path = PathToUtf8(pal::AssetsDir() / "branding" / "hack-sticker.png");
+    return ctx.textures->Get(path, 256);
+}
+
+// The picture on a cartridge's label or a disc: a hack's is the original game's cover.
+std::string LabelCover(const library::Entry& game, const LoadedFaces* faces, bool own) {
+    if (!own && faces != nullptr && !faces->base_cover.empty()) {
+        return faces->base_cover;
+    }
+    return faces != nullptr && !faces->cover.empty() ? faces->cover : game.cover;
 }
 
 } // namespace
@@ -45,13 +53,19 @@ float Footprint(const GameObject& object, const GameObject* box) {
 
 std::optional<GameObject> OwnObject(const GameObject& look, const LoadedFaces& faces) {
     const bool cart = look.shape == "cartridge" || look.shape == "card";
-    if (cart && faces.cart_aspect > 0) {
-        return look.WithPhoto(faces.plastic, faces.cart_aspect);
+    std::optional<GameObject> own;
+    // A photograph far from the mould's proportions shows another side (an end label).
+    const float ratio = faces.cart_aspect / std::max(0.01f, look.aspect);
+    if (cart && faces.cart_aspect > 0 && ratio > 0.6f && ratio < 1.6f) {
+        own = look.WithPhoto(faces.plastic, faces.cart_aspect);
+    } else if ((look.shape == "case" || look.shape == "jewel") && faces.cover_aspect > 0) {
+        own = look.WithCover(faces.cover_aspect);
     }
-    if ((look.shape == "case" || look.shape == "jewel") && faces.cover_aspect > 0) {
-        return look.WithCover(faces.cover_aspect);
+    if (faces.hack) {
+        own = own.value_or(look);
+        own->hack = true;
     }
-    return std::nullopt;
+    return own;
 }
 
 ShelfPiece CartPieceOf(float height, const GameObject& object, const GameObject* box) {
@@ -70,9 +84,10 @@ gfx::Material ShelfMaterial(ui::Context& ctx, const library::Entry& game, const 
                             const LoadedFaces* faces, bool box, bool beside_box) {
     gfx::Material m;
     m.shell = object.shell;
-    const std::string& cover = faces != nullptr && !faces->cover.empty() ? faces->cover : game.cover;
-    m.cover = cover.empty() ? gfx::Texture{} : ctx.textures->Get(cover, 1024);
     const bool full = box || object.shape == "case" || object.shape == "jewel";
+    // The box and the case show the game's own cover; a cartridge the original game's.
+    const std::string cover = LabelCover(game, faces, full);
+    m.cover = cover.empty() ? gfx::Texture{} : ctx.textures->Get(cover, 1024);
     if (m.cover) {
         const float aspect = full ? object.aspect : object.LabelAspect();
         m.label_uv = gfx::CoverUv(m.cover.width, m.cover.height, gfx::Rect{0, 0, aspect * 100, 100});
@@ -81,7 +96,10 @@ gfx::Material ShelfMaterial(ui::Context& ctx, const library::Entry& game, const 
     const auto art = [&](const std::string& path, int size) {
         return path.empty() ? gfx::Texture{} : ctx.textures->Get(path, size);
     };
-    const bool hack = !game.hack_of.empty() || (faces != nullptr && faces->faces.base_game);
+    const bool hack = IsHack(game, faces);
+    if (hack) {
+        m.sticker_art = HackSticker(ctx);
+    }
     if (box) {
         // The box carries the game's own cover: a hack's on foil, so its art reads as printed.
         m.foil = hack;
@@ -94,20 +112,31 @@ gfx::Material ShelfMaterial(ui::Context& ctx, const library::Entry& game, const 
         if (object.photo) {
             m.cart_art = art(faces->faces.cart, 1024);
             m.back_art = art(faces->faces.cart_back, 512);
-            // A hack on the cartridge of the game it was made from: its own cover over the
-            // label (where the photo shows one, else where the mould has it).
-            if (faces->faces.base_game && m.cover) {
-                const gfx::Rect place = StickerRect(faces->cart_label, object.label);
-                m.sticker = place;
-                const float aspect = place.w * object.aspect / std::max(0.01f, place.h);
-                m.label_uv = gfx::CoverUv(m.cover.width, m.cover.height, gfx::Rect{0, 0, aspect * 100, 100});
-            }
         } else if (!beside_box) {
             m.back_art = art(faces->faces.back, 1024);
             m.spine_art = art(faces->faces.spine, 512);
         }
         m.disc_art = art(faces->faces.disc, 512);
     }
+    return m;
+}
+
+gfx::Material DiscMaterial(ui::Context& ctx, const library::Entry& game, const GameObject& object,
+                           const LoadedFaces* faces) {
+    gfx::Material m;
+    const std::string cover = LabelCover(game, faces, false);
+    m.cover = cover.empty() ? gfx::Texture{} : ctx.textures->Get(cover, 1024);
+    if (m.cover) {
+        m.label_uv = gfx::CoverUv(m.cover.width, m.cover.height, gfx::Rect{0, 0, 100, 100});
+    }
+    // A UMD's picture shows its shell as well: its disc takes the cover.
+    if (faces != nullptr && !faces->faces.disc.empty() && !object.umd) {
+        m.disc_art = ctx.textures->Get(faces->faces.disc, 512);
+    }
+    if (IsHack(game, faces)) {
+        m.sticker_art = HackSticker(ctx);
+    }
+    m.shell = gfx::Color{226, 227, 232, 255}; // a UMD's shell
     return m;
 }
 

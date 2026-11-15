@@ -48,6 +48,7 @@ private:
     GameObject media_;
     std::unique_ptr<FaceLoader> faces_;
     std::optional<gfx::Rect> from_;
+    bool shaped_ = false;
 };
 
 } // namespace den::app

@@ -211,27 +211,35 @@ void ObjectShelf::DrawContent(ui::Context& ctx) {
     const auto draw = [&](const Placed& p, const gfx::Mat4& place, bool mirrored, bool clear) {
         const gfx::Mat4 m = place * model(p, CartPiece(p));
         const gfx::Material look = MaterialFor(ctx, p, false);
+        // The selected case's disc, out to its side: a UMD's shell stays still round it.
+        const gfx::Mesh3D* disc = p.index == index_ && slide_ > 0.01f ? p.object->DiscMesh() : nullptr;
+        gfx::Mat4 at;
+        gfx::Material d;
+        if (disc != nullptr) {
+            const float size = DiscSize(*p.object) * (p.object->umd ? 0.9f : 1.0f);
+            const float start = std::max(0.0f, size * 0.5f - p.object->aspect * 0.5f);
+            const float x = start + slide_ * p.object->aspect * 0.62f;
+            at = m * gfx::Mat4::Translate(x, 0, -(p.object->depth * 0.5f + 0.03f)) * gfx::Mat4::Scale(size, size, size);
+            d = DiscMaterial(ctx, games_[p.index], *p.object, faces_.Peek(games_[p.index].id));
+            d.light = p.light;
+        }
         if (clear) {
             if (const gfx::Mesh3D* lid = p.object->ClearMesh()) {
                 renderer->DrawClear(*lid, m, look, mirrored);
+            }
+            if (const gfx::Mesh3D* window = disc ? p.object->UmdClearMesh() : nullptr) {
+                renderer->DrawClear(*window, at, d, mirrored);
             }
             return;
         }
         if (p.box != nullptr) {
             renderer->Draw(p.box->Mesh(), place * model(p, BoxPiece(p)), MaterialFor(ctx, p, true), mirrored);
         }
-        if (p.index == index_ && slide_ > 0.01f) {
-            if (const gfx::Mesh3D* disc = p.object->DiscMesh()) {
-                const float size = DiscSize(*p.object);
-                const float start = std::max(0.0f, size * 0.5f - p.object->aspect * 0.5f);
-                const float x = start + slide_ * p.object->aspect * 0.62f;
-                gfx::Material d = look;
-                d.label_uv = d.cover ? gfx::CoverUv(d.cover.width, d.cover.height, gfx::Rect{0, 0, 100, 100}) : d.label_uv;
-                renderer->Draw(*disc,
-                               m * gfx::Mat4::Translate(x, 0, -(p.object->depth * 0.5f + 0.01f)) *
-                                   gfx::Mat4::RotateZ(-time * 1.6f * slide_) * gfx::Mat4::Scale(size, size, 1),
-                               d, mirrored);
+        if (disc != nullptr) {
+            if (const gfx::Mesh3D* shell = p.object->UmdMesh()) {
+                renderer->Draw(*shell, at, d, mirrored);
             }
+            renderer->Draw(*disc, at * gfx::Mat4::RotateZ(-time * 1.6f * slide_), d, mirrored);
         }
         const float spin = p.object->shape == "disc" ? -time * (0.6f + 4.0f * LaunchAmount()) * p.weight : 0;
         renderer->Draw(p.object->Mesh(), spin != 0 ? m * gfx::Mat4::RotateZ(spin) : m, look, mirrored);

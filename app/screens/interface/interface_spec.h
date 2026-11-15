@@ -28,11 +28,13 @@ struct ObjectLook {
     bool has_shell = false;     // false: the shape's own colour
     gfx::Rect label{0, 0, 0, 0}; // the part of the front the cover is on; empty: the shape's own
     bool disc = false;          // a case or jewel case with a disc that slides out when chosen
+    bool umd = false;           // that disc is a UMD: a shell whose disc turns inside it
     float radius = -1;          // the top corners' rounding; below 0: the shape's own
     float notch = -1;           // the top-right corner cut off at 45 degrees; below 0: the shape's own
     int grip = -1;              // a cartridge's grip ridges; below 0: the shape's own
     // A cartridge's mould: "plain"; "pocket", a handheld's with stepped top corners, a sunk
-    // panel and label well; "pocket_wide", a wide one with shoulders. Empty: plain.
+    // panel and label well; "pocket_wide", a wide one with shoulders; or a console's own
+    // (game_moulds.cpp: "nes", "snes", "n64", "hucard", ...). Empty: plain.
     std::string style;
     std::string label_edge; // "none", "paper" or "foil" round the cover; empty: the style's own
     // A cartridge's or card's cardboard box standing behind it, front width over height (its

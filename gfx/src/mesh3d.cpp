@@ -42,7 +42,7 @@ uniform float u_light; uniform int u_has_tex; uniform int u_clear;
 uniform sampler2D u_tex;
 // The other faces' pictures: back, spine, cart, disc; bit i of u_arts says art i is there.
 uniform sampler2D u_back_art; uniform sampler2D u_spine_art; uniform sampler2D u_cart_art;
-uniform sampler2D u_disc_art; uniform int u_arts; uniform vec4 u_cart_uv; uniform vec4 u_sticker;
+uniform sampler2D u_disc_art; uniform sampler2D u_sticker_art; uniform int u_arts; uniform vec4 u_cart_uv; uniform vec4 u_sticker;
 uniform float u_boot; uniform int u_foil;
 float grain(vec2 p) { return fract(sin(dot(floor(p), vec2(12.9898, 78.233))) * 43758.5453); }
 out vec4 o_color;
@@ -147,6 +147,13 @@ void main() {
     } else if (part == 18) {
         vec2 c = floor(v_uv + 0.5);
         base = vec3(floor(c.x / 256.0), mod(c.x, 256.0), c.y) / 255.0;
+    } else if (part == 19) {
+        vec4 t = has_art(16) ? texture(u_sticker_art, clamp(v_uv, 0.0, 1.0)) : vec4(0.8, 0.8, 0.82, 1.0);
+        if (t.a < 0.5) discard;
+        float k = dot(t.rgb, vec3(0.333));
+        vec3 rainbow = 0.5 + 0.5 * cos(6.2832 * (v_uv.x * 1.1 + v_uv.y * 0.6 + n.x * 1.8 + n.y + vec3(0.0, 0.33, 0.67)));
+        base = mix(t.rgb, t.rgb * 0.5 + rainbow * 0.55, 0.45 * k);
+        gloss = 70.0; spec = 1.0; fresnel = 0.5;
     } else if (part == 14) {
         vec4 p = has_art(4) ? texture(u_cart_art, u_cart_uv.xy + clamp(v_uv, 0.0, 1.0) * u_cart_uv.zw) : vec4(0.0);
         base = mix(u_shell.rgb, p.rgb, p.a);
@@ -290,8 +297,8 @@ Status Renderer3D::Init(Device& device) {
     u_sticker_ = at("u_sticker");
     u_boot_ = at("u_boot");
     u_foil_ = at("u_foil");
-    const char* arts[] = {"u_back_art", "u_spine_art", "u_cart_art", "u_disc_art"};
-    for (int i = 0; i < 4; ++i) {
+    const char* arts[] = {"u_back_art", "u_spine_art", "u_cart_art", "u_disc_art", "u_sticker_art"};
+    for (int i = 0; i < 5; ++i) {
         u_art_[i] = at(arts[i]);
     }
     gl::GenFramebuffers(1, &fbo_);
@@ -369,7 +376,7 @@ void Renderer3D::Begin(Canvas& canvas, const Rect& clip) {
     gl::UseProgram(program_);
     gl::UniformMatrix4fv(u_view_proj_, 1, gl::FALSE_, view_proj_.m);
     gl::Uniform1i(u_tex_, 0);
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 5; ++i) {
         gl::Uniform1i(u_art_[i], i + 1);
     }
     gl::ActiveTexture(gl::TEXTURE0);
@@ -393,9 +400,10 @@ void Renderer3D::Submit(const Mesh3D& mesh, const Mat4& model, const Material& m
     gl::Uniform4f(u_spine_, s.x, s.y, s.w, s.h);
     gl::Uniform1f(u_light_, material.light);
     gl::Uniform1i(u_has_tex_, material.cover ? 1 : 0);
-    const Texture* arts[] = {&material.back_art, &material.spine_art, &material.cart_art, &material.disc_art};
+    const Texture* arts[] = {&material.back_art, &material.spine_art, &material.cart_art, &material.disc_art,
+                             &material.sticker_art};
     int present = 0;
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 5; ++i) {
         if (*arts[i]) {
             present |= 1 << i;
             gl::ActiveTexture(gl::TEXTURE0 + 1 + i);
