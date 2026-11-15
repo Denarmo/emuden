@@ -7,6 +7,7 @@
 #include "den/base/files.h"
 #include "den/base/archive.h"
 #include "game_files.h"
+#include "den/player/session.h"
 
 namespace den::player {
 
@@ -67,6 +68,10 @@ GamePaths MakeGamePaths(const fs::path& data_dir, const std::string& system,
     paths.state_dir = data_dir / "states" / folder;
     paths.base = SafeFileName(game_id.empty() ? PathToUtf8(content.stem()) : game_id);
     return paths;
+}
+
+fs::path BatterySaveFile(const fs::path& data_dir, const std::string& system, const std::string& game_id) {
+    return MakeGamePaths(data_dir, system, game_id, {}).BatterySave();
 }
 
 std::vector<std::uint8_t> WrapState(const std::string& core_name,

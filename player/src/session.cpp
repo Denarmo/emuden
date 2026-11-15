@@ -11,6 +11,7 @@
 
 #include "den/base/files.h"
 #include "den/base/log.h"
+#include "den/net/party.h"
 #include "den/store/settings.h"
 #include "pad_map.h"
 #include "session_impl.h"
@@ -57,7 +58,10 @@ Status PlayerSession::Open(const OpenRequest& request) {
 Status PlayerSession::Start(const OpenRequest& request) {
     const store::Settings* settings = config_.settings;
     hardcore_ = request.hardcore;
-    resume_enabled_ = request.resume && !hardcore_ && (!settings || settings->GetBool("player.resume", true));
+    together_ = request.together;
+    // A state of another core, or of the host's game, is no place to resume this one from.
+    resume_enabled_ = !together_.party && request.resume && !hardcore_ &&
+                      (!settings || settings->GetBool("player.resume", true));
     pad_by_label_ = !settings || settings->GetBool("player.pad_by_label", true);
     integer_scale_ = settings && settings->GetBool("player.integer_scale", false);
     smooth_ = !settings || settings->GetBool("player.smooth", true);
@@ -115,7 +119,7 @@ Status PlayerSession::Start(const OpenRequest& request) {
         }
         content = resolved.take();
     }
-    if (!core_->LoadGame(content, &error)) {
+    if (!LoadContent(content, &error)) {
         return Fail(error);
     }
     content_path_ = content;
@@ -127,8 +131,12 @@ Status PlayerSession::Start(const OpenRequest& request) {
     if (settings) {
         audio_.SetVolume(static_cast<float>(settings->GetNumber("player.volume", 1.0)));
     }
+    if (together_.save_memory != 0) {
+        core_->SetSaveRamId(together_.save_memory);
+    }
     LoadBatterySave();
     SetupRewind();
+    StartTogether();
 
     due_ = 0.0;
     step_ = 1.0;
@@ -153,8 +161,10 @@ void PlayerSession::Close() {
     if (core_) {
         FlushSaves();
         SaveResumeState();
+        StopTogether();
         core_.reset();
     }
+    together_ = TogetherRequest{};
     hw_.reset();
     audio_.Close();
     rewind_.reset();
@@ -317,6 +327,9 @@ void PlayerSession::SaveResumeState() {
 }
 
 void PlayerSession::Pause() {
+    if (together_.party) {
+        together_.party->SetPaused(true);
+    }
     if (snapshot_.state == State::Running) {
         snapshot_.state = State::Paused;
         audio_.SetPaused(true);
@@ -325,6 +338,9 @@ void PlayerSession::Pause() {
 }
 
 void PlayerSession::Resume() {
+    if (together_.party) {
+        together_.party->SetPaused(false);
+    }
     if (snapshot_.state == State::Paused) {
         snapshot_.state = State::Running;
         audio_.SetPaused(false);
@@ -338,6 +354,9 @@ void PlayerSession::SetPad(int port, const input::PadState& pad) {
     }
     const auto family = std::min(static_cast<std::size_t>(pad.family), button_maps_.size() - 1);
     RetroPad mapped = MapPad(pad, system_, button_maps_[family]);
+    if (StoreLocalInput(port, mapped)) {
+        return;
+    }
     const auto index = static_cast<unsigned>(port);
     if (index == 0) {
         mapped.buttons |= held_buttons_;
@@ -385,6 +404,7 @@ void PlayerSession::SetScreenPointer(int screen, float u, float v, bool pressed)
 }
 
 void PlayerSession::SetFastForward(bool on) {
+    on = on && !together_.party; // the other device keeps the game's own speed
     if (snapshot_.fast_forward == on) {
         return;
     }
@@ -396,7 +416,7 @@ void PlayerSession::SetFastForward(bool on) {
 }
 
 void PlayerSession::SetRewind(bool on) {
-    on = on && rewind_.has_value() && !hardcore_;
+    on = on && rewind_.has_value() && !hardcore_ && !together_.party;
     if (snapshot_.rewinding == on) {
         return;
     }
@@ -491,7 +511,16 @@ void PlayerSession::Advance(double seconds) {
     seconds = std::clamp(seconds, 0.0, 0.1);
     const double frames = seconds * av_.fps;
     step_ += (frames - step_) * 0.1;
-    if (snapshot_.rewinding) {
+    if (together_.party) {
+        PumpTogether();
+        LeftLockstep();
+    }
+    if (InLockstep()) {
+        TickLockstep();
+        if (core_ && InLockstep()) {
+            AdvanceLockstep(frames);
+        }
+    } else if (snapshot_.rewinding) {
         // One kept state back per the frames between two states: the game's own speed.
         due_ += frames / static_cast<double>(rewind_interval_);
         while (due_ >= 1.0) {

@@ -9,6 +9,7 @@
 #include "../achievements/achievements_glue.h"
 #include "../apps/apps_catalog.h"
 #include "../companion/second_screen.h"
+#include "../together/together.h"
 #include "den/app/pages.h"
 #include "den/base/files.h"
 #include "glyphs.h"
@@ -117,7 +118,7 @@ void PlayerScreen::BuildMain(ui::Node* list) {
         rows.push_back(ActionRow("menu.save", "Save state", [this] { Show(View::Save); }));
         if (snapshot.hardcore) {
             rows.push_back(ValueRow("menu.load", "Load state", [] { return std::string("Off in hardcore mode"); }));
-        } else {
+        } else if (!snapshot.together) {
             rows.push_back(ActionRow("menu.load", "Load state", [this] { Show(View::Load); }));
         }
     } else if (!external) {
@@ -126,11 +127,11 @@ void PlayerScreen::BuildMain(ui::Node* list) {
     if (AchievementsForRunningGame()) {
         rows.push_back(ActionRow("menu.achievements", "Achievements", [this] { GetStage().Push("achievements"); }));
     }
-    if (snapshot.can_fast_forward) {
+    if (snapshot.can_fast_forward && !snapshot.together) {
         rows.push_back(ToggleRow("menu.fast", "Fast-forward", [this] { return fast_toggle_; },
                                  [this](bool on) { fast_toggle_ = on; }));
     }
-    if (!external) {
+    if (!external && !snapshot.together) {
         rows.push_back(ValueRow("menu.rewind", "Rewind", [this, can = snapshot.can_rewind, hardcore = snapshot.hardcore] {
             if (hardcore) {
                 return std::string("Off in hardcore mode");
@@ -198,6 +199,10 @@ void PlayerScreen::BuildMain(ui::Node* list) {
             "menu.players", "Players",
             [] { return std::format("{}", std::max(1, std::min(4, Svc().input->PadCount()))); },
             [this] { Show(View::Players); }));
+        rows.push_back(ValueRow(
+            "menu.together", "Play together",
+            [id = game_.id] { return Together::Get().PartyFor(id) ? Together::Get().StatusText() : std::string("Off"); },
+            [this] { GetStage().Push("together", {{"id", game_.id}, {"from", "game"}}); }));
     }
     // The volumes sit between the rows above and below, a little taller for their second line.
     AddRows(list, std::move(rows), ROW_HEIGHT);

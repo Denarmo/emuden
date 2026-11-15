@@ -13,6 +13,7 @@
 #include "den/base/files.h"
 #include "den/base/log.h"
 #include "den/library/content.h"
+#include "../together/together.h"
 #include "picture_choice.h"
 #include "../achievements/achievements_glue.h"
 #include "player_screen.h"
@@ -80,7 +81,7 @@ void PlayerScreen::Open() {
     }
     game_ = *game;
     const auto console = svc.plugins->FindConsole(game_.system);
-    const auto core = CoreForGame(game_, Param("core"));
+    const auto core = Param("together") == "1" ? PlayerCoreFor(game_, true) : CoreForGame(game_, Param("core"));
     if (!console || !core || !core->Ready()) {
         return Fail((console ? console->name : game_.name) + ": its core is not installed. Open Consoles to install it.");
     }
@@ -133,6 +134,7 @@ void PlayerScreen::Begin(const std::filesystem::path& content, bool resume) {
     request.resume = resume && Param("resume") != "0";
     request.title = game_.name;
     request.hardcore = AchievementsHardcore(game_);
+    request.together = PlayerTogetherFor(game_, Param("together") == "1");
     if (core_.runner == plugins::Runner::Engine) {
         // An engine app runs it; the session talks to it through the engine host.
         engine::Install install;
@@ -195,6 +197,7 @@ void PlayerScreen::Leave() {
         }
         svc.player->Close();
     }
+    PlayerLeft(game_.id);
     phase_ = Phase::Left;
     svc.input->SetNavFromPads(true);
     GetStage().Pop();

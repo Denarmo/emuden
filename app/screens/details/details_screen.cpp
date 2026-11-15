@@ -123,6 +123,9 @@ public:
         if (game.last_played > 0 && console_info && console_info->runner == plugins::Runner::Core) {
             action("details.restart", Tr("details.restart"), [id] { StartGame(id, true); });
         }
+        if (console_info && console_info->runner == plugins::Runner::Core) {
+            action("details.together", "Play together", [id] { Svc().stage->Push("together", {{"id", id}}); });
+        }
         action("details.favourite", game.favourite ? Tr("details.unfavourite") : Tr("details.favourite"),
                [id, now = game.favourite] { Svc().library->SetFavourite(id, !now); });
         action("details.collect", Tr("details.collect"), [id] { Svc().stage->Push("collect", {{"id", id}}); });

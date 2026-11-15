@@ -72,6 +72,10 @@ public:
         return config_.jobs->Run("Install " + system,
                                  [this, system](Job& job) { return DoInstall(job, system); });
     }
+    JobPtr InstallCore(const std::string& system, const std::string& core_id) override {
+        return config_.jobs->Run("Install " + core_id,
+                                 [this, system, core_id](Job& job) { return DoInstall(job, system, core_id); });
+    }
     JobPtr Remove(const std::string& system) override {
         return config_.jobs->Run("Remove " + system,
                                  [this, system](Job&) { return DoRemove(system); });
@@ -164,7 +168,7 @@ private:
     // have at all) from their packages. `only` limits it to one plugin, where a failure counts.
     Status SyncPackages(Job& job, const std::string& only);
     Status FetchPackage(Job& job, const IndexPlugin& offered, const std::string& address);
-    Status DoInstall(Job& job, const std::string& system);
+    Status DoInstall(Job& job, const std::string& system, const std::string& core_id = {});
     Status InstallCore(Job& job, const Loaded& loaded, const Component& core,
                        const Download& download);
     // Puts the files a core needs into the system folder. A failure is a note on `result`:

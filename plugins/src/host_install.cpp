@@ -190,7 +190,7 @@ Status RealHost::FetchPackage(Job& job, const IndexPlugin& offered, const std::s
     return {};
 }
 
-Status RealHost::DoInstall(Job& job, const std::string& system) {
+Status RealHost::DoInstall(Job& job, const std::string& system, const std::string& core_id) {
     job.SetMessage("Checking the plugin list");
     Status result;
     // Without the list the manifest the app already has still pins every download.
@@ -232,6 +232,14 @@ Status RealHost::DoInstall(Job& job, const std::string& system) {
             return result; // the engine comes with the app
         }
         const Component* chosen = ChosenCore(*found.loaded, *found.system);
+        if (!core_id.empty()) {
+            chosen = nullptr;
+            for (const Component* option : manifest.CoresFor(*found.system, deps_.platform_key)) {
+                if (option->id == core_id) {
+                    chosen = option;
+                }
+            }
+        }
         if (chosen == nullptr) {
             return Status::Fail(found.system->console.name + " is not available on this device yet.");
         }

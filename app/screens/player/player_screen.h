@@ -98,6 +98,10 @@ public:
     bool WantsSecond() const;
     /// An engine app plays it: its window over the main one is the game, not an app beside it.
     bool External() const;
+    /// The core the game runs with ("mgba").
+    const std::string& CoreId() const {
+        return core_.id;
+    }
 
 private:
     enum class Phase { New, Checking, Choosing, Preparing, Running, Left };

@@ -38,11 +38,22 @@ struct LibretroCore::Impl {
     void (*retro_unload_game)() = nullptr;
     void* (*retro_get_memory_data)(unsigned) = nullptr;
     std::size_t (*retro_get_memory_size)(unsigned) = nullptr;
+    bool (*retro_load_game_special)(unsigned, const retro_game_info*, std::size_t) = nullptr; // optional
 
     bool initialized = false;
     bool game_loaded = false;
     CoreSystemInfo info;
     std::vector<std::uint8_t> rom_data;
+    std::vector<std::vector<std::uint8_t>> special_data; // the games of LoadGameSpecial
+    std::vector<std::string> special_paths;
+    unsigned save_ram_id = RETRO_MEMORY_SAVE_RAM;
+    // The netpacket interface the core set, and the session's side of it.
+    bool has_netpacket = false;
+    retro_netpacket_callback netpacket{};
+    std::string netpacket_version;
+    bool netpacket_running = false;
+    LibretroCore::PacketSend packet_send;
+    std::function<void()> packet_poll;
     std::string core_path;
     std::string rom_path;
     std::string system_dir;
@@ -118,6 +129,8 @@ private:
 extern LibretroCore::Impl* g_core;
 
 bool RETRO_CALLCONV EnvironmentCallback(unsigned command, void* data);
+/// RETRO_ENVIRONMENT_SET_NETPACKET_INTERFACE (core_link.cpp).
+bool SetNetpacketInterface(const void* data);
 void RETRO_CALLCONV VideoCallback(const void* data, unsigned width, unsigned height,
                                   std::size_t pitch);
 std::size_t RETRO_CALLCONV AudioBatchCallback(const std::int16_t* data, std::size_t frames);

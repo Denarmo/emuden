@@ -88,6 +88,7 @@ public:
         return core_ ? content_path_ : std::filesystem::path();
     }
     Status SaveScreenshot(const std::filesystem::path& png) override;
+    void SetTogether(TogetherRequest request) override;
 
 private:
     void Notify(FrameEvent event) {
@@ -95,6 +96,21 @@ private:
             frame_hook_(event);
         }
     }
+    // session_net.cpp: playing with another device.
+    bool LoadContent(const std::filesystem::path& content, std::string* error);
+    void StartTogether();
+    void StopTogether();
+    void PumpTogether();
+    void StartLink();
+    void DeliverPackets();
+    bool InLockstep() const;
+    void LeftLockstep();
+    void TickLockstep();
+    void AdvanceLockstep(double frames);
+    void SendStateToPeer(std::uint64_t frame);
+    void TakeStateFromPeer();
+    bool StoreLocalInput(int port, const RetroPad& mapped);
+
     Status Fail(std::string message);
     Status Start(const OpenRequest& request);
     void ApplyStoredOptions();
@@ -190,6 +206,16 @@ private:
     std::array<ButtonMap, 4> button_maps_{};
     std::uint16_t held_buttons_ = 0; // port 1, for a shortcut
     std::string game_key_;
+
+    // Playing with another device.
+    TogetherRequest together_;
+    bool link_started_ = false;     // the core's netpacket session runs
+    bool peer_connected_ = false;   // ... and the other device is in it
+    int lockstep_owed_ = 0;         // frames due that waited for the other device
+    bool lockstep_ran_ = false;
+    double waiting_since_ = -1;
+    std::array<std::int16_t, 4> local_axes_{};
+    std::uint16_t local_buttons_ = 0;
 };
 
 } // namespace den::player

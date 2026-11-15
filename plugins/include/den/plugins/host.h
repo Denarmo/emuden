@@ -217,6 +217,11 @@ public:
     /// Downloads, verifies (SHA-256 and size from the signed index) and unpacks what the
     /// system needs. Progress and cancel through the job; the failure text is user-facing.
     virtual JobPtr Install(const std::string& system) = 0;
+    /// As Install, with `core_id` (one of the system's cores) in place of the chosen core,
+    /// which stays chosen: a core needed for one purpose, such as playing together.
+    virtual JobPtr InstallCore(const std::string& system, const std::string& /*core_id*/) {
+        return Install(system);
+    }
     virtual JobPtr Remove(const std::string& system) = 0;
     /// Fetches the signed index of every source again.
     virtual JobPtr Refresh() = 0;

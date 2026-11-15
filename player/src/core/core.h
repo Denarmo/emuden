@@ -167,6 +167,26 @@ public:
     bool SaveState(std::span<std::uint8_t> out) const;
     bool LoadState(std::span<const std::uint8_t> state);
 
+    /// Loads several games through the core's subsystem `type` (TGB Dual's two linked Game
+    /// Boys: RETRO_GAME_TYPE_GAMEBOY_LINK_2P).
+    bool LoadGameSpecial(unsigned type, const std::vector<std::filesystem::path>& roms, std::string* error);
+    /// The memory the battery save is kept in; RETRO_MEMORY_SAVE_RAM unless set.
+    void SetSaveRamId(unsigned id);
+
+    // Link cable and local wireless the core emulates itself (libretro's netpacket
+    // interface, core_link.cpp). The calls are made on this thread, also from inside RunFrame.
+    using PacketSend = std::function<void(std::span<const std::uint8_t> packet, std::uint16_t to)>;
+    bool HasNetpacket() const;
+    /// The session begins: `client_id` 0 is the host, the guest is 1. `poll` is what the core
+    /// calls to read packets that arrived in the middle of a frame.
+    void NetpacketStart(std::uint16_t client_id, PacketSend send, std::function<void()> poll);
+    void NetpacketReceive(std::span<const std::uint8_t> packet, std::uint16_t from);
+    /// Once a frame, before it runs.
+    void NetpacketPoll();
+    bool NetpacketConnected(std::uint16_t client_id);
+    void NetpacketDisconnected(std::uint16_t client_id);
+    void NetpacketStop();
+
     /// Battery-backed save RAM, empty when the game has none. Valid until the game unloads.
     std::span<std::uint8_t> SaveRam() const;
     std::span<std::uint8_t> Memory(unsigned id) const;

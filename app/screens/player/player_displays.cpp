@@ -19,6 +19,7 @@
 #include "den/base/log.h"
 #include "den/platform/lifecycle.h"
 #include "player_screen.h"
+#include "../together/together.h"
 
 namespace den::app {
 
@@ -249,6 +250,8 @@ void PlayerScreen::DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const p
         badge("\xC2\xAB Rewind", false);
     } else if (snapshot.fast_forward) {
         badge("Fast-forward \xC2\xBB", false);
+    } else if (snapshot.waiting_for_peer) {
+        badge(TogetherWaitText(), false);
     }
     DrawAchievementOverlay(ctx, area);
 }

@@ -34,7 +34,7 @@ void PlayerSession::LoadBatterySave() {
 }
 
 void PlayerSession::FlushSaves() {
-    if (!core_) {
+    if (!core_ || !together_.write_saves) {
         return;
     }
     const std::span<std::uint8_t> ram = core_->SaveRam();
@@ -124,6 +124,9 @@ Status PlayerSession::LoadState(int slot) {
     }
     if (hardcore_) {
         return Status::Fail("Hardcore mode is on: states cannot be loaded.");
+    }
+    if (together_.party) {
+        return Status::Fail("Not while playing together: it would leave the other device behind.");
     }
     pending_resume_ = false;
     const Status loaded = ReadStateFile(paths_.State(slot));

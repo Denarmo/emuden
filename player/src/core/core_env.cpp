@@ -507,6 +507,8 @@ bool RETRO_CALLCONV EnvironmentCallback(unsigned command, void* data) {
         return true;
     case RETRO_ENVIRONMENT_SET_MEMORY_MAPS:
         return SetMemoryMaps(static_cast<const retro_memory_map*>(data));
+    case RETRO_ENVIRONMENT_SET_NETPACKET_INTERFACE:
+        return SetNetpacketInterface(data);
     case RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME:
     case RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL:
     case RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS:

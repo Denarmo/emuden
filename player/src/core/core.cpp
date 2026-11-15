@@ -92,6 +92,7 @@ std::unique_ptr<LibretroCore> LibretroCore::Load(const LoadParams& params, std::
     if (missing) {
         return fail(std::string("This file is not a libretro core (no ") + missing + ").");
     }
+    load(c.retro_load_game_special, "retro_load_game_special");
     // A core built to be loaded by Java finds the Java VM through JNI_OnLoad, which only
     // System.loadLibrary calls; Play! asks for it with its own setter.
     if (void* vm = pal::JavaVm()) {
@@ -141,6 +142,7 @@ LibretroCore::~LibretroCore() {
         if (c.hw_ready && c.hw.context_destroy) {
             c.hw.context_destroy();
         }
+        NetpacketStop();
         if (c.game_loaded) {
             c.retro_unload_game();
         }
@@ -362,7 +364,7 @@ bool LibretroCore::LoadState(std::span<const std::uint8_t> state) {
 }
 
 std::span<std::uint8_t> LibretroCore::SaveRam() const {
-    return Memory(RETRO_MEMORY_SAVE_RAM);
+    return Memory(impl_->save_ram_id);
 }
 
 std::span<std::uint8_t> LibretroCore::Memory(unsigned id) const {

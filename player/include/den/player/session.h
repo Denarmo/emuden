@@ -29,10 +29,30 @@
 namespace den::store {
 class Settings;
 }
+namespace den::net {
+class Party;
+}
 
 struct retro_memory_map;
 
 namespace den::player {
+
+/// A game played with another device (den/net/party.h): how this session takes part.
+struct TogetherRequest {
+    /// The connection; null when the game is played on this device alone.
+    std::shared_ptr<net::Party> party;
+    /// Non-zero: the content is loaded twice through this subsystem of the core (TGB Dual's
+    /// two linked Game Boys, RETRO_GAME_TYPE_GAMEBOY_LINK_2P).
+    unsigned subsystem = 0;
+    /// The memory this device's battery save is kept in (0: the usual save RAM), and the
+    /// memory the other device's save is put in (0: none).
+    unsigned save_memory = 0;
+    unsigned peer_save_memory = 0;
+    /// False: this device's battery save is not written (it plays the host's game).
+    bool write_saves = true;
+    /// Option values for this session only; never saved.
+    std::vector<std::pair<std::string, std::string>> options;
+};
 
 struct OpenRequest {
     std::filesystem::path core;       // plugins::CoreInfo::library
@@ -51,6 +71,7 @@ struct OpenRequest {
     bool fullscreen = true; // the engine's own window
     /// RetroAchievements hardcore: no state is loaded (the resume state neither) and no rewind.
     bool hardcore = false;
+    TogetherRequest together;
 };
 
 enum class State { Closed, Running, Paused, Failed };
@@ -126,6 +147,10 @@ struct Snapshot {
     bool can_volume = true;
     bool can_picture = true; // picture presets, screen size and button remapping (EmuDEN draws it)
     bool hardcore = false;   // states cannot be loaded and there is no rewind
+    /// Played with another device: no fast-forward, rewind or loaded states.
+    bool together = false;
+    /// The game waits for the other device's buttons or state.
+    bool waiting_for_peer = false;
 };
 
 struct CoreOption {
@@ -344,6 +369,9 @@ public:
         (void)png;
         return Status::Fail("This player cannot take a screenshot.");
     }
+    /// Plays the running game with another device from now on, or alone again with no party.
+    /// A request with a subsystem needs the game opened again instead.
+    virtual void SetTogether(TogetherRequest /*request*/) {}
 };
 
 struct Config {
@@ -354,6 +382,10 @@ struct Config {
 };
 
 std::unique_ptr<Session> CreateSession(const Config& config);
+
+/// The battery save file of a game under the player's data folder (it may not exist).
+std::filesystem::path BatterySaveFile(const std::filesystem::path& data_dir, const std::string& system,
+                                      const std::string& game_id);
 
 /// A session over the engine host: the game runs in an engine app, controlled through the
 /// protocol. Option values are kept as "key=value" lists under engine_options.<core> for the
