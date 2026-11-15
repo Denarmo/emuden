@@ -17,6 +17,7 @@ const char* const PERMISSIONS[] = {
     PERMISSION_BROWSE,       PERMISSION_FILES_IMPORT,    PERMISSION_DOWNLOADS_WATCH,
     PERMISSION_LIBRARY_READ, PERMISSION_PATCH,           PERMISSION_LIBRARY_WRITE,
     PERMISSION_SYNC,         PERMISSION_HTTP_USER_HOST,  PERMISSION_HTTP_LOCAL,
+    PERMISSION_DEVICE_INFO,  PERMISSION_GAME_SETTINGS,   PERMISSION_STEAM,
 };
 
 const char* CategoryName(std::string_view category) {
@@ -266,7 +267,7 @@ Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
         }
     }
     const bool library = access.Has(PERMISSION_LIBRARY_READ) || access.Has(PERMISSION_PATCH) ||
-                         access.Has(PERMISSION_LIBRARY_WRITE);
+                         access.Has(PERMISSION_LIBRARY_WRITE) || access.Has(PERMISSION_GAME_SETTINGS);
     if (library && access.systems.empty()) {
         return Status::Fail("the library permissions need systems");
     }
@@ -380,6 +381,14 @@ std::vector<PermissionLine> PermissionLines(const FeatureAccess& access,
             text = "Connect to the server you enter";
         } else if (name == PERMISSION_HTTP_LOCAL) {
             text = "Connect to apps on this device";
+        } else if (name == PERMISSION_DEVICE_INFO) {
+            text = "See this device's model, processor, graphics and memory";
+        } else if (name == PERMISSION_GAME_SETTINGS) {
+            text = Contains(access.systems, "*")
+                       ? "Change the settings of single games"
+                       : "Change the settings of single games of these consoles: " + Join(access.systems);
+        } else if (name == PERMISSION_STEAM) {
+            text = "See your Steam games and change their launch options and Proton version";
         } else {
             text = "Change the hacks it installed";
         }

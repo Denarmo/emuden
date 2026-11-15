@@ -47,6 +47,7 @@ void CreateHost() {
     config.plugins = svc.plugins;
     config.library = svc.library;
     config.app_version = system::Version();
+    config.tune = CreateTuneServices();
     HostSlot() = plugins::CreateFeatureHost(config);
 }
 

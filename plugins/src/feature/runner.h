@@ -24,6 +24,7 @@
 #include "den/base/json.h"
 #include "den/plugins/feature_manifest.h"
 #include "den/plugins/feature_services.h"
+#include "den/plugins/feature_tune.h"
 #include "den/plugins/feature_ui.h"
 #include "den/plugins/sync_link.h"
 #include "feature/http.h"
@@ -46,6 +47,7 @@ struct RunnerConfig {
     std::function<bool()> web_available; // may be empty: no in-app browser
     HttpGetter http;
     std::shared_ptr<FeatureServices> services; // may be null
+    std::shared_ptr<TuneServices> tune;         // den.device.info, den.game, den.steam; may be null
     std::function<std::int64_t()> now;
     long long instruction_limit = 200'000'000;
     pal::Secrets* secrets = nullptr;      // den.secrets; null: pal::GetSecrets()
@@ -268,6 +270,7 @@ void RegisterWeb(lua_State* L, Runner& runner);     // web
 void RegisterRequest(lua_State* L, Runner& runner); // http.request (after RegisterNetwork)
 void RegisterSecrets(lua_State* L, Runner& runner); // secrets
 void RegisterSync(lua_State* L, Runner& runner);    // sync, for the sync permission
+void RegisterTune(lua_State* L, Runner& runner);    // device.info, game, steam (after RegisterCore)
 
 /// The credential store's name of a plugin's secret.
 std::string SecretName(const std::string& plugin, const std::string& key);

@@ -31,6 +31,12 @@ inline constexpr const char* PERMISSION_SYNC = "sync";
 inline constexpr const char* PERMISSION_HTTP_USER_HOST = "http.user_host";
 /// den.http.request to 127.0.0.1 and localhost on any port, http or https.
 inline constexpr const char* PERMISSION_HTTP_LOCAL = "http.local";
+/// den.device.info(): the device's model, processor, graphics and memory.
+inline constexpr const char* PERMISSION_DEVICE_INFO = "device.info";
+/// den.game.settings and den.game.set: the own core options of games of `systems`.
+inline constexpr const char* PERMISSION_GAME_SETTINGS = "game.settings";
+/// den.steam: the Steam games of this computer, their launch options and Proton version.
+inline constexpr const char* PERMISSION_STEAM = "steam";
 
 /// The categories a sync provider may offer, in the order the sync page shows them.
 inline constexpr const char* SYNC_CATEGORIES[] = {"saves", "states", "config", "games", "bios"};

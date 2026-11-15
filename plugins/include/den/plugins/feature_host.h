@@ -27,6 +27,7 @@ class Library;
 namespace den::plugins {
 
 class SyncLink;
+class TuneServices;
 
 /// Package kinds the feature host installs: "feature" (a script) and "interface" (data only:
 /// a look for the Home screen, docs/interface-plugins.md in emuden-plugins).
@@ -113,6 +114,8 @@ struct FeatureConfig {
     Host* plugins = nullptr;
     library::Library* library = nullptr;
     std::string app_version;
+    /// What den.device.info, den.game and den.steam reach; null: those calls fail.
+    std::shared_ptr<TuneServices> tune;
 };
 
 std::unique_ptr<FeatureHost> CreateFeatureHost(const FeatureConfig& config);

@@ -17,6 +17,7 @@
 
 #include "den/base/result.h"
 #include "den/plugins/feature_host.h"
+#include "den/plugins/feature_tune.h"
 #include "den/plugins/index.h"
 #include "den/plugins/installer.h"
 
@@ -88,6 +89,7 @@ std::shared_ptr<FeatureServices> CreateLibraryServices(library::Library* library
 struct FeatureDeps {
     HttpGetter http;                           // default: pal::HttpGet
     std::shared_ptr<FeatureServices> services; // default: CreateLibraryServices
+    std::shared_ptr<TuneServices> tune;         // default: FeatureConfig::tune
     std::filesystem::path bundled_dir;         // default: pal::AssetsDir() / "plugins"
     std::filesystem::path downloads_dir;       // the device's Downloads folder; empty = none
     std::string platform;                      // den.device.platform; default: pal::GetCaps().os

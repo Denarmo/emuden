@@ -99,6 +99,9 @@ Permissions (the sentence is what the install page shows):
 | `sync` | `den.sync`, `plugin.provider`; needs `feature.sync.categories` (`docs/sync.md`) | "Keep these in step between your devices: ..." |
 | `http.user_host` | `den.http.request` to the one server the user confirmed (`den.sync.set_server`) | "Connect to the server you enter" |
 | `http.local` | `den.http.request` to `127.0.0.1` and `localhost` on a port, http or https | "Connect to apps on this device" |
+| `device.info` | `den.device.info()` | "See this device's model, processor, graphics and memory" |
+| `game.settings` | `den.game.settings`, `den.game.set` for games of `systems` (needs `feature.tune.1`) | "Change the settings of single games of these consoles: ..." |
+| `steam` | `den.steam.*` (needs `feature.tune.1`) | "See your Steam games and change their launch options and Proton version" |
 
 `den.http.request` (any method, bodies, multipart, answer headers) needs `http`,
 `http.user_host` or `http.local`; see `docs/sync.md`, section 4.
@@ -159,6 +162,12 @@ Paths are relative to the plugin's data folder; `..` and absolute paths are erro
 | `den.ui.toast(text)`, `den.ui.confirm{title, message, yes}` (wait) | - / boolean |
 | `den.app.open_game(id)` | opens the game's details page |
 | `den.sleep(ms)` (wait), `den.now()` | - / Unix seconds |
+| `den.device.info()` (wait) | `{name, known, manufacturer, model, soc, os, os_version, os_name, steamos, cpu_cores, ram_mb, gpu, handheld, form, tier, screen = {width, height, refresh_hz}}`; `soc` is the CPU's name on a PC. Section 4.2 |
+| `den.game.settings(id)` (wait) | `{id, name, system, core, core_name, known, options = { {key, label, value, values, own} }}` |
+| `den.game.set(id, {key = value or den.json.null})` (wait) | the game's own values before (`den.json.null` for none), after the app asked the user |
+| `den.steam.status()` (wait) | `{installed, can_change, note, apps = { {appid, name, shortcut} }, tools = { {name, display} }}` |
+| `den.steam.config(appid)` (wait) | `{launch_options, compat_tool, compat_tool_display}` |
+| `den.steam.set{appid, name?, launch_options?, compat_tool?}` (wait) | true, after the app asked the user |
 
 `cover` is a path in the plugin's folder, an https URL of an allowed host, or nil (the base
 game's cover with a "Hack" label). The HTTP client sends `User-Agent: EmuDEN/<app version>
@@ -243,6 +252,36 @@ Limits: a callback is stopped with an error after 200 million VM instructions (c
 or when the allocator passes `limits.memory_mb`; time spent waiting does not count. A
 plugin whose callback failed shows the message with "Close" and "Try again"; three failures
 in a row stop it until it is opened again. Scripts are loaded as text only.
+
+### 4.2 Tuning: `den.device.info`, `den.game`, `den.steam`
+
+For plugins that set games up from community reports (`emuden.tune.*` in emuden-plugins). A
+plugin lists `feature.tune.1` in `needs`.
+
+- `den.game.set` and `den.steam.set` work only inside `plugin.actions.*`, after something the
+  user pressed. The app then asks its own question, which names the game and lists every
+  change ("Resolution: 1x -> 2x"). Nothing is changed when the user says no (`nil,
+  "cancelled"`).
+- `den.game.set` writes the game's own layer of the settings (the game's Settings page), so
+  "Reset" on that page or `den.json.null` brings the console's value back. When the core's
+  options are known (a game of the core ran once), every key and value must be one the core
+  offers; before that, any key is stored and the player ignores values the core does not have.
+  `set` returns the values it replaced, for undo.
+- `den.steam` reads Steam's files (library folders, `appmanifest_*.acf`, every user's
+  `shortcuts.vdf` and `localconfig.vdf`, `config.vdf`; `library/include/den/library/steam.h`).
+  Changes go through the running client: `SteamClient.Apps.SetAppLaunchOptions` (or
+  `SetShortcutLaunchOptions` for a non-Steam shortcut) and `SpecifyCompatTool`, evaluated in
+  Steam's SharedJSContext over its local DevTools port `127.0.0.1:8080`, then read back with
+  `RegisterForAppDetails`. The app only uses the port when Steam's
+  `.cef-enable-remote-debugging` marker exists (Decky Loader creates it); it never turns it on.
+  Without it `can_change` is false and `note` says why: Steam rewrites its files while it
+  runs, so the app does not write them.
+- Launch options must pass `library::steam::CheckLaunchOptions`, because Steam runs them
+  through a shell: words of `A-Z a-z 0-9 _ - . , = : / + @`, `%command%` at most once, and
+  before it only environment variables of known prefixes (`PROTON_`, `DXVK_`, `VKD3D_`,
+  `WINE...`, `RADV_`, `MESA_`, `MANGOHUD`, ...) and the wrappers `gamemoderun`, `mangohud`,
+  `gamescope`, `obs-gamecapture`, `prime-run` with flags that hold no path. `LD_PRELOAD`, a
+  script path or any shell syntax is refused before the user is asked.
 
 ## 5. UI model
 

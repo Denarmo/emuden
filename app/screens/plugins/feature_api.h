@@ -6,10 +6,12 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "den/base/jobs.h"
 #include "den/plugins/feature_host.h"
+#include "den/plugins/feature_tune.h"
 #include "den/plugins/feature_ui.h"
 
 namespace den::app {
@@ -22,6 +24,8 @@ bool FindFeaturePlugin(const std::string& id, plugins::FeaturePlugin& out);
 void InstallFeaturePlugin(const std::string& id, bool consent);
 /// The running install or removal of a plugin, or null.
 JobPtr FeaturePluginJob(const std::string& id);
+/// What den.device.info, den.game and den.steam of feature plugins reach (plugin_tune.cpp).
+std::shared_ptr<plugins::TuneServices> CreateTuneServices();
 void TrackFeaturePluginJob(const std::string& id, const std::string& name, const std::string& done,
                            JobPtr job);
 
