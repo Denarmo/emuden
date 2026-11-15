@@ -142,6 +142,33 @@ have a lock of their own (`files_mutex_`), held by a run's regular part but not 
 uploads. A run's regular part gives the lock to a waiting game between two files and leaves
 out what the game's sync did meanwhile.
 
+### 3.4 Continue on any device
+
+Home's first row, "Continue", shows the games played last on any of the user's devices (at
+most 4, `sync::ContinueGames`): this device's own play and the other devices' play time files
+under `<data>/sync/playtime/`, each game once, by its latest session. A card shows the picture
+of the moment the game was left, the device ("On Legion Go S") and how long ago.
+
+- The player writes that picture beside the resume state when a session closes:
+  `states/<system>/<id>.resume.png`, portable `states/<system>/<rom stem>.resume.png`. It
+  syncs with the states. A resume state written within a day after the session started is
+  taken as that session's: its time is when the game was left, and its picture is shown.
+- When a game ends, the play time file goes up after the game's saves and states: a device
+  that sees the session finds its files online.
+- Choosing a card starts the game (`continue=1` for the player screen): the check before it
+  starts (section 3.3) brings the newer resume state down, for up to 30 s instead of 3 with
+  "Getting where you left off on <device>" and its progress, and the core loads it.
+- A game only another device has shows by its ROM's name; when the online game library has it
+  (`games` on), choosing it offers the download, else it says where it is.
+- Home looks again every 2 s (a sync brings new play or pictures) and asks for a sync when it
+  is shown and the last one is over a minute old.
+- Leaving a game shows "Saving to the cloud… N of M" with a bar while its files go up, then
+  "Saved to the cloud" (or that they go up with the next sync). Closing the app while a game is
+  open leaves it as "Exit to home" does and waits for its files, 10 s at most; closing again
+  does not wait.
+- Interface layouts (`carousel`, `shelf3d`) show the same cards as a "Continue" tab first
+  (`tabs.continue`, on by default; look key `continue`), the picture above the name.
+
 ## 4. HTTP for plugins (platform and `den.http`)
 
 `pal::HttpRequest` gains `method` (GET, POST, PUT, PATCH, DELETE, HEAD), `body` (in memory)

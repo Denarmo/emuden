@@ -132,6 +132,9 @@ public:
     std::size_t Depth() const;
 
     void Toast(std::string text, float seconds = 3.0f);
+    /// A note that stays at the top until it is set again or cleared (empty text), with a bar
+    /// for `fraction` (0..1; negative: none), for work that goes on behind the pages.
+    void SetNote(std::string text, float fraction = -1.0f);
     /// A modal question. `on_yes` runs when the confirm button is chosen. The selection starts
     /// on the cancel button unless `yes_first` (for questions whose yes loses nothing).
     void Confirm(std::string title, std::string message, std::string yes_label,

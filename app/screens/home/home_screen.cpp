@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // The first screen: the rail, a clock, the selected game's name and records, and shelves of
-// covers ("Continue playing", favourites, one per console) over the selected cover, blurred.
+// covers (Continue from any device, recently played, favourites, one per console) over the
+// selected cover, blurred.
 
+#include <algorithm>
 #include <ctime>
 #include <format>
 #include <map>
@@ -12,7 +14,10 @@
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "collections.h"
+#include "continue_row.h"
 #include "den/app/registry.h"
+#include "den/base/files.h"
+#include "den/platform/pal.h"
 #include "game_widgets.h"
 #include "games.h"
 #include "strings.h"
@@ -23,6 +28,7 @@ namespace den::app {
 namespace {
 
 constexpr int RECENT_LIMIT = 12;
+constexpr double CONTINUE_POLL = 2.0; // seconds between looks at what Continue shows
 constexpr std::int64_t ADDED_WINDOW = 30 * 24 * 3600; // "recently" added: the last 30 days
 
 // The games added lately, newest first; none when that is the whole library (a first scan).
@@ -68,8 +74,16 @@ public:
         list->id = "home.shelves";
         list->pad_bottom = 24;
 
-        AddShelf(list, "recent", Tr("home.continue"), WithoutHidden(svc.library->RecentlyPlayed(RECENT_LIMIT)),
-                 Tr("home.continue_badge"));
+        cards_ = ContinueCards();
+        signature_ = ContinueSignature(cards_);
+        polled_ = pal::NowSeconds();
+        AddContinue(list);
+        std::vector<library::Entry> recent = WithoutHidden(svc.library->RecentlyPlayed(RECENT_LIMIT));
+        std::erase_if(recent, [&](const library::Entry& game) {
+            return std::any_of(cards_.begin(), cards_.end(),
+                               [&](const ContinueCard& card) { return card.item.game_id == game.id; });
+        });
+        AddShelf(list, "recent", Tr("home.recently_played"), recent, Tr("home.continue_badge"));
         AddShelf(list, "added", Tr("home.recently_added"), RecentlyAdded(games.size()), "", false);
         AddShelf(list, "favourites", Tr("home.favourites"), WithoutHidden(svc.library->Favourites()), "");
         int collection = 0;
@@ -98,6 +112,16 @@ public:
             Rebuild();
             return;
         }
+        if (const double now = pal::NowSeconds(); now - polled_ >= CONTINUE_POLL) {
+            polled_ = now;
+            if (ContinueSignature(ContinueCards()) != signature_) {
+                Rebuild();
+                return;
+            }
+            for (auto& [tile, card] : continue_tiles_) {
+                tile->line = ContinueLine(card); // "5 min ago" moves on
+            }
+        }
         if (clock_) {
             clock_->text = ClockText();
         }
@@ -108,6 +132,10 @@ public:
         const float rail = 232;
         backdrop_.Draw(ctx, gfx::Rect{rail, 0, ctx.canvas->Width() - rail, ctx.canvas->Height()});
         ui::Page::Draw(ctx, area);
+    }
+
+    void OnShow() override {
+        RefreshContinue();
     }
 
     bool OnEvent(const input::Event& event) override {
@@ -124,7 +152,7 @@ public:
         ui::Stage& stage = *Svc().stage;
         switch (nav) {
         case input::Nav::Option:
-            if (OnGame()) {
+            if (OnGame() && Svc().library->Find(selected_)) {
                 stage.Push("details", {{"id", selected_}});
             }
             return true;
@@ -177,6 +205,35 @@ private:
         go("home.open_settings", Tr("rail.settings"), "settings");
     }
 
+    // Continue: wide cards with the moment each game was left, the device and how long ago.
+    void AddContinue(ui::Node* list) {
+        continue_tiles_.clear();
+        if (cards_.empty()) {
+            return;
+        }
+        ui::Node* section = list->Add(ui::MakeBox(ui::Axis::Column, 6));
+        auto heading = ui::MakeHeading(Tr("home.continue"));
+        heading->size = 20;
+        heading->tone = ui::Tone::Dim;
+        section->Add(std::move(heading));
+        ui::Node* shelf = section->Add(ui::MakeShelf(18));
+        shelf->id = "shelf.continue";
+        shelf->SetPadding(10, 10);
+        shelf->pad_right = 32;
+        for (const ContinueCard& card : cards_) {
+            auto* tile = shelf->Emplace<ContinueTile>(card);
+            tile->id = "continue." + ContinueId(card);
+            tile->on_activate = [card] { ChooseContinue(card); };
+            tile->on_focus = [this, card] {
+                selected_ = ContinueId(card);
+                name_->text = card.game.name;
+                records_->text = ContinueLine(card);
+                backdrop_.Set(card.item.screenshot.empty() ? card.game.cover : PathToUtf8(card.item.screenshot));
+            };
+            continue_tiles_.emplace_back(tile, card);
+        }
+    }
+
     void AddShelf(ui::Node* list, const std::string& id, const std::string& title,
                   const std::vector<library::Entry>& games, const std::string& badge, bool show_badge = true) {
         if (games.empty()) {
@@ -223,6 +280,10 @@ private:
     std::string selected_;
     bool by_pointer_ = false;
     std::uint64_t revision_ = 0;
+    std::vector<ContinueCard> cards_;
+    std::vector<std::pair<ContinueTile*, ContinueCard>> continue_tiles_;
+    std::string signature_;
+    double polled_ = 0;
 };
 
 } // namespace

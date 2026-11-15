@@ -8,12 +8,15 @@
 
 #include <string>
 
+#include "den/ui/page.h"
+
 namespace den::app {
 
 /// Starts the library entry `game_id`. A ROM whose console's core is not installed asks to
 /// download it first (the "install" screen) and starts afterwards. Everything that can go
 /// wrong ends in a toast or a dialog; nothing is thrown.
-/// `restart` starts a ROM from the beginning instead of where it was left.
-void StartGame(const std::string& game_id, bool restart = false);
+/// `restart` starts a ROM from the beginning instead of where it was left. `extra` goes to the
+/// player screen's parameters (Continue's "continue" and "from").
+void StartGame(const std::string& game_id, bool restart = false, const ui::Params& extra = {});
 
 } // namespace den::app

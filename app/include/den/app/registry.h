@@ -41,6 +41,10 @@ public:
     void AddStartup(std::function<void()> hook);
     /// Runs every frame on the main thread, before the screens update.
     void AddFrame(std::function<void()> hook);
+    /// Asked every frame once the app is to close: true while it should wait a little (work
+    /// that must not be lost). The app closes when none does, after a few seconds at most, or
+    /// at once when the user asks to close again.
+    void AddQuitHold(std::function<bool()> hook);
 
     const std::vector<std::pair<std::string, ui::Stage::Factory>>& Screens() const {
         return screens_;
@@ -54,12 +58,16 @@ public:
     const std::vector<std::function<void()>>& Frame() const {
         return frame_;
     }
+    const std::vector<std::function<bool()>>& QuitHolds() const {
+        return quit_holds_;
+    }
 
 private:
     std::vector<std::pair<std::string, ui::Stage::Factory>> screens_;
     std::vector<RailEntry> rail_;
     std::vector<SettingsSection> settings_;
     std::vector<std::function<void()>> startup_, frame_;
+    std::vector<std::function<bool()>> quit_holds_;
 };
 
 struct Registrar {
@@ -90,3 +98,5 @@ struct Registrar {
     DEN_REGISTRAR([](::den::app::Registry& r) { r.AddStartup(__VA_ARGS__); })
 #define DEN_REGISTER_FRAME(...)                                                                   \
     DEN_REGISTRAR([](::den::app::Registry& r) { r.AddFrame(__VA_ARGS__); })
+#define DEN_REGISTER_QUIT_HOLD(...)                                                               \
+    DEN_REGISTRAR([](::den::app::Registry& r) { r.AddQuitHold(__VA_ARGS__); })

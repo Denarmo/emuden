@@ -5,9 +5,12 @@
 // section 3.3): a newer online save comes down without a question, a save changed on both
 // devices asks which one to keep. Offline, slow or skipped, the game starts as it is.
 
+#include <algorithm>
 #include <ctime>
 #include <format>
 
+#include "../home/game_widgets.h"
+#include "../home/games.h"
 #include "../sync/sync_glue.h"
 #include "den/app/pages.h"
 #include "den/base/log.h"
@@ -19,6 +22,9 @@ namespace den::app {
 namespace {
 
 constexpr double CHECK_SECONDS = 3.0;
+// From Home's Continue the moment it was left on another device is what the user asked for:
+// it may take a while to come down (Skip starts the game as it is here).
+constexpr double CONTINUE_SECONDS = 30.0;
 constexpr float ROW_HEIGHT = 52;
 
 // "Today, 14:05": the day as the library shows it, and the time within the last month.
@@ -39,6 +45,10 @@ struct PlayerScreen::SaveCheck {
     sync::GameCheck result;
     JobPtr job;
     double started = 0;
+    double seconds = CHECK_SECONDS;
+    bool from_continue = false;
+    ui::Label* progress = nullptr; // shown while a Continue check brings files down
+    ProgressBar* bar = nullptr;
     bool resolving = false;
     Status resolved;
 };
@@ -51,8 +61,10 @@ bool PlayerScreen::StartSaveCheck() {
     }
     auto check = std::make_shared<SaveCheck>();
     check->started = pal::NowSeconds();
+    check->from_continue = Param("continue") == "1";
+    check->seconds = check->from_continue ? CONTINUE_SECONDS : CHECK_SECONDS;
     check->job = Svc().jobs->Run("check saves", [engine, check, id = game_.id](Job&) {
-        check->result = engine->CheckGame(id, check->gate, CHECK_SECONDS);
+        check->result = engine->CheckGame(id, check->gate, check->seconds);
         return Status();
     });
     check_ = check;
@@ -80,7 +92,8 @@ void PlayerScreen::TickSaveCheck() {
         return;
     }
     if (!done) {
-        if (pal::NowSeconds() - check->started >= CHECK_SECONDS) {
+        ShowCheckProgress(*check);
+        if (pal::NowSeconds() - check->started >= check->seconds) {
             check->gate.Abandon(); // offline or slow: the game starts with what it has
             log::Info("player", "save check for {} took too long; starting", game_.name);
             check_ = nullptr;
@@ -98,11 +111,29 @@ void PlayerScreen::TickSaveCheck() {
         Rebuild();
         return;
     }
-    if (result.downloaded > 0) {
+    if (result.downloaded > 0 && !check->from_continue) {
         GetStage().Toast("Using your newer save from online");
     }
     check_ = nullptr;
     Proceed();
+}
+
+void PlayerScreen::ShowCheckProgress(SaveCheck& check) {
+    sync::Engine* engine = SyncSvc();
+    if (check.progress == nullptr || check.bar == nullptr || engine == nullptr) {
+        return;
+    }
+    const sync::GameTransfer transfer = engine->GameProgress(true);
+    if (transfer.game_id != game_.id || transfer.total == 0) {
+        check.progress->text = "Looking online\xE2\x80\xA6";
+        check.bar->fraction = -1;
+        return;
+    }
+    const float part = transfer.fraction >= 0 ? transfer.fraction : 0.0f;
+    check.bar->fraction = std::clamp((static_cast<float>(transfer.done) + part) / static_cast<float>(transfer.total),
+                                     0.0f, 1.0f);
+    check.progress->text = std::format("{} of {}", std::min(transfer.done + 1, transfer.total), transfer.total) +
+                           (transfer.size > 0 ? " \xC2\xB7 " + SizeText(transfer.size) : std::string());
 }
 
 void PlayerScreen::SkipSaveCheck() {
@@ -136,6 +167,10 @@ void PlayerScreen::Choose(bool online) {
 }
 
 void PlayerScreen::BuildSaveCheck() {
+    if (check_) {
+        check_->progress = nullptr; // the nodes of the last build are gone
+        check_->bar = nullptr;
+    }
     const ui::Theme& theme = *Svc().theme;
     ui::Node& root = Root();
     root.axis = ui::Axis::Column;
@@ -155,7 +190,18 @@ void PlayerScreen::BuildSaveCheck() {
     if (!choosing) {
         const bool resolving = check_ && check_->resolving;
         panel->Emplace<ui::Label>(game_.name, theme.text_heading, gfx::FONT_BOLD);
-        line(resolving ? "Getting your save ready\xE2\x80\xA6" : "Checking for newer saves\xE2\x80\xA6", true);
+        const std::string from = Param("from");
+        const bool picking_up = check_ && check_->from_continue && !resolving;
+        line(resolving    ? "Getting your save ready\xE2\x80\xA6"
+             : picking_up ? "Getting where you left off" + (from.empty() ? std::string() : " on " + from) + "\xE2\x80\xA6"
+                          : "Checking for newer saves\xE2\x80\xA6",
+             true);
+        if (picking_up) {
+            check_->progress = panel->Emplace<ui::Label>(" ", theme.text_small);
+            check_->progress->tone = ui::Tone::Dim;
+            check_->bar = panel->Emplace<ProgressBar>();
+            check_->bar->pad_bottom = 6;
+        }
         if (!resolving) {
             ui::Node* list = panel->Add(ui::MakeBox(ui::Axis::Column, 6));
             AddRows(list, {ActionRow("sync.skip", "Skip", [this] { SkipSaveCheck(); })}, ROW_HEIGHT);

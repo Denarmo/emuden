@@ -10,6 +10,7 @@
 #include <map>
 
 #include "../details/launch.h"
+#include "../home/continue_row.h"
 #include "../home/game_widgets.h"
 #include "../home/games.h"
 #include "../home/strings.h"
@@ -18,6 +19,7 @@
 #include "den/app/app.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
+#include "den/platform/pal.h"
 #include "interfaces.h"
 
 namespace den::app {
@@ -26,6 +28,7 @@ namespace {
 
 constexpr int RECENT_LIMIT = 15;
 constexpr int GRADIENT_BANDS = 16;
+constexpr double CONTINUE_POLL = 2.0; // seconds between looks at what Continue shows
 
 struct TabData {
     std::string key, label;
@@ -33,6 +36,7 @@ struct TabData {
     std::string wallpaper;
     float aspect = 0.75f;
     std::vector<library::Entry> games;
+    std::vector<ContinueCard> cards; // the Continue tab: one per game
 };
 
 // Where the user was, so a game started and left, or a trip to Settings, comes back to it.
@@ -138,15 +142,27 @@ public:
         }
         carousel_->on_select = [this](const library::Entry& game) { ShowGame(game); };
         carousel_->on_activate = [this] {
-            if (const library::Entry* game = carousel_->Selected(); game && !carousel_->Launching()) {
-                carousel_->Launch([id = game->id] { StartGame(id); });
+            const library::Entry* game = carousel_->Selected();
+            if (game == nullptr || carousel_->Launching()) {
+                return;
             }
+            if (const ContinueCard* card = SelectedCard()) {
+                if (card->item.game_id.empty()) {
+                    ChooseContinue(*card); // only another device has it: its download
+                } else {
+                    carousel_->Launch([card = *card] { ChooseContinue(card); });
+                }
+                return;
+            }
+            carousel_->Launch([id = game->id] { StartGame(id); });
         };
 
         below_ = root.Add(ui::MakeBox(ui::Axis::Column, 6));
         ui::Node* info = below_->Add(ui::MakeBox(ui::Axis::Column, 4));
         info->align = ui::Align::Center;
         info->pad_bottom = 8;
+        moment_ = info->Emplace<MomentPicture>(224, 126);
+        moment_->visible = false;
         name_ = info->Emplace<ui::Label>(" ", theme_.text_title, gfx::FONT_BOLD);
         name_->text_align = ui::Align::Center;
         records_ = info->Emplace<ui::Label>(" ");
@@ -170,6 +186,16 @@ public:
         if (GamesRevision() != revision_) {
             Rebuild();
             return;
+        }
+        if (const double now = pal::NowSeconds(); now - polled_ >= CONTINUE_POLL) {
+            polled_ = now;
+            if (ContinueSignature(ContinueCards()) != signature_) {
+                Rebuild();
+                return;
+            }
+            if (const ContinueCard* card = SelectedCard()) {
+                records_->text = ContinueLine(*card); // "5 min ago" moves on
+            }
         }
         if (clock_) {
             clock_->text = ClockText();
@@ -212,12 +238,12 @@ public:
             }
             return true;
         case input::Nav::Option:
-            if (game) {
+            if (game && Svc().library->Find(game->id)) {
                 stage.Push("details", {{"id", game->id}});
             }
             return true;
         case input::Nav::Extra:
-            if (game) {
+            if (game && Svc().library->Find(game->id)) {
                 Svc().library->SetFavourite(game->id, !game->favourite);
                 stage.Toast(TrF(game->favourite ? "home.unfavourited" : "home.favourited", game->name), 2.0f);
             }
@@ -262,6 +288,15 @@ private:
         return carousel_ != nullptr && Focus() == carousel_;
     }
 
+    // The Continue card of the selected game, when the Continue tab is chosen.
+    const ContinueCard* SelectedCard() const {
+        if (carousel_ == nullptr || tab_ >= tabs_.size() || tabs_[tab_].cards.empty()) {
+            return nullptr;
+        }
+        const std::vector<ContinueCard>& cards = tabs_[tab_].cards;
+        return carousel_->Index() < cards.size() ? &cards[carousel_->Index()] : nullptr;
+    }
+
     void FocusCarousel() {
         if (carousel_) {
             SetFocus(carousel_, false);
@@ -285,6 +320,19 @@ private:
                                  look.wallpaper.empty() ? spec_->wallpaper : look.wallpaper, aspect, std::move(list)});
             }
         };
+        cards_ = ContinueCards();
+        signature_ = ContinueSignature(cards_);
+        polled_ = pal::NowSeconds();
+        if (spec_->tab_continue && !cards_.empty()) {
+            std::vector<library::Entry> list;
+            for (const ContinueCard& card : cards_) {
+                library::Entry entry = card.game;
+                entry.id = ContinueId(card);
+                list.push_back(std::move(entry));
+            }
+            add("continue", Tr("home.tab_continue"), spec_->LookFor("continue", "recent"), 0.75f, std::move(list));
+            tabs_.back().cards = cards_;
+        }
         if (spec_->tab_recent) {
             add("recent", Tr("home.tab_recent"), spec_->LookFor("recent", "recent"), 0.75f,
                 WithoutHidden(svc.library->RecentlyPlayed(RECENT_LIMIT)));
@@ -332,9 +380,13 @@ private:
     void ShowGame(const library::Entry& game) {
         Remembered().game = game.id;
         name_->text = game.name;
-        records_->text = RecordsLine(game);
         position_->text = TrF("home.position", carousel_->Index() + 1, tabs_[tab_].games.size());
-        backdrop_.Set(game.cover);
+        const ContinueCard* card = SelectedCard();
+        const std::string moment = card != nullptr ? PathToUtf8(card->item.screenshot) : std::string();
+        records_->text = card != nullptr ? ContinueLine(*card) : RecordsLine(game);
+        moment_->path = moment;
+        moment_->visible = !moment.empty();
+        backdrop_.Set(moment.empty() ? game.cover : moment);
     }
 
     void DrawBackdrop(ui::Context& ctx, const gfx::Rect& area, const TabData* tab) {
@@ -401,7 +453,11 @@ private:
     ui::Label* records_ = nullptr;
     ui::Label* position_ = nullptr;
     ui::Label* clock_ = nullptr;
+    MomentPicture* moment_ = nullptr;
     Backdrop backdrop_;
+    std::vector<ContinueCard> cards_;
+    std::string signature_;
+    double polled_ = 0;
     gfx::Color color_;
     std::uint64_t revision_ = 0;
 };

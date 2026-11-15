@@ -94,6 +94,7 @@ struct InterfaceSpec {
     float side_angle = 0.9f; // shelf3d: how far side objects turn towards the middle (radians)
     float sway = 0.12f;      // shelf3d: the selected object's slow turn either way (radians)
 
+    bool tab_continue = true; // a "Continue" tab first: the games last played on any device
     bool tab_recent = true; // a "Recent" tab first when something was played
     bool tab_all = true;    // an "All" tab with every game
 

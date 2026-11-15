@@ -16,7 +16,8 @@
   "hint.next_console": "Next console",
 
   "home.title": "Home",
-  "home.continue": "Continue playing",
+  "home.continue": "Continue",
+  "home.recently_played": "Recently played",
   "home.continue_badge": "Continue",
   "home.favourites": "Favourites",
   "home.favourited": "{} added to favourites",
@@ -24,6 +25,7 @@
   "home.empty_title": "No games yet",
   "home.empty_message": "Add the folders your games are in and they show up here.",
   "home.add_folders": "Game folders",
+  "home.tab_continue": "Continue",
   "home.tab_recent": "Recent",
   "home.tab_all": "All",
   "home.position": "{} of {}",

@@ -36,6 +36,10 @@ void Registry::AddFrame(std::function<void()> hook) {
     frame_.push_back(std::move(hook));
 }
 
+void Registry::AddQuitHold(std::function<bool()> hook) {
+    quit_holds_.push_back(std::move(hook));
+}
+
 std::vector<RailEntry> Registry::Rail() const {
     std::vector<RailEntry> out = rail_;
     std::stable_sort(out.begin(), out.end(),

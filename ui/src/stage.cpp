@@ -75,6 +75,8 @@ struct Stage::Impl {
     std::vector<std::unique_ptr<Page>> stack;
     std::vector<Pending> pending;
     std::vector<ToastItem> toasts;
+    std::string note;
+    float note_fraction = -1;
     std::unique_ptr<Dialog> dialog;
     std::unique_ptr<TextEntry> entry;
     KeyboardSetup keyboard;
@@ -182,6 +184,20 @@ struct Stage::Impl {
             y += 52;
         }
         std::erase_if(toasts, [](const ToastItem& t) { return t.left <= 0; });
+        if (!note.empty()) {
+            const float w = std::min(ctx.canvas->Width() - 64, ctx.Text().Measure(note, theme.text_body) + 40);
+            const gfx::Rect box{(ctx.canvas->Width() - w) * 0.5f, y, w, 44};
+            ctx.canvas->FillRect(box, theme.dialog, 22);
+            ctx.canvas->StrokeRect(box, theme.panel_strong, 1.5f, 22);
+            ctx.canvas->DrawText(ctx.Text().Elide(note, theme.text_body, w - 40), box.x + 20, box.y + 8,
+                                 theme.text_body, theme.fg);
+            if (note_fraction >= 0) {
+                const gfx::Rect track{box.x + 20, box.Bottom() - 9, box.w - 40, 3};
+                ctx.canvas->FillRect(track, theme.panel_strong, 1.5f);
+                ctx.canvas->FillRect(gfx::Rect{track.x, track.y, track.w * std::min(note_fraction, 1.0f), track.h},
+                                     theme.fg, 1.5f);
+            }
+        }
     }
 
     void DrawDialog(Context& ctx) {
@@ -284,6 +300,14 @@ void Stage::Toast(std::string text, float seconds) {
     if (impl_->toasts.size() > 4) {
         impl_->toasts.erase(impl_->toasts.begin());
     }
+}
+
+void Stage::SetNote(std::string text, float fraction) {
+    if (text != impl_->note && !text.empty() && impl_->note.empty()) {
+        log::Info("ui", "note: {}", text);
+    }
+    impl_->note = std::move(text);
+    impl_->note_fraction = fraction;
 }
 
 void Stage::Confirm(std::string title, std::string message, std::string yes_label,
@@ -407,6 +431,9 @@ std::string Stage::StateJson() const {
         toasts.push_back(JsonString(toast.text));
     }
     members.emplace_back("toasts", JsonArray(std::move(toasts)));
+    if (!impl_->note.empty()) {
+        members.emplace_back("note", JsonString(impl_->note));
+    }
     // Every scrolling node of the page: where it is, how far it can go, whether it moves.
     std::vector<JsonValue> scrollers;
     const auto collect = [&](const auto& self, const Node& node) -> void {

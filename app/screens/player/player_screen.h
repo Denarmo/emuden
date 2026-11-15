@@ -123,6 +123,7 @@ private:
     bool StartSaveCheck();
     void TickSaveCheck();
     void SkipSaveCheck();
+    void ShowCheckProgress(SaveCheck& check);
     void AbandonSaveCheck(); // the screen goes: the check writes nothing more
     void Choose(bool online);
     void BuildSaveCheck();

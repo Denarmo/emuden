@@ -28,6 +28,8 @@ namespace {
 constexpr float LOGICAL_HEIGHT = 720.0f;
 constexpr float MIN_LOGICAL_WIDTH = 760.0f;
 constexpr int KEY_F11 = 0x40000044; // SDLK_F11
+// How long closing may wait for the quit holds (a game's saves going up).
+constexpr double QUIT_HOLD_SECONDS = 10.0;
 
 // Pixels per logical unit: the window's height over the layout's, times the interface size
 // (bigger on small screens), held back where a narrow window would get too few units across.
@@ -204,8 +206,24 @@ int Run(int argc, char** argv) {
         double last = pal::NowSeconds();
         double fps_time = last;
         int fps_frames = 0;
-        while (!svc.quit) {
+        double quit_since = -1;
+        bool quit_again = false;
+        while (true) {
             const double now = pal::NowSeconds();
+            if (svc.quit) {
+                if (quit_since < 0) {
+                    quit_since = now;
+                }
+                bool hold = false;
+                if (!quit_again && now - quit_since < QUIT_HOLD_SECONDS) {
+                    for (const auto& hook : registry.QuitHolds()) {
+                        hold = hook() || hold;
+                    }
+                }
+                if (!hold) {
+                    break;
+                }
+            }
             const float dt = static_cast<float>(std::clamp(now - last, 0.0, 0.1));
             last = now;
             if (++fps_frames, now - fps_time >= 0.5) {
@@ -227,6 +245,7 @@ int Run(int argc, char** argv) {
                     event.y -= static_cast<float>(svc.title_bar_px); // the screens start under the bar
                 }
                 if (event.type == input::Event::Type::Quit) {
+                    quit_again = svc.quit; // a second close does not wait
                     svc.quit = true;
                 } else if (event.type == input::Event::Type::Key && event.down && !event.repeat &&
                            event.key == KEY_F11 && pal::GetCaps().windowed) {

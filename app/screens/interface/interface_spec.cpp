@@ -210,6 +210,7 @@ Result<InterfaceSpec> ParseInterface(std::string_view manifest_json, const std::
     spec.sway = sway_degrees * 0.0174533f;
 
     const JsonValue* tabs = look->Find("tabs");
+    ReadBool(tabs, "continue", spec.tab_continue);
     ReadBool(tabs, "recent", spec.tab_recent);
     ReadBool(tabs, "all", spec.tab_all);
 

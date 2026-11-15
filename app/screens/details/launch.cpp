@@ -40,21 +40,22 @@ void StartInEngine(const library::Entry& game) {
 }
 
 // ROMs: the player screen opens the session for the entry.
-void StartInPlayer(const library::Entry& game, bool restart) {
+void StartInPlayer(const library::Entry& game, bool restart, const ui::Params& extra) {
     Services& svc = Svc();
     if (!svc.stage->HasRoute("player")) {
         svc.stage->Toast(Tr("launch.no_player"));
         return;
     }
     log::Info("launch", "player: {} ({})", game.name, game.system);
-    ui::Params params{{"id", game.id}};
+    ui::Params params = extra;
+    params["id"] = game.id;
     if (restart) {
         params["resume"] = "0";
     }
     svc.stage->Push("player", std::move(params));
 }
 
-void StartRom(const library::Entry& game, bool restart) {
+void StartRom(const library::Entry& game, bool restart, const ui::Params& extra) {
     Services& svc = Svc();
     const auto core = CoreForGame(game);
     const std::string console = SystemName(game.system);
@@ -80,15 +81,15 @@ void StartRom(const library::Entry& game, bool restart) {
         }
         svc.stage->Confirm(Tr("bios.missing_title"),
                            TrF("bios.missing_message", console, files, PathToUtf8(core->system_dir)),
-                           Tr("bios.start_anyway"), [game, restart] { StartInPlayer(game, restart); });
+                           Tr("bios.start_anyway"), [game, restart, extra] { StartInPlayer(game, restart, extra); });
         return;
     }
-    StartInPlayer(game, restart);
+    StartInPlayer(game, restart, extra);
 }
 
 } // namespace
 
-void StartGame(const std::string& game_id, bool restart) {
+void StartGame(const std::string& game_id, bool restart, const ui::Params& extra) {
     Services& svc = Svc();
     const auto game = svc.library->Find(game_id);
     if (!game) {
@@ -103,7 +104,7 @@ void StartGame(const std::string& game_id, bool restart) {
     if (console->runner == plugins::Runner::Engine) {
         StartInEngine(*game);
     } else {
-        StartRom(*game, restart);
+        StartRom(*game, restart, extra);
     }
 }
 
