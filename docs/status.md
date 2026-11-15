@@ -19,7 +19,7 @@ or per game); Auto keeps GL unless the core only asks for Vulkan.
 | Windows, RTX 5070 | PPSSPP (Vulkan) | Device made by the core, shared memory, 60 fps, picture right |
 | Windows, RTX 5070 | Play! Vulkan GS, Gran Turismo 4 (PAL) | 49.7 of 50 fps, as on GL; save and load state work |
 | Retroid Pocket Duo, Adreno 722 | Play! Vulkan GS, Gran Turismo 4 race | Hardware buffer share, picture right, but 4.8 fps with the GPU 99% busy (GL: 33 fps, GPU 26%). The cost is Play!'s mobile Vulkan GS, not the share (one 640x512 blit a frame). Keep Auto/GL there. |
-| Legion Go S, RADV | Play! Vulkan GS | Device and shared memory set up; the game then crashes in Play!'s JIT, as it does on GL with current Play! builds (0.77-30 is fine) |
+| Legion Go S, RADV | Play! Vulkan GS, Colin McRae Rally 3 | Shared memory, 50 of 50 fps, logo screen right (with Play!'s fix for its static C++ runtime, 0.77-41) |
 
 Play!'s Vulkan GS for libretro is on the Play! fork's branch `emuden-vulkan`.
 
