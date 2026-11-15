@@ -5,6 +5,9 @@
 // section 3.3): a newer online save comes down without a question, a save changed on both
 // devices asks which one to keep. Offline, slow or skipped, the game starts as it is.
 
+#include <ctime>
+#include <format>
+
 #include "../sync/sync_glue.h"
 #include "den/app/pages.h"
 #include "den/base/log.h"
@@ -17,6 +20,17 @@ namespace {
 
 constexpr double CHECK_SECONDS = 3.0;
 constexpr float ROW_HEIGHT = 52;
+
+// "Today, 14:05": the day as the library shows it, and the time within the last month.
+std::string When(std::int64_t unix_time) {
+    std::string text = SyncTimeText(unix_time);
+    const std::time_t time = static_cast<std::time_t>(unix_time);
+    const std::tm* local = unix_time > 0 ? std::localtime(&time) : nullptr;
+    if (local != nullptr && std::time(nullptr) - time < 30 * 86400) {
+        text += std::format(", {:02}:{:02}", local->tm_hour, local->tm_min);
+    }
+    return text;
+}
 
 } // namespace
 
@@ -128,7 +142,7 @@ void PlayerScreen::BuildSaveCheck() {
     root.justify = ui::Align::Center;
     root.align = ui::Align::Center;
     ui::Node* panel = root.Add(ui::MakeBox(ui::Axis::Column, 10));
-    panel->width = 620;
+    panel->width = 820;
     panel->background = theme.dialog;
     panel->SetPadding(28, 28);
     const bool choosing = phase_ == Phase::Choosing && check_;
@@ -143,7 +157,7 @@ void PlayerScreen::BuildSaveCheck() {
         panel->Emplace<ui::Label>(game_.name, theme.text_heading, gfx::FONT_BOLD);
         line(resolving ? "Getting your save ready\xE2\x80\xA6" : "Checking for newer saves\xE2\x80\xA6", true);
         if (!resolving) {
-            ui::Node* list = panel->Add(ui::MakeList(6));
+            ui::Node* list = panel->Add(ui::MakeBox(ui::Axis::Column, 6));
             AddRows(list, {ActionRow("sync.skip", "Skip", [this] { SkipSaveCheck(); })}, ROW_HEIGHT);
         }
         return;
@@ -151,15 +165,15 @@ void PlayerScreen::BuildSaveCheck() {
     const sync::GameCheck& result = check_->result;
     const std::string device = result.online_device.empty() ? "another device" : result.online_device;
     panel->Emplace<ui::Label>("Which save do you want?", theme.text_heading, gfx::FONT_BOLD);
-    line(game_.name + " was played on " + device + " and on this device", true);
-    line("since they last synced.", true);
-    line("Online: " + device + ", " + SyncTimeText(result.online_time), false);
-    line("This device: " + SyncTimeText(result.local_time), false);
+    line(game_.name + " was played on " + device, true);
+    line("and on this device since they last synced.", true);
+    line("Online: " + device + ", " + When(result.online_time), false);
+    line("This device: " + When(result.local_time), false);
     auto* note = panel->Emplace<ui::Label>("The other one is kept under Settings > Sync > Conflicts.",
                                            theme.text_small);
     note->tone = ui::Tone::Dim;
     note->pad_bottom = 6;
-    ui::Node* list = panel->Add(ui::MakeList(6));
+    ui::Node* list = panel->Add(ui::MakeBox(ui::Axis::Column, 6));
     AddRows(list,
             {ActionRow("sync.online", "Use the online save", [this] { Choose(true); }),
              ActionRow("sync.local", "Keep this device's save", [this] { Choose(false); })},
