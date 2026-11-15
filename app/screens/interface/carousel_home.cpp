@@ -187,6 +187,9 @@ public:
     }
 
     void Update(ui::Context&) override {
+        if (carousel_ && carousel_->Launching()) {
+            return; // a rebuild now would drop the game the launch is about to start
+        }
         if (GamesRevision() != revision_) {
             Rebuild();
             return;

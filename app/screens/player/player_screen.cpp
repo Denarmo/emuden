@@ -98,6 +98,7 @@ void PlayerScreen::Open() {
 
 void PlayerScreen::Proceed() {
     Services& svc = Svc();
+    MatchResumeCore();
     if (InSaveCheck()) {
         phase_ = Phase::Preparing;
         Rebuild();

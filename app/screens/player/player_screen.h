@@ -123,6 +123,9 @@ private:
     bool StartSaveCheck();
     void TickSaveCheck();
     void SkipSaveCheck();
+    /// The resume state was written by another core (another device plays this console with
+    /// another one): this launch uses that core when it is installed here.
+    void MatchResumeCore();
     void ShowCheckProgress(SaveCheck& check);
     void AbandonSaveCheck(); // the screen goes: the check writes nothing more
     void Choose(bool online);
