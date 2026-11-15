@@ -12,16 +12,18 @@ SteamOS (Legion Go S) feature by feature, with the Linux fixes it needed: `docs/
 
 Libretro cores can render with Vulkan; the picture reaches the GL interface through shared
 memory. Design: `docs/vulkan.md`. The renderer is a core option (Auto / OpenGL / Vulkan, per core
-or per game); Auto keeps GL unless the core only asks for Vulkan.
+or per game); Auto gives each core the API it asks for first.
 
 | Where | Core and game | Result |
 |---|---|---|
 | Windows, RTX 5070 | PPSSPP (Vulkan) | Device made by the core, shared memory, 60 fps, picture right |
 | Windows, RTX 5070 | Play! Vulkan GS, Gran Turismo 4 (PAL) | 49.7 of 50 fps, as on GL; save and load state work |
-| Retroid Pocket Duo, Adreno 722 | Play! Vulkan GS, Gran Turismo 4 race | Hardware buffer share, picture right, but 4.8 fps with the GPU 99% busy (GL: 33 fps, GPU 26%). The cost is Play!'s mobile Vulkan GS, not the share (one 640x512 blit a frame). Keep Auto/GL there. |
+| Retroid Pocket Duo, Adreno 722 | Play! Vulkan GS, Gran Turismo 4 race | Hardware buffer share, picture right. Play! 0.77-53 (PS2 1.1.13) fixed its mobile Vulkan GS (passes limited to the area drawn, no pass end per CLUT load, 24-bit stores without atomics): 4.6 to 35-43 fps, OpenGL 30-41 in the same runs. The EE thread (~100%, JIT) is now the limit for 50. Colin McRae Rally 3: ~50 fps. |
 | Legion Go S, RADV | Play! Vulkan GS, Colin McRae Rally 3 | Shared memory, 50 of 50 fps, logo screen right (with Play!'s fix for its static C++ runtime, 0.77-41) |
 
-Play!'s Vulkan GS for libretro is on the Play! fork's branch `emuden-vulkan`.
+Play! asks for Vulkan first where the GPU can run its Vulkan GS (desktop GPUs with fragment shader
+interlock, any Android GPU), so with the renderer on Auto it uses Vulkan there; OpenGL keeps the OpenGL
+renderer. Shipped in PS2 1.1.13 (Play! `emuden-0.77-53-g03545daf`).
 
 ## Engine apps through the Emulator Control Protocol (branch feat/ecp)
 
