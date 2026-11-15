@@ -32,6 +32,10 @@ public:
     void OpenBrowser(ui::Stage& stage);
     /// A tap or click at a point (logical units); true when it was on the button.
     bool Tap(float x, float y, ui::Stage& stage);
+    /// Where accepted files are copied: the opener's folder; empty = InboxDir().
+    void SetFolder(std::filesystem::path folder) {
+        folder_ = std::move(folder);
+    }
     /// The files the user said yes to, copied into the inbox; each is handed out once.
     std::vector<Download> TakeAccepted();
 
@@ -51,6 +55,7 @@ private:
     };
 
     std::string url_, host_, reason_;
+    std::filesystem::path folder_;
     std::vector<std::string> hosts_, wanted_;
     std::unique_ptr<pal::DownloadWatch> watch_;
     std::vector<pal::DownloadWatch::File> found_; // waiting to be asked about

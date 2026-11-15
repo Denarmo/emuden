@@ -329,6 +329,7 @@ private:
 
     void StartFallback(const std::string& url, const std::string& reason) {
         fallback_ = std::make_unique<Fallback>(url, hosts_, reason, wanted_);
+        fallback_->SetFolder(opener_.folder);
         g_state.fallback = true;
         g_state.watching = fallback_->Watching();
         g_state.url = url;

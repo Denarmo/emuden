@@ -55,7 +55,7 @@ Fallback::Fallback(std::string url, std::vector<std::string> hosts, std::string 
     }
     std::vector<std::filesystem::path> folders = pal::DownloadFolders();
     if (!folders.empty()) {
-        // JudgeDownload never takes a ROM image, whatever the opener listed.
+        // JudgeDownload takes a ROM image only for the browser plugin ("*").
         watch_ = std::make_unique<pal::DownloadWatch>(std::move(folders), [wanted = wanted_](const std::string& name) {
             return JudgeDownload(name, wanted) == Verdict::Take;
         });
@@ -116,12 +116,12 @@ void Fallback::Update(ui::Stage& stage) {
         std::format("It appeared in {} after this page was opened. EmuDEN takes a copy; your download stays where it is.",
                     folder),
         "Install",
-        [shared = shared_, file, host = host_] {
+        [shared = shared_, file, host = host_, dir = folder_.empty() ? InboxDir() : folder_] {
             std::error_code ec;
-            std::filesystem::create_directories(InboxDir(), ec);
+            std::filesystem::create_directories(dir, ec);
             Download download;
             download.name = pal::WebSafeFileName(file.name);
-            download.file = FreeFile(InboxDir(), download.name);
+            download.file = FreeFile(dir, download.name);
             download.host = host; // the site the page was opened for; the file came through the user's browser
             std::filesystem::copy_file(file.path, download.file, ec);
             if (ec) {
