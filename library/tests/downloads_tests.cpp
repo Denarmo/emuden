@@ -283,6 +283,11 @@ TEST_CASE("downloads: a patch with a checksum becomes a hack of the user's game"
     REQUIRE(second.record.replaced);
     REQUIRE(second.record.games.front().id == hack->id);
     REQUIRE(second.record.message == "Updated Monster Quest Remix to 1.1");
+
+    // Taking the hack back leaves no empty Hacks folder.
+    REQUIRE(f.setup->Undo(second.record.id).ok);
+    CHECK_FALSE(f.library->Find(hack->id));
+    CHECK_FALSE(fs::exists(f.roms / "gba" / "Hacks"));
 }
 
 TEST_CASE("downloads: a patch without a checksum is matched by name, else the user picks") {

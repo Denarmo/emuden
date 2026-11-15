@@ -211,6 +211,10 @@ public:
         for (fs::path cover = CoverBeside(rom); !cover.empty() && fs::remove(cover, ec);) {
             cover = CoverBeside(rom);
         }
+        // The last hack takes its Hacks folder with it.
+        if (EqualsNoCase(PathToUtf8(rom.parent_path().filename()), "Hacks") && fs::is_empty(rom.parent_path(), ec)) {
+            fs::remove(rom.parent_path(), ec);
+        }
         hooks_.drop(id);
         return {};
     }

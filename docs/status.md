@@ -19,13 +19,15 @@ and name, patches by checksum and name, archives, cue/bin and disc sets, BIOS na
 |---|---|
 | Windows (own portable profile) | uCity (GPL homebrew, `ucity.gbc` from its GitHub release) clicked with the virtual pad: "Added ucity to Game Boy Color". Pokemon Emerald Legacy 1.1.0 patches zip: a hack of the Emerald copy in the test library, then 1.1.4 "Updated Pokemon Emerald Legacy to 1.1.4". Downloads tab, undo, menu with bookmarks |
 | Legion Go S (own AppImage and profile, launched over ssh) | Bundled WebKitGTK 4.1 loaded, the release page loaded, `ucity.gbc` from a bookmark: "Added ucity to Game Boy Color" |
-| Retroid Pocket Duo (debug APK, test endpoint, then the earlier APK put back) | Android WebView in browser mode: the bar and the GitHub page drawn, `ucity.gbc` downloaded |
+| Retroid Pocket Duo (debuggable APK from main, plugin from the index, then removed) | uCity: "Added ucity to Game Boy Color" into the existing ROMS/GBC folder. Emerald Legacy 1.1.4 patches zip: a hack of a test Emerald copy, toast logged. Downloads tab listed both; both undone |
 
 Not tried: rar (refused with a message), xdelta and UPS patches live (unit tests only),
-multi-disc downloads live, the no-engine fallback live, the plugin's setup on Android, Game
-Mode pictures (an app started over ssh is not the one gamescope shows). On the PC, a toast
-pushes the page down for a moment, so a click right after one can miss; undo leaves the
-empty console folder it created.
+multi-disc downloads live, the no-engine fallback live, Game Mode pictures (an app started
+over ssh is not the one gamescope shows).
+
+Fixed after the first check: the page no longer moves down while toasts show (the bar repeats
+the newest toast), undo removes the console folder a setup made, and the last hack's undo
+removes its empty Hacks folder; a chosen chip's bold label is no longer cut off.
 
 ## RetroAchievements (2026-11-15)
 
