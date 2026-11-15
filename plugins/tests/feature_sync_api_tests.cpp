@@ -271,7 +271,8 @@ TEST_CASE("the host calls plugin.provider and gets its results") {
         end
         function plugin.provider.put(path, local_path, rev, modified)
           local data = den.files.read(local_path)
-          den.log("put " .. path .. " " .. #data .. " " .. tostring(rev) .. " " .. modified)
+          den.log("put " .. path .. " " .. #data .. " " .. tostring(rev) .. " " .. modified ..
+                  " size " .. den.files.size(local_path))
           return "r2"
         end
         function plugin.provider.get(path, local_path, progress)
@@ -306,7 +307,7 @@ TEST_CASE("the host calls plugin.provider and gets its results") {
     CHECK(results[0].value()[0].items[0].String("rev") == "r1");
     REQUIRE(results[1]);
     CHECK(results[1].value()[0].string == "r2");
-    CHECK(Logged(*runner, "put saves/gba/Game.srm 3 r1 42"));
+    CHECK(Logged(*runner, "put saves/gba/Game.srm 3 r1 42 size 3"));
     CHECK_FALSE(results[2]);
     CHECK(results[2].error() == "not there");
     CHECK(progress == std::vector<double>{5, 10});

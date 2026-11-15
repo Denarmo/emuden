@@ -145,6 +145,7 @@ Paths are relative to the plugin's data folder; `..` and absolute paths are erro
 | `den.files.take(token)` | copies that Downloads file to `"inbox/<name>"`; the original stays |
 | `den.files.list(dir)` / `remove(path)` / `exists(path)` | the plugin's own folder |
 | `den.files.read(path)` | text, at most 4 MiB (package files: `"package/<path>"`) |
+| `den.files.size(path)` | the file's size in bytes, also of a file the sync engine lent (`docs/sync.md`) |
 | `den.include(path)` | runs another script of the package, returns its value |
 | `den.patch.inspect(path)` (wait) | `{format, source_size?, source_crc32?, target_size?, target_crc32?}` |
 | `den.library.find{system?, crc32?, sha1?, md5?, size?}` (wait) | game or nil; hashes the candidates once and remembers them |

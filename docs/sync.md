@@ -92,6 +92,8 @@ call (`"sync:<token>"`, valid during that call only). `to_file` into the plugin'
 counts against its storage limit; a lent file has none. `den.http.get` stays as it is.
 
 `den.files.read(local_path)` reads a lent file too, as it is (binary-safe), up to 8 MiB.
+`den.files.size(local_path)` gives its size in bytes, of any size (the total a resumable
+upload's `Content-Range` names); it works on the plugin's own files as well.
 
 Hosts: `http.hosts` as before (https only), plus two permissions:
 - `http.user_host`: the plugin may reach one https or http host the user typed on its setup

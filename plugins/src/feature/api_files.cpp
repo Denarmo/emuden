@@ -204,6 +204,29 @@ int Read(lua_State* L) {
     return 1;
 }
 
+// The size in bytes of a file of the plugin's folder or of one the sync engine lent, so a
+// provider can upload a large file in slices (body_offset, body_length).
+int Size(lua_State* L) {
+    fs::path path;
+    const std::string name = luaL_checkstring(L, 1);
+    bool lent = false;
+    const Status found = name.starts_with("sync:") ? Runner::Of(L).ResolveFile(name, path, lent)
+                                                   : Runner::Of(L).Resolve(name, true, path);
+    if (!found.ok) {
+        return Refuse(L, found.error);
+    }
+    std::error_code ec;
+    if (!fs::is_regular_file(path, ec)) {
+        return Refuse(L, "there is no such file");
+    }
+    const std::uint64_t size = fs::file_size(path, ec);
+    if (ec) {
+        return Refuse(L, "the file could not be read");
+    }
+    lua_pushinteger(L, static_cast<lua_Integer>(size));
+    return 1;
+}
+
 // Only what the plugin itself brought in: downloads, inbox and cache.
 int Remove(lua_State* L) {
     const std::string name = luaL_checkstring(L, 1);
@@ -280,6 +303,7 @@ void RegisterFiles(lua_State* L, Runner& runner) {
     SetFunction(L, runner, "list", &List);
     SetFunction(L, runner, "exists", &Exists);
     SetFunction(L, runner, "read", &Read);
+    SetFunction(L, runner, "size", &Size);
     SetFunction(L, runner, "remove", &Remove);
     lua_setfield(L, -2, "files");
 }
