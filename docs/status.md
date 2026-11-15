@@ -43,6 +43,31 @@ Play! asks for Vulkan first where the GPU can run its Vulkan GS (desktop GPUs wi
 interlock, any Android GPU), so with the renderer on Auto it uses Vulkan there; OpenGL keeps the OpenGL
 renderer. Shipped in PS2 1.1.13 (Play! `emuden-0.77-53-g03545daf`).
 
+## Play together (2026-11-15)
+
+Two EmuDEN devices on the same network play one game: "Play together" on the game page and in
+the pause menu. The host is announced by UDP broadcast (port 47950, with a query/answer path for
+networks or devices that drop broadcasts), the guest picks it from a list, and the game runs over
+one TCP connection (47951) with ping and state shown. Code: `net/` (channel, discovery, party,
+lockstep), sockets in `platform/src/net_sockets.cpp`, the session side in
+`player/src/session_net.cpp`, screens in `app/screens/together/`.
+
+| System | Core | How |
+|---|---|---|
+| GB, GBC | TGB Dual (two-player subsystem) | Both devices run both Game Boys in lockstep; each shows and hears its own. The host's state is sent on join, the guest runs as many frames as the host had before taking it, and a CRC every 60 frames asks for the host's state when they differ. Each device's own save goes in its own Game Boy. |
+| GBA | gpSP | The core's link (libretro netpacket): wireless adapter for Emerald, FireRed and LeafGreen, cable for Ruby and Sapphire. Each device runs its own game. |
+| NDS | melonDS DS | The core's local wireless over netpacket. |
+| Others | the console's core | Input-delay lockstep from the host's state (no battery save written on the guest), CRC checks and resync. |
+
+Fast-forward, rewind and loading states are off while playing together. Tests: `net/tests` (two
+peers in one process over loopback: handshake, refusal, a guest vanishing, link packets, 600 frames
+of lockstep, a desync mended).
+
+Checked on Windows, two instances on one PC: discovery and joining; Tetris (GB) Mario vs. Luigi over
+the link cable with each instance playing its own Game Boy, 6000 frames, no desync; Pokémon Edición
+Cristal with both saves loaded, walking on both Game Boys; gpSP Emerald hacks hosting and joining at
+60 fps.
+
 ## Engine apps through the Emulator Control Protocol (branch feat/ecp)
 
 A console's core can be an engine app (`"type": "engine-app"` in a plugin manifest) that

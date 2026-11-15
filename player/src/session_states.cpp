@@ -28,7 +28,6 @@ void PlayerSession::LoadBatterySave() {
     if (!ram.empty()) {
         if (const auto data = ReadBinaryFile(paths_.BatterySave())) {
             std::memcpy(ram.data(), data->data(), std::min(ram.size(), data->size()));
-            log::Info("player", "battery save: {} bytes into {} bytes", data->size(), ram.size());
         }
     }
     saved_ram_.assign(ram.begin(), ram.end());
