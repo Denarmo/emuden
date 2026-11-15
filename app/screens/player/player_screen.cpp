@@ -79,7 +79,7 @@ void PlayerScreen::Open() {
     }
     game_ = *game;
     const auto console = svc.plugins->FindConsole(game_.system);
-    const auto core = CoreForGame(game_);
+    const auto core = CoreForGame(game_, Param("core"));
     if (!console || !core || !core->Ready()) {
         return Fail((console ? console->name : game_.name) + ": its core is not installed. Open Consoles to install it.");
     }

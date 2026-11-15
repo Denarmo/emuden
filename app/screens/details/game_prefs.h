@@ -26,8 +26,9 @@ extern const system::Key<std::string> ENGINE_SCREEN_KEY;
 system::Scope ScopeOf(const library::Entry& game);
 
 /// The core that plays this game: the game's own choice when it is installed, else the
-/// console's. Its option hints carry the game's own core options.
-std::optional<plugins::CoreInfo> CoreForGame(const library::Entry& game);
+/// console's. Its option hints carry the game's own core options. `forced` (a test's "core="
+/// route parameter) picks a core for this launch only, without touching the settings.
+std::optional<plugins::CoreInfo> CoreForGame(const library::Entry& game, const std::string& forced = {});
 int ScreenSizeFor(const library::Entry& game);
 bool EngineFullscreenFor(const library::Entry& game, bool app_fullscreen);
 

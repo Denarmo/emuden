@@ -150,11 +150,12 @@ std::string OptionKey(const std::string& core_id, const std::string& option_key)
     return "core_option." + Plain(core_id) + "." + Plain(option_key);
 }
 
-std::optional<plugins::CoreInfo> CoreForGame(const library::Entry& game) {
+std::optional<plugins::CoreInfo> CoreForGame(const library::Entry& game, const std::string& forced) {
     Services& svc = Svc();
     std::optional<plugins::CoreInfo> core = svc.plugins->CoreFor(game.system);
-    const std::string wanted =
-        system::HasStore() ? system::Store().Get(GAME_CORE_KEY, ScopeOf(game)) : std::string();
+    const std::string wanted = !forced.empty()       ? forced
+                               : system::HasStore() ? system::Store().Get(GAME_CORE_KEY, ScopeOf(game))
+                                                    : std::string();
     for (plugins::CoreInfo& other : svc.plugins->CoresFor(game.system)) {
         if (!other.Ready()) {
             continue;
