@@ -23,6 +23,8 @@ its launch options for the test, and clear them afterwards.
 |---|---|---|
 | Start in Game Mode, full screen, handheld layout | Works | Steam shortcut; 1920x1200, 120 fps in menus, "Legion Go S, Handheld, known device" |
 | Controller | Works | The pad shows as "Lenovo Legion Go S Controller" (Xbox layout, Xbox glyphs); no second copy from Steam Input. Game buttons and sticks through the virtual pad of the test endpoint |
+| In-game menu | Fixed | Steam keeps the pad's home button (Legion L and R), so the ways in are Start+Select (at once, no hold) and Select held for a second. The menu opened as an empty card after the save check before a game (the check centred the screen); fixed. Select+L1/R1 switch rewind and fast-forward on and off |
+| Buttons and shortcuts | Works | Buttons lists every control of the pad; each gets a console button, nothing, or a shortcut the core can do (menu, fast-forward, rewind, save/load state slot 1, next picture, swap screens, frame rate, DS microphone held). L3 as Save state and R3 as the DS microphone checked |
 | Exit from Steam (Exit game) | Works | The app closes on Steam's terminate; the running game's save and resume state are written |
 | Library scan with plugin consoles | Fixed | Console folders under `roms/` (`~/Games/roms/gb`, EmuDeck's `Emulation/roms/<console>`) were not found |
 | Covers, LaunchBox first | Works, fixed one | LaunchBox boxes for every test game, the Lazarus hack included; `0012 - Asphalt - Urban GT (U)(Wario).nds` got none until scene release numbers were dropped from names |
@@ -39,7 +41,7 @@ its launch options for the test, and clear them afterwards.
 | ROM hack plugins | Works | romhacking.net installed; its page is the fallback page (SteamOS has no WebKitGTK). "Open in browser" opens the site in Steam's own browser over the app. A BPS put in `~/Downloads` was offered, matched to Tetris by CRC and installed as a hack in the library |
 | Feature plugin install | Fixed | A new install read a pointer into a destroyed catalogue (undefined on every platform); on Linux the unit tests' installs answered "The plugin list does not offer this plugin" |
 | Sync (Settings > Sync) | Works, fixed one | Syncthing plugin: "Use Sync/EmuDEN" pointed at `~/Downloads/Sync/EmuDEN` (the Downloads folder had a trailing separator); now `~/Sync/EmuDEN`. "Sync now" wrote saves, states and settings there as plain files. File times came back a second early on Linux (rounding) |
-| Settings | Works | Device page: Legion Go S, tier Medium, 1920x1200 8.0 in 120 Hz, Ryzen Z2 Go |
+| Settings | Works, fixed one | Device page: Legion Go S, tier Medium, 1920x1200 8.0 in 120 Hz, Ryzen Z2 Go. Display had a "Full screen" switch that read Off under gamescope; Game Mode is always full screen now and the switch is gone there |
 | In-app browser | Fallback by design | No WebKitGTK on SteamOS: the fallback page and the Downloads folder, as above |
 | Linux build | Fixed | `http_curl.cpp` had raw line breaks inside character literals and did not compile |
 | Second screen | Not applicable | One screen |

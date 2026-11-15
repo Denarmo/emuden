@@ -40,9 +40,12 @@ Caps DetectCaps() {
     const bool android = caps.os == "android";
     caps.gles = android;
     caps.touch = android;
-    caps.windowed = !android;
+    // Gamescope (SteamOS Game Mode) shows one window over the whole screen: there is no window
+    // to resize or leave full screen.
+    const bool gamescope = !GetEnv("GAMESCOPE_WAYLAND_DISPLAY").empty();
+    caps.windowed = !android && !gamescope;
     caps.child_processes = !android;
-    caps.handheld = android || !GetEnv("SteamDeck").empty() || !GetEnv("GAMESCOPE_WAYLAND_DISPLAY").empty();
+    caps.handheld = android || gamescope || !GetEnv("SteamDeck").empty();
     // SDL keeps a borderless Windows window's shadow, snapping and animations.
     caps.custom_frame = caps.os == "windows" && GetEnv("EMUDEN_SYSTEM_FRAME").empty();
     return caps;
