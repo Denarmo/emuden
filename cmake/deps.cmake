@@ -44,6 +44,11 @@ den_fetch(stb https://github.com/nothings/stb.git 5736b15f7ea0ffb08dd38af21067c3
 add_library(den_stb INTERFACE)
 target_include_directories(den_stb SYSTEM INTERFACE "${stb_SOURCE_DIR}")
 
+# QR codes on plugin pages (a sign-in link to open on a phone).
+den_fetch(qrcodegen https://github.com/nayuki/QR-Code-generator.git v1.8.0 GIT_SHALLOW ON)
+add_library(den_qrcodegen STATIC "${qrcodegen_SOURCE_DIR}/cpp/qrcodegen.cpp")
+target_include_directories(den_qrcodegen SYSTEM PUBLIC "${qrcodegen_SOURCE_DIR}/cpp")
+
 if(DEN_BUILD_TESTS)
     den_fetch(catch2 https://github.com/catchorg/Catch2.git v3.8.1 GIT_SHALLOW ON)
 endif()

@@ -52,12 +52,22 @@ public:
                                      "The kept copy of " + name + " replaces the current one, which is kept "
                                      "here in its place.",
                                      "Use this one", [i] {
-                                         const Status used = SyncSvc()->UseConflict(i);
-                                         Svc().stage->Toast(used.ok ? "Done. It syncs next." : used.error, 4.0f);
-                                         if (used.ok) {
-                                             SyncSvc()->SyncNow();
+                                         // It waits for a sync in progress, so not on the main thread.
+                                         if (SyncSvc()->State().running) {
+                                             Svc().stage->Toast("It is swapped once the sync in progress ends.",
+                                                                4.0f);
                                          }
-                                         RebuildTop();
+                                         Svc().jobs->Run(
+                                             "Use the kept copy",
+                                             [i](Job&) { return SyncSvc()->UseConflict(i); },
+                                             [](Job& job) {
+                                                 const bool ok = job.State() == JobState::Done;
+                                                 Svc().stage->Toast(ok ? "Done. It syncs next." : job.Error(), 4.0f);
+                                                 if (ok) {
+                                                     SyncSvc()->SyncNow();
+                                                 }
+                                                 RebuildTop();
+                                             });
                                      });
             });
             row.description = std::format("From {}, {}. Use this one instead", conflict.from,

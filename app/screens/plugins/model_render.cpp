@@ -323,6 +323,13 @@ struct Builder {
         case ElementType::Empty:
             AddEmpty(list, element, path);
             break;
+        case ElementType::Qr: {
+            ui::Node* row = list->Add(ui::MakeBox(ui::Axis::Row, 0));
+            row->align = ui::Align::Start;
+            const float side = element.height > 0 ? std::clamp(element.height, 120.0f, 360.0f) : 220.0f;
+            row->Emplace<QrCode>(element.text, side)->id = NodeId(element, path);
+            break;
+        }
         }
     }
 

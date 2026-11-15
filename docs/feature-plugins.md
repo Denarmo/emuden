@@ -306,6 +306,7 @@ element = one of, by `type`:
   input    { id, label, value?, action, secret = false }     -- opens the on-screen keyboard
   progress { id, label?, fraction }  -- 0..1, negative = unknown
   empty    { title, text?, button? }
+  qr       { text, height? }         -- a QR code of text (a link), dark on light; older hosts skip it
 ```
 
 Every element may carry `id` (needed for `den.ui.patch` and kept focus). `image` is

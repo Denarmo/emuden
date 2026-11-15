@@ -73,6 +73,21 @@ private:
     bool enabled_ = true;
 };
 
+/// A QR code of `text` (a link), dark on a light square whatever the theme, so phones read it.
+class QrCode final : public ui::Node {
+public:
+    QrCode(const std::string& text, float side);
+
+protected:
+    ui::Size MeasureContent(ui::Context& ctx) override;
+    void DrawContent(ui::Context& ctx) override;
+
+private:
+    std::vector<bool> modules_;
+    int count_ = 0;
+    float side_;
+};
+
 /// A label, the amount as text and a bar.
 class ProgressLine final : public ui::Node {
 public:

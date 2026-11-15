@@ -3,7 +3,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <exception>
 #include <format>
+
+#include <qrcodegen.hpp>
 
 #include "model_widgets.h"
 
@@ -140,6 +143,45 @@ void FilterChip::DrawContent(ui::Context& ctx) {
     }
     const gfx::Rect area{rect.x + 42, rect.y, rect.w - 58, rect.h};
     DrawLineIn(ctx, area, text, theme.text_body, selected ? gfx::FONT_BOLD : gfx::FONT_REGULAR, theme.fg, false);
+}
+
+QrCode::QrCode(const std::string& text, float side) : side_(side) {
+    try {
+        const qrcodegen::QrCode code = qrcodegen::QrCode::encodeText(text.c_str(), qrcodegen::QrCode::Ecc::MEDIUM);
+        count_ = code.getSize();
+        modules_.resize(static_cast<std::size_t>(count_ * count_));
+        for (int y = 0; y < count_; ++y) {
+            for (int x = 0; x < count_; ++x) {
+                modules_[static_cast<std::size_t>(y * count_ + x)] = code.getModule(x, y);
+            }
+        }
+    } catch (const std::exception&) {
+        count_ = 0; // too long for a QR code: nothing is drawn
+    }
+}
+
+ui::Size QrCode::MeasureContent(ui::Context&) {
+    return count_ > 0 ? ui::Size{side_, side_} : ui::Size{0, 0};
+}
+
+void QrCode::DrawContent(ui::Context& ctx) {
+    if (count_ == 0) {
+        return;
+    }
+    const float side = std::min(rect.w, rect.h);
+    ctx.canvas->FillRect({rect.x, rect.y, side, side}, gfx::Color{255, 255, 255, 255}, 8);
+    // Four modules of quiet zone around the code.
+    const float module = side / static_cast<float>(count_ + 8);
+    const float left = rect.x + module * 4, top = rect.y + module * 4;
+    for (int y = 0; y < count_; ++y) {
+        for (int x = 0; x < count_; ++x) {
+            if (modules_[static_cast<std::size_t>(y * count_ + x)]) {
+                // A hair wider than a module, so neighbours leave no seams.
+                ctx.canvas->FillRect({left + x * module, top + y * module, module + 0.5f, module + 0.5f},
+                                     gfx::Color{0, 0, 0, 255});
+            }
+        }
+    }
 }
 
 void ModelButton::SetEnabled(bool enabled) {

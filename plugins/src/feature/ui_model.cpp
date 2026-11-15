@@ -19,7 +19,7 @@ std::optional<ElementType> TypeOf(const std::string& name) {
         {"text", ElementType::Text},     {"image", ElementType::Image},
         {"button", ElementType::Button}, {"row", ElementType::Row},
         {"input", ElementType::Input},   {"progress", ElementType::Progress},
-        {"empty", ElementType::Empty},
+        {"empty", ElementType::Empty},   {"qr", ElementType::Qr},
     };
     for (const auto& [text, type] : TYPES) {
         if (name == text) {

@@ -20,7 +20,7 @@ target_include_directories(den_app PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(den_app PRIVATE
     den_sync den_system den_player den_engine den_plugins den_library den_store
-    den_ui den_input den_gfx den_platform den_base)
+    den_ui den_input den_gfx den_platform den_base den_qrcodegen)
 den_warnings(den_app)
 if(WIN32)
     # The icon Explorer and the taskbar show for emuden.exe.

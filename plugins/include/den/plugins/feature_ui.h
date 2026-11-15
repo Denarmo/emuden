@@ -12,7 +12,7 @@
 
 namespace den::plugins {
 
-enum class ElementType { Shelf, Grid, Tile, Detail, Text, Image, Button, Row, Input, Progress, Empty };
+enum class ElementType { Shelf, Grid, Tile, Detail, Text, Image, Button, Row, Input, Progress, Empty, Qr };
 
 struct Fact {
     std::string label, value;

@@ -155,9 +155,8 @@ Status EngineImpl::UseConflict(std::size_t index) {
     fs::remove(conflict.file, ec);
     {
         std::lock_guard lock(mutex_);
-        if (index < conflicts_.size()) {
-            conflicts_.erase(conflicts_.begin() + static_cast<std::ptrdiff_t>(index));
-        }
+        // By its file: the list may have changed while the run lock was awaited.
+        std::erase_if(conflicts_, [&](const Conflict& c) { return c.file == conflict.file; });
         SaveConflicts();
     }
     if (fs::is_regular_file(swap, ec)) {
@@ -219,10 +218,9 @@ JobPtr EngineImpl::RefreshRemoteGames() {
         if (!provider) {
             return Status::Fail("The sync plugin is not installed.");
         }
-        Result<std::vector<RemoteFile>> files = [&] {
-            std::lock_guard run(engine->run_mutex_);
-            return provider->List(std::string(GAMES) + "/");
-        }();
+        // Listing changes nothing, so it does not wait for a sync run, which can take long
+        // while games go up.
+        Result<std::vector<RemoteFile>> files = provider->List(std::string(GAMES) + "/");
         if (!files) {
             return files.status();
         }
