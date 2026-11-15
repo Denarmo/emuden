@@ -117,7 +117,7 @@ public:
             list->Emplace<ui::Label>("Nothing beyond showing its own pages.")->tone = ui::Tone::Dim;
         }
         auto* never = list->Emplace<Paragraph>(
-            "No plugin can read your games, saves or settings, reach other sites than the ones named here, "
+            "No plugin can read your saves or game files, reach other sites than the ones named here, "
             "or run programs.",
             TextWidth());
         never->tone = ui::Tone::Dim;
