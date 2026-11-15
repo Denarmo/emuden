@@ -151,10 +151,12 @@ TEST_CASE("settings sync without what belongs to the device") {
     a.settings->SetNumber("ui.scale", 1.5);
     a.settings->SetString("console.steam.path", "C:/Steam");
     a.settings->SetList("library.collection_games.best", {"gba:1", "steam:2"});
+    a.settings->SetString("core_options.flycast.emuden_renderer", "Vulkan");
     REQUIRE(a.Sync().ok);
     const std::string uploaded = cloud.files.at("config/settings.json").data;
     CHECK(uploaded.find("Dark") != std::string::npos);
     CHECK(uploaded.find("ui.scale") == std::string::npos);
+    CHECK(uploaded.find("emuden_renderer") == std::string::npos);
     CHECK(uploaded.find("sync.") == std::string::npos);
     CHECK(uploaded.find("steam") == std::string::npos);
     b.settings->SetNumber("ui.scale", 2.0);

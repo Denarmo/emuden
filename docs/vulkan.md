@@ -62,6 +62,9 @@ discrete or integrated GPU otherwise.
   what the core asks for (`create_device2` through the wrapper, or `create_device` with the
   required list); without a negotiation interface the host makes the device with the sharing
   extensions and every feature the GPU has that cores commonly need (the libretro default).
+  Some cores ignore the required list or the wrapper and call `vkCreateDevice` themselves
+  (Flycast), so the `vkGetInstanceProcAddr` a core gets hands out a `vkCreateDevice` that adds
+  the sharing extensions too; everything else goes to the loader.
 * When the sharing extensions are missing the host still makes a device and uses the copy.
 
 ## Renderer choice
@@ -69,7 +72,8 @@ discrete or integrated GPU otherwise.
 The player menu gets a `Renderer` entry for cores that draw with the GPU: Auto, OpenGL or
 Vulkan. It is stored like a core option, as `core_options.<core>.emuden_renderer` for the
 console and `game_options.<system>.<game>.emuden_renderer` for one game, and takes effect when
-the game starts again (the menu says so).
+the game starts again (the menu says so). It stays on the device: sync leaves it out, since what
+works depends on each device's GPU and drivers.
 
 * Auto: `GET_PREFERRED_HW_RENDER` answers OpenGL, as before, and whichever API the core then
   asks for is given when the device has it. Cores keep their own defaults.

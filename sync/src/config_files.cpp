@@ -255,6 +255,11 @@ std::string MergeSettings(const std::string& base, const std::string& local, con
 }
 
 bool IsDeviceOnlySetting(const std::string& key) {
+    // The renderer a core draws with (core_options.<core>... and game_options.<system>.<game>...)
+    // depends on this device's GPU and drivers.
+    if (key.ends_with(".emuden_renderer")) {
+        return true;
+    }
     for (const char* prefix : DEVICE_ONLY) {
         if (key.starts_with(prefix)) {
             return true;
