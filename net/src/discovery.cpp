@@ -127,11 +127,11 @@ void Browser::Heard(const pal::net::UdpSocket::Datagram& datagram, double now) {
         return;
     }
     const pal::net::Address address{datagram.from.ip, beacon.port};
-    // The same host answers on every address it was asked at: its network address wins over
-    // the loopback one (which only a host on this device answers on).
+    // The same host answers on every address it was asked at. Only a host on this device answers
+    // on loopback, and loopback wins there: a firewall can block its network address.
     for (FoundHost& host : hosts_) {
         if (host.beacon.id == beacon.id && host.beacon.device == beacon.device) {
-            if (host.address.ip == pal::net::Address::Loopback(0).ip) {
+            if (address.ip == pal::net::Address::Loopback(0).ip) {
                 host.address = address;
             }
             host.beacon = std::move(beacon);
