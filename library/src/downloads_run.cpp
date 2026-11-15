@@ -192,7 +192,11 @@ void SetupWork::SetUpGames(std::vector<GameGroup> groups, const fs::path& base) 
                               (group.missing.size() > 1 ? std::format(" and {} more", group.missing.size() - 1) : "") + ")");
             continue;
         }
-        fs::path dir = ConsoleDir(setup.library_, systems, group.system, setup.data_dir_);
+        bool made = false;
+        fs::path dir = ConsoleDir(setup.library_, systems, group.system, setup.data_dir_, &made);
+        if (made) {
+            record.folders.push_back(PathToUtf8(dir));
+        }
         if (!group.set_name.empty()) {
             dir /= PathFromUtf8(FolderName(group.set_name));
             if (!IsDirectory(dir)) {

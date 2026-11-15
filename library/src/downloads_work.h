@@ -59,9 +59,10 @@ std::filesystem::path FreeName(const std::filesystem::path& dir, const std::file
 bool CanWriteHere(const std::filesystem::path& dir);
 /// The library's folder for a console's games that can be written: a folder of that
 /// console, a system folder of a game folder (made when missing), else EmuDEN's own
-/// `<data>/games/<system>`, which is then added to the library.
+/// `<data>/games/<system>`, which is then added to the library. `made` is set when the
+/// returned folder did not exist before (undo removes it again once it is empty).
 std::filesystem::path ConsoleDir(Library& library, const SystemTable& systems, const std::string& system,
-                                 const std::filesystem::path& data_dir);
+                                 const std::filesystem::path& data_dir, bool* made = nullptr);
 /// Starts a scan and waits until the library lists games of these files.
 std::vector<Entry> WaitForGames(Library& library, const std::vector<std::filesystem::path>& files,
                                 const std::function<bool()>& cancelled);

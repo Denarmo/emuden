@@ -3,7 +3,8 @@
 
 // The browser page. The kit draws the bar at the top and the hints at the bottom; the web
 // view is a native view over the rest. A native view sits above everything the app draws, so
-// it is hidden while a dialog or the text entry is open and pushed down while toasts show.
+// it is hidden while a dialog or the text entry is open. It never moves for toasts (a click
+// aimed before one appeared would land elsewhere): the bar repeats the newest toast instead.
 //
 // Pad: the left stick (or the D-pad) moves a pointer, A clicks, the right stick scrolls, B
 // goes back in the page's history or closes the page, X types text into the page, View
@@ -182,9 +183,8 @@ public:
         gfx::Canvas& canvas = *ctx.canvas;
         const float scale = canvas.Scale();
         scale_ = scale;
-        // Toasts are drawn from 24 units down, 52 apart: the view starts below them.
         // The page area starts below a window title bar the app draws in a window.
-        const float top = std::max(area.y + BAR_HEIGHT, 16.0f + 52.0f * static_cast<float>(ToastCount()));
+        const float top = area.y + BAR_HEIGHT;
         view_rect_ = gfx::Rect{area.x, top, area.w, std::max(0.0f, area.Bottom() - top)};
         DrawBar(ctx, area);
         g_state.menu.clear();
@@ -544,10 +544,11 @@ private:
         return static_cast<int>(std::lround(units * scale_));
     }
 
-    int ToastCount() const {
+    // The newest toast, shown in the bar: toasts below the bar are under the view.
+    std::string NewestToast() const {
         const auto state = ParseJson(GetStage().StateJson());
         const JsonValue* toasts = state ? state->Find("toasts") : nullptr;
-        return toasts ? static_cast<int>(toasts->items.size()) : 0;
+        return toasts && !toasts->items.empty() ? toasts->items.back().string : std::string();
     }
 
     void DrawMessage(ui::Context& ctx, const std::string& heading, const std::string& text) {
@@ -576,6 +577,8 @@ private:
             if (item.total > 0) {
                 bar.progress = static_cast<float>(item.received) / static_cast<float>(item.total);
             }
+        } else if (const std::string toast = NewestToast(); !toast.empty()) {
+            bar.line = toast;
         } else if (state_.loading) {
             bar.line += "  -  loading";
         }

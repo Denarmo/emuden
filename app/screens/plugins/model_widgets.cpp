@@ -129,7 +129,9 @@ FilterChip::FilterChip(std::string text_) : text(std::move(text_)) {
 }
 
 ui::Size FilterChip::MeasureContent(ui::Context& ctx) {
-    return ui::Size{ctx.Text().Measure(text, ctx.theme->text_body, gfx::FONT_BOLD) + 58, 44};
+    // Bold (the chosen chip) is the wider face; the spare units keep layout rounding from
+    // eliding a label that just fits.
+    return ui::Size{std::ceil(ctx.Text().Measure(text, ctx.theme->text_body, gfx::FONT_BOLD)) + 62, 44};
 }
 
 void FilterChip::DrawContent(ui::Context& ctx) {

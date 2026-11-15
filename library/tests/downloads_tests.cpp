@@ -190,6 +190,19 @@ TEST_CASE("downloads: a game goes into its console's folder and can be taken bac
     REQUIRE_FALSE(f.setup->Undo(done.record.id).ok);
 }
 
+TEST_CASE("downloads: undo removes the console folder the setup made") {
+    Fixture f("made");
+    f.Open();
+    WriteFile(f.downloads / "Tiny Town.gbc", MakeRom(32768, 4));
+    const Outcomes done = f.Run("Tiny Town.gbc");
+    REQUIRE(done.record.outcome == Outcome::Added);
+    REQUIRE(fs::exists(f.roms / "gbc" / "Tiny Town.gbc"));
+    REQUIRE(f.setup->Undo(done.record.id).ok);
+    REQUIRE(fs::exists(f.downloads / "Tiny Town.gbc"));
+    CHECK_FALSE(fs::exists(f.roms / "gbc"));
+    CHECK(fs::exists(f.roms / "gba")); // there before: kept
+}
+
 TEST_CASE("downloads: a zipped cue sheet stays with its tracks") {
     Fixture f("cue");
     f.Open();

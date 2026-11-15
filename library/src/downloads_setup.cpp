@@ -151,7 +151,7 @@ fs::path FreeName(const fs::path& dir, const fs::path& name) {
 }
 
 fs::path ConsoleDir(Library& library, const SystemTable& systems, const std::string& system,
-                    const fs::path& data_dir) {
+                    const fs::path& data_dir, bool* made) {
     const std::vector<Folder> folders = library.Folders();
     for (const Folder& folder : folders) {
         if (folder.system == system && CanWriteHere(PathFromUtf8(folder.path))) {
@@ -176,13 +176,21 @@ fs::path ConsoleDir(Library& library, const SystemTable& systems, const std::str
                 return dir;
             }
         }
-        if (CanWriteHere(root / PathFromUtf8(system))) {
-            return root / PathFromUtf8(system);
+        const fs::path dir = root / PathFromUtf8(system);
+        const bool existed = IsDirectory(dir);
+        if (CanWriteHere(dir)) {
+            if (made != nullptr) {
+                *made = !existed;
+            }
+            return dir;
         }
     }
     // No game folder that can be written: EmuDEN's own, added to the library once.
     const fs::path own = data_dir / "games";
     std::error_code ec;
+    if (made != nullptr) {
+        *made = !IsDirectory(own / PathFromUtf8(system));
+    }
     fs::create_directories(own / PathFromUtf8(system), ec);
     library.AddFolder(PathToUtf8(own));
     return own / PathFromUtf8(system);
