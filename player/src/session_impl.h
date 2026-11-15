@@ -14,13 +14,16 @@
 #include "core/core.h"
 #include "den/player/session.h"
 #include "game_files.h"
-#include "hw_context.h"
+#include "hw_host.h"
 #include "pad_map.h"
 #include "den/gfx/retro_chain.h"
 #include "picture_presets.h"
 #include "rewind_buffer.h"
 
 namespace den::player {
+
+/// The key of the renderer entry among a session's core options; never passed to the core.
+inline constexpr const char* RENDERER_OPTION = "emuden_renderer";
 
 class PlayerSession final : public Session {
 public:
@@ -77,6 +80,11 @@ private:
     void ApplyStoredOptions();
     std::string OptionSettingKey(const std::string& key) const;
     std::string GameOptionKey(const std::string& key) const;
+    // The renderer choice, kept like a core option (session_renderer.cpp).
+    std::string RendererValue() const;
+    void AddRendererOption(std::vector<CoreOption>& options) const;
+    void SetRenderer(const std::string& value, OptionScope scope);
+    void ClearGameRenderer();
     void ReadAvInfo();
     void RunForward(int frames, bool sound_on_all);
     bool StepRewind();
@@ -99,7 +107,7 @@ private:
 
     Config config_;
     // Destroyed after the core: the core frees what it drew with while it unloads.
-    std::unique_ptr<HwContext> hw_;
+    std::unique_ptr<HwHost> hw_;
     std::unique_ptr<LibretroCore> core_;
     AudioOut audio_;
     std::optional<RewindBuffer> rewind_;

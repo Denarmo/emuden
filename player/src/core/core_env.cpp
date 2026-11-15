@@ -31,7 +31,12 @@ void LogMessage(const char* text) {
 bool LibretroCore::Impl::ResizeHwTarget(const retro_game_geometry& announced) {
     unsigned width = std::max(announced.max_width, announced.base_width);
     unsigned height = std::max(announced.max_height, announced.base_height);
-    if (geometry) {
+    if (hw_vulkan) {
+        // A Vulkan core draws into its own image: the picture starts at the base size and
+        // grows when a frame needs more.
+        width = announced.base_width;
+        height = announced.base_height;
+    } else if (geometry) {
         width = std::max({width, geometry->max_width, geometry->base_width});
         height = std::max({height, geometry->max_height, geometry->base_height});
     }
@@ -181,7 +186,7 @@ retro_proc_address_t RETRO_CALLCONV HwGetProcAddress(const char* name) {
     return reinterpret_cast<retro_proc_address_t>(g_core->hw_host->GetProcAddress(name));
 }
 
-// OpenGL only: Vulkan and Direct3D are refused, and cores then ask for OpenGL.
+// OpenGL and Vulkan: Direct3D is refused, and cores then ask for one of the others.
 bool SetHwRender(retro_hw_render_callback* callback) {
     if (!callback || !g_core->hw_host || g_core->game_loaded) {
         return false;
@@ -209,6 +214,11 @@ bool SetHwRender(retro_hw_render_callback* callback) {
         request.major = callback->version_major;
         request.minor = callback->version_minor;
         break;
+    case RETRO_HW_CONTEXT_VULKAN:
+        request.api = HwRenderRequest::Api::Vulkan;
+        request.major = callback->version_major;
+        request.minor = callback->version_minor;
+        break;
     default:
         g_core->hw_accepted = false;
         g_core->hw_refused = true;
@@ -225,6 +235,7 @@ bool SetHwRender(retro_hw_render_callback* callback) {
     callback->get_current_framebuffer = HwCurrentFramebuffer;
     callback->get_proc_address = HwGetProcAddress;
     g_core->hw = *callback;
+    g_core->hw_vulkan = request.api == HwRenderRequest::Api::Vulkan;
     g_core->hw_accepted = true;
     g_core->hw_refused = false;
     return true;
@@ -371,8 +382,36 @@ bool VideoCommand(unsigned command, void* data, bool* handled) {
         case HwRenderRequest::Api::OpenGLCore:
             *static_cast<unsigned*>(data) = RETRO_HW_CONTEXT_OPENGL_CORE;
             break;
+        case HwRenderRequest::Api::Vulkan:
+            *static_cast<unsigned*>(data) = RETRO_HW_CONTEXT_VULKAN;
+            break;
         }
         return true;
+    case RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE: {
+        const void* iface = g_core->hw_host && g_core->hw_vulkan ? g_core->hw_host->VulkanInterface() : nullptr;
+        if (!iface || !data) {
+            return false;
+        }
+        *static_cast<const void**>(data) = iface;
+        return true;
+    }
+    case RETRO_ENVIRONMENT_GET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_SUPPORT: {
+        auto* query = static_cast<retro_hw_render_context_negotiation_interface*>(data);
+        if (!query) {
+            return false;
+        }
+        query->interface_version =
+            query->interface_type == RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN ? 2 : 0;
+        return true;
+    }
+    case RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE: {
+        const auto* negotiation = static_cast<const retro_hw_render_context_negotiation_interface*>(data);
+        if (!negotiation || !g_core->hw_host || !g_core->hw_vulkan ||
+            negotiation->interface_type != RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN) {
+            return false;
+        }
+        return g_core->hw_host->SetVulkanNegotiation(negotiation);
+    }
     case RETRO_ENVIRONMENT_SET_HW_SHARED_CONTEXT:
         // The core's context is its own already.
         return g_core->hw_host != nullptr;

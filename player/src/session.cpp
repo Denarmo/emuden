@@ -82,7 +82,7 @@ Status PlayerSession::Start(const OpenRequest& request) {
         params.options[key] = value;
     }
     if (config_.device) {
-        hw_ = std::make_unique<HwContext>(config_.device->Gles());
+        hw_ = std::make_unique<HwHost>(config_.device->Gles());
         params.hw_host = hw_.get();
     }
     std::string error;
@@ -97,6 +97,10 @@ Status PlayerSession::Start(const OpenRequest& request) {
         if (!std::isalnum(static_cast<unsigned char>(c))) {
             c = '_';
         }
+    }
+    if (hw_) {
+        // Before the game: cores pick their renderer while it loads.
+        hw_->SetChoice(ParseRendererChoice(RendererValue()));
     }
     ReloadButtons();
     ApplyStoredOptions();
@@ -231,6 +235,7 @@ std::vector<CoreOption> PlayerSession::Options() const {
         }
         out.push_back(std::move(item));
     }
+    AddRendererOption(out);
     return out;
 }
 
@@ -240,6 +245,10 @@ void PlayerSession::SetOption(const std::string& key, const std::string& value) 
 
 void PlayerSession::SetOption(const std::string& key, const std::string& value, OptionScope scope) {
     if (!core_) {
+        return;
+    }
+    if (key == RENDERER_OPTION) {
+        SetRenderer(value, scope);
         return;
     }
     core_->SetOption(key, value);
@@ -258,6 +267,7 @@ void PlayerSession::ClearGameOptions() {
     if (!core_ || !config_.settings) {
         return;
     }
+    ClearGameRenderer();
     for (const OptionInfo& option : core_->Options()) {
         const std::string game = GameOptionKey(option.key);
         if (!config_.settings->Has(game)) {

@@ -278,7 +278,7 @@ bool LibretroCore::HardwareRefused() const {
 }
 
 bool LibretroCore::BottomLeftOrigin() const {
-    return impl_->hw_ready && impl_->hw.bottom_left_origin;
+    return impl_->hw_ready && !impl_->hw_vulkan && impl_->hw.bottom_left_origin;
 }
 
 bool LibretroCore::ReadPicture(unsigned* width, unsigned* height,

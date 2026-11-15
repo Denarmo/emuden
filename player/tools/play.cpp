@@ -6,10 +6,12 @@
 //       [--data <folder>] [--frames <n>] [--screenshot <png>] [--tap <button>@<frame>]...
 //       [--save-state <frame>] [--load-state <frame>] [--no-resume]
 //       [--size <w>x<h>] [--picture <preset>] [--param <id>=<value>]...
+//       [--renderer Auto|OpenGL|Vulkan] [--option <key>=<value>]...
 // Keyboard: arrows, Z/X/A/S, Q/W, Enter, right Shift; Tab fast-forwards, Backspace rewinds,
 // F5 saves slot 0, F8 loads it, Escape leaves. The first gamepad plays too.
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <string>
 #include <vector>
@@ -20,6 +22,7 @@
 #include "den/input/input.h"
 #include "den/platform/pal.h"
 #include "den/player/session.h"
+#include "den/store/settings.h"
 
 using namespace den;
 
@@ -44,6 +47,8 @@ struct Args {
     int width = 960, height = 720;
     std::string picture;
     std::vector<std::pair<std::string, float>> params;
+    std::string renderer;
+    std::vector<std::pair<std::string, std::string>> options;
 };
 
 input::PadButton ButtonByName(const std::string& name) {
@@ -102,6 +107,14 @@ Args Parse(int argc, char** argv) {
                 args.params.emplace_back(param.substr(0, at),
                                          static_cast<float>(std::atof(param.c_str() + at + 1)));
             }
+        } else if (flag == "--renderer") {
+            args.renderer = value();
+        } else if (flag == "--option") {
+            const std::string option = value();
+            const std::size_t at = option.find("=");
+            if (at != std::string::npos) {
+                args.options.emplace_back(option.substr(0, at), option.substr(at + 1));
+            }
         } else if (flag == "--tap") {
             const std::string tap = value();
             const std::size_t at = tap.find('@');
@@ -152,6 +165,21 @@ int Play(const Args& args) {
     request.system_dir = args.system_dir.empty() ? config.data_dir / "system" : args.system_dir;
     request.game_id = PathToUtf8(args.rom.stem());
     request.resume = args.resume;
+    request.option_hints = args.options;
+    // The renderer is kept for this game only, in a settings file of the data folder.
+    std::unique_ptr<store::Settings> settings;
+    if (!args.renderer.empty()) {
+        settings = std::make_unique<store::Settings>(config.data_dir / "play-settings.json");
+        std::string game = request.game_id;
+        for (char& c : game) {
+            if (!std::isalnum(static_cast<unsigned char>(c))) {
+                c = '_';
+            }
+        }
+        settings->SetString("game_options." + args.system + "." + game + ".emuden_renderer", args.renderer);
+        config.settings = settings.get();
+        session = player::CreateSession(config);
+    }
     if (const Status opened = session->Open(request); !opened) {
         return 2;
     }

@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// What a core that draws with the GPU (libretro hardware rendering, OpenGL) needs from the
-// player: a context and a framebuffer to draw into. Every call comes from the thread that
-// runs the core.
+// What a core that draws with the GPU (libretro hardware rendering, OpenGL or Vulkan) needs
+// from the player: a context and a framebuffer to draw into, or a Vulkan device. Every call
+// comes from the thread that runs the core.
 
 #pragma once
 
@@ -17,6 +17,7 @@ struct HwRenderRequest {
         OpenGL,     // compatibility profile, any version
         OpenGLCore, // core profile of at least major.minor
         OpenGLES,   // OpenGL ES of at least major.minor
+        Vulkan,     // a Vulkan device (docs/vulkan.md)
     };
     Api api = Api::OpenGL;
     unsigned major = 0;
@@ -51,6 +52,16 @@ public:
                              std::vector<std::uint8_t>* rgba) = 0;
     /// Deletes the framebuffer and the context. Nothing is called after it but Accept.
     virtual void Shutdown() = 0;
+
+    // Vulkan. The device is made by the first ResizeTarget, after the game is loaded.
+    /// The core's retro_hw_render_context_negotiation_interface_vulkan; false when refused.
+    virtual bool SetVulkanNegotiation(const void* negotiation) {
+        return false;
+    }
+    /// The retro_hw_render_interface_vulkan of the device, null before it exists.
+    virtual const void* VulkanInterface() {
+        return nullptr;
+    }
 };
 
 } // namespace den::player

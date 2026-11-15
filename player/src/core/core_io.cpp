@@ -32,8 +32,9 @@ void RETRO_CALLCONV VideoCallback(const void* data, unsigned width, unsigned hei
         if (!g_core->hw_ready || width == 0 || height == 0) {
             return;
         }
-        frame.width = std::min(width, g_core->hw_width);
-        frame.height = std::min(height, g_core->hw_height);
+        // A Vulkan core hands its own image; the host makes room for any size.
+        frame.width = g_core->hw_vulkan ? width : std::min(width, g_core->hw_width);
+        frame.height = g_core->hw_vulkan ? height : std::min(height, g_core->hw_height);
         frame.rgba.clear();
         frame.hardware = true;
         ++frame.serial;

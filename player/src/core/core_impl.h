@@ -75,6 +75,7 @@ struct LibretroCore::Impl {
     retro_hw_render_callback hw{};
     bool hw_accepted = false;
     bool hw_refused = false;
+    bool hw_vulkan = false;
     bool hw_ready = false;
     unsigned hw_width = 0;
     unsigned hw_height = 0;
