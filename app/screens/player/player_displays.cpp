@@ -13,6 +13,7 @@
 #include <format>
 
 #include "../apps/apps_catalog.h"
+#include "../achievements/achievements_glue.h"
 #include "../apps/beside.h"
 #include "../companion/second_screen.h"
 #include "den/base/log.h"
@@ -249,6 +250,7 @@ void PlayerScreen::DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const p
     } else if (snapshot.fast_forward) {
         badge("Fast-forward \xC2\xBB", false);
     }
+    DrawAchievementOverlay(ctx, area);
 }
 
 // The game on the display it has, and the menu over it when it is on the same one.

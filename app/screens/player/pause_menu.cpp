@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <format>
 
+#include "../achievements/achievements_glue.h"
 #include "../apps/apps_catalog.h"
 #include "../companion/second_screen.h"
 #include "den/app/pages.h"
@@ -114,16 +115,26 @@ void PlayerScreen::BuildMain(ui::Node* list) {
     rows.push_back(ActionRow("menu.resume", "Resume", [this] { CloseMenu(); }));
     if (snapshot.can_save_states) {
         rows.push_back(ActionRow("menu.save", "Save state", [this] { Show(View::Save); }));
-        rows.push_back(ActionRow("menu.load", "Load state", [this] { Show(View::Load); }));
+        if (snapshot.hardcore) {
+            rows.push_back(ValueRow("menu.load", "Load state", [] { return std::string("Off in hardcore mode"); }));
+        } else {
+            rows.push_back(ActionRow("menu.load", "Load state", [this] { Show(View::Load); }));
+        }
     } else if (!external) {
         rows.push_back(ValueRow("menu.save", "Save states", [] { return std::string("Not with this core"); }));
+    }
+    if (AchievementsForRunningGame()) {
+        rows.push_back(ActionRow("menu.achievements", "Achievements", [this] { GetStage().Push("achievements"); }));
     }
     if (snapshot.can_fast_forward) {
         rows.push_back(ToggleRow("menu.fast", "Fast-forward", [this] { return fast_toggle_; },
                                  [this](bool on) { fast_toggle_ = on; }));
     }
     if (!external) {
-        rows.push_back(ValueRow("menu.rewind", "Rewind", [this, can = snapshot.can_rewind] {
+        rows.push_back(ValueRow("menu.rewind", "Rewind", [this, can = snapshot.can_rewind, hardcore = snapshot.hardcore] {
+            if (hardcore) {
+                return std::string("Off in hardcore mode");
+            }
             if (!can) {
                 return std::string("Not with this core");
             }

@@ -14,6 +14,7 @@
 #include "den/base/log.h"
 #include "den/library/content.h"
 #include "picture_choice.h"
+#include "../achievements/achievements_glue.h"
 #include "player_screen.h"
 
 namespace den::app {
@@ -130,6 +131,7 @@ void PlayerScreen::Begin(const std::filesystem::path& content, bool resume) {
     request.option_hints = core_.option_hints;
     request.resume = resume && Param("resume") != "0";
     request.title = game_.name;
+    request.hardcore = AchievementsHardcore(game_);
     if (core_.runner == plugins::Runner::Engine) {
         // An engine app runs it; the session talks to it through the engine host.
         engine::Install install;

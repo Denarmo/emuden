@@ -12,6 +12,7 @@
 #include "den/app/pages.h"
 #include "den/app/registry.h"
 #include "den/system/info.h"
+#include "../achievements/achievements_glue.h"
 #include "fake_host.h"
 #include "feature_api.h"
 
@@ -48,6 +49,7 @@ void CreateHost() {
     config.library = svc.library;
     config.app_version = system::Version();
     config.tune = CreateTuneServices();
+    config.achievements = AchievementServicesSvc();
     HostSlot() = plugins::CreateFeatureHost(config);
 }
 
