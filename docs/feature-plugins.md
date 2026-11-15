@@ -75,7 +75,7 @@ in `needs`, so an app without it refuses the plugin instead of failing in the sc
 | `icon` | string | no | PNG in the package, square, at most 512 px |
 | `permissions` | string[] | yes | From the list below; anything else refuses the manifest |
 | `http.hosts` | string[] | with `http` or `download` | Exact host names, https only, no wildcards, at most 8 |
-| `http.min_interval_ms` | number | no | Pause between requests to one host; default and minimum 500 |
+| `http.min_interval_ms` | number | no | Pause between requests to one host; default and minimum 500 (100 for a plugin with `sync`) |
 | `open_hosts` | string[] | with `open-url` | Hosts `den.open_url` may open in the browser |
 | `browse_hosts` | string[] | with `browse` | Sites `den.web.open` may show inside the app: exact names, at most 8 |
 | `file_types` | string[] | no | Extensions the plugin takes from "open with" and the import picker |

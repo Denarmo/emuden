@@ -185,7 +185,9 @@ Hosts: `http.hosts` as before (https only), plus two permissions:
   port is required. Over https any certificate is accepted there (Syncthing's
   self-signed one), never for another host. Shown as "Connect to apps on this device".
 
-Requests to the user's server and to this device have no pause between them and their
+A sync provider may set `http.min_interval_ms` down to 100 (others: 500): a game's own sync
+makes a few requests in a row and the user waits for them. Requests to the user's server and
+to this device have no pause between them and their
 redirects are not followed: a 3xx comes back as it is (`headers.location`). Requests to
 `http.hosts` follow redirects and keep the per-host pause of `den.http.get`.
 

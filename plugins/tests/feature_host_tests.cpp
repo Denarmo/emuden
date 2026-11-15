@@ -215,6 +215,22 @@ TEST_CASE("a feature manifest that asks for what it may not is refused") {
     CHECK(CheckTrust(plain, FeaturePlugin::Trust::ThirdParty, "Tester").ok);
     CHECK_FALSE(CheckTrust(plain, FeaturePlugin::Trust::ThirdParty, "other").ok);
     CHECK_FALSE(CheckTrust(plain, FeaturePlugin::Trust::Official, {}).ok);
+
+    // The pause between requests: 500 ms at least, 100 ms for a sync provider.
+    const auto pause = [](const std::string& permissions) {
+        return ParseFeatureManifest(ManifestOf("tester.notes", "1.0.0",
+                                               R"({"entry":"main.lua","permissions":[)" + permissions +
+                                                   R"(],"http":{"hosts":["api.example.org"],"min_interval_ms":100},)"
+                                                   R"("sync":{"categories":["saves"]}})"))
+            .take()
+            .min_interval_ms;
+    };
+    CHECK(pause(R"("http","sync")") == 100);
+    CHECK(ParseFeatureManifest(ManifestOf("tester.notes", "1.0.0",
+                                          R"({"entry":"main.lua","permissions":["http"],)"
+                                          R"("http":{"hosts":["api.example.org"],"min_interval_ms":100}})"))
+              .take()
+              .min_interval_ms == 500);
 }
 
 TEST_CASE("a feature plugin is listed from the signed index, installed, run and removed") {

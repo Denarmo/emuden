@@ -254,8 +254,11 @@ Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
         access.browse_hosts.clear();
     }
     if (http != nullptr) {
+        // A sync provider talks to its own storage API, many small requests per game: it may
+        // ask for a shorter pause than a plugin that reads public sites.
+        const int least = access.Has(PERMISSION_SYNC) ? 100 : 500;
         manifest.min_interval_ms = std::clamp(
-            static_cast<int>(json::Number(*http, "min_interval_ms", 500)), 500, 600'000);
+            static_cast<int>(json::Number(*http, "min_interval_ms", 500)), least, 600'000);
     }
 
     for (const std::string& system : json::Strings(*feature, "systems", false)) {
