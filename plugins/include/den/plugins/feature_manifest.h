@@ -37,6 +37,8 @@ inline constexpr const char* PERMISSION_DEVICE_INFO = "device.info";
 inline constexpr const char* PERMISSION_GAME_SETTINGS = "game.settings";
 /// den.steam: the Steam games of this computer, their launch options and Proton version.
 inline constexpr const char* PERMISSION_STEAM = "steam";
+/// den.achievements: sign in to RetroAchievements and the achievements of the user's games.
+inline constexpr const char* PERMISSION_ACHIEVEMENTS = "achievements";
 
 /// The categories a sync provider may offer, in the order the sync page shows them.
 inline constexpr const char* SYNC_CATEGORIES[] = {"saves", "states", "config", "games", "bios"};

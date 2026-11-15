@@ -18,6 +18,7 @@ const char* const PERMISSIONS[] = {
     PERMISSION_LIBRARY_READ, PERMISSION_PATCH,           PERMISSION_LIBRARY_WRITE,
     PERMISSION_SYNC,         PERMISSION_HTTP_USER_HOST,  PERMISSION_HTTP_LOCAL,
     PERMISSION_DEVICE_INFO,  PERMISSION_GAME_SETTINGS,   PERMISSION_STEAM,
+    PERMISSION_ACHIEVEMENTS,
 };
 
 const char* CategoryName(std::string_view category) {
@@ -392,6 +393,8 @@ std::vector<PermissionLine> PermissionLines(const FeatureAccess& access,
                        : "Change the settings of single games of these consoles: " + Join(access.systems);
         } else if (name == PERMISSION_STEAM) {
             text = "See your Steam games and change their launch options and Proton version";
+        } else if (name == PERMISSION_ACHIEVEMENTS) {
+            text = "Sign in to RetroAchievements and track achievements while you play";
         } else {
             text = "Change the hacks it installed";
         }

@@ -90,6 +90,7 @@ struct FeatureDeps {
     HttpGetter http;                           // default: pal::HttpGet
     std::shared_ptr<FeatureServices> services; // default: CreateLibraryServices
     std::shared_ptr<TuneServices> tune;         // default: FeatureConfig::tune
+    std::shared_ptr<AchievementServices> achievements; // default: FeatureConfig::achievements
     std::filesystem::path bundled_dir;         // default: pal::AssetsDir() / "plugins"
     std::filesystem::path downloads_dir;       // the device's Downloads folder; empty = none
     std::string platform;                      // den.device.platform; default: pal::GetCaps().os

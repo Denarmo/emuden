@@ -26,6 +26,7 @@ class Library;
 
 namespace den::plugins {
 
+class AchievementServices;
 class SyncLink;
 class TuneServices;
 
@@ -116,6 +117,8 @@ struct FeatureConfig {
     std::string app_version;
     /// What den.device.info, den.game and den.steam reach; null: those calls fail.
     std::shared_ptr<TuneServices> tune;
+    /// What den.achievements reaches; null: those calls fail.
+    std::shared_ptr<AchievementServices> achievements;
 };
 
 std::unique_ptr<FeatureHost> CreateFeatureHost(const FeatureConfig& config);

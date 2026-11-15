@@ -100,6 +100,7 @@ Result<std::shared_ptr<Runner>> RealFeatureHost::Start(const std::string& id) {
     config.http = deps_.http;
     config.services = deps_.services;
     config.tune = deps_.tune ? deps_.tune : config_.tune;
+    config.achievements = deps_.achievements ? deps_.achievements : config_.achievements;
     config.now = deps_.now;
     config.instruction_limit = deps_.instruction_limit;
     if (package.manifest.access.Has(PERMISSION_SYNC)) {

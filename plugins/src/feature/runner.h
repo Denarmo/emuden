@@ -24,6 +24,7 @@
 #include "den/base/json.h"
 #include "den/plugins/feature_manifest.h"
 #include "den/plugins/feature_services.h"
+#include "den/plugins/feature_achievements.h"
 #include "den/plugins/feature_tune.h"
 #include "den/plugins/feature_ui.h"
 #include "den/plugins/sync_link.h"
@@ -48,6 +49,7 @@ struct RunnerConfig {
     HttpGetter http;
     std::shared_ptr<FeatureServices> services; // may be null
     std::shared_ptr<TuneServices> tune;         // den.device.info, den.game, den.steam; may be null
+    std::shared_ptr<AchievementServices> achievements; // den.achievements; may be null
     std::function<std::int64_t()> now;
     long long instruction_limit = 200'000'000;
     pal::Secrets* secrets = nullptr;      // den.secrets; null: pal::GetSecrets()
@@ -271,11 +273,15 @@ void RegisterRequest(lua_State* L, Runner& runner); // http.request (after Regis
 void RegisterSecrets(lua_State* L, Runner& runner); // secrets
 void RegisterSync(lua_State* L, Runner& runner);    // sync, for the sync permission
 void RegisterTune(lua_State* L, Runner& runner);    // device.info, game, steam (after RegisterCore)
+void RegisterAchievements(lua_State* L, Runner& runner); // achievements
 
 /// The credential store's name of a plugin's secret.
 std::string SecretName(const std::string& plugin, const std::string& key);
 /// Removes every secret the plugin kept (it is removed with its data).
 void RemoveSecrets(const std::string& plugin, const std::filesystem::path& data_dir);
+/// den.secrets.set and remove for the host's own calls (den.achievements keeps its token so).
+Status KeepSecret(Runner& runner, const std::string& key, const JsonValue& value);
+void DropSecret(Runner& runner, const std::string& key);
 
 /// Sets `name` in the table on top of the stack to the function, with the runner as upvalue.
 void SetFunction(lua_State* L, Runner& runner, const char* name, lua_CFunction function);

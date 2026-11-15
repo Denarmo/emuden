@@ -186,6 +186,7 @@ void Runner::Boot() {
     RegisterRequest(L, *this);
     RegisterSecrets(L, *this);
     RegisterTune(L, *this);
+    RegisterAchievements(L, *this);
     if (config_.manifest.access.Has(PERMISSION_SYNC)) {
         RegisterSync(L, *this);
     }

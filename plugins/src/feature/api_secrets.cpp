@@ -124,6 +124,27 @@ void RemoveSecrets(const std::string& plugin, const std::filesystem::path& data_
     }
 }
 
+Status KeepSecret(Runner& runner, const std::string& key, const JsonValue& value) {
+    const std::string text = CompactJson(value);
+    if (!IsKey(key) || text.size() > MAX_SECRET) {
+        return Status::Fail("the secret cannot be kept");
+    }
+    std::vector<std::string> names = Names(runner);
+    if (std::find(names.begin(), names.end(), key) == names.end()) {
+        names.push_back(key);
+        SaveNames(runner, names);
+    }
+    return Store(runner).Set(SecretName(runner.Config().manifest.id, key), text);
+}
+
+void DropSecret(Runner& runner, const std::string& key) {
+    Store(runner).Remove(SecretName(runner.Config().manifest.id, key));
+    std::vector<std::string> names = Names(runner);
+    if (std::erase(names, key) > 0) {
+        SaveNames(runner, names);
+    }
+}
+
 void RegisterSecrets(lua_State* L, Runner& runner) {
     lua_newtable(L);
     SetFunction(L, runner, "get", &Get);
