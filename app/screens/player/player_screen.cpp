@@ -26,7 +26,7 @@ using input::PadButton;
 constexpr int KEY_F3 = 0x4000003C; // SDLK_F3
 constexpr int KEY_FAST = 'f';
 constexpr int KEY_REWIND = 'r';
-constexpr double CHORD_HOLD = 0.5; // Start and Select together, held
+constexpr double SELECT_HOLD = 1.0; // Select alone, held: the menu without the chord
 constexpr float STICK_HOLD = 0.6f;
 constexpr int MAX_PORTS = 4;
 constexpr float MENU_CORNER = 72; // logical units: a tap in the top left corner opens the menu
@@ -239,7 +239,7 @@ void PlayerScreen::CloseMenu() {
     Svc().player->Resume();
     Svc().input->SetNavFromPads(false);
     wait_release_ = true;
-    chord_since_ = -1;
+    select_since_ = -1;
     direct_ = false;
     Show(View::Closed);
 }
@@ -266,7 +266,7 @@ void PlayerScreen::FeedPads() {
     input::PadState pads[MAX_PORTS];
     pads[0] = input.KeyboardPad();
     std::uint32_t all = pads[0].buttons;
-    bool chord = false, guide = false, hold_fast = false, hold_rewind = false;
+    bool chord = false, guide = false, select_alone = false, hold_fast = false, hold_rewind = false;
     float stick = 0;
     for (int port = 0; port < MAX_PORTS; ++port) {
         const input::PadState& pad = input.Pad(port);
@@ -279,6 +279,7 @@ void PlayerScreen::FeedPads() {
         all |= pad.buttons;
         chord = chord || (pad.Down(PadButton::Start) && pad.Down(PadButton::Select));
         guide = guide || pad.Down(PadButton::Guide);
+        select_alone = select_alone || pad.buttons == Bit(PadButton::Select);
         if (std::fabs(pad.rx) > std::fabs(stick)) {
             stick = pad.rx;
         }
@@ -294,16 +295,18 @@ void PlayerScreen::FeedPads() {
         }
     }
 
-    // The menu: the pad's home button, or Start and Select held together.
+    // The menu: the pad's home button, Start and Select together, or Select held alone. Steam
+    // keeps the home button of the handhelds it runs on, so there only the other two reach us.
     const double now = pal::NowSeconds();
     const bool guide_pressed = guide && !guide_was_down_;
     guide_was_down_ = guide;
-    if (!chord) {
-        chord_since_ = -1;
-    } else if (chord_since_ < 0) {
-        chord_since_ = now;
+    if (!select_alone) {
+        select_since_ = -1;
+    } else if (select_since_ < 0) {
+        select_since_ = now;
     }
-    if (!wait_release_ && (guide_pressed || (chord && now - chord_since_ >= CHORD_HOLD))) {
+    const bool select_held = select_since_ >= 0 && now - select_since_ >= SELECT_HOLD;
+    if (!wait_release_ && (guide_pressed || chord || select_held)) {
         OpenMenu();
         return;
     }
