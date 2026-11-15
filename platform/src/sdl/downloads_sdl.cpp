@@ -41,6 +41,10 @@ std::vector<std::filesystem::path> DownloadFolders() {
         if (const auto same = std::filesystem::weakly_canonical(folder, ec); !ec) {
             folder = same;
         }
+        // SDL's folders end in a separator.
+        if (!folder.has_filename() && folder.has_parent_path() && folder != folder.root_path()) {
+            folder = folder.parent_path();
+        }
         if (std::find(folders.begin(), folders.end(), folder) == folders.end()) {
             folders.push_back(folder);
         }

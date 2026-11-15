@@ -120,6 +120,26 @@ std::string MoveArticle(std::string name) {
     return name;
 }
 
+// "0012 - Asphalt - Urban GT (U)(Wario)" -> "Asphalt - Urban GT": a scene release number goes
+// when the file also has a short GoodTools region tag, so "1943 - The Battle of Midway" stays.
+std::string DropReleaseNumber(std::string kept, std::string_view raw) {
+    const bool number = kept.size() > 7 && std::all_of(kept.begin(), kept.begin() + 4, [](char c) {
+        return c >= '0' && c <= '9';
+    }) && kept.compare(4, 3, " - ") == 0;
+    if (!number) {
+        return kept;
+    }
+    for (std::size_t open = raw.find('('); open != std::string_view::npos; open = raw.find('(', open + 1)) {
+        const std::size_t close = raw.find(')', open);
+        const std::string_view tag = raw.substr(open + 1, close == std::string_view::npos ? 0 : close - open - 1);
+        if (!tag.empty() && tag.size() <= 2 &&
+            std::all_of(tag.begin(), tag.end(), [](char c) { return c >= 'A' && c <= 'Z'; })) {
+            return kept.substr(7);
+        }
+    }
+    return kept;
+}
+
 // Latin-1 letters with accents (UTF-8 C3 80..BF) to their plain letter, 0 for anything else.
 char FoldAccent(unsigned char second) {
     static constexpr char TABLE[] = "aaaaaaaceeeeiiiidnooooo ouuuuy saaaaaaaceeeeiiiidnooooo ouuuuy y";
@@ -159,6 +179,7 @@ ParsedName ParseGameName(std::string_view raw) {
     while (!kept.empty() && (kept.back() == '-' || kept.back() == ' ' || kept.back() == ',')) {
         kept.pop_back();
     }
+    kept = DropReleaseNumber(std::move(kept), name);
     kept = MoveArticle(std::move(kept));
     if (kept.empty()) {
         kept = CollapseSpaces(name);

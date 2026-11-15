@@ -18,6 +18,8 @@ TEST_CASE("ROM names are cleaned up") {
     CHECK(CleanDisplayName("Dr. Mario") == "Dr. Mario");
     CHECK(CleanDisplayName("Super Mario Bros. Deluxe (Europe) (Rev 2).gbc") == "Super Mario Bros. Deluxe");
     CHECK(CleanDisplayName("(USA)") == "(USA)");
+    CHECK(CleanDisplayName("0012 - Asphalt - Urban GT (U)(Wario).nds") == "Asphalt - Urban GT");
+    CHECK(CleanDisplayName("1943 - The Battle of Midway (USA).nes") == "1943 - The Battle of Midway");
     CHECK(CleanStoreTitle("Portal\xE2\x84\xA2  2") == "Portal 2");
 }
 

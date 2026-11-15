@@ -334,7 +334,15 @@ std::filesystem::path DataDir() {
 
 std::filesystem::path DownloadsDir() {
     const char* folder = SDL_GetUserFolder(SDL_FOLDER_DOWNLOADS);
-    return folder ? PathFromUtf8(folder) : std::filesystem::path();
+    if (folder == nullptr) {
+        return {};
+    }
+    // SDL ends the folder with a separator: without the cut, parent_path() is the folder itself.
+    std::filesystem::path path = PathFromUtf8(folder);
+    if (!path.has_filename() && path.has_parent_path() && path != path.root_path()) {
+        path = path.parent_path();
+    }
+    return path;
 }
 
 std::filesystem::path AssetsDir() {
