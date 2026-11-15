@@ -135,6 +135,11 @@ public:
         if (listed && !Cancelled()) {
             Synced(id);
         }
+        {
+            const SyncState state = engine_.State();
+            log::Info("sync", "{} files: {} up, {} down, {} waiting, {} errors; {} games to upload", actions.size(),
+                      state.uploaded, state.downloaded, state.waiting, state.errors.size(), uploads.size());
+        }
         UploadGames(uploads);
         fs::remove_all(temp_dir_, ec);
         return listed ? Status() : Status::Fail("The provider could not be reached.");
@@ -194,6 +199,8 @@ private:
             Change([](SyncState& s) { ++s.games_done; });
         }
         engine_.games_pass_.store(false);
+        log::Info("sync", "games: {} of {} looked at{}", engine_.State().games_done, uploads.size(),
+                  engine_.Stopping() ? ", the rest goes on later" : "");
     }
 
     void Error(const std::string& message) {
