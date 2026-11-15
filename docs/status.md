@@ -513,7 +513,13 @@ GS work runs on a thread of its own on Android, with an EGL context shared with 
 That thread is now the limit, at 100% of a CPU core inside the Adreno driver's per-draw work. Since 1.1.5 interlaced
 games no longer shake (the odd field is shown half a line lower). Batching draws across palette changes
 (one palette texture, a row per vertex) was tried and dropped: in CMR3 every split also changes texture
-and shader, so draws and speed stayed the same. The PCSX2 notes below are history.
+and shader, so draws and speed stayed the same. Since 1.1.6 the core samples where the GS samples (CMR3 had a
+line of wrong texels every 64 pixels, GT4's menu buttons a seam), has a widescreen option (the player's
+Widescreen row: CMR3's own 16:9 mode, GT4's text fix with 16:9 set in its options) and cheaper GS
+transfers: CMR3's village start runs at 98.9% (was 95.9%) and 98.7% in 16:9, both threads near 100% of a core.
+GT4's race view is still noise with Play!'s OpenGL renderer on every platform: the game reads its 32-bit
+frame back as 8-bit textures through palettes it renders, which only Play!'s Vulkan renderer emulates.
+The PCSX2 notes below are history.
 
 The 24 consoles added on 2026-11-14 (Atari 2600/5200/7800/Lynx/Jaguar, Sega CD/32X/SG-1000,
 PC Engine/CD/PC-FX, Neo Geo/Pocket/Color, WonderSwan/Color, Virtual Boy, Pokémon mini, 3DO,
