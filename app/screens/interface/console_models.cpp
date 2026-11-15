@@ -8,6 +8,7 @@
 #include <memory>
 #include <vector>
 
+#include "console_mesh.h"
 #include "den/gfx/mesh_shapes.h"
 
 namespace den::app {
@@ -63,52 +64,6 @@ void Screen(Vertices& out, float cy, float bezel_w, float bezel_h, float w, floa
 void Speaker(Vertices& out, float x, float y, float z, int count) {
     for (int i = 0; i < count; ++i) {
         gfx::AddGroove(out, RoundedOutline(0.012f, 0.09f, 0.006f, 0.006f), 0.006f, z + 0.002f, x + i * 0.024f, y);
-    }
-}
-
-// The part of the convex `outline` where a * x + b * y <= limit (Sutherland-Hodgman).
-std::vector<gfx::Vec2> Clip(const std::vector<gfx::Vec2>& outline, float a, float b, float limit) {
-    std::vector<gfx::Vec2> out;
-    const std::size_t n = outline.size();
-    for (std::size_t i = 0; i < n; ++i) {
-        const gfx::Vec2 p = outline[i], q = outline[(i + 1) % n];
-        const float dp = a * p.x + b * p.y - limit, dq = a * q.x + b * q.y - limit;
-        if (dp <= 0) {
-            out.push_back(p);
-        }
-        if ((dp < 0 && dq > 0) || (dp > 0 && dq < 0)) {
-            const float t = dp / (dp - dq);
-            out.push_back({p.x + (q.x - p.x) * t, p.y + (q.y - p.y) * t});
-        }
-    }
-    // Points the cut put on top of each other would give an edge without a direction.
-    std::vector<gfx::Vec2> kept;
-    for (const gfx::Vec2& p : out) {
-        if (kept.empty() || std::abs(p.x - kept.back().x) + std::abs(p.y - kept.back().y) > 1e-4f) {
-            kept.push_back(p);
-        }
-    }
-    while (kept.size() > 1 &&
-           std::abs(kept.front().x - kept.back().x) + std::abs(kept.front().y - kept.back().y) <= 1e-4f) {
-        kept.pop_back();
-    }
-    return kept.size() >= 3 ? kept : std::vector<gfx::Vec2>{};
-}
-
-// A console's body `depth` thick with the pocket of `model` in the top of its back: the
-// front part whole, the back part round the pocket (below its lip, and the shoulders
-// beside it), so the cartridge stands in it with its back flush with the console's.
-void PocketBody(Vertices& out, const std::vector<gfx::Vec2>& outline, float depth, float bevel, SlabParts front,
-                const ConsoleModel& model) {
-    const float pd = model.pocket_depth, half = model.pocket_w * 0.5f;
-    gfx::AddSlab(out, outline, depth - pd, bevel, front, pd * 0.5f);
-    const float cz = -depth * 0.5f + pd * 0.5f, b = std::min(bevel, pd * 0.3f);
-    const std::vector<gfx::Vec2> upper = Clip(outline, 0, -1, -model.lip_y);
-    for (const std::vector<gfx::Vec2>& piece :
-         {Clip(outline, 0, 1, model.lip_y), Clip(upper, 1, 0, -half), Clip(upper, -1, 0, -half)}) {
-        if (!piece.empty()) {
-            gfx::AddSlab(out, piece, pd, b, All(Part::Shell), cz);
-        }
     }
 }
 
@@ -212,6 +167,52 @@ Vertices Home(const ConsoleModel&) {
 
 } // namespace
 
+// The part of the convex `outline` where a * x + b * y <= limit (Sutherland-Hodgman).
+std::vector<gfx::Vec2> ClipOutline(const std::vector<gfx::Vec2>& outline, float a, float b, float limit) {
+    std::vector<gfx::Vec2> out;
+    const std::size_t n = outline.size();
+    for (std::size_t i = 0; i < n; ++i) {
+        const gfx::Vec2 p = outline[i], q = outline[(i + 1) % n];
+        const float dp = a * p.x + b * p.y - limit, dq = a * q.x + b * q.y - limit;
+        if (dp <= 0) {
+            out.push_back(p);
+        }
+        if ((dp < 0 && dq > 0) || (dp > 0 && dq < 0)) {
+            const float t = dp / (dp - dq);
+            out.push_back({p.x + (q.x - p.x) * t, p.y + (q.y - p.y) * t});
+        }
+    }
+    // Points the cut put on top of each other would give an edge without a direction.
+    std::vector<gfx::Vec2> kept;
+    for (const gfx::Vec2& p : out) {
+        if (kept.empty() || std::abs(p.x - kept.back().x) + std::abs(p.y - kept.back().y) > 1e-4f) {
+            kept.push_back(p);
+        }
+    }
+    while (kept.size() > 1 &&
+           std::abs(kept.front().x - kept.back().x) + std::abs(kept.front().y - kept.back().y) <= 1e-4f) {
+        kept.pop_back();
+    }
+    return kept.size() >= 3 ? kept : std::vector<gfx::Vec2>{};
+}
+
+// A console's body `depth` thick with the pocket of `model` in the top of its back: the
+// front part whole, the back part round the pocket (below its lip, and the shoulders
+// beside it), so the cartridge stands in it with its back flush with the console's.
+void PocketBody(Vertices& out, const std::vector<gfx::Vec2>& outline, float depth, float bevel, SlabParts front,
+                const ConsoleModel& model) {
+    const float pd = model.pocket_depth, half = model.pocket_w * 0.5f;
+    gfx::AddSlab(out, outline, depth - pd, bevel, front, pd * 0.5f);
+    const float cz = -depth * 0.5f + pd * 0.5f, b = std::min(bevel, pd * 0.3f);
+    const std::vector<gfx::Vec2> upper = ClipOutline(outline, 0, -1, -model.lip_y);
+    for (const std::vector<gfx::Vec2>& piece :
+         {ClipOutline(outline, 0, 1, model.lip_y), ClipOutline(upper, 1, 0, -half), ClipOutline(upper, -1, 0, -half)}) {
+        if (!piece.empty()) {
+            gfx::AddSlab(out, piece, pd, b, All(Part::Shell), cz);
+        }
+    }
+}
+
 ConsoleModel ConsoleFor(const std::string& name) {
     static std::map<std::string, std::unique_ptr<gfx::Mesh3D>> meshes;
     ConsoleModel model;
@@ -233,7 +234,7 @@ ConsoleModel ConsoleFor(const std::string& name) {
         build = Home;
         model = {nullptr, 2.4f, 1.6f, 0.5f, 0.0f, 1.3f, 0.45f, false};
     } else {
-        return model;
+        return HandheldFor(name);
     }
     auto& mesh = meshes[name];
     if (!mesh) {

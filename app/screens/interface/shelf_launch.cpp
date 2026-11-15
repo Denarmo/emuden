@@ -92,8 +92,8 @@ void ObjectShelf::DrawLaunch(ui::Context& ctx, gfx::Renderer3D& renderer, const 
 
     // A point of the console (in its heights, y up) on the screen.
     const auto attached = [&](float ly, float lz, float& x, float& y, float& z) {
-        x = cx + std::sin(turn) * lz * hc;
-        z = cz + std::cos(turn) * lz * hc;
+        x = cx + (std::cos(turn) * console.slot_x + std::sin(turn) * lz) * hc;
+        z = cz + (std::cos(turn) * lz - std::sin(turn) * console.slot_x) * hc;
         y = cy - ly * hc;
     };
 

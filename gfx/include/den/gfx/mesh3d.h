@@ -52,6 +52,7 @@ enum class Part : int {
     Screen = 15,   // a console's screen: dark glass, or lit and showing the boot (Material::boot)
     Led = 16,      // a power light: dark, red once the console is on
     Print = 17,    // the cover printed on cardboard: fine grain, a satin sheen, or foil
+    Paint = 18,    // plastic in the vertex's own colour: u = red * 256 + green, v = blue (0..255)
 };
 
 struct MeshVertex {

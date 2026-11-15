@@ -41,7 +41,8 @@ struct ObjectLook {
     float box_aspect = 0.9f;
     // The console a cartridge or card goes into when its game starts: "portrait" or
     // "landscape" (a handheld), "clamshell" (one that folds open) or "home" (one under a
-    // television); empty for none. `player_color` is its plastic.
+    // television); empty for none. "player_model" in the package names a handheld modelled
+    // on the real one instead (ConsoleModel's HandheldFor). `player_color` is its plastic.
     std::string player;
     gfx::Color player_color{200, 200, 205, 255};
     // Its other colours: each start picks one of these or player_color at random.

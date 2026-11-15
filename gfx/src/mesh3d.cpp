@@ -144,6 +144,9 @@ void main() {
             base = mix(base, base * 0.55 + rainbow * 0.6, 0.35 * k + 0.12);
             gloss = 70.0; spec = 0.9; fresnel = 0.6;
         }
+    } else if (part == 18) {
+        vec2 c = floor(v_uv + 0.5);
+        base = vec3(floor(c.x / 256.0), mod(c.x, 256.0), c.y) / 255.0;
     } else if (part == 14) {
         vec4 p = has_art(4) ? texture(u_cart_art, u_cart_uv.xy + clamp(v_uv, 0.0, 1.0) * u_cart_uv.zw) : vec4(0.0);
         base = mix(u_shell.rgb, p.rgb, p.a);

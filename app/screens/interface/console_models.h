@@ -1,10 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Generic consoles for the launch animation of the "shelf3d" layout: a portrait and a
-// landscape handheld, one that folds open, and one that stands under a television. None is a
-// copy of a real console; they share the layout the real ones had (screen above, pad on the
-// left, buttons on the right, the cartridge slot at the top of the back).
+// Consoles for the launch animation of the "shelf3d" layout. The generic ones (a portrait and
+// a landscape handheld, one that folds open, one that stands under a television) share the
+// layout the real ones had; HandheldFor's are modelled on particular handhelds.
 
 #pragma once
 
@@ -28,11 +27,16 @@ struct ConsoleModel {
     // The pocket in the top of the back the cartridge stands in: its width and depth, and
     // the height of the lip it rests behind; none when 0.
     float pocket_w = 0, pocket_depth = 0, lip_y = 0;
+    float slot_x = 0; // the slot's middle across, in console heights
 };
 
-/// The console of that name ("portrait", "landscape", "clamshell", "home"); null mesh for
-/// another.
+/// The console of that name: a generic one ("portrait", "landscape", "clamshell", "home") or
+/// a model of a real handheld (HandheldFor); null mesh for another.
 ConsoleModel ConsoleFor(const std::string& name);
+
+/// Handhelds modelled on the real ones at their real proportions: "dmg", "cgb", "agb",
+/// "ds_lite", "switch2"; null mesh for another name.
+ConsoleModel HandheldFor(const std::string& name);
 
 /// The console of that name with the photograph's outline and front, its screen at `screen`
 /// (0..1 of the photograph; none when empty); null mesh when there is no photograph.

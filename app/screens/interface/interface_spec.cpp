@@ -126,6 +126,12 @@ void ReadObject(const JsonValue* object, ObjectLook& out) {
         out.player_photo = photo;
     }
     ReadUnitRect(object->Find("player_screen"), out.player_screen);
+    // A console modelled on the real one: it takes the generic one's place, and its photograph's.
+    if (std::string model; ReadChoice(object, "player_model", {"dmg", "cgb", "agb", "ds_lite", "switch2"}, model),
+        !model.empty()) {
+        out.player = model;
+        out.player_photo.clear();
+    }
     ReadNumber(object, "aspect", 0.3f, 2.5f, out.aspect);
     ReadNumber(object, "depth", 0.01f, 0.6f, out.depth);
     if (const auto shell = ParseColor(object->String("shell"))) {
