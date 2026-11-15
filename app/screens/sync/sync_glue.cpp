@@ -13,6 +13,7 @@
 #include "den/app/registry.h"
 #include "den/platform/device.h"
 #include "den/plugins/feature_host.h"
+#include "den/system/device.h"
 #include "den/system/settings.h"
 #include "sync_glue.h"
 
@@ -29,6 +30,10 @@ std::string DeviceName() {
     const pal::DeviceFacts facts = pal::GetDeviceFacts();
     if (!facts.device_name.empty()) {
         return facts.device_name;
+    }
+    // "Legion Go S" rather than its DMI product name: Continue and conflicts show it.
+    if (const system::DeviceProfile& device = system::Device(); device.known && !device.name.empty()) {
+        return device.name;
     }
     return !facts.model.empty() ? facts.model : pal::GetCaps().os;
 }

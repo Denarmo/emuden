@@ -6,6 +6,7 @@
 #include <cmath>
 #include <format>
 #include <map>
+#include <utility>
 
 #include "../details/launch.h"
 #include "../sync/sync_glue.h"
@@ -140,6 +141,15 @@ std::string ContinueLine(const ContinueCard& card) {
         line += card.online ? " \xC2\xB7 Download " + SizeText(card.online->size) : std::string(" \xC2\xB7 Not here");
     }
     return line;
+}
+
+bool ContinueNews(const std::vector<ContinueCard>& cards) {
+    static std::string seen;
+    if (cards.empty()) {
+        return false;
+    }
+    const std::string newest = cards.front().item.key + "@" + std::to_string(cards.front().item.time);
+    return std::exchange(seen, newest) != newest;
 }
 
 void RefreshContinue() {

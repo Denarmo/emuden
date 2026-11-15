@@ -36,6 +36,9 @@ std::string ContinueSignature(const std::vector<ContinueCard>& cards);
 std::string ContinueLine(const ContinueCard& card);
 /// Starts the game where it was left, or offers its download.
 void ChooseContinue(const ContinueCard& card);
+/// True once for each newest session the cards show (another device's game just came in, or
+/// a game just left here): Home then puts the selection on it.
+bool ContinueNews(const std::vector<ContinueCard>& cards);
 /// Home was shown: a sync starts when the last one is over a minute old, so a game just left
 /// on another device shows up.
 void RefreshContinue();

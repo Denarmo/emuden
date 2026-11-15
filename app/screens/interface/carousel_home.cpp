@@ -173,6 +173,10 @@ public:
         position_->text_align = ui::Align::Center;
         AddScreens(*below_);
 
+        // A session that just came in (or the game just left) is where the page opens.
+        if (ContinueNews(cards_) && !tabs_.empty() && tabs_.front().key == "continue") {
+            Remembered() = {"continue", tabs_.front().games.front().id};
+        }
         std::size_t chosen = 0;
         for (std::size_t i = 0; i < tabs_.size(); ++i) {
             chosen = tabs_[i].key == Remembered().tab ? i : chosen;
@@ -223,6 +227,10 @@ public:
         if (carousel_ && carousel_->LaunchCover() > 0) {
             ctx.canvas->FillRect(area, color_.WithAlpha(carousel_->LaunchCover() * 0.92f));
         }
+    }
+
+    void OnShow() override {
+        RefreshContinue();
     }
 
     bool OnNav(input::Nav nav) override {

@@ -112,6 +112,10 @@ public:
             Rebuild();
             return;
         }
+        if (focus_news_ && !continue_tiles_.empty()) {
+            focus_news_ = false;
+            SetFocus(continue_tiles_.front().first);
+        }
         if (const double now = pal::NowSeconds(); now - polled_ >= CONTINUE_POLL) {
             polled_ = now;
             if (ContinueSignature(ContinueCards()) != signature_) {
@@ -232,6 +236,9 @@ private:
             };
             continue_tiles_.emplace_back(tile, card);
         }
+        // A session that just came in (or the game just left) takes the selection, once the
+        // rebuild has put the old one back.
+        focus_news_ = ContinueNews(cards_);
     }
 
     void AddShelf(ui::Node* list, const std::string& id, const std::string& title,
@@ -284,6 +291,7 @@ private:
     std::vector<std::pair<ContinueTile*, ContinueCard>> continue_tiles_;
     std::string signature_;
     double polled_ = 0;
+    bool focus_news_ = false;
 };
 
 } // namespace
