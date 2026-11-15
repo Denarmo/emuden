@@ -8,6 +8,25 @@ listened.
 
 SteamOS (Legion Go S) feature by feature, with the Linux fixes it needed: `docs/steamos.md`.
 
+## Browser plugin (2026-11-15)
+
+The `emuden.browser` plugin (`docs/feature-plugins.md` 4.4, `docs/in-app-browser.md`) and the
+setup of downloads in `library/src/downloads_*.cpp`. Unit tests: console detection by header
+and name, patches by checksum and name, archives, cue/bin and disc sets, BIOS names, undo
+(`den_library_tests`, synthetic ROMs); the plugin API (`den_plugins_tests`).
+
+| Where | Result |
+|---|---|
+| Windows (own portable profile) | uCity (GPL homebrew, `ucity.gbc` from its GitHub release) clicked with the virtual pad: "Added ucity to Game Boy Color". Pokemon Emerald Legacy 1.1.0 patches zip: a hack of the Emerald copy in the test library, then 1.1.4 "Updated Pokemon Emerald Legacy to 1.1.4". Downloads tab, undo, menu with bookmarks |
+| Legion Go S (own AppImage and profile, launched over ssh) | Bundled WebKitGTK 4.1 loaded, the release page loaded, `ucity.gbc` from a bookmark: "Added ucity to Game Boy Color" |
+| Retroid Pocket Duo (debug APK, test endpoint, then the earlier APK put back) | Android WebView in browser mode: the bar and the GitHub page drawn, `ucity.gbc` downloaded |
+
+Not tried: rar (refused with a message), xdelta and UPS patches live (unit tests only),
+multi-disc downloads live, the no-engine fallback live, the plugin's setup on Android, Game
+Mode pictures (an app started over ssh is not the one gamescope shows). On the PC, a toast
+pushes the page down for a moment, so a click right after one can miss; undo leaves the
+empty console folder it created.
+
 ## RetroAchievements (2026-11-15)
 
 The `emuden.retroachievements` plugin (`docs/feature-plugins.md` 4.3) and the runtime in
