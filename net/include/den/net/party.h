@@ -66,6 +66,9 @@ public:
     ~Party();
 
     void Update(double now);
+    /// Only the connection: what was sent goes out, what arrived is read. For a core that
+    /// waits for an answer in the middle of a frame.
+    void Pump(double now);
     /// Ends the session; the other side is told `reason`.
     void Leave(const std::string& reason = "The other player left.");
 

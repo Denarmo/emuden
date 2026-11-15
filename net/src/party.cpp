@@ -287,6 +287,10 @@ void Party::Update(double now) {
         announcer_->Update(now);
         Accept(now);
     }
+    Pump(now);
+}
+
+void Party::Pump(double now) {
     if (!channel_) {
         return;
     }

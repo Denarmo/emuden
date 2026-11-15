@@ -214,6 +214,7 @@ private:
     int lockstep_owed_ = 0;         // frames due that waited for the other device
     bool lockstep_ran_ = false;
     double last_resync_ = -100;
+    double last_link_pump_ = 0;
     int quick_resyncs_ = 0;
     double waiting_since_ = -1;
     std::array<std::int16_t, 4> local_axes_{};

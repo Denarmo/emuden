@@ -21,7 +21,7 @@ namespace {
 
 constexpr unsigned GAMEBOY_LINK_2P = 0x101;   // RETRO_GAME_TYPE_GAMEBOY_LINK_2P
 constexpr unsigned GAMEBOY_1_SRAM = 0x100;    // RETRO_MEMORY_GAMEBOY_1_SRAM
-constexpr unsigned GAMEBOY_2_SRAM = 0x200;    // RETRO_MEMORY_GAMEBOY_2_SRAM
+constexpr unsigned GAMEBOY_2_SRAM = 0x300;    // TGB Dual: RETRO_MEMORY_GAMEBOY_2_SRAM is (3 << 8) | SAVE_RAM
 constexpr double BROWSE_IDLE_SECONDS = 3.0;   // a browser no page asked for in that long stops
 constexpr std::size_t MAX_SAVE_BYTES = 1u << 20;
 

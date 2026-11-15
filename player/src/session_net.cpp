@@ -8,6 +8,7 @@
 //   are known; the host's state starts the guest, checksums catch a desync, and the host's
 //   state mends it.
 
+#include <cmath>
 #include <cstring>
 #include <format>
 
@@ -27,6 +28,7 @@ constexpr int MAX_OWED_FRAMES = 3;
 constexpr double LOCK_TOLERANCE = 0.012;
 constexpr std::uint64_t MAX_ALIGN_FRAMES = 1200;
 constexpr int QUICK_RESYNCS = 3;
+constexpr double LINK_PUMP_SECONDS = 0.0003;
 constexpr double RESYNC_PAUSE = 10.0;
 
 // EMUDEN_NET_DUMP=<folder>: every checked state is written there, to find what differs
@@ -65,6 +67,8 @@ void PlayerSession::StartTogether() {
         if (!memory.empty() && !save.empty()) {
             std::memcpy(memory.data(), save.data(), std::min(memory.size(), save.size()));
         }
+        log::Info("player", "the other device's save: {} bytes into {} bytes of memory {:#x}", save.size(),
+                  memory.size(), together_.peer_save_memory);
     }
     lockstep_owed_ = 0;
     waiting_since_ = -1;
@@ -115,8 +119,13 @@ void PlayerSession::StartLink() {
             }
         },
         [this] {
-            // The core waits for an answer in the middle of a frame.
-            together_.party->Update(pal::NowSeconds());
+            // The core waits for an answer in the middle of a frame, and asks very often
+            // while it does: the socket is read a few times a millisecond at most.
+            const double now = pal::NowSeconds();
+            if (now - last_link_pump_ >= LINK_PUMP_SECONDS) {
+                last_link_pump_ = now;
+                together_.party->Pump(now);
+            }
             DeliverPackets();
         });
     link_started_ = true;
@@ -292,7 +301,7 @@ void PlayerSession::AdvanceLockstep(double frames) {
         lockstep_owed_ += count;
     }
     lockstep_owed_ = std::min(lockstep_owed_, MAX_OWED_FRAMES);
-    bool stalled = !sync.Started();
+    int ran = 0;
     while (lockstep_owed_ > 0 && sync.Started()) {
         if (sync.NeedsLocal()) {
             net::FrameInput input;
@@ -304,7 +313,6 @@ void PlayerSession::AdvanceLockstep(double frames) {
             // Read once more: the buttons may be on their way.
             party.Update(pal::NowSeconds());
             if (!sync.Ready()) {
-                stalled = true;
                 break;
             }
         }
@@ -321,6 +329,7 @@ void PlayerSession::AdvanceLockstep(double frames) {
         ++snapshot_.frames;
         ++fps_frames_;
         --lockstep_owed_;
+        ++ran;
         sync.Advance();
         if (sync.CrcDue()) {
             state_scratch_.resize(core_->StateSize());
@@ -332,6 +341,8 @@ void PlayerSession::AdvanceLockstep(double frames) {
             }
         }
     }
+    // Waiting means no frame at all could run, not one frame of the few that were due.
+    const bool stalled = ran == 0 && (lockstep_owed_ > 0 || !sync.Started());
     const double now = pal::NowSeconds();
     if (!stalled) {
         waiting_since_ = -1;
