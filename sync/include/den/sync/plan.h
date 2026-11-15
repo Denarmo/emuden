@@ -51,6 +51,11 @@ public:
     virtual Status Import(const std::string& path, const std::string& text, const GameIndex& games) = 0;
 };
 
+/// A settings file changed on both devices since `base`, the version both last agreed on:
+/// key by key, what changed here wins, else the other device's value. "" when one of them is
+/// not a JSON object.
+std::string MergeSettings(const std::string& base, const std::string& local, const std::string& remote);
+
 /// Settings that stay on their device: display, paths, input devices, the plugins, the sync
 /// settings themselves, and whatever a key declares device_only.
 bool IsDeviceOnlySetting(const std::string& key);

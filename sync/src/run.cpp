@@ -281,11 +281,20 @@ private:
                 Apply(path, temp, *remote);
             } else {
                 const std::string hash = Sha256File(temp).value_or("");
-                if (action.op == Op::Compare && local && hash == local->hash) {
+                if (local && hash == local->hash) {
                     Agree(path, hash, remote->rev, local->size);
-                } else if (action.op == Op::Compare && CategoryOf(path) == CONFIG) {
-                    // Settings met for the first time are merged, not a conflict: the remote
-                    // values are applied, and what this device adds goes up.
+                } else if (CategoryOf(path) == CONFIG) {
+                    // Settings are merged, never a conflict copy. Changed on both sides: key by
+                    // key against the version both last agreed on (what changed here wins).
+                    // Met for the first time: the remote values are applied. Then what this
+                    // device has besides goes up.
+                    if (action.op == Op::Conflict && local) {
+                        const std::string merged = MergeSettings(
+                            ReadTextFile(BaseOf(path)).value_or(""), local->text, ReadTextFile(temp).value_or(""));
+                        if (!merged.empty()) {
+                            WriteFileAtomic(temp, merged);
+                        }
+                    }
                     if (Apply(path, temp, *remote)) {
                         for (LocalItem& item : config_->Export(games_)) {
                             if (item.path == path && TextHash(item.text) != hash) {
@@ -343,11 +352,25 @@ private:
             return false;
         }
         Agree(item.path, item.hash, put.value(), item.size);
+        if (CategoryOf(item.path) == CONFIG) {
+            KeepBase(item.path, item.text);
+        }
         Change([](SyncState& s) { ++s.uploaded; });
         return true;
     }
 
     // A downloaded file takes the place of the local one (or is applied, for settings).
+    // The last version of a settings file both sides agreed on, for merging.
+    fs::path BaseOf(const std::string& path) const {
+        return sync_dir_ / "base" / PathFromUtf8(path);
+    }
+
+    void KeepBase(const std::string& path, const std::string& text) {
+        std::error_code ec;
+        fs::create_directories(BaseOf(path).parent_path(), ec);
+        WriteFileAtomic(BaseOf(path), text);
+    }
+
     bool Apply(const std::string& path, const fs::path& temp, const RemoteFile& remote) {
         const std::string hash = Sha256File(temp).value_or("");
         if (CategoryOf(path) == CONFIG) {
@@ -364,6 +387,7 @@ private:
                 }
             }
             Agree(path, agreed, remote.rev, remote.size);
+            KeepBase(path, text);
         } else {
             const auto target = local_.contains(path)
                                     ? std::optional<LocalTarget>(LocalTarget{local_.at(path).file, {}})

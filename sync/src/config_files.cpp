@@ -5,6 +5,8 @@
 // and how a downloaded one is applied (device-only values stay as they are).
 
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
 
 #include "den/base/files.h"
 #include "den/store/settings.h"
@@ -26,6 +28,27 @@ constexpr const char* DEVICE_ONLY[] = {
     "player.overlay_on_second_screen",   "player.refresh_hz",   "player.audio_latency_ms",
     "player.screen_size", "player.volume",
 };
+
+// A fraction with 9 significant digits: what a float setting holds. The last bits of a double
+// move a little each time the settings are read and written again, which would make the file
+// differ on every run and go up (or conflict) every time.
+JsonValue Steady(const JsonValue& value) {
+    if (value.kind == JsonValue::Kind::Number && value.number != std::trunc(value.number)) {
+        char text[32];
+        std::snprintf(text, sizeof(text), "%.9g", value.number);
+        if (const auto parsed = ParseJson(text)) {
+            return *parsed;
+        }
+    }
+    if (value.kind == JsonValue::Kind::Array) {
+        JsonValue out = value;
+        for (JsonValue& item : out.items) {
+            item = Steady(item);
+        }
+        return out;
+    }
+    return value;
+}
 
 std::vector<std::string> Parts(const std::string& key) {
     std::vector<std::string> parts;
@@ -148,7 +171,7 @@ private:
             if (!Shared(key)) {
                 continue;
             }
-            JsonValue kept = value;
+            JsonValue kept = Steady(value);
             if (kept.kind == JsonValue::Kind::Array) {
                 std::erase_if(kept.items, [&](const JsonValue& item) {
                     const std::size_t colon = item.string.find(':');
@@ -181,6 +204,55 @@ private:
 };
 
 } // namespace
+
+namespace {
+
+JsonValue Merge3(const JsonValue* base, const JsonValue& local, const JsonValue& remote) {
+    using Kind = JsonValue::Kind;
+    if (local.kind == Kind::Object && remote.kind == Kind::Object) {
+        JsonValue out = JsonObject();
+        std::vector<std::string> keys;
+        for (const auto& [key, value] : remote.members) {
+            keys.push_back(key);
+        }
+        for (const auto& [key, value] : local.members) {
+            if (std::find(keys.begin(), keys.end(), key) == keys.end()) {
+                keys.push_back(key);
+            }
+        }
+        std::sort(keys.begin(), keys.end());
+        for (const std::string& key : keys) {
+            const JsonValue* in_base = base != nullptr && base->kind == Kind::Object ? base->Find(key) : nullptr;
+            const JsonValue* here = local.Find(key);
+            const JsonValue* there = remote.Find(key);
+            if (here != nullptr && there != nullptr) {
+                out.members.emplace_back(key, Merge3(in_base, *here, *there));
+            } else if (here != nullptr) {
+                // Only here: new here, or removed there (then it goes unless it changed here).
+                if (in_base == nullptr || WriteJson(*in_base) != WriteJson(*here)) {
+                    out.members.emplace_back(key, *here);
+                }
+            } else if (in_base == nullptr || WriteJson(*in_base) != WriteJson(*there)) {
+                out.members.emplace_back(key, *there); // new there, or removed here but changed there
+            }
+        }
+        return out;
+    }
+    const bool changed_here = base == nullptr ? false : WriteJson(*base) != WriteJson(local);
+    return changed_here ? local : remote;
+}
+
+} // namespace
+
+std::string MergeSettings(const std::string& base, const std::string& local, const std::string& remote) {
+    const auto b = ParseJson(base);
+    const auto l = ParseJson(local);
+    const auto r = ParseJson(remote);
+    if (!l || !r || l->kind != JsonValue::Kind::Object || r->kind != JsonValue::Kind::Object) {
+        return {};
+    }
+    return WriteJson(Merge3(b ? &*b : nullptr, *l, *r));
+}
 
 bool IsDeviceOnlySetting(const std::string& key) {
     for (const char* prefix : DEVICE_ONLY) {

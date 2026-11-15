@@ -15,6 +15,7 @@
 
 #include "den/base/files.h"
 #include "den/base/jobs.h"
+#include "den/base/json.h"
 #include "den/store/settings.h"
 #include "den/sync/engine.h"
 #include "den/sync/names.h"
@@ -528,4 +529,37 @@ TEST_CASE("play time adds up across devices without counting anything twice") {
     REQUIRE(b.engine->Conflicts().size() == 1);
     CHECK(b.engine->Conflicts()[0].from == "Legion Go S");
     CHECK(b.other_play.at("gba:b").seconds == 160);
+}
+
+TEST_CASE("settings changed on both devices merge key by key, without a conflict copy") {
+    CHECK(MergeSettings(R"({"a":1,"b":1,"c":1})", R"({"a":2,"b":1,"c":1})", R"({"a":1,"b":3})") ==
+          WriteJson(JsonObject({{"a", JsonNumber(2)}, {"b", JsonNumber(3)}})));
+    CHECK(MergeSettings("", R"({"a":2})", R"({"a":3,"n":1})") ==
+          WriteJson(JsonObject({{"a", JsonNumber(3)}, {"n", JsonNumber(1)}})));
+    CHECK(MergeSettings("{}", "[]", "{}").empty());
+
+    Cloud cloud;
+    Device a(cloud, "A", {"config"}), b(cloud, "B", {"config"});
+    a.settings->SetNumber("player.shader.crt.bright", 1.450000047683716);
+    a.settings->SetString("ui.theme", "dark");
+    REQUIRE(a.Sync().ok);
+    REQUIRE(b.Sync().ok);
+    CHECK(b.settings->GetString("ui.theme") == "dark");
+    // The last bits of a fraction moving does not make the file go up again.
+    b.settings->SetNumber("player.shader.crt.bright", 1.4500000476837154);
+    cloud.puts.clear();
+    REQUIRE(b.Sync().ok);
+    CHECK(cloud.puts.empty());
+    // Each changes another key: both keep both, and nobody gets a conflict.
+    a.settings->SetString("ui.theme", "light");
+    b.settings->SetBool("player.rewind", true);
+    REQUIRE(a.Sync().ok);
+    REQUIRE(b.Sync().ok);
+    REQUIRE(a.Sync().ok);
+    CHECK(b.settings->GetString("ui.theme") == "light");
+    CHECK(b.settings->GetBool("player.rewind"));
+    CHECK(a.settings->GetBool("player.rewind"));
+    CHECK(a.settings->GetString("ui.theme") == "light");
+    CHECK(a.engine->Conflicts().empty());
+    CHECK(b.engine->Conflicts().empty());
 }

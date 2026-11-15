@@ -61,6 +61,11 @@ same stem (rare) sync under the first and the conflict is logged. Device-only se
   `<name>.conflict-<device>-<yyyymmdd-hhmmss>` (locally under `<data>/sync/conflicts/`) and
   the sync page lists it with "Use this one instead". A remote copy is named after the other
   device when only one other is known (from the play time files), else "another device".
+  Settings files never make a conflict copy: changed on both devices, they are merged key by
+  key against the last version both agreed on (kept under `<data>/sync/<provider>/base/`);
+  a key changed here keeps this device's value, any other takes the remote one, and the merge
+  goes up. Fractions are written with 9 significant digits, so a value read and written again
+  does not make the file differ.
 - Downloads land in a temporary file and replace the target atomically; a save or state of a
   game that is running is never replaced (it waits for the session to end).
 - **When:** on app start, when a game session ends (that game's saves and states first), on
