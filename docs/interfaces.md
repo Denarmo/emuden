@@ -180,6 +180,14 @@ A runnable folder: `powershell -ExecutionPolicy Bypass -File tools\package.ps1` 
   `engine.running` page (pad input ignored) and books the play time with
   `Library::RecordPlay`: screens must not book engine sessions again.
 
+- **Achievements** (`den/achievements/runtime.h`, `games.h`): `achievements::Runtime` wraps
+  rcheevos' `rc_client` with server calls on helper threads, answered on the main thread in
+  `Pump()`; events come out of `TakeEvents()`. `HashFile`, `ResolveHash`, `FetchProgress` work
+  without a running game. The player side is in `Session`: `MemoryMap()`, `MemoryRegion(id)`,
+  `SetFrameHook` (`FrameEvent::Frame`, `Reset`, `StateLoaded`, `MemoryMoved`),
+  `SetHardcore`, `OpenRequest::hardcore`, `ContentPath()`, `SaveScreenshot(png)`. App glue:
+  `app/screens/achievements/`; the plugin services: `den/plugins/feature_achievements.h`.
+
 ## Automation endpoint
 
 Off unless the app is started with `EMUDEN_AUTOMATION=<port>`. It listens on

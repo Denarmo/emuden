@@ -102,6 +102,7 @@ Permissions (the sentence is what the install page shows):
 | `device.info` | `den.device.info()` | "See this device's model, processor, graphics and memory" |
 | `game.settings` | `den.game.settings`, `den.game.set` for games of `systems` (needs `feature.tune.1`) | "Change the settings of single games of these consoles: ..." |
 | `steam` | `den.steam.*` (needs `feature.tune.1`) | "See your Steam games and change their launch options and Proton version" |
+| `achievements` | `den.achievements.*` (needs `feature.achievements.1`) | "Sign in to RetroAchievements and track achievements while you play" |
 
 `den.http.request` (any method, bodies, multipart, answer headers) needs `http`,
 `http.user_host` or `http.local`; see `docs/sync.md`, section 4.
@@ -282,6 +283,33 @@ plugin lists `feature.tune.1` in `needs`.
   `WINE...`, `RADV_`, `MESA_`, `MANGOHUD`, ...) and the wrappers `gamemoderun`, `mangohud`,
   `gamescope`, `obs-gamecapture`, `prime-run` with flags that hold no path. `LD_PRELOAD`, a
   script path or any shell syntax is refused before the user is asked.
+
+### 4.3 `den.achievements` (RetroAchievements)
+
+For `emuden.retroachievements` (emuden-plugins). The plugin is the switch, the sign-in and the
+pages; the app runs the achievements while a game plays (`achievements/`, over rcheevos
+12.5.0, fetched by `cmake/deps.cmake`). Needs `feature.achievements.1` and the `achievements`
+permission.
+
+| Call | What it does |
+|---|---|
+| `status()` | `{signed_in, signing_in, user = {name, display_name, avatar, score, softcore_score, messages}, hardcore, sound, screenshot, playing}` (`playing`: library id of the running game, or empty) |
+| `sign_in{user, password}` | Action only. Signs in with the RA password the user typed; the token RA returns is kept in the plugin's `den.secrets` (`login` = `{user, token}`), the password nowhere |
+| `sign_out()` | Action only. Forgets the token and signs out |
+| `set{hardcore, sound, screenshot}` | Action only. Hardcore (off by default) refuses state loads, rewind and the resume state; turning it on while playing resets the game, as RA requires. `sound` is the unlock chime, `screenshot` a PNG in `<data>/screenshots/achievements/<system>/` |
+| `game(library_id)` | The game's set and the user's unlocks: `{id, name, ra_id, title, image, total, unlocked, points_total, points_unlocked, hardcore, mastered, playing, note, achievements = [{id, title, description, badge, points, unlocked, progress, percent, rarity}]}`; `ra_id = 0` and a `note` for a game RA does not know |
+
+- The app only signs in while the plugin is installed (checked every 2 s); removing it signs
+  out, and removing its data deletes the token.
+- Games are identified by rcheevos' hash of the file (`achievements::HashFile`), the console
+  by the console plugin's `achievements.rcheevos_console` or the app's table
+  (`achievements::ConsoleFor`). Core memory: the core's `SET_MEMORY_MAPS`, else
+  `retro_get_memory_data`.
+- During play: unlock cards (top right), the progress indicator (bottom right), challenge
+  badges and trackers (bottom left), leaderboard started, failed and submitted cards. The
+  pause menu has an "Achievements" page for the running game.
+- Progress lives on RetroAchievements; EmuDEN sync carries none of it. `EMUDEN_RA_HOST`
+  points the app at a test server.
 
 ## 5. UI model
 

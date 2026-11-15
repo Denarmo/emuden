@@ -8,6 +8,24 @@ listened.
 
 SteamOS (Legion Go S) feature by feature, with the Linux fixes it needed: `docs/steamos.md`.
 
+## RetroAchievements (2026-11-15)
+
+The `emuden.retroachievements` plugin (`docs/feature-plugins.md` 4.3) and the runtime in
+`achievements/` (rcheevos 12.5.0). Unit tests: hashing synthetic ROMs, sign-in, unlocks,
+leaderboards, hardcore reset, state loads (`den_achievements_tests`); player hook and
+hardcore refusals; the plugin API.
+
+| What | Result |
+|---|---|
+| Game identification on the real server (no account) | Tetris (GB) 508, Pokemon Emerald 668, Golden Sun 767, Castlevania AoS (EU) 1100000510, Pokemon Platinum (NDS) 11732 |
+| Windows, test server (`EMUDEN_RA_HOST`), mGBA | Sign-in by password then by kept token, profile, game list and progress page, unlock card, chime path, progress indicator, screenshot, rich presence, hardcore on mid-game (reset, `h=1`, leaderboard and tracker), Load state and Rewind off in hardcore, sign-out deletes the credential |
+
+Not tried: a real RetroAchievements account (sign-in, real unlocks, whether RA's hardcore
+client list accepts EmuDEN), badge pictures from media.retroachievements.org, PS2 (Play!)
+memory, CHD discs (rcheevos' default reader takes bin, cue and iso), engine-app consoles
+(no achievements), rcheevos' disallowed core settings. States do not carry achievement
+progress: loading one restarts the triggers.
+
 ## Vulkan cores (2026-11-15)
 
 Libretro cores can render with Vulkan; the picture reaches the GL interface through shared
