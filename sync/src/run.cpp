@@ -111,6 +111,11 @@ public:
                 uploads.push_back(action);
                 return true;
             }
+            // A save or state of a game this device does not have is not fetched at all.
+            if (action.op == Op::Download && CategoryOf(action.path) != CONFIG && !local_.contains(action.path)) {
+                const auto target = TargetOf(action.path, games_, data, games_folder_);
+                return !target || target->file.empty();
+            }
             return false;
         });
         std::stable_partition(actions.begin(), actions.end(), [&](const Action& action) {
