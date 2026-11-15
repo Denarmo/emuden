@@ -6,6 +6,7 @@
 #pragma once
 
 #include <array>
+#include <deque>
 #include <optional>
 
 #include "core/core.h"
@@ -79,6 +80,12 @@ struct LibretroCore::Impl {
     bool hw_ready = false;
     unsigned hw_width = 0;
     unsigned hw_height = 0;
+    // The memory map the core declared, copied (its address space names too).
+    std::vector<retro_memory_descriptor> memory_descriptors;
+    std::deque<std::string> memory_names;
+    retro_memory_map memory_map{};
+    bool memory_map_set = false;
+    bool memory_moved = false;
 
     /// Sizes the core's framebuffer for the largest picture it announced. It only grows.
     bool ResizeHwTarget(const retro_game_geometry& announced);

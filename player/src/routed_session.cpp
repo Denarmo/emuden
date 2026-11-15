@@ -139,6 +139,28 @@ public:
     bool TakeMenuRequest() override {
         return active_->TakeMenuRequest();
     }
+    const retro_memory_map* MemoryMap() const override {
+        return active_->MemoryMap();
+    }
+    std::span<std::uint8_t> MemoryRegion(unsigned id) const override {
+        return active_->MemoryRegion(id);
+    }
+    void SetFrameHook(std::function<void(FrameEvent)> hook) override {
+        // Either session may play the next game.
+        core_->SetFrameHook(hook);
+        if (engine_) {
+            engine_->SetFrameHook(hook);
+        }
+    }
+    void SetHardcore(bool on) override {
+        active_->SetHardcore(on);
+    }
+    std::filesystem::path ContentPath() const override {
+        return active_->ContentPath();
+    }
+    Status SaveScreenshot(const std::filesystem::path& png) override {
+        return active_->SaveScreenshot(png);
+    }
 
 private:
     std::unique_ptr<Session> core_;

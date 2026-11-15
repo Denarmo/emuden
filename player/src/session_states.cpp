@@ -122,8 +122,15 @@ Status PlayerSession::LoadState(int slot) {
     if (slot < 0 || slot >= STATE_SLOTS) {
         return Status::Fail("There is no such slot.");
     }
+    if (hardcore_) {
+        return Status::Fail("Hardcore mode is on: states cannot be loaded.");
+    }
     pending_resume_ = false;
-    return ReadStateFile(paths_.State(slot));
+    const Status loaded = ReadStateFile(paths_.State(slot));
+    if (loaded) {
+        Notify(FrameEvent::StateLoaded);
+    }
+    return loaded;
 }
 
 bool PlayerSession::HasState(int slot) const {

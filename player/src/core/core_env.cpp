@@ -424,6 +424,26 @@ bool VideoCommand(unsigned command, void* data, bool* handled) {
     }
 }
 
+// Kept for an achievements runtime: the descriptors point into the core's own memory.
+bool SetMemoryMaps(const retro_memory_map* map) {
+    LibretroCore::Impl& c = *g_core;
+    c.memory_descriptors.clear();
+    c.memory_names.clear();
+    if (map && map->descriptors) {
+        c.memory_descriptors.assign(map->descriptors, map->descriptors + map->num_descriptors);
+        for (retro_memory_descriptor& descriptor : c.memory_descriptors) {
+            if (descriptor.addrspace) {
+                descriptor.addrspace = c.memory_names.emplace_back(descriptor.addrspace).c_str();
+            }
+        }
+    }
+    c.memory_map.descriptors = c.memory_descriptors.data();
+    c.memory_map.num_descriptors = static_cast<unsigned>(c.memory_descriptors.size());
+    c.memory_map_set = !c.memory_descriptors.empty();
+    c.memory_moved = true;
+    return true;
+}
+
 } // namespace
 
 bool RETRO_CALLCONV EnvironmentCallback(unsigned command, void* data) {
@@ -485,12 +505,13 @@ bool RETRO_CALLCONV EnvironmentCallback(unsigned command, void* data) {
     case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
         SetInputDescriptors(static_cast<const retro_input_descriptor*>(data));
         return true;
+    case RETRO_ENVIRONMENT_SET_MEMORY_MAPS:
+        return SetMemoryMaps(static_cast<const retro_memory_map*>(data));
     case RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME:
     case RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL:
     case RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS:
     case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO:
     case RETRO_ENVIRONMENT_SET_SUBSYSTEM_INFO:
-    case RETRO_ENVIRONMENT_SET_MEMORY_MAPS:
     case RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS:
     case RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY:
     case RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK:

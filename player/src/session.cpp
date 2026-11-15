@@ -56,7 +56,8 @@ Status PlayerSession::Open(const OpenRequest& request) {
 
 Status PlayerSession::Start(const OpenRequest& request) {
     const store::Settings* settings = config_.settings;
-    resume_enabled_ = request.resume && (!settings || settings->GetBool("player.resume", true));
+    hardcore_ = request.hardcore;
+    resume_enabled_ = request.resume && !hardcore_ && (!settings || settings->GetBool("player.resume", true));
     pad_by_label_ = !settings || settings->GetBool("player.pad_by_label", true);
     integer_scale_ = settings && settings->GetBool("player.integer_scale", false);
     smooth_ = !settings || settings->GetBool("player.smooth", true);
@@ -117,6 +118,7 @@ Status PlayerSession::Start(const OpenRequest& request) {
     if (!core_->LoadGame(content, &error)) {
         return Fail(error);
     }
+    content_path_ = content;
     // Options a core only declares once it has the game.
     ApplyStoredOptions();
     ReadAvInfo();
@@ -139,6 +141,7 @@ Status PlayerSession::Start(const OpenRequest& request) {
     snapshot_.picture = picture_;
     snapshot_.can_save_states = core_->StateSize() > 0;
     snapshot_.hardware_rendered = core_->HardwareRendered();
+    snapshot_.hardcore = hardcore_;
     log::Info("player", "{} {} runs {} ({}x{}, {:.2f} fps, {} Hz{})", snapshot_.core_name,
               core_->Info().version, PathToUtf8(content.filename()), av_.base_width,
               av_.base_height, av_.fps, static_cast<int>(av_.sample_rate),
@@ -393,7 +396,7 @@ void PlayerSession::SetFastForward(bool on) {
 }
 
 void PlayerSession::SetRewind(bool on) {
-    on = on && rewind_.has_value();
+    on = on && rewind_.has_value() && !hardcore_;
     if (snapshot_.rewinding == on) {
         return;
     }
@@ -408,6 +411,7 @@ void PlayerSession::Reset() {
     }
     core_->Reset();
     pending_resume_ = false;
+    Notify(FrameEvent::Reset);
     if (rewind_) {
         rewind_->Clear();
     }
@@ -426,7 +430,7 @@ void PlayerSession::SetupRewind() {
     rewind_interval_ = size <= (1u << 20) ? 2 : size <= (4u << 20) ? 4 : 8;
     frames_since_capture_ = 0;
     rewind_.emplace(REWIND_BUDGET_BYTES);
-    snapshot_.can_rewind = true;
+    snapshot_.can_rewind = !hardcore_;
 }
 
 void PlayerSession::CaptureRewind() {
@@ -450,6 +454,7 @@ bool PlayerSession::StepRewind() {
     core_->RunFrame();
     core_->SetAudioMuted(false);
     frames_since_capture_ = 0;
+    Notify(FrameEvent::StateLoaded);
     return true;
 }
 
@@ -461,10 +466,15 @@ void PlayerSession::RunForward(int frames, bool sound_on_all) {
         ++snapshot_.frames;
         ++fps_frames_;
         CaptureRewind();
+        if (core_->TakeMemoryMoved()) {
+            Notify(FrameEvent::MemoryMoved);
+        }
+        Notify(FrameEvent::Frame);
         if (pending_resume_) {
             // Some cores only take a state once they have run a frame.
             pending_resume_ = false;
             snapshot_.resumed = static_cast<bool>(ReadStateFile(paths_.Resume()));
+            Notify(FrameEvent::StateLoaded);
         }
         const std::chrono::duration<double> spent = std::chrono::steady_clock::now() - start;
         if (!sound_on_all && spent.count() > FAST_FORWARD_BUDGET_SECONDS) {

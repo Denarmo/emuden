@@ -17,6 +17,8 @@
 #include <string>
 #include <vector>
 
+struct retro_memory_map;
+
 namespace den::player {
 
 inline constexpr unsigned MAX_PORTS = 4;
@@ -168,6 +170,10 @@ public:
     /// Battery-backed save RAM, empty when the game has none. Valid until the game unloads.
     std::span<std::uint8_t> SaveRam() const;
     std::span<std::uint8_t> Memory(unsigned id) const;
+    /// The core's memory map (SET_MEMORY_MAPS), null when it declared none.
+    const retro_memory_map* MemoryMap() const;
+    /// True once after the core declared a memory map.
+    bool TakeMemoryMoved();
 
     /// A value set here wins over the core's declared default; the core is told on its next
     /// frame. A value the core does not allow is ignored in favour of the default.

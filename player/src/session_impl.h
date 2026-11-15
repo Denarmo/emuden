@@ -77,8 +77,24 @@ public:
     Status StartAudioCapture(double seconds) override;
     Result<AudioCapture> SaveAudioCapture(const std::filesystem::path& wav) override;
     Snapshot GetSnapshot() const override;
+    // session_achievements.cpp
+    const retro_memory_map* MemoryMap() const override;
+    std::span<std::uint8_t> MemoryRegion(unsigned id) const override;
+    void SetFrameHook(std::function<void(FrameEvent)> hook) override {
+        frame_hook_ = std::move(hook);
+    }
+    void SetHardcore(bool on) override;
+    std::filesystem::path ContentPath() const override {
+        return core_ ? content_path_ : std::filesystem::path();
+    }
+    Status SaveScreenshot(const std::filesystem::path& png) override;
 
 private:
+    void Notify(FrameEvent event) {
+        if (frame_hook_) {
+            frame_hook_(event);
+        }
+    }
     Status Fail(std::string message);
     Status Start(const OpenRequest& request);
     void ApplyStoredOptions();
@@ -120,6 +136,11 @@ private:
     Snapshot snapshot_;
     std::string system_;
     AvInfo av_;
+
+    // Achievements.
+    std::function<void(FrameEvent)> frame_hook_;
+    bool hardcore_ = false;
+    std::filesystem::path content_path_;
 
     // Settings as read at Open.
     bool resume_enabled_ = true;

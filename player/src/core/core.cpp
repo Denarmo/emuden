@@ -374,6 +374,14 @@ std::span<std::uint8_t> LibretroCore::Memory(unsigned id) const {
     return data && size ? std::span<std::uint8_t>(data, size) : std::span<std::uint8_t>();
 }
 
+const retro_memory_map* LibretroCore::MemoryMap() const {
+    return impl_->game_loaded && impl_->memory_map_set ? &impl_->memory_map : nullptr;
+}
+
+bool LibretroCore::TakeMemoryMoved() {
+    return std::exchange(impl_->memory_moved, false);
+}
+
 void LibretroCore::SetOption(const std::string& key, const std::string& value) {
     const auto set = impl_->options.find(key);
     if (set != impl_->options.end() && set->second == value) {

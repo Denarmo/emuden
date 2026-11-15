@@ -11,8 +11,10 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -27,6 +29,8 @@
 namespace den::store {
 class Settings;
 }
+
+struct retro_memory_map;
 
 namespace den::player {
 
@@ -45,9 +49,19 @@ struct OpenRequest {
     std::optional<engine::Install> engine;
     std::string title;
     bool fullscreen = true; // the engine's own window
+    /// RetroAchievements hardcore: no state is loaded (the resume state neither) and no rewind.
+    bool hardcore = false;
 };
 
 enum class State { Closed, Running, Paused, Failed };
+
+/// What the frame hook (Session::SetFrameHook) hears of.
+enum class FrameEvent {
+    Frame,       // the core emulated a frame forwards
+    Reset,       // the game started again
+    StateLoaded, // a state (a slot, the resume state, a rewind step) replaced the game's memory
+    MemoryMoved, // the core announced a new memory map
+};
 
 /// Counters of the sound path, since the game opened (or ResetAudioStats).
 struct AudioStats {
@@ -111,6 +125,7 @@ struct Snapshot {
     bool can_options = true;
     bool can_volume = true;
     bool can_picture = true; // picture presets, screen size and button remapping (EmuDEN draws it)
+    bool hardcore = false;   // states cannot be loaded and there is no rewind
 };
 
 struct CoreOption {
@@ -298,6 +313,36 @@ public:
     /// True once after an engine paused and handed its menu over (the player opens it).
     virtual bool TakeMenuRequest() {
         return false;
+    }
+
+    // For an achievements runtime (den::achievements).
+    /// The memory map the core declared (SET_MEMORY_MAPS), null when it declared none or an
+    /// engine app runs the game. Valid until the game closes or a MemoryMoved event.
+    virtual const retro_memory_map* MemoryMap() const {
+        return nullptr;
+    }
+    /// retro_get_memory_data with its size (RETRO_MEMORY_SYSTEM_RAM, ...); empty when none.
+    virtual std::span<std::uint8_t> MemoryRegion(unsigned id) const {
+        (void)id;
+        return {};
+    }
+    /// Called on the main thread from Advance, Reset and LoadState; empty to stop.
+    virtual void SetFrameHook(std::function<void(FrameEvent)> hook) {
+        (void)hook;
+    }
+    /// Hardcore for the running game: LoadState fails and rewind is off. Turning it on does
+    /// not undo a state loaded before.
+    virtual void SetHardcore(bool on) {
+        (void)on;
+    }
+    /// The file the core was given (an unpacked ROM rather than its zip); empty when none.
+    virtual std::filesystem::path ContentPath() const {
+        return {};
+    }
+    /// The game's latest picture as a PNG.
+    virtual Status SaveScreenshot(const std::filesystem::path& png) {
+        (void)png;
+        return Status::Fail("This player cannot take a screenshot.");
     }
 };
 
