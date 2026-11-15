@@ -61,6 +61,20 @@ struct HackMade {
     std::filesystem::path path;
 };
 
+/// A setup of a download (den.downloads, library::downloads::Record).
+struct DownloadFacts {
+    std::string id, outcome, message, download, console;
+    std::int64_t time = 0;
+    bool replaced = false, undone = false;
+    std::vector<GameFacts> games;   // what went into the library
+    std::vector<GameFacts> choices; // outcome "needs_base": the games the patch may be for
+};
+
+struct DownloadOrder {
+    std::filesystem::path file; // in DownloadsFolder()
+    std::string page_title, host, base_id, plugin;
+};
+
 /// den.patch and den.library reach the patching module and the library through this. The
 /// real one wraps den::patching and den::library::Hacks; tests use a fake.
 class FeatureServices {
@@ -81,10 +95,32 @@ public:
                               const std::optional<std::string>& description,
                               const std::filesystem::path& cover) = 0;
     virtual Status RemoveHack(const std::string& id, const std::string& plugin) = 0;
+
+    /// EmuDEN's Downloads folder, where the files of den.web.open{any = true} land; empty
+    /// when there is none.
+    virtual std::filesystem::path DownloadsFolder() {
+        return {};
+    }
+    /// Blocking: called from a worker thread.
+    virtual Result<DownloadFacts> SetUpDownload(const DownloadOrder& order, const std::atomic<bool>& cancel) {
+        (void)order;
+        (void)cancel;
+        return Status::Fail("This app does not set up downloads");
+    }
+    virtual std::vector<DownloadFacts> DownloadHistory() {
+        return {};
+    }
+    /// Blocking.
+    virtual Status UndoDownload(const std::string& id) {
+        (void)id;
+        return Status::Fail("This app does not set up downloads");
+    }
 };
 
-/// The services over the app's library (den::patching and den::library::Hacks); null without one.
-std::shared_ptr<FeatureServices> CreateLibraryServices(library::Library* library);
+/// The services over the app's library (den::patching and den::library::Hacks); null without
+/// one. Downloads are set up in `data_dir`/downloads.
+std::shared_ptr<FeatureServices> CreateLibraryServices(library::Library* library,
+                                                       const std::filesystem::path& data_dir = {});
 
 struct FeatureDeps {
     HttpGetter http;                           // default: pal::HttpGet

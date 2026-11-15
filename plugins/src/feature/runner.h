@@ -42,6 +42,7 @@ struct RunnerConfig {
     std::filesystem::path package_dir; // the scripts, read-only
     std::filesystem::path data_dir;    // <data>/plugin-data/<id>
     std::filesystem::path downloads_dir;
+    std::filesystem::path bookmarks_file; // the browser page's bookmarks, for browse.any
     std::string app_version;
     std::string platform;
     bool developer = false; // from the developer folder: may show a test site of this machine
@@ -77,9 +78,10 @@ using StreamFn = std::function<void(bool accepted, const std::string& value)>;
 /// that arrived from it and were not handed to the script yet.
 struct WebVisit {
     struct File {
-        std::string path, name, host;
+        std::string path, name, host, title;
     };
     bool open = false;
+    bool any = false; // den.web.open{any = true}: every file, kept in the Downloads folder
     std::uint64_t waiting = 0; // the coroutine inside den.web.open
     std::vector<std::string> extensions;
     std::deque<File> ready;
@@ -269,6 +271,7 @@ void RegisterFiles(lua_State* L, Runner& runner);   // files
 void RegisterUi(lua_State* L, Runner& runner);      // ui, app
 void RegisterLibrary(lua_State* L, Runner& runner); // patch, library
 void RegisterWeb(lua_State* L, Runner& runner);     // web
+void RegisterDownloads(lua_State* L, Runner& runner); // downloads, for downloads.setup
 void RegisterRequest(lua_State* L, Runner& runner); // http.request (after RegisterNetwork)
 void RegisterSecrets(lua_State* L, Runner& runner); // secrets
 void RegisterSync(lua_State* L, Runner& runner);    // sync, for the sync permission

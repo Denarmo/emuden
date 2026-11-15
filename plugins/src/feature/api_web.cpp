@@ -23,7 +23,8 @@ namespace den::plugins {
 std::string WebFileAnswer(const WebFile& file) {
     return feature::CompactJson(JsonObject({{"file", JsonString(file.file)},
                                    {"name", JsonString(file.name)},
-                                   {"host", JsonString(file.host)}}));
+                                   {"host", JsonString(file.host)},
+                                   {"title", JsonString(file.title)}}));
 }
 
 } // namespace den::plugins
@@ -35,6 +36,8 @@ namespace {
 namespace fs = std::filesystem;
 
 constexpr std::uint64_t MAX_PATCH = 256ull << 20;
+// Where den.web.open{any = true} starts when the plugin names no page: a search page.
+constexpr const char* HOME = "https://duckduckgo.com/";
 
 // What a plugin can be handed from a web site: patches, or a zip or 7z holding one. Never a
 // ROM image, whatever the plugin asks for. (rar cannot be opened here, so it cannot be
@@ -96,8 +99,23 @@ Result<fs::path> PatchInZip(const fs::path& archive) {
     return out;
 }
 
+// A download of a visit to any site: the screen saved it in the Downloads folder, where it
+// stays; the script gets its name there (for den.downloads).
+Result<WebVisit::File> TakeAnyFile(Runner& runner, const WebFile& arrived) {
+    const fs::path file = PathFromUtf8(arrived.file);
+    const auto& services = runner.Config().services;
+    const fs::path folder = services ? services->DownloadsFolder() : fs::path();
+    if (folder.empty() || !IsRegularFile(file) || file.parent_path().lexically_normal() != folder.lexically_normal()) {
+        return Status::Fail("the file is not in the Downloads folder");
+    }
+    return WebVisit::File{PathToUtf8(file.filename()), arrived.name, arrived.host, arrived.title};
+}
+
 // Checks a file the screen handed over and moves it into the plugin's inbox.
 Result<WebVisit::File> TakeFile(Runner& runner, const WebFile& arrived) {
+    if (runner.Web().any) {
+        return TakeAnyFile(runner, arrived);
+    }
     const fs::path file = PathFromUtf8(arrived.file);
     const std::string extension = ExtensionOf(PathFromUtf8(arrived.name.empty() ? arrived.file : arrived.name));
     const WebVisit& visit = runner.Web();
@@ -127,7 +145,7 @@ Result<WebVisit::File> TakeFile(Runner& runner, const WebFile& arrived) {
         } else if (auto copied = CopyIntoInbox(runner.Config().data_dir, patch, {},
                                                std::min(MAX_PATCH, runner.StorageLeft()));
                    copied) {
-            result = WebVisit::File{copied.take(), PathToUtf8(patch.filename()), arrived.host};
+            result = WebVisit::File{copied.take(), PathToUtf8(patch.filename()), arrived.host, arrived.title};
         } else {
             result = copied.status();
         }
@@ -156,6 +174,12 @@ int PushFile(lua_State* L, const WebVisit::File& file) {
     lua_setfield(L, -2, "name");
     lua_pushstring(L, file.host.c_str());
     lua_setfield(L, -2, "source_host");
+    lua_pushstring(L, file.title.c_str());
+    lua_setfield(L, -2, "page_title");
+    if (Runner::Of(L).Web().any) {
+        lua_pushstring(L, file.path.c_str());
+        lua_setfield(L, -2, "download");
+    }
     return 1;
 }
 
@@ -173,7 +197,8 @@ void OnAnswer(Runner& runner, bool accepted, const std::string& value) {
     if (!parsed || parsed->kind != JsonValue::Kind::Object) {
         return;
     }
-    const WebFile arrived{parsed->String("file"), parsed->String("name"), parsed->String("host")};
+    const WebFile arrived{parsed->String("file"), parsed->String("name"), parsed->String("host"),
+                          parsed->String("title")};
     Result<WebVisit::File> taken = TakeFile(runner, arrived);
     if (!taken) {
         runner.AddLog("den.web: " + arrived.name + " refused: " + taken.error());
@@ -199,20 +224,70 @@ int Available(lua_State* L) {
     return 2;
 }
 
+bool FieldFlag(lua_State* L, int table, const char* key) {
+    lua_getfield(L, table, key);
+    const bool value = lua_toboolean(L, -1) != 0;
+    lua_pop(L, 1);
+    return value;
+}
+
+// den.web.open{any = true, url?, title?}: the browser for any site (browse.any). Every file the
+// user downloads there is kept in the Downloads folder.
+int OpenAny(lua_State* L, Runner& runner, WebVisit& visit) {
+    if (!runner.Config().manifest.access.Has(PERMISSION_BROWSE_ANY)) {
+        return Refuse(L, "the plugin has no permission to show any website");
+    }
+    const auto& services = runner.Config().services;
+    if (!services || services->DownloadsFolder().empty()) {
+        return Refuse(L, "this version of the app has no Downloads folder");
+    }
+    std::string url = FieldText(L, 1, "url");
+    if (url.empty()) {
+        url = HOME;
+    }
+    const UrlParts parts = ParseUrl(url);
+    if (!parts.valid || parts.scheme != "https" || parts.host.empty()) {
+        return Refuse(L, "the page must be an https address");
+    }
+    if (runner.CoroutineOf(L) == 0) {
+        return runner.Park(L); // raises: not one of the plugin's own functions
+    }
+    Ask ask;
+    ask.kind = AskKind::OpenWeb;
+    ask.value = url;
+    ask.title = CutText(FieldText(L, 1, "title"));
+    ask.hosts = {"*"};
+    ask.extensions = {"*"};
+    ask.message = "browser";
+    visit.extensions = {"*"};
+    visit.ready.clear();
+    visit.open = true;
+    visit.any = true;
+    runner.PostStream(std::move(ask), [&runner](bool accepted, const std::string& value) {
+        OnAnswer(runner, accepted, value);
+    });
+    visit.waiting = runner.CoroutineOf(L);
+    return runner.Park(L);
+}
+
 // den.web.open{url, hosts?, title?, extensions?}: shows the page and waits for the next file
 // the user downloads there. Called again while the page is open, it waits for the next one.
 int Open(lua_State* L) {
     Runner& runner = Runner::Of(L);
     const FeatureManifest& manifest = runner.Config().manifest;
-    if (!manifest.access.Has(PERMISSION_BROWSE)) {
-        return Refuse(L, "the plugin has no permission to show websites");
-    }
     luaL_checktype(L, 1, LUA_TTABLE);
     WebVisit& visit = runner.Web();
     if (visit.waiting != 0) {
         return Refuse(L, "den.web.open is already waiting for a file");
     }
+    if (!visit.open && FieldFlag(L, 1, "any")) {
+        return OpenAny(L, runner, visit);
+    }
+    if (!visit.any && !manifest.access.Has(PERMISSION_BROWSE)) {
+        return Refuse(L, "the plugin has no permission to show websites");
+    }
     if (!visit.open) {
+        visit.any = false;
         const std::string url = FieldText(L, 1, "url");
         std::vector<std::string> hosts = FieldList(L, 1, "hosts");
         if (hosts.empty()) {
@@ -275,6 +350,33 @@ int Close(lua_State* L) {
     return 0;
 }
 
+// den.web.bookmarks(): {title, url} of the browser page's bookmarks (browse.any).
+int Bookmarks(lua_State* L) {
+    Runner& runner = Runner::Of(L);
+    if (!runner.Config().manifest.access.Has(PERMISSION_BROWSE_ANY)) {
+        return Refuse(L, "the plugin has no permission to show any website");
+    }
+    const auto text = ReadTextFile(runner.Config().bookmarks_file);
+    const auto json = text ? ParseJson(*text) : std::nullopt;
+    lua_newtable(L);
+    int index = 0;
+    if (json && json->kind == JsonValue::Kind::Array) {
+        for (const JsonValue& item : json->items) {
+            const std::string url = item.String("url");
+            if (url.empty() || index >= 200) {
+                continue;
+            }
+            lua_createtable(L, 0, 2);
+            lua_pushstring(L, CutText(item.String("title")).c_str());
+            lua_setfield(L, -2, "title");
+            lua_pushstring(L, CutText(url).c_str());
+            lua_setfield(L, -2, "url");
+            lua_rawseti(L, -2, ++index);
+        }
+    }
+    return 1;
+}
+
 } // namespace
 
 void RegisterWeb(lua_State* L, Runner& runner) {
@@ -282,6 +384,7 @@ void RegisterWeb(lua_State* L, Runner& runner) {
     SetFunction(L, runner, "available", &Available);
     SetFunction(L, runner, "open", &Open);
     SetFunction(L, runner, "close", &Close);
+    SetFunction(L, runner, "bookmarks", &Bookmarks);
     lua_setfield(L, -2, "web");
 }
 

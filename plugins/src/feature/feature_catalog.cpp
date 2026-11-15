@@ -101,7 +101,7 @@ RealFeatureHost::RealFeatureHost(const FeatureConfig& config, FeatureDeps deps)
             deps_.platform = pal::GetCaps().os;
         }
         if (!deps_.services) {
-            deps_.services = CreateLibraryServices(config.library);
+            deps_.services = CreateLibraryServices(config.library, config.data_dir);
         }
         if (!deps_.web_available) {
             deps_.web_available = [] { return pal::WebView::Available(); };

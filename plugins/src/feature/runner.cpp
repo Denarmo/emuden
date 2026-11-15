@@ -183,6 +183,9 @@ void Runner::Boot() {
     RegisterUi(L, *this);
     RegisterLibrary(L, *this);
     RegisterWeb(L, *this);
+    if (config_.manifest.access.Has(PERMISSION_DOWNLOADS_SETUP)) {
+        RegisterDownloads(L, *this);
+    }
     RegisterRequest(L, *this);
     RegisterSecrets(L, *this);
     RegisterTune(L, *this);

@@ -167,10 +167,11 @@ std::string WebUrlHost(const std::string& url);
 std::string WebUrlScheme(const std::string& url);
 /// 127.0.0.1, ::1, localhost and names ending in .localhost.
 bool WebHostIsLoopback(const std::string& host);
-/// Whether `host` matches an entry of `allowed` (exact, or "*.name" for name and subdomains).
+/// Whether `host` matches an entry of `allowed` (exact, "*.name" for name and subdomains, or
+/// "*" for any host: the browser).
 bool WebHostAllowed(const std::string& host, const std::vector<std::string>& allowed);
 /// Whether the top-level page may be at `url`: https on an allowed host, or http on an
-/// allowed loopback host.
+/// allowed loopback host; with "*", http anywhere too.
 bool WebUrlAllowed(const std::string& url, const std::vector<std::string>& allowed);
 /// The file name of a path or suggestion without folders, drive letters, control characters
 /// or the characters a file system refuses; "download" when nothing is left.

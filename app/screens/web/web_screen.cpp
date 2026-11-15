@@ -8,7 +8,8 @@
 // Pad: the left stick (or the D-pad) moves a pointer, A clicks, the right stick scrolls, B
 // goes back in the page's history or closes the page, X types text into the page, View
 // presses Enter, LB and RB go back and forward, Y reloads, Start closes. Mouse and touch go
-// straight to the page.
+// straight to the page. The browser (mode "browser": any site) has the address bar on Y and
+// its menu on Start instead (web_menu.h).
 //
 // Without a web engine the page is the fallback of web_fallback.h: the user's own browser
 // and the Downloads folder. EMUDEN_WEB_FALLBACK=1 asks for it where an engine exists.
@@ -24,8 +25,10 @@
 #include "den/base/log.h"
 #include "den/platform/webview.h"
 #include "den/ui/glyphs.h"
+#include "web_bar.h"
 #include "web_browser.h"
 #include "web_fallback.h"
+#include "web_menu.h"
 
 namespace den::app::web {
 
@@ -33,8 +36,6 @@ namespace {
 
 using input::Nav;
 
-constexpr float BAR_HEIGHT = 72;
-constexpr float BUTTON = 48;
 constexpr float STICK_DEADZONE = 0.22f;
 constexpr float POINTER_SPEED = 900;  // units per second at full deflection
 constexpr float SCROLL_SPEED = 1500;  // pixels per second at full deflection
@@ -100,12 +101,16 @@ public:
             ShowPointer(false);
             return true;
         case Type::PointerUp:
+            if (menu_.IsOpen()) {
+                menu_.Tap(event.x / scale, event.y / scale);
+                return true;
+            }
             if (fallback_ && fallback_->Tap(event.x / scale, event.y / scale, GetStage())) {
                 return true;
             }
-            for (const BarButton& button : buttons_) {
+            for (const BarHit& button : buttons_) {
                 if (button.enabled && button.rect.Contains(event.x / scale, event.y / scale)) {
-                    button.action();
+                    BarPressed(button.action);
                     break;
                 }
             }
@@ -162,6 +167,13 @@ public:
         if (!view_) {
             return {{Nav::Confirm, "Open in browser"}, {Nav::Back, "Close"}};
         }
+        if (menu_.IsOpen()) {
+            return {{Nav::Confirm, "Choose"}, {Nav::Back, "Back"}};
+        }
+        if (browser_) {
+            return {{Nav::Confirm, "Click"}, {Nav::Option, "Type"}, {Nav::Extra, "Address"},
+                    {Nav::Back, state_.can_go_back ? "Back" : "Close"}, {Nav::Menu, "Menu"}};
+        }
         return {{Nav::Confirm, "Click"}, {Nav::Option, "Type"}, {Nav::Extra, "Reload"},
                 {Nav::Back, state_.can_go_back ? "Back" : "Close"}, {Nav::Menu, "Close"}};
     }
@@ -174,6 +186,10 @@ public:
         const float top = std::max(BAR_HEIGHT, 16.0f + 52.0f * static_cast<float>(ToastCount()));
         view_rect_ = gfx::Rect{area.x, top, area.w, std::max(0.0f, area.h - top)};
         DrawBar(ctx, area);
+        g_state.menu.clear();
+        for (const std::string& label : menu_.Labels()) {
+            g_state.menu += (g_state.menu.empty() ? "" : "|") + label;
+        }
         if (!view_) {
             fallback_->Draw(ctx, view_rect_, !GetStage().DialogOpen());
             return;
@@ -186,7 +202,7 @@ public:
             static_cast<int>(std::lround(view_rect_.w * scale)), static_cast<int>(std::lround(view_rect_.h * scale))};
         view_->SetBounds(bounds);
         // A dialog or the text entry is the app's own drawing: the view would cover it.
-        const bool covered = GetStage().DialogOpen() || bounds.w <= 0 || bounds.h <= 0;
+        const bool covered = GetStage().DialogOpen() || menu_.IsOpen() || bounds.w <= 0 || bounds.h <= 0;
         if (covered && view_->Visible()) {
             view_->Hide();
         } else if (!covered && !view_->Visible()) {
@@ -210,6 +226,7 @@ public:
         g_state.view_y = view_rect_.y;
         g_state.view_w = view_rect_.w;
         g_state.view_h = view_rect_.h;
+        menu_.Draw(ctx, view_rect_);
     }
 
     void SetCursorAt(float x, float y) {
@@ -219,11 +236,6 @@ public:
     }
 
 private:
-    struct BarButton {
-        gfx::Rect rect;
-        bool enabled = true;
-        std::function<void()> action;
-    };
     struct Arriving {
         std::uint64_t id = 0;
         Download download;
@@ -240,6 +252,11 @@ private:
         }
         if (const Opener* opener = FindOpener(Param("opener"))) {
             opener_ = *opener;
+        }
+        browser_ = Param("mode") == "browser";
+        g_state.browser = browser_;
+        if (browser_) {
+            hosts_ = {ANY};
         }
         wanted_ = SplitList(Param("ext"));
         std::erase_if(wanted_, [](const std::string& e) { return IsRomImage(e); });
@@ -325,15 +342,17 @@ private:
             GetStage().Toast(RefusalText(download.file_name, verdict), 6.0f);
             return pal::WebDownloadDecision::Refuse();
         }
+        const std::filesystem::path dir = opener_.folder.empty() ? InboxDir() : opener_.folder;
         std::error_code ec;
-        std::filesystem::create_directories(InboxDir(), ec);
+        std::filesystem::create_directories(dir, ec);
         Arriving item;
         item.id = download.id;
         item.total = download.size;
-        item.download.file = FreeFile(InboxDir(), download.file_name);
+        item.download.file = FreeFile(dir, download.file_name);
         item.download.name = download.file_name;
         item.download.host = download.host;
         item.download.mime = download.mime;
+        item.download.title = state_.title;
         arriving_.push_back(item);
         NoteProgress();
         return pal::WebDownloadDecision::Accept(item.download.file);
@@ -396,7 +415,17 @@ private:
     }
 
     void HandleNav(Nav nav, bool repeat) {
+        if (menu_.IsOpen()) {
+            if (!repeat || nav == Nav::Up || nav == Nav::Down) {
+                menu_.Nav(nav);
+            }
+            return;
+        }
         const bool usable = view_ && view_->Visible();
+        if (browser_ && usable && !repeat && (nav == Nav::Extra || nav == Nav::Menu)) {
+            BarPressed(nav == Nav::Extra ? BarAction::Address : BarAction::Menu);
+            return;
+        }
         switch (nav) {
         case Nav::Up:
         case Nav::Down:
@@ -464,6 +493,33 @@ private:
         }
     }
 
+    void BarPressed(BarAction action) {
+        switch (action) {
+        case BarAction::Back:
+            view_->Back();
+            break;
+        case BarAction::Forward:
+            view_->Forward();
+            break;
+        case BarAction::Reload:
+            view_->Reload();
+            break;
+        case BarAction::Close:
+            GetStage().Pop();
+            break;
+        case BarAction::Address:
+            AskAddress(GetStage(), state_.url, CurrentView);
+            break;
+        case BarAction::Menu:
+            FillMenu(menu_, GetStage(), state_, CurrentView);
+            break;
+        }
+    }
+
+    static pal::WebView* CurrentView() {
+        return g_screen != nullptr ? g_screen->view_.get() : nullptr;
+    }
+
     void GoBack() {
         if (view_ && state_.can_go_back) {
             view_->Back();
@@ -501,57 +557,27 @@ private:
     }
 
     void DrawBar(ui::Context& ctx, const gfx::Rect& area) {
-        const ui::Theme& theme = *ctx.theme;
-        gfx::Canvas& canvas = *ctx.canvas;
-        canvas.FillRect(gfx::Rect{area.x, 0, area.w, BAR_HEIGHT}, theme.panel);
-        buttons_.clear();
-        const float y = (BAR_HEIGHT - BUTTON) * 0.5f;
-        const auto button = [&](float x, bool enabled, std::function<void()> action) {
-            const gfx::Rect rect{x, y, BUTTON, BUTTON};
-            canvas.FillRect(rect, theme.panel, theme.radius);
-            buttons_.push_back({rect, enabled, std::move(action)});
-            return rect;
-        };
-        const auto ink = [&](bool enabled) { return enabled ? theme.fg : theme.text_dim.WithAlpha(0.35f); };
-        const bool live = view_ != nullptr;
-
-        // Back and forward: chevrons.
-        gfx::Rect r = button(16, live && state_.can_go_back, [this] { view_->Back(); });
-        ui::DrawLine(canvas, r.CenterX() + 5, r.y + 14, r.CenterX() - 5, r.CenterY(), 3, ink(live && state_.can_go_back));
-        ui::DrawLine(canvas, r.CenterX() - 5, r.CenterY(), r.CenterX() + 5, r.Bottom() - 14, 3, ink(live && state_.can_go_back));
-        r = button(72, live && state_.can_go_forward, [this] { view_->Forward(); });
-        ui::DrawLine(canvas, r.CenterX() - 5, r.y + 14, r.CenterX() + 5, r.CenterY(), 3, ink(live && state_.can_go_forward));
-        ui::DrawLine(canvas, r.CenterX() + 5, r.CenterY(), r.CenterX() - 5, r.Bottom() - 14, 3, ink(live && state_.can_go_forward));
-        // Reload: a ring with an arrow head.
-        r = button(128, live, [this] { view_->Reload(); });
-        canvas.StrokeRect(gfx::Rect{r.CenterX() - 10, r.CenterY() - 10, 20, 20}, ink(live), 3, 10);
-        ui::DrawLine(canvas, r.CenterX() + 10, r.CenterY() - 2, r.CenterX() + 15, r.CenterY() - 9, 3, ink(live));
-        ui::DrawLine(canvas, r.CenterX() + 10, r.CenterY() - 2, r.CenterX() + 2, r.CenterY() - 5, 3, ink(live));
-        // Close: a cross.
-        r = button(area.Right() - 16 - BUTTON, true, [this] { GetStage().Pop(); });
-        ui::DrawLine(canvas, r.CenterX() - 8, r.CenterY() - 8, r.CenterX() + 8, r.CenterY() + 8, 3, theme.fg);
-        ui::DrawLine(canvas, r.CenterX() + 8, r.CenterY() - 8, r.CenterX() - 8, r.CenterY() + 8, 3, theme.fg);
-
-        const float text_x = 192, text_w = std::max(0.0f, area.Right() - 16 - BUTTON - 16 - text_x);
-        const std::string title = !state_.title.empty() ? state_.title : Param("title");
+        BarInput bar;
+        bar.live = view_ != nullptr;
+        bar.browser = browser_;
+        bar.can_back = state_.can_go_back;
+        bar.can_forward = state_.can_go_forward;
+        bar.title = !state_.title.empty() ? state_.title : Param("title");
         if (fallback_) {
             state_.url = Param("url"); // the bar names the site the page was opened for
         }
-        canvas.DrawText(ctx.Text().Elide(title, theme.text_body, text_w, gfx::FONT_BOLD), text_x, 12, theme.text_body,
-                        theme.fg, gfx::FONT_BOLD);
-        std::string line = pal::WebUrlHost(state_.url);
+        bar.line = pal::WebUrlHost(state_.url);
         if (!arriving_.empty()) {
             const Arriving& item = arriving_.back();
-            line += item.total > 0 ? std::format("  -  downloading {} {}%", item.download.name, item.received * 100 / item.total)
-                                   : std::format("  -  downloading {}", item.download.name);
+            bar.line += item.total > 0 ? std::format("  -  downloading {} {}%", item.download.name, item.received * 100 / item.total)
+                                       : std::format("  -  downloading {}", item.download.name);
+            if (item.total > 0) {
+                bar.progress = static_cast<float>(item.received) / static_cast<float>(item.total);
+            }
         } else if (state_.loading) {
-            line += "  -  loading";
+            bar.line += "  -  loading";
         }
-        canvas.DrawText(ctx.Text().Elide(line, theme.text_small, text_w), text_x, 42, theme.text_small, theme.text_dim);
-        if (!arriving_.empty() && arriving_.back().total > 0) {
-            const float done = static_cast<float>(arriving_.back().received) / static_cast<float>(arriving_.back().total);
-            canvas.FillRect(gfx::Rect{area.x, BAR_HEIGHT - 3, area.w * std::clamp(done, 0.0f, 1.0f), 3}, theme.fg);
-        }
+        buttons_ = DrawWebBar(ctx, area, bar);
     }
 
     std::unique_ptr<pal::WebView> view_;
@@ -561,14 +587,15 @@ private:
     std::vector<std::string> hosts_, wanted_;
     std::vector<Arriving> arriving_;
     std::vector<Download> finished_;
-    std::vector<BarButton> buttons_;
+    std::vector<BarHit> buttons_;
+    BrowserMenu menu_;
     std::string refused_host_;
     gfx::Rect view_rect_;
     double refused_at_ = 0;
     float cursor_x_ = -1, cursor_y_ = -1; // units inside the view
     float scroll_x_ = 0, scroll_y_ = 0;   // pixels not yet sent
     float scale_ = 1;
-    bool started_ = false, pointer_ = false, stick_ = false;
+    bool started_ = false, pointer_ = false, stick_ = false, browser_ = false;
 };
 
 } // namespace

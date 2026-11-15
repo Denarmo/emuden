@@ -402,6 +402,7 @@ const std::vector<std::string>& HostCapabilities() {
         "kind.feature",       "feature.lua.1",  "feature.web.1",
         "core.engine-app.1",  "kind.interface", "interface.1",
         "feature.tune.1",     "feature.achievements.1",
+        "feature.browser.1",
     };
     return capabilities;
 }

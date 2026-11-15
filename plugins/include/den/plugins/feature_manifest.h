@@ -39,6 +39,11 @@ inline constexpr const char* PERMISSION_GAME_SETTINGS = "game.settings";
 inline constexpr const char* PERMISSION_STEAM = "steam";
 /// den.achievements: sign in to RetroAchievements and the achievements of the user's games.
 inline constexpr const char* PERMISSION_ACHIEVEMENTS = "achievements";
+/// den.web.open{any = true}: any https site in the in-app browser, every file downloaded there
+/// kept in EmuDEN's Downloads folder (official plugins only).
+inline constexpr const char* PERMISSION_BROWSE_ANY = "browse.any";
+/// den.downloads: sets up the files of the Downloads folder as games and hacks (official only).
+inline constexpr const char* PERMISSION_DOWNLOADS_SETUP = "downloads.setup";
 
 /// The categories a sync provider may offer, in the order the sync page shows them.
 inline constexpr const char* SYNC_CATEGORIES[] = {"saves", "states", "config", "games", "bios"};

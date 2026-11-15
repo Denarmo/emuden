@@ -72,10 +72,13 @@ bool IsRomImage(const std::string& extension) {
 
 Verdict JudgeDownload(const std::string& file_name, const std::vector<std::string>& wanted) {
     const std::string extension = ExtensionOf(file_name);
-    if (IsRomImage(extension)) {
+    if (IsRomImage(extension) && std::find(wanted.begin(), wanted.end(), ANY) == wanted.end()) {
         return Verdict::RomImage;
     }
     const std::vector<std::string>& list = wanted.empty() ? DefaultExtensions() : wanted;
+    if (std::find(list.begin(), list.end(), ANY) != list.end()) {
+        return Verdict::Take;
+    }
     return std::find(list.begin(), list.end(), extension) != list.end() ? Verdict::Take : Verdict::NotWanted;
 }
 
@@ -141,8 +144,9 @@ void Open(OpenRequest request) {
     RegisterOpener("request", std::move(request.opener));
     Svc().stage->Push("web", {{"url", request.url},
                               {"title", request.title},
-                              {"hosts", Join(request.allowed_hosts)},
-                              {"opener", "request"}});
+                              {"hosts", request.browser ? std::string(ANY) : Join(request.allowed_hosts)},
+                              {"opener", "request"},
+                              {"mode", request.browser ? "browser" : ""}});
 }
 
 } // namespace den::app::web

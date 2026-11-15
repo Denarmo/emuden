@@ -19,6 +19,7 @@ const char* const PERMISSIONS[] = {
     PERMISSION_SYNC,         PERMISSION_HTTP_USER_HOST,  PERMISSION_HTTP_LOCAL,
     PERMISSION_DEVICE_INFO,  PERMISSION_GAME_SETTINGS,   PERMISSION_STEAM,
     PERMISSION_ACHIEVEMENTS,
+    PERMISSION_BROWSE_ANY,   PERMISSION_DOWNLOADS_SETUP,
 };
 
 const char* CategoryName(std::string_view category) {
@@ -343,6 +344,9 @@ Status CheckTrust(const FeatureManifest& manifest, FeaturePlugin::Trust trust,
         if (manifest.access.Has(PERMISSION_DOWNLOADS_WATCH)) {
             return Status::Fail("A plugin of this source may not watch the Downloads folder.");
         }
+        if (manifest.access.Has(PERMISSION_BROWSE_ANY) || manifest.access.Has(PERMISSION_DOWNLOADS_SETUP)) {
+            return Status::Fail("Only an official plugin may show any website or set up downloads.");
+        }
     }
     return {};
 }
@@ -391,6 +395,10 @@ std::vector<PermissionLine> PermissionLines(const FeatureAccess& access,
             text = Contains(access.systems, "*")
                        ? "Change the settings of single games"
                        : "Change the settings of single games of these consoles: " + Join(access.systems);
+        } else if (name == PERMISSION_BROWSE_ANY) {
+            text = "Show any website inside EmuDEN and keep what you download there in EmuDEN's Downloads folder";
+        } else if (name == PERMISSION_DOWNLOADS_SETUP) {
+            text = "Add the games and patches you download to your library";
         } else if (name == PERMISSION_STEAM) {
             text = "See your Steam games and change their launch options and Proton version";
         } else if (name == PERMISSION_ACHIEVEMENTS) {

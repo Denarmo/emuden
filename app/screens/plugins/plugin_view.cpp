@@ -324,10 +324,16 @@ private:
         request.title = ask.title;
         request.allowed_hosts = ask.hosts;
         request.opener.extensions = ask.extensions;
+        // The browser (den.web.open{any = true}): any site, every file into EmuDEN's Downloads.
+        request.browser = ask.message == "browser";
+        if (request.browser) {
+            request.opener.folder = Svc().data_dir / "downloads";
+        }
         request.opener.on_download = [id = ask.id](const web::Download& download) {
             if (plugins::FeatureHost* h = FeatureHostSvc()) {
                 h->Answer(id, true,
-                          plugins::WebFileAnswer({PathToUtf8(download.file), download.name, download.host}));
+                          plugins::WebFileAnswer(
+                              {PathToUtf8(download.file), download.name, download.host, download.title}));
             }
         };
         web_ask_ = ask.id;

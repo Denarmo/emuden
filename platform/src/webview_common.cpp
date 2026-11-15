@@ -65,6 +65,9 @@ bool WebHostAllowed(const std::string& host, const std::vector<std::string>& all
     }
     for (const std::string& raw : allowed) {
         const std::string entry = ToLower(Trim(raw));
+        if (entry == "*") {
+            return true; // the browser: any site
+        }
         if (entry.starts_with("*.")) {
             const std::string name = entry.substr(2);
             if (!name.empty() && (host == name || host.ends_with("." + name))) {
@@ -82,7 +85,8 @@ bool WebUrlAllowed(const std::string& url, const std::vector<std::string>& allow
     if (!WebHostAllowed(host, allowed)) {
         return false;
     }
-    return WebUrlScheme(url) == "https" || WebHostIsLoopback(host);
+    const bool any = std::find(allowed.begin(), allowed.end(), "*") != allowed.end();
+    return WebUrlScheme(url) == "https" || WebHostIsLoopback(host) || (any && WebUrlScheme(url) == "http");
 }
 
 std::string WebSafeFileName(const std::string& name) {

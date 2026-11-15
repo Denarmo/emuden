@@ -105,3 +105,12 @@ TEST_CASE("a file the page made is named after its first bytes") {
     CHECK(pal::WebPatchExtension("PK\x03\x04rest") == ".zip");
     CHECK(pal::WebPatchExtension(std::string_view("\x00\x00\x00\xC0\x00\x00\x00\xEA", 8)).empty());
 }
+
+TEST_CASE("the browser's \"*\" allows any site, plain http too") {
+    const std::vector<std::string> any = {"*"};
+    CHECK(pal::WebUrlAllowed("https://homebrew.example.org/games", any));
+    CHECK(pal::WebUrlAllowed("http://old.example.net/", any));
+    CHECK_FALSE(pal::WebUrlAllowed("file:///etc/passwd", any));
+    CHECK_FALSE(pal::WebUrlAllowed("javascript:alert(1)", any));
+    CHECK_FALSE(pal::WebUrlAllowed("http://old.example.net/", {"old.example.net"}));
+}

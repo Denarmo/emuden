@@ -70,6 +70,7 @@ struct WebFile {
     std::string file; // where it is now (the app's web inbox); the host moves it
     std::string name; // the name the site gave it
     std::string host; // where it came from
+    std::string title; // the title of the page the download started on
 };
 /// The `value` of an accepted answer to an OpenWeb ask.
 std::string WebFileAnswer(const WebFile& file);

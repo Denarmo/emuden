@@ -93,6 +93,9 @@ Result<std::shared_ptr<Runner>> RealFeatureHost::Start(const std::string& id) {
     if (package.manifest.access.Has(PERMISSION_DOWNLOADS_WATCH)) {
         config.downloads_dir = deps_.downloads_dir;
     }
+    if (package.manifest.access.Has(PERMISSION_BROWSE_ANY)) {
+        config.bookmarks_file = config_.data_dir / "browser" / "bookmarks.json";
+    }
     config.app_version = config_.app_version;
     config.platform = deps_.platform;
     config.developer = package.trust == FeaturePlugin::Trust::Developer;
