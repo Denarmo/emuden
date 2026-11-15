@@ -144,6 +144,21 @@ TEST_CASE("system folders and loose files") {
     CHECK(ScanFolders(direct).front().name == "Other");
 }
 
+TEST_CASE("console folders a folder or two down, as EmuDeck keeps them") {
+    const fs::path root = FreshDir("nested");
+    Put(root / "Emulation" / "roms" / "gb" / "Tetris (World) (Rev 1).gb");
+    Put(root / "roms" / "gba" / "Golden Sun.gba");
+    Put(root / "Photos" / "holiday" / "gba" / "Hidden.gba"); // Photos holds no console folder
+    Put(root / "a" / "b" / "c" / "gba" / "Deep.gba");
+
+    const std::vector<Entry> entries = ScanFolders(Options(root));
+    CHECK(entries.size() == 2);
+    REQUIRE(ByName(entries, "Tetris") != nullptr);
+    CHECK(ByName(entries, "Tetris")->system == "gb");
+    REQUIRE(ByName(entries, "Golden Sun") != nullptr);
+    CHECK(ByName(entries, "Golden Sun")->system == "gba");
+}
+
 TEST_CASE("discs, cue sheets and playlists are one game each") {
     const fs::path root = FreshDir("discs");
     const fs::path psx = root / "psx";

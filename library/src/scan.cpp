@@ -323,7 +323,24 @@ void ScanSystemDir(Scan& scan, const fs::path& dir, const SystemDef& def, const 
     }
 }
 
-void ScanMixedDir(Scan& scan, const fs::path& root) {
+bool HasSystemFolder(const SystemTable& systems, const fs::path& root) {
+    for (const fs::path& entry : ListDirectory(root)) {
+        if (IsDirectory(entry) && systems.FromFolderName(PathToUtf8(entry.filename())) != nullptr) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Folders that other frontends keep their console folders in (EmuDeck's Emulation/roms,
+// RetroDECK's retrodeck/roms).
+bool HoldsSystemFolders(const SystemTable& systems, const fs::path& dir, const std::string& name) {
+    const std::string lower = ToLower(name);
+    return lower == "roms" || lower == "emulation" || lower == "retrodeck" || HasSystemFolder(systems, dir);
+}
+
+// Console folders may also sit a folder or two down.
+void ScanMixedDir(Scan& scan, const fs::path& root, int depth = 0) {
     std::vector<fs::path> entries = ListDirectory(root);
     std::sort(entries.begin(), entries.end());
     for (const fs::path& entry : entries) {
@@ -334,6 +351,8 @@ void ScanMixedDir(Scan& scan, const fs::path& root) {
         if (IsDirectory(entry)) {
             if (const SystemDef* def = scan.systems.FromFolderName(name)) {
                 ScanSystemDir(scan, entry, *def, entry, 0);
+            } else if (depth < 2 && HoldsSystemFolders(scan.systems, entry, name)) {
+                ScanMixedDir(scan, entry, depth + 1);
             }
             continue;
         }
@@ -343,15 +362,6 @@ void ScanMixedDir(Scan& scan, const fs::path& root) {
             AddRom(scan, entry, def, {});
         }
     }
-}
-
-bool HasSystemFolder(const SystemTable& systems, const fs::path& root) {
-    for (const fs::path& entry : ListDirectory(root)) {
-        if (IsDirectory(entry) && systems.FromFolderName(PathToUtf8(entry.filename())) != nullptr) {
-            return true;
-        }
-    }
-    return false;
 }
 
 // Keeps one entry per game where the files differ in region only.

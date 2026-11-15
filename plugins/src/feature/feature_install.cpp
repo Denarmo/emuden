@@ -115,9 +115,10 @@ Status RealFeatureHost::DoInstall(Job& job, const std::string& id, bool consent)
     // offers it first.
     const std::vector<SourceView> views = Views();
     std::size_t origin = views.size();
+    const Catalogue catalogue = MergeCatalogue(views);
     if (present) {
         origin = ViewOf(views, *present);
-    } else if (const Offer* offer = MergeCatalogue(views).Find(id)) {
+    } else if (const Offer* offer = catalogue.Find(id)) {
         origin = offer->source;
     } else {
         for (std::size_t i = 0; i < views.size() && origin == views.size(); ++i) {

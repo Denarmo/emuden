@@ -122,7 +122,9 @@ std::int64_t FileTime(const fs::path& file) {
     const auto system = std::chrono::system_clock::now() +
                         std::chrono::duration_cast<std::chrono::system_clock::duration>(
                             time - fs::file_time_type::clock::now());
-    return std::chrono::duration_cast<std::chrono::seconds>(system.time_since_epoch()).count();
+    // Rounded: the two clocks are read a moment apart, so a time set to a whole second can
+    // come back a hair below it.
+    return std::chrono::round<std::chrono::seconds>(system.time_since_epoch()).count();
 }
 
 void SetFileTime(const fs::path& file, std::int64_t unix_seconds) {

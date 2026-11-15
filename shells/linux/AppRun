@@ -1,4 +1,8 @@
 #!/bin/sh
 # Entry point of the AppImage: the executable finds its assets beside itself.
 here="$(dirname "$(readlink -f "$0")")"
+# glibc 2.41 and later refuse to load a library that asks for an executable stack, as some
+# libretro cores (melonDS) still do; this lets dlopen give them one, as older glibc did.
+GLIBC_TUNABLES="${GLIBC_TUNABLES:+$GLIBC_TUNABLES:}glibc.rtld.execstack=2"
+export GLIBC_TUNABLES
 exec "$here/usr/bin/emuden" "$@"

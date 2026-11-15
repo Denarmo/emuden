@@ -96,9 +96,7 @@ size_t OnHeader(char* data, size_t size, size_t count, void* user) {
     auto& t = *static_cast<Transfer*>(user);
     const size_t bytes = size * count;
     std::string line(data, bytes);
-    while (!line.empty() && (line.back() == '
-' || line.back() == '
-')) {
+    while (!line.empty() && (line.back() == '\n' || line.back() == '\r')) {
         line.pop_back();
     }
     if (line.rfind("HTTP/", 0) == 0) {
