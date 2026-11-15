@@ -307,6 +307,8 @@ void PlayerSession::SaveResumeState() {
     if (core_ && resume_enabled_ && snapshot_.can_save_states && snapshot_.frames > 0) {
         if (const Status status = WriteStateFile(paths_.Resume()); !status) {
             log::Warn("player", "no resume state: {}", status.error);
+        } else {
+            WriteThumbnail(paths_.ResumePicture()); // Home's Continue shows it, on every device
         }
     }
 }

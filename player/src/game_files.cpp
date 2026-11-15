@@ -55,6 +55,10 @@ fs::path GamePaths::Resume() const {
     return state_dir / PathFromUtf8(base + ".resume.state");
 }
 
+fs::path GamePaths::ResumePicture() const {
+    return state_dir / PathFromUtf8(base + ".resume.png");
+}
+
 GamePaths MakeGamePaths(const fs::path& data_dir, const std::string& system,
                         const std::string& game_id, const fs::path& content) {
     GamePaths paths;

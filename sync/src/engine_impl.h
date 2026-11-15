@@ -72,6 +72,10 @@ public:
     GameCheck CheckGame(const std::string& game_id, CheckGate& gate, double seconds) override;
     Status ResolveGame(const std::string& game_id, bool use_online) override;
     Status SyncGameOnce(const std::string& game_id, const std::atomic<bool>* cancel) override;
+    GameTransfer GameProgress(bool before) const override;
+    int GameUploadsPending() const override {
+        return uploads_pending_.load();
+    }
     void Pump(const std::string& running_game) override;
     void NoteDeleted(const std::filesystem::path& local_file) override;
 
@@ -159,9 +163,11 @@ private:
     // (not its game uploads), a game's own run and conflict swaps.
     std::timed_mutex files_mutex_;
     std::atomic<int> files_wanted_{0}; // a game's own run waits for files_mutex_
+    std::atomic<int> uploads_pending_{0}; // SyncGame jobs not finished
 
     mutable std::mutex mutex_; // everything below
     SyncState state_;
+    GameTransfer check_transfer_, upload_transfer_; // games' own runs, before and after
     std::vector<Conflict> conflicts_;
     std::vector<RemoteGame> remote_games_;
     std::map<std::string, std::int64_t> game_synced_; // game id -> last synced, of the active provider

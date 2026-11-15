@@ -39,6 +39,11 @@ void Run::Current(const std::string& path, std::uint64_t size) {
         s.current = path;
         s.fraction = -1;
         s.size = size;
+        if (transfer_ != nullptr) {
+            transfer_->current = path;
+            transfer_->fraction = -1;
+            transfer_->size = size;
+        }
     });
 }
 
@@ -47,6 +52,10 @@ void Run::Fraction(double done, double total) {
         s.fraction = total > 0 ? static_cast<float>(done / total) : done <= 1 ? static_cast<float>(done) : -1;
         if (total > 1) {
             s.size = static_cast<std::uint64_t>(total);
+        }
+        if (transfer_ != nullptr) {
+            transfer_->fraction = s.fraction;
+            transfer_->size = s.size;
         }
     });
 }

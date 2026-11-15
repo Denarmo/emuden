@@ -28,6 +28,7 @@ struct GamePaths {
     std::filesystem::path State(int slot) const;    // <state_dir>/<base>.slot<N>.state
     std::filesystem::path Thumbnail(int slot) const; // the same with .png
     std::filesystem::path Resume() const;           // <state_dir>/<base>.resume.state
+    std::filesystem::path ResumePicture() const;    // <state_dir>/<base>.resume.png
 };
 
 GamePaths MakeGamePaths(const std::filesystem::path& data_dir, const std::string& system,

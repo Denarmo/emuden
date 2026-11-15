@@ -85,6 +85,7 @@ private:
     SyncState own_state_;             // a game's run keeps its counts apart from the full run's
     SyncState* state_ = nullptr;
     CheckGate* gate_ = nullptr;
+    GameTransfer* transfer_ = nullptr; // a game's own run: the engine's, under its mutex_
     GameIndex games_;
     Catalog local_;
     const std::map<std::string, RemoteFile>* remote_ = nullptr;

@@ -97,6 +97,16 @@ struct GameCheck {
     std::string error;
 };
 
+/// A game's own sync while it goes on: the check before it starts, or its files going up
+/// after it ended.
+struct GameTransfer {
+    std::string game_id;     // "" when none goes on
+    int done = 0, total = 0; // its files
+    std::string current;     // the file being moved
+    float fraction = -1;     // of it, negative when unknown
+    std::uint64_t size = 0;
+};
+
 /// Ends a game's check early (the user skipped it, or it took too long): once Abandon has
 /// returned, the check writes no more files, so the game can start.
 class CheckGate {
@@ -187,6 +197,11 @@ public:
     virtual Status ResolveGame(const std::string& game_id, bool use_online) = 0;
     /// Blocking: one game's saves and states after it ended (SyncGame runs it on a job).
     virtual Status SyncGameOnce(const std::string& game_id, const std::atomic<bool>* cancel) = 0;
+    /// The game check (`before`) or the upload after a game ended that goes on now.
+    virtual GameTransfer GameProgress(bool before) const = 0;
+    /// Games that ended whose saves and states are not up yet (SyncGame's jobs, queued or
+    /// running).
+    virtual int GameUploadsPending() const = 0;
     /// Main thread, every frame: the timer. `running_game` is the library id of the game
     /// that runs now ("" for none): its files are never replaced while it does.
     virtual void Pump(const std::string& running_game) = 0;

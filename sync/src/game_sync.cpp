@@ -112,13 +112,29 @@ Status Run::GoGame(const GameScope& scope) {
     }
     PlanRequest plan{&local_, &remote, &view, categories, false};
     std::vector<Action> actions = MakePlan(plan);
+    // The play time file last: another device that sees this session finds its files online.
     std::stable_partition(actions.begin(), actions.end(), [](const Action& a) { return !IsPlayFile(a.path); });
+    const auto moves = [&](const Action& a) {
+        return scope.before ? a.op != Op::Upload && a.op != Op::DeleteRemote && !IsPlayFile(a.path)
+                            : a.op != Op::Forget && a.op != Op::Adopt;
+    };
+    Change([&](SyncState&) {
+        transfer_ = scope.before ? &engine_.check_transfer_ : &engine_.upload_transfer_;
+        *transfer_ = {scope.game_id, 0, static_cast<int>(std::count_if(actions.begin(), actions.end(), moves))};
+    });
     for (const Action& action : actions) {
         if (Cancelled() || (gate_ != nullptr && gate_->Abandoned())) {
             break;
         }
         GameAction(scope, action);
+        if (moves(action)) {
+            Change([&](SyncState&) { ++transfer_->done; });
+        }
     }
+    Change([&](SyncState&) {
+        *transfer_ = {};
+        transfer_ = nullptr;
+    });
     SaveJournal(true);
     hashes.Save();
     const bool clean = own_state_.errors.empty() && !Cancelled();
@@ -400,6 +416,11 @@ Status EngineImpl::SyncGameOnce(const std::string& game_id, const std::atomic<bo
     }
 }
 
+GameTransfer EngineImpl::GameProgress(bool before) const {
+    std::lock_guard lock(mutex_);
+    return before ? check_transfer_ : upload_transfer_;
+}
+
 void EngineImpl::SyncGame(const std::string& game_id) {
     if (Active().empty() || config_.jobs == nullptr) {
         return;
@@ -409,11 +430,18 @@ void EngineImpl::SyncGame(const std::string& game_id) {
         return;
     }
     std::weak_ptr<EngineImpl> self = shared_from_this();
+    ++uploads_pending_;
     config_.jobs->Run(
         "Sync " + game_id,
         [self, game_id](Job&) {
             const auto engine = self.lock();
-            return engine ? engine->SyncGameOnce(game_id, &engine->stop_) : Status();
+            if (!engine) {
+                return Status();
+            }
+            const Status status = engine->SyncGameOnce(game_id, &engine->stop_);
+            --engine->uploads_pending_;
+            engine->Touch();
+            return status;
         },
         [self, game_id](Job&) {
             if (const auto engine = self.lock()) {
