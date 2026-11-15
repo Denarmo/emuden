@@ -7,6 +7,7 @@
 #include "../home/game_widgets.h"
 #include "../home/games.h"
 #include "../home/strings.h"
+#include "../sync/sync_glue.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/registry.h"
@@ -97,6 +98,16 @@ public:
         if (const auto core = CoreForGame(game)) {
             const std::string name = core->name.empty() ? core->id : core->name;
             fact(TrF("details.core", core->installed ? name : TrF("details.core_missing", name)));
+        }
+        const auto console_of = svc.plugins->FindConsole(game.system);
+        if (sync::Engine* engine = SyncSvc(); engine && console_of && console_of->group != "pc") {
+            const sync::GameSync saves = engine->GameState(id);
+            if (saves.active) {
+                fact(saves.conflict  ? std::string("Saves synced, with a conflict: see Settings, Sync")
+                     : saves.waiting ? std::string("Saves sync when the game ends")
+                     : saves.synced > 0 ? "Saves synced " + SyncTimeText(saves.synced)
+                                        : std::string("Saves not synced yet"));
+            }
         }
 
         body->Emplace<ui::Node>()->height = 12;
