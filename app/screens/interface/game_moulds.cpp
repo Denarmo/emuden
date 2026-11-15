@@ -26,6 +26,7 @@ enum class Outline {
     StepBottom, // the sides step in near the bottom (the end that goes in)
     Wings,      // the top corners cut away at a slant (Nintendo 64)
     Chamfer,    // both top corners cut off at 45 degrees
+    Advance,    // the top corners cut at a slant and the bottom a little narrower (Game Boy Advance)
 };
 
 struct Mould {
@@ -47,10 +48,13 @@ struct Mould {
     float band = 0;      // a darker band this tall across the bottom
     bool handle = false; // a handle along the top
     bool ridge = false;  // a ridge along the top
+    float top_band = 0;  // a recessed band this tall across the top, between the corners
 };
 
 // Proportions are the front's width over its height; depth and label in heights.
 constexpr Mould MOULDS[] = {
+    {"pocket_wide", "cartridge", 1.63f, 0.23f, {52, 53, 58, 255}, {0.14f, 0.23f, 0.72f, 0.64f}, "none",
+     Outline::Advance, 0.02f, 0.03f, 0.045f, 0.14f, 0, 0, 0, false, false, true, 0, 0, false, false, 0.12f},
     {"nes", "cartridge", 0.89f, 0.15f, {128, 129, 135, 255}, {0.23f, 0.035f, 0.54f, 0.5f}, "none",
      Outline::StepBottom, 0.02f, 0.02f, 0.035f, 0.1f, 8, 0, 0, false, false, true},
     {"snes", "cartridge", 1.36f, 0.19f, {163, 164, 170, 255}, {0.08f, 0.05f, 0.84f, 0.42f}, "none",
@@ -158,6 +162,21 @@ std::vector<Vec2> OutlineOf(const Mould& m, float a) {
                         {x - m.cut_w, 0.5f, 0.015f},
                         {-x + m.cut_w, 0.5f, 0.015f},
                         {-x, 0.5f - m.cut_h, 0.015f}});
+    case Outline::Advance: {
+        // Straight sides up to a slant at each top corner; the strip along the bottom a hair
+        // narrower than the body.
+        const float sx = 0.018f, sy = -0.5f + 0.13f;
+        return Rounded({{-x + sx, -0.5f, rb},
+                        {x - sx, -0.5f, rb},
+                        {x - sx, sy, 0},
+                        {x, sy + sx, 0.006f},
+                        {x, 0.5f - m.cut_h, 0.012f},
+                        {x - m.cut_w, 0.5f, rt},
+                        {-x + m.cut_w, 0.5f, rt},
+                        {-x, 0.5f - m.cut_h, 0.012f},
+                        {-x, sy + sx, 0.006f},
+                        {-x + sx, sy, 0}});
+    }
     case Outline::Rect:
         break;
     }
@@ -229,6 +248,11 @@ bool BuildMould(Built& b, const GameObject& o) {
         gfx::AddSlab(shell, RoundedOutline(a * 0.9f, 0.17f, 0.08f, 0.02f), d * 1.3f, 0.02f, All(part), d * 0.1f, 0,
                      0.5f - 0.085f, 3);
     }
+    if (m->top_band > 0) {
+        // Recessed, with the console's name moulded in it on the real one.
+        gfx::AddGroove(shell, RoundedOutline(a * 0.62f, m->top_band, 0.02f, 0.02f), 0.014f, z, 0,
+                       0.5f - 0.03f - m->top_band * 0.5f, part);
+    }
     if (m->ridge) {
         gfx::AddGroove(shell, RoundedOutline(a * 0.86f, 0.05f, 0.02f, 0.02f), 0.012f, z, 0, 0.5f - 0.055f, part, true);
     }
@@ -240,7 +264,8 @@ bool BuildMould(Built& b, const GameObject& o) {
 
     const float label_top = 0.5f - l.y, label_bottom = 0.5f - (l.y + l.h);
     const float low = m->band > 0 ? -0.5f + m->band + 0.02f : -0.5f + 0.04f + std::max(0.0f, m->contacts);
-    const float high = 0.5f - 0.04f - std::max(0.0f, -m->contacts) - (m->ridge || m->handle ? 0.12f : 0);
+    const float high = 0.5f - 0.04f - std::max(0.0f, -m->contacts) - (m->ridge || m->handle ? 0.12f : 0) -
+                       (m->top_band > 0 ? m->top_band + 0.03f : 0);
     // The free part of the front: under the label, or over it when the label sits low.
     const bool below = label_bottom - low >= high - label_top;
     const float free_top = below ? label_bottom - 0.04f : high;

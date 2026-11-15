@@ -49,7 +49,6 @@ struct StyleDefaults {
 
 constexpr StyleDefaults STYLES[] = {
     {"pocket", 0.877f, 0.12f, {0.105f, 0.3f, 0.79f, 0.6f}, 5, "foil"},
-    {"pocket_wide", 1.64f, 0.18f, {0.11f, 0.29f, 0.78f, 0.64f}, 0, "none"},
 };
 
 } // namespace
@@ -178,57 +177,44 @@ void BuildCartridge(Built& b, const GameObject& o) {
     AddBack(b.solid, o, true);
 }
 
-// A handheld's cartridge after the real moulds: the top corners stepped down with grip ridges
-// on them, a sunk panel along the top, the label in a sunk well and an arrow under it; the
-// wide kind with deep shoulders and a band along the top instead.
+// A Game Boy's cartridge after the real mould: the top corners stepped down with grip ridges
+// on them, a sunk panel along the top, the label in a sunk well and an arrow under it. (The
+// Game Boy Advance's is in game_moulds.cpp.)
 void BuildPocket(Built& b, const GameObject& o) {
-    const bool wide = o.style == "pocket_wide";
     const float a = o.aspect, d = o.depth, face = d * 0.5f, z = face + 0.002f;
     auto& shell = b.Shell(o);
     const Part part = ShellPart(o);
-    const float shoulder = wide ? 0.07f : a * 0.105f, drop = wide ? 0.21f : 0.035f;
-    gfx::AddSlab(shell,
-                 gfx::ShoulderedOutline(a, 1, shoulder, drop, wide ? 0.03f : 0.01f, wide ? 0.06f : 0.022f,
-                                        wide ? 0.04f : 0.02f),
-                 d, std::min(0.012f, d * 0.2f), All(part));
+    const float shoulder = a * 0.105f, drop = 0.035f;
+    gfx::AddSlab(shell, gfx::ShoulderedOutline(a, 1, shoulder, drop, 0.01f, 0.022f, 0.02f), d,
+                 std::min(0.012f, d * 0.2f), All(part));
     const gfx::Rect& l = o.label;
     const gfx::Vec2 lc = Centre(o, l);
     const float margin = 0.022f, label_top = 0.5f - l.y, label_bottom = 0.5f - (l.y + l.h);
-    const float well_top = label_top + margin, well_bottom = wide ? label_bottom - margin : -0.5f + 0.035f;
+    const float well_top = label_top + margin, well_bottom = -0.5f + 0.035f;
     gfx::AddGroove(shell, RoundedOutline(l.w * a + 2 * margin, well_top - well_bottom, 0.03f, 0.03f), 0.012f, z, lc.x,
                    (well_top + well_bottom) * 0.5f, part);
-    if (wide) {
-        // The band along the top, between the shoulders, and a lip across the shoulders.
-        const float top = 0.5f - 0.03f, bottom = well_top + 0.03f;
-        gfx::AddGroove(shell, RoundedOutline(a - 2 * shoulder - 0.08f, top - bottom, 0.02f, 0.02f), 0.012f, z, 0,
-                       (top + bottom) * 0.5f, part);
-        gfx::AddGroove(shell, RoundedOutline(a - 0.06f, 0.012f, 0.005f, 0.005f), 0.006f, z, 0, 0.5f - drop - 0.035f,
-                       part);
-    } else {
-        // The arrow under the label, pointing the way in.
-        const float ay = (label_bottom + well_bottom) * 0.5f;
-        gfx::AddGroove(shell, {{0, ay - 0.02f}, {0.05f, ay + 0.02f}, {-0.05f, ay + 0.02f}}, 0.014f, z, 0, 0, part);
-        // The panel along the top, round-ended.
-        const float top = 0.5f - 0.045f, bottom = well_top + 0.035f, px = a * 0.5f - shoulder - 0.03f;
-        const float r = (top - bottom) * 0.5f;
-        gfx::AddGroove(shell, RoundedOutline(2 * px, top - bottom, r, r, 0, 10), 0.014f, z, 0, (top + bottom) * 0.5f,
-                       part);
-        // Grip ridges on both stepped corners.
-        const int ridges = std::clamp(o.grip, 0, 8);
-        const float rw = shoulder + 0.03f;
-        for (int i = 0; i < ridges; ++i) {
-            const float y = 0.5f - drop - 0.03f - static_cast<float>(i) * 0.03f;
-            for (const float side : {-1.0f, 1.0f}) {
-                gfx::AddGroove(shell, RoundedOutline(rw, 0.012f, 0.004f, 0.004f), 0.006f, z,
-                               side * (a * 0.5f - rw * 0.5f - 0.012f), y, part);
-            }
+    // The arrow under the label, pointing the way in.
+    const float ay = (label_bottom + well_bottom) * 0.5f;
+    gfx::AddGroove(shell, {{0, ay - 0.02f}, {0.05f, ay + 0.02f}, {-0.05f, ay + 0.02f}}, 0.014f, z, 0, 0, part);
+    // The panel along the top, round-ended.
+    const float top = 0.5f - 0.045f, bottom = well_top + 0.035f, px = a * 0.5f - shoulder - 0.03f;
+    const float r = (top - bottom) * 0.5f;
+    gfx::AddGroove(shell, RoundedOutline(2 * px, top - bottom, r, r, 0, 10), 0.014f, z, 0, (top + bottom) * 0.5f, part);
+    // Grip ridges on both stepped corners.
+    const int ridges = std::clamp(o.grip, 0, 8);
+    const float rw = shoulder + 0.03f;
+    for (int i = 0; i < ridges; ++i) {
+        const float y = 0.5f - drop - 0.03f - static_cast<float>(i) * 0.03f;
+        for (const float side : {-1.0f, 1.0f}) {
+            gfx::AddGroove(shell, RoundedOutline(rw, 0.012f, 0.004f, 0.004f), 0.006f, z,
+                           side * (a * 0.5f - rw * 0.5f - 0.012f), y, part);
         }
     }
     AddSticker(b.solid, o, face);
     if (o.smoke) {
-        AddBoard(b.solid, o, wide);
+        AddBoard(b.solid, o, false);
     }
-    AddBack(b.solid, o, !wide);
+    AddBack(b.solid, o, true);
 }
 
 void BuildCard(std::vector<gfx::MeshVertex>& out, const GameObject& o) {
@@ -261,7 +247,6 @@ void BuildPhoto(Built& b, const GameObject& o) {
     const std::vector<gfx::Vec2> outline =
         mould                      ? *mould
         : o.style == "pocket"      ? gfx::ShoulderedOutline(a, 1, a * 0.105f, 0.035f, 0.01f, 0.022f, 0.02f)
-        : o.style == "pocket_wide" ? gfx::ShoulderedOutline(a, 1, 0.07f, 0.21f, 0.03f, 0.06f, 0.04f)
                                    : RoundedOutline(a, 1, o.radius, std::max(0.02f, o.radius), o.notch);
     gfx::AddSlab(b.solid, outline, d, std::min(0.012f, d * 0.2f), parts);
 }
