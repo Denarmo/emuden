@@ -110,6 +110,8 @@ DEN_REGISTER_RAIL(20, "Library", "library");              // an entry in the lef
 DEN_REGISTER_SETTINGS(30, "Player", [] { return std::vector<den::ui::RowSpec>{...}; });
 DEN_REGISTER_STARTUP([] { ... });                         // once, services ready
 DEN_REGISTER_FRAME([] { ... });                           // every frame, main thread
+DEN_REGISTER_OVERLAY([](den::ui::Context& ctx) { ... });  // drawn over the screens
+DEN_REGISTER_EVENT_FILTER([](const den::input::Event& e) { return false; }); // true eats it
 ```
 
 Routes the home screen already opens when they exist: `details` (param `id`, a library

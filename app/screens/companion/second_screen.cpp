@@ -26,6 +26,7 @@
 #include "den/base/files.h"
 #include "den/base/log.h"
 #include "../apps/beside.h"
+#include "../boot/boot.h"
 #include "../player/player_screen.h"
 #include "den/platform/lifecycle.h"
 #include "den/platform/second_display.h"
@@ -315,6 +316,7 @@ void Frame() {
     } else if (c.client.draw) {
         c.client.draw(ctx, gfx::Rect{0, 0, svc.canvas->Width(), svc.canvas->Height()});
     }
+    DrawBootSecond(ctx);
     svc.canvas->End();
     TakeShot(c, width, height);
     display.EndFrame();

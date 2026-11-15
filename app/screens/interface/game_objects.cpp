@@ -365,11 +365,6 @@ GameObject Resolve(const ObjectLook& look) {
     const bool cart = o.shape == "cartridge" || o.shape == "card";
     o.box = look.box && cart;
     o.box_aspect = look.box_aspect;
-    o.player = cart ? look.player : std::string();
-    o.player_color = look.player_color;
-    o.player_colors = look.player_colors;
-    o.player_photo = o.player.empty() ? std::string() : look.player_photo;
-    o.player_screen = look.player_screen;
     return o;
 }
 

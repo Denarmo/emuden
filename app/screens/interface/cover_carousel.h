@@ -30,8 +30,11 @@ public:
         return index_;
     }
     void Select(std::size_t index, bool glide = true);
-    /// Plays the launch animation, then runs `then`.
+    /// Plays the launch animation, then runs `then`. With the boot screen's animation on,
+    /// `then` runs at once: the boot screen lifts the game off from LaunchRect.
     void Launch(std::function<void()> then);
+    /// Where the selected game is drawn, in canvas units.
+    virtual gfx::Rect LaunchRect() const;
     bool Launching() const {
         return launch_ >= 0;
     }

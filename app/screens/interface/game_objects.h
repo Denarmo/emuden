@@ -31,11 +31,6 @@ struct GameObject {
     bool disc = false;
     bool box = false;      // a cardboard box stands behind the cartridge or card
     float box_aspect = 0.9f;
-    std::string player;    // the console it goes into when started (ObjectLook::player)
-    gfx::Color player_color;
-    std::vector<gfx::Color> player_colors;
-    std::string player_photo;
-    gfx::Rect player_screen{0, 0, 0, 0};
 
     /// The opaque parts, one unit high, centred on the origin, front towards +z.
     const gfx::Mesh3D& Mesh() const;

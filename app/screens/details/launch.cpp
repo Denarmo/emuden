@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "../boot/boot.h"
 #include "../home/games.h"
 #include "../home/strings.h"
 #include "den/app/app.h"
@@ -33,10 +34,12 @@ void StartInEngine(const library::Entry& game) {
     request.title = game.name;
     request.content = PathFromUtf8(game.path);
     request.fullscreen = EngineFullscreenFor(game, svc.window->Fullscreen());
-    log::Info("launch", "engine: {} ({})", game.name, game.system);
-    if (const Status started = svc.engine->Start(request); !started) {
-        svc.stage->Toast(started.error.empty() ? Tr("launch.failed") : started.error, 6.0f);
-    }
+    BootGame(game, BootRunner::Engine, [request, name = game.name, system = game.system] {
+        log::Info("launch", "engine: {} ({})", name, system);
+        if (const Status started = Svc().engine->Start(request); !started) {
+            Svc().stage->Toast(started.error.empty() ? Tr("launch.failed") : started.error, 6.0f);
+        }
+    });
 }
 
 // ROMs: the player screen opens the session for the entry.
@@ -52,7 +55,7 @@ void StartInPlayer(const library::Entry& game, bool restart, const ui::Params& e
     if (restart) {
         params["resume"] = "0";
     }
-    svc.stage->Push("player", std::move(params));
+    BootGame(game, BootRunner::Player, [params] { Svc().stage->Push("player", params); });
 }
 
 void StartRom(const library::Entry& game, bool restart, const ui::Params& extra) {

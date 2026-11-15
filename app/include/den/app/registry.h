@@ -45,6 +45,10 @@ public:
     /// that must not be lost). The app closes when none does, after a few seconds at most, or
     /// at once when the user asks to close again.
     void AddQuitHold(std::function<bool()> hook);
+    /// Drawn over the screens every frame, after them (the canvas is begun).
+    void AddOverlay(std::function<void(ui::Context&)> draw);
+    /// Sees every input event first: true keeps it from the screens.
+    void AddEventFilter(std::function<bool(const input::Event&)> filter);
 
     const std::vector<std::pair<std::string, ui::Stage::Factory>>& Screens() const {
         return screens_;
@@ -61,6 +65,12 @@ public:
     const std::vector<std::function<bool()>>& QuitHolds() const {
         return quit_holds_;
     }
+    const std::vector<std::function<void(ui::Context&)>>& Overlays() const {
+        return overlays_;
+    }
+    const std::vector<std::function<bool(const input::Event&)>>& EventFilters() const {
+        return event_filters_;
+    }
 
 private:
     std::vector<std::pair<std::string, ui::Stage::Factory>> screens_;
@@ -68,6 +78,8 @@ private:
     std::vector<SettingsSection> settings_;
     std::vector<std::function<void()>> startup_, frame_;
     std::vector<std::function<bool()>> quit_holds_;
+    std::vector<std::function<void(ui::Context&)>> overlays_;
+    std::vector<std::function<bool(const input::Event&)>> event_filters_;
 };
 
 struct Registrar {
@@ -100,3 +112,7 @@ struct Registrar {
     DEN_REGISTRAR([](::den::app::Registry& r) { r.AddFrame(__VA_ARGS__); })
 #define DEN_REGISTER_QUIT_HOLD(...)                                                               \
     DEN_REGISTRAR([](::den::app::Registry& r) { r.AddQuitHold(__VA_ARGS__); })
+#define DEN_REGISTER_OVERLAY(...)                                                                 \
+    DEN_REGISTRAR([](::den::app::Registry& r) { r.AddOverlay(__VA_ARGS__); })
+#define DEN_REGISTER_EVENT_FILTER(...)                                                            \
+    DEN_REGISTRAR([](::den::app::Registry& r) { r.AddEventFilter(__VA_ARGS__); })

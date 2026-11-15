@@ -39,19 +39,6 @@ struct ObjectLook {
     // cover's own proportions once that is loaded).
     bool box = false;
     float box_aspect = 0.9f;
-    // The console a cartridge or card goes into when its game starts: "portrait" or
-    // "landscape" (a handheld), "clamshell" (one that folds open) or "home" (one under a
-    // television); empty for none. "player_model" in the package names a handheld modelled
-    // on the real one instead (ConsoleModel's HandheldFor). `player_color` is its plastic.
-    std::string player;
-    gfx::Color player_color{200, 200, 205, 255};
-    // Its other colours: each start picks one of these or player_color at random.
-    std::vector<gfx::Color> player_colors;
-    // A photograph of the console's front to model it from: "launchbox" for the database's,
-    // or an https address; empty for the generic console. `player_screen` is where its
-    // screen is, 0..1 of the console in the photograph.
-    std::string player_photo;
-    gfx::Rect player_screen{0, 0, 0, 0};
 };
 
 /// How one console looks: its colour, a wallpaper of the package and the label on its tab.

@@ -40,6 +40,14 @@ void Registry::AddQuitHold(std::function<bool()> hook) {
     quit_holds_.push_back(std::move(hook));
 }
 
+void Registry::AddOverlay(std::function<void(ui::Context&)> draw) {
+    overlays_.push_back(std::move(draw));
+}
+
+void Registry::AddEventFilter(std::function<bool(const input::Event&)> filter) {
+    event_filters_.push_back(std::move(filter));
+}
+
 std::vector<RailEntry> Registry::Rail() const {
     std::vector<RailEntry> out = rail_;
     std::stable_sort(out.begin(), out.end(),

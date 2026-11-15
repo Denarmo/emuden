@@ -51,6 +51,10 @@ public:
     // For the quick settings of the second display (companion.play).
     /// The screen whose game is running; null when there is none.
     static PlayerScreen* Current();
+    /// Asking something before the game starts (which saves to use).
+    bool InStartCheck() const {
+        return InSaveCheck();
+    }
     /// Opens one page of the pause menu by itself ("options", "buttons"); Back closes it.
     void OpenPage(const std::string& page);
     /// The game goes to the other display and the quick settings come to this one. A game

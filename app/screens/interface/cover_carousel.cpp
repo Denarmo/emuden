@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "../boot/boot.h"
 #include "den/gfx/canvas.h"
 
 namespace den::app {
@@ -63,6 +64,11 @@ void CoverCarousel::Select(std::size_t index, bool glide) {
 }
 
 void CoverCarousel::Launch(std::function<void()> then) {
+    if (LaunchAnimationOn() && !games_.empty()) {
+        NoteLaunchFrom(LaunchRect());
+        then();
+        return;
+    }
     if (spec_->launch == "none") {
         then();
         return;
@@ -70,6 +76,10 @@ void CoverCarousel::Launch(std::function<void()> then) {
     after_launch_ = std::move(then);
     launch_ = 0;
     launch_seconds_ = LaunchSeconds();
+}
+
+gfx::Rect CoverCarousel::LaunchRect() const {
+    return SlotAt(static_cast<float>(index_) - pos_).rect;
 }
 
 float CoverCarousel::CoverHeight() const {
@@ -236,6 +246,9 @@ void CoverCarousel::DrawContent(ui::Context& ctx) {
     const float bob = spec_->bob * (0.5f + 0.5f * static_cast<float>(std::sin(time_ * 2.2)));
     ctx.canvas->PushClip(gfx::Rect{0, rect.y, ctx.canvas->Width(), rect.h});
     for (const auto& [distance, i] : order) {
+        if (BootCarries(games_[i].id)) {
+            continue; // the boot screen draws it
+        }
         Slot slot = SlotAt(static_cast<float>(i) - pos_);
         if (i == index_ && zoom > 0) {
             const float grow_by = 1.0f + 0.22f * zoom;

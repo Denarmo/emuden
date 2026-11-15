@@ -250,7 +250,8 @@ int Run(int argc, char** argv) {
                 } else if (event.type == input::Event::Type::Key && event.down && !event.repeat &&
                            event.key == KEY_F11 && pal::GetCaps().windowed) {
                     SetFullscreen(!svc.window->Fullscreen());
-                } else {
+                } else if (std::none_of(registry.EventFilters().begin(), registry.EventFilters().end(),
+                                        [&](const auto& filter) { return filter(event); })) {
                     stage.HandleEvent(event);
                 }
             }
@@ -292,6 +293,9 @@ int Run(int argc, char** argv) {
             ctx.dt = dt;
             ctx.time = now;
             stage.Frame(ctx);
+            for (const auto& overlay : registry.Overlays()) {
+                overlay(ctx);
+            }
             canvas.End();
             canvas.Begin(width, height, bar_scale);
             title_bar.Draw(ctx, *svc.window, width, bar);

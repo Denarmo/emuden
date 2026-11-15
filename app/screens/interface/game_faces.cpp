@@ -68,16 +68,11 @@ std::string Cleaned(const std::string& path, FaceKind kind, gfx::ImageData* imag
     return PathToUtf8(out);
 }
 
-LoadedFaces Load(const std::string& id, const ConsoleAsk& console, Job& job) {
+LoadedFaces Load(const std::string& id, Job& job) {
     LoadedFaces out;
     library::Library& library = *Svc().library;
     const auto stopping = [&job] { return job.CancelRequested(); };
     out.faces = library.Faces(id, stopping);
-    if (!console.photo.empty()) {
-        const std::string device =
-            library.Device(id, console.photo == "launchbox" ? std::string() : console.photo, stopping);
-        out.console = PrepareConsolePhoto(device, console.colors);
-    }
     library::GameFaces& f = out.faces;
     f.back = Cleaned(f.back, FaceKind::Back);
     f.spine = Cleaned(f.spine, FaceKind::Spine);
@@ -122,13 +117,12 @@ FaceLoader::~FaceLoader() {
     }
 }
 
-const LoadedFaces* FaceLoader::Get(const std::string& id, const ConsoleAsk& console) {
+const LoadedFaces* FaceLoader::Get(const std::string& id) {
     const auto found = slots_.find(id);
     if (found != slots_.end()) {
         return found->second->done ? &found->second->result : nullptr;
     }
     slots_[id] = std::make_shared<Slot>();
-    slots_[id]->console = console;
     queue_.push_back(id);
     while (queue_.size() > MAX_QUEUED) {
         slots_.erase(queue_.front());
@@ -153,7 +147,7 @@ void FaceLoader::Pump() {
     job_ = Svc().jobs->Run(
         "Box faces",
         [slot, id](Job& job) {
-            slot->result = Load(id, slot->console, job);
+            slot->result = Load(id, job);
             return Status{};
         },
         [this, slot, alive = alive_](Job&) {

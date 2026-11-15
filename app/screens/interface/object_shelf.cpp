@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "../boot/boot.h"
 #include "den/app/app.h"
 #include "den/base/log.h"
 #include "den/gfx/canvas.h"
@@ -112,7 +113,7 @@ ObjectShelf::Placed ObjectShelf::Place(std::size_t index, float time) const {
     p.yaw = -side * spec_->side_angle * near_a + weight * spec_->sway * std::sin(time * 0.9f);
     p.light = 1.0f - spec_->side_dim * (1.0f - weight);
     p.y -= spec_->bob * (0.5f + 0.5f * std::sin(time * 2.2f)) * weight;
-    if (index == index_ && LaunchAmount() > 0 && !console_launch_) {
+    if (index == index_ && LaunchAmount() > 0) {
         const float t = LaunchAmount();
         p.yaw *= 1 - t;
         if (object.shape == "cartridge" || object.shape == "card") {
@@ -127,9 +128,6 @@ gfx::Rect ObjectShelf::FocusRect() const {
     if (games_.empty()) {
         return rect;
     }
-    if (console_launch_ && Launching()) {
-        return gfx::Rect{view_w_ * 0.5f, view_h_ + 100, 1, 1}; // out of sight: the console has the screen
-    }
     const Placed p = Place(index_, static_cast<float>(time_));
     const float distance = view_h_ * 0.5f / std::tan(HALF_FIELD);
     const float k = distance / std::max(1.0f, distance - p.z);
@@ -140,15 +138,27 @@ gfx::Rect ObjectShelf::FocusRect() const {
     return gfx::Rect{cx - w * 0.4f, bottom + 14, w * 0.8f, 4};
 }
 
+gfx::Rect ObjectShelf::LaunchRect() const {
+    if (games_.empty()) {
+        return rect;
+    }
+    // The selected cartridge (or case) as the camera sees it.
+    const Placed p = Place(index_, static_cast<float>(time_));
+    const ShelfPiece piece = CartPiece(p);
+    const float distance = view_h_ * 0.5f / std::tan(HALF_FIELD);
+    const float k = distance / std::max(1.0f, distance - (p.z + piece.dz));
+    const float cx = view_w_ * 0.5f + (p.x + piece.dx - view_w_ * 0.5f) * k;
+    const float bottom = view_h_ * 0.5f + (p.y - view_h_ * 0.5f) * k;
+    const float h = piece.height * k, w = h * p.object->aspect;
+    return gfx::Rect{cx - w * 0.5f, bottom - h, w, h};
+}
+
 void ObjectShelf::OnTick(ui::Context& ctx) {
     CoverCarousel::OnTick(ctx);
     const bool still = std::fabs(pos_ - static_cast<float>(index_)) < 0.05f && !Launching();
     const bool disc = !games_.empty() && ObjectFor(games_[index_].system).disc;
     const float target = still && disc ? 1.0f : 0.0f;
     slide_ = ui::Approach(slide_, target, ctx.dt, target > slide_ ? 4.0f : 12.0f);
-    if (!Launching()) {
-        console_launch_ = false;
-    }
 }
 
 gfx::Material ObjectShelf::MaterialFor(ui::Context& ctx, const Placed& p, bool box) const {
@@ -175,8 +185,7 @@ void ObjectShelf::DrawContent(ui::Context& ctx) {
     for (int d = 0; d <= 3; ++d) {
         for (const int i : {static_cast<int>(index_) - d, static_cast<int>(index_) + d}) {
             if (i >= 0 && i < static_cast<int>(games_.size()) && (d > 0 || i == static_cast<int>(index_))) {
-                const GameObject& object = ObjectAt(static_cast<std::size_t>(i));
-                faces_.Get(games_[static_cast<std::size_t>(i)].id, {object.player_photo, object.player_colors});
+                faces_.Get(games_[static_cast<std::size_t>(i)].id);
             }
         }
     }
@@ -190,10 +199,8 @@ void ObjectShelf::DrawContent(ui::Context& ctx) {
     }
     // Far first: there is no depth buffer, the nearer object is drawn over the farther.
     std::sort(placed.begin(), placed.end(), [](const Placed& a, const Placed& b) { return a.z < b.z; });
-    if (console_launch_ && Launching()) {
-        DrawLaunch(ctx, *renderer, placed);
-        return;
-    }
+    // The game being started is the boot screen's to draw.
+    std::erase_if(placed, [&](const Placed& p) { return BootCarries(games_[p.index].id); });
 
     const auto model = [&](const Placed& p, const ShelfPiece& piece) {
         return gfx::Renderer3D::Model(p.x, p.y, p.z, p.yaw) * gfx::Mat4::Translate(piece.dx, piece.height * 0.5f, piece.dz) *

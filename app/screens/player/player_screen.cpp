@@ -7,6 +7,7 @@
 #include <cmath>
 #include <format>
 
+#include "../boot/boot.h"
 #include "../companion/second_screen.h"
 #include "../details/game_prefs.h"
 #include "den/app/registry.h"
@@ -152,6 +153,9 @@ void PlayerScreen::Begin(const std::filesystem::path& content, bool resume) {
         return Fail(opened.error.empty() ? game_.name + " could not be started." : opened.error);
     }
     phase_ = Phase::Running;
+    if (BootCovers()) {
+        svc.player->SetVolume(0); // the boot screen brings the sound up with the picture
+    }
     ReadWidescreen();
     started_ = pal::NowSeconds();
     started_unix_ = std::chrono::duration_cast<std::chrono::seconds>(
@@ -320,7 +324,11 @@ void PlayerScreen::FeedPads() {
         return;
     }
 
-    // Buttons held when the game got the pad back are not for the game.
+    // Buttons held when the game got the pad back are not for the game, nor any pressed
+    // while the boot screen still covers it.
+    if (BootCovers()) {
+        wait_release_ = true;
+    }
     if (wait_release_) {
         if (all != 0) {
             for (input::PadState& pad : pads) {

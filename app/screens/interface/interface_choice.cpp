@@ -13,6 +13,7 @@
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
+#include "../boot/boot.h"
 #include "interfaces.h"
 
 namespace den::app {
@@ -99,8 +100,14 @@ std::vector<ui::RowSpec> InterfaceRows() {
         std::string(LAUNCH_ANIMATION_KEY), "Launch animation",
         [] { return Svc().settings->GetBool(LAUNCH_ANIMATION_KEY, true); },
         [](bool on) { Svc().settings->SetBool(LAUNCH_ANIMATION_KEY, on); });
-    animation.description = "In interfaces that have one: the cartridge goes into its console, which switches on";
-    std::vector<ui::RowSpec> rows = {std::move(choice), std::move(animation)};
+    animation.description = "The game's cartridge or disc drops into its slot, then the EmuDEN logo shows while "
+                            "the game starts";
+    ui::RowSpec sound = ToggleRow(
+        std::string(LAUNCH_SOUND_KEY), "Launch sound",
+        [] { return Svc().settings->GetBool(LAUNCH_SOUND_KEY, true); },
+        [](bool on) { Svc().settings->SetBool(LAUNCH_SOUND_KEY, on); });
+    sound.description = "A short chime with the EmuDEN logo";
+    std::vector<ui::RowSpec> rows = {std::move(choice), std::move(animation), std::move(sound)};
     for (const plugins::FeaturePlugin& plugin : found) {
         ui::RowSpec row = ValueRow(
             "interface.about." + plugin.id, plugin.name,

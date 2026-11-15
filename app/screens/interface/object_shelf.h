@@ -24,13 +24,11 @@ public:
     explicit ObjectShelf(std::shared_ptr<const InterfaceSpec> spec);
 
     gfx::Rect FocusRect() const override;
-    float LaunchCover() const override;
-    float LaunchStage() const override;
+    gfx::Rect LaunchRect() const override;
 
 protected:
     void DrawContent(ui::Context& ctx) override;
     void OnTick(ui::Context& ctx) override;
-    float LaunchSeconds() const override;
 
 private:
     // One game in its place: the anchor is the middle of its bottom on the floor.
@@ -52,13 +50,10 @@ private:
     float Floor() const;
     float ObjectHeight() const;
     gfx::Material MaterialFor(ui::Context& ctx, const Placed& p, bool box) const;
-    void DrawLaunch(ui::Context& ctx, gfx::Renderer3D& renderer, const std::vector<Placed>& placed);
 
     mutable std::map<std::string, GameObject> objects_; // by system
     mutable std::map<std::string, GameObject> own_;     // by game: shaped by its own pictures
     mutable std::map<std::string, GameObject> boxes_;   // by system, then by game
-    mutable bool console_launch_ = false;               // the launch plays into a console
-    mutable std::size_t launch_pick_ = 0;               // picks the console's colour
     mutable FaceLoader faces_;
     float slide_ = 0; // the selected case's disc: 0 inside, 1 out
     float view_h_ = 720, view_w_ = 1280;
