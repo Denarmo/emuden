@@ -15,6 +15,7 @@
 #include <SDL3/SDL.h>
 
 #include "den/base/files.h"
+#include "../own_env.h"
 #include "den/base/log.h"
 #include "webview_linux.h"
 
@@ -52,7 +53,7 @@ Status StartGtk(const Api& api) {
     api.gdk_set_allowed_backends("x11");
     api.gtk_disable_setlocale();
     // The app works in pixels; the page's size comes from the zoom level instead.
-    api.g_setenv("GDK_SCALE", "1", 1);
+    SetOwnEnv("GDK_SCALE", "1");
     if (!api.gtk_init_check(nullptr, nullptr)) {
         return Status::Fail("The web engine could not start (GTK found no X11 display).");
     }

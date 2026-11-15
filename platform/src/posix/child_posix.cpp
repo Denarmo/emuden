@@ -18,6 +18,7 @@
 #include "den/base/files.h"
 #include "den/platform/child.h"
 #include "den/platform/pal.h"
+#include "../own_env.h"
 
 namespace den::pal {
 
@@ -175,6 +176,13 @@ Result<std::unique_ptr<Child>> StartChild(const ChildDesc& desc) {
             dup2(from_child[1], 1);
             if (log >= 0) {
                 dup2(log, 2);
+            }
+        }
+        for (const OwnEnvChange& change : OwnEnvChanges()) {
+            if (change.had) {
+                setenv(change.name.c_str(), change.before.c_str(), 1);
+            } else {
+                unsetenv(change.name.c_str());
             }
         }
         for (const auto& [name, value] : desc.env) {

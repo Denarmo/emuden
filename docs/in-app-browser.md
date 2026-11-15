@@ -185,14 +185,35 @@ Backends:
     small view above the page that touches pass through. While a page shows, pad keys and
     sticks go to the app even when the page has the focus. Back (key, gesture or pad) is the
     app's Back: back in the page's history first, then the page closes.
-- **Linux**: WebKitGTK when the system has it (`platform/src/linux/`).
-  - *Found at run time.* `libwebkit2gtk-4.1.so.0` (else `libwebkit2gtk-4.0.so.37`) is opened
-    with `dlopen`, and every function is looked up by name; the declarations the backend
-    needs are written out in `gtk_api.h`, so a build needs no GTK or WebKit headers and the
-    binary has no link dependency on either (`tools/linux/package.sh` refuses to package one
-    that does). SteamOS ships no WebKitGTK: there `Available()` is false and the page is the
-    fallback below. WebKitGTK 6.0 is GTK 4, which cannot sit inside another program's
-    window, so it is not used.
+- **Linux**: WebKitGTK 4.1, the AppImage's own copy first, else the system's
+  (`platform/src/linux/`).
+  - *Found at run time.* `gtk::Load` (`gtk_api.cpp`) opens with `dlopen` the bundled
+    `<exe>/../lib/webkit/libwebkit2gtk-4.1.so.0` (`gtk::BundledWebKit`), else the system's
+    `libwebkit2gtk-4.1.so.0`, else `libwebkit2gtk-4.0.so.37`, and looks every function up by
+    name; the declarations the backend needs are written out in `gtk_api.h`, so a build
+    needs no GTK or WebKit headers and the binary has no link dependency on either
+    (`tools/linux/package.sh` refuses to package one that does). WebKitGTK 6.0 is GTK 4,
+    which cannot sit inside another program's window, so it is not used.
+  - *The bundled copy* (`usr/lib/webkit` in the AppImage) is how SteamOS, which ships none,
+    gets the browser. `tools/linux/bundle-webkit.sh`, run by `package.sh`, copies Debian's
+    WebKitGTK 4.1 with GTK 3, GLib, libsoup, ICU, GStreamer's core and the rest of what it
+    needs, its two helper programs (`WebKitWebProcess`, `WebKitNetworkProcess`), its
+    injected bundle and GLib's TLS module (glib-networking), and gives each file the RPATH
+    `$ORIGIN`, so they find each other and nothing else in the process changes. Left to the
+    system: glibc, the C++ runtime, the graphics stack (GL, EGL, GBM, DRM), X11, XCB,
+    Wayland, xkbcommon, ALSA, udev, systemd, D-Bus, fontconfig, FreeType, expat and zlib.
+    WebKit starts its helpers from a folder built into the library; right after loading,
+    `gtk::PrepareBundledWebKit` (`webkit_bundle.cpp`) overwrites that one string in the
+    process's memory with the bundle's folder, padded with slashes to the same length (a link
+    named after the process in `$XDG_RUNTIME_DIR` stands in when the folder is too long), so
+    every instance starts its own helpers and nothing on disk changes. It sets
+    `WEBKIT_INJECTED_BUNDLE_PATH`, `GIO_MODULE_DIR` (the TLS module: without it no https),
+    `GST_PLUGIN_SYSTEM_PATH_1_0` and `GST_REGISTRY_1_0` (GStreamer away from the system's
+    plugins and registry) for the engine's processes; programs the app starts get those
+    variables, and `GDK_SCALE`, as they were before (`platform/src/own_env.h`). No
+    GStreamer plugins are bundled, so audio and video in pages do not play. The bundle
+    takes the AppImage from 8.7 MB to 104 MB; `EMUDEN_WEBKIT=0` leaves it out, `=1` (releases)
+    makes `package.sh` fail without it.
   - *X11 only.* The engine's widget lives in a frameless GTK window that is made a child of
     the app's X11 window, so under gamescope it is part of the app's one window. On a
     Wayland session `Available()` is false (start the app with `SDL_VIDEODRIVER=x11` to get

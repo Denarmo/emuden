@@ -15,6 +15,7 @@
 #include "den/base/log.h"
 #include "../frame_native.h"
 #include "../lifecycle_native.h"
+#include "../own_env.h"
 #include "den/platform/pal.h"
 
 namespace den::pal {
@@ -390,6 +391,13 @@ Result<std::unique_ptr<Process>> StartProcess(const ProcessDesc& desc) {
     argv.push_back(nullptr);
 
     SDL_Environment* env = SDL_CreateEnvironment(true);
+    for (const OwnEnvChange& change : OwnEnvChanges()) {
+        if (change.had) {
+            SDL_SetEnvironmentVariable(env, change.name.c_str(), change.before.c_str(), true);
+        } else {
+            SDL_UnsetEnvironmentVariable(env, change.name.c_str());
+        }
+    }
     for (const auto& [name, value] : desc.env) {
         SDL_SetEnvironmentVariable(env, name.c_str(), value.c_str(), true);
     }

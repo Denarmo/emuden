@@ -3,7 +3,9 @@
 
 #include <dlfcn.h>
 
+#include "den/base/log.h"
 #include "gtk_api.h"
+#include "webkit_bundle.h"
 
 namespace den::pal::gtk {
 
@@ -22,7 +24,25 @@ struct Loaded {
 
 void LoadInto(Loaded& loaded) {
     void* handle = nullptr;
+    // The AppImage's own copy first: it is the one the app was tested with. Its libraries
+    // find each other through their RPATH, so nothing else in the process changes.
+    if (const std::string bundled = BundledWebKit(); !bundled.empty()) {
+        handle = dlopen(bundled.c_str(), RTLD_LAZY | RTLD_LOCAL);
+        std::string reason;
+        if (!handle) {
+            log::Warn("web", "the bundled web engine did not load: {}", dlerror());
+        } else if (!PrepareBundledWebKit(bundled, reason)) {
+            log::Warn("web", "{}", reason);
+            dlclose(handle);
+            handle = nullptr;
+        } else {
+            loaded.api.library = bundled;
+        }
+    }
     for (const char* name : LIBRARIES) {
+        if (handle) {
+            break;
+        }
         // Local: the engine's symbols stay out of the app's own lookups.
         handle = dlopen(name, RTLD_LAZY | RTLD_LOCAL);
         if (handle) {

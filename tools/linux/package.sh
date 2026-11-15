@@ -2,7 +2,8 @@
 # Wraps a finished linux build into an AppImage.
 #   tools/linux/package.sh [build-dir] [out-dir]
 # Needs mksquashfs (squashfs-tools) and curl. The AppImage runtime is the pinned release of
-# github.com/AppImage/type2-runtime, checked by SHA-256 and kept beside the output.
+# github.com/AppImage/type2-runtime, checked by SHA-256 and kept beside the output. The web
+# engine is bundled from libwebkit2gtk-4.1-0, glib-networking and patchelf (bundle-webkit.sh).
 set -eu
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 build="${1:-$root/build/linux}"
@@ -55,6 +56,16 @@ fi
 if command -v desktop-file-validate >/dev/null; then
     desktop-file-validate "$app/emuden.desktop"
 fi
+
+# The in-app browser's engine for systems without one (SteamOS). EMUDEN_WEBKIT=1 (releases)
+# fails when it cannot be bundled, =0 leaves it out; unset, it is bundled when installed.
+case "${EMUDEN_WEBKIT:-}" in
+    0) echo "web engine left out (EMUDEN_WEBKIT=0)" ;;
+    1) sh "$root/tools/linux/bundle-webkit.sh" "$app" ;;
+    *) sh "$root/tools/linux/bundle-webkit.sh" "$app" || {
+           rm -rf "$app/usr/lib/webkit"
+           echo "web engine not bundled: the in-app browser needs the system's WebKitGTK" >&2; } ;;
+esac
 
 deps="$(sed -n 's/^DEN_DEPS_DIR:PATH=//p' "$build/CMakeCache.txt")"
 lic="$app/usr/share/licenses/emuden"

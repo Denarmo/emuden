@@ -8,7 +8,8 @@ nobody pressed the device's buttons.
 
 ## Installing
 
-`tools/linux/build.sh` and `tools/linux/package.sh` in WSL Debian, then on the device
+`tools/linux/build.sh` and `EMUDEN_WEBKIT=1 tools/linux/package.sh` in WSL Debian (with
+`libwebkit2gtk-4.1-0 glib-networking patchelf` installed, for the in-app browser), then on the device
 `tools/linux/install-steamos.sh --steam <AppImage>`: `~/Games/EmuDEN/EmuDEN-x86_64.AppImage`, a menu
 and desktop entry, one Steam shortcut "EmuDEN" with its cover, banner, logo and icon (Steam shows
 the artwork after it restarts). No root is needed for any of it.
@@ -38,11 +39,11 @@ its launch options for the test, and clear them afterwards.
 | Shaders | Works | Dot matrix by Auto on Game Boy, CRT chosen in the pause menu |
 | Sound | Works | Speaker sink; 3 s recorded: level 0.72 peak, no gaps; no underruns while playing |
 | Home interfaces | Works | Shelf (3D boxes and cartridges, LaunchBox faces) and Showcase installed from the index and used as Home |
-| ROM hack plugins | Works | romhacking.net installed; its page is the fallback page (SteamOS has no WebKitGTK). "Open in browser" opens the site in Steam's own browser over the app. A BPS put in `~/Downloads` was offered, matched to Tetris by CRC and installed as a hack in the library |
+| ROM hack plugins | Works | romhacking.net installed. Before the AppImage carried WebKitGTK its page was the fallback page: "Open in browser" opened the site in Steam's own browser over the app, and a BPS put in `~/Downloads` was offered, matched to Tetris by CRC and installed as a hack in the library. Not repeated with the in-app browser |
 | Feature plugin install | Fixed | A new install read a pointer into a destroyed catalogue (undefined on every platform); on Linux the unit tests' installs answered "The plugin list does not offer this plugin" |
 | Sync (Settings > Sync) | Works, fixed one | Syncthing plugin: "Use Sync/EmuDEN" pointed at `~/Downloads/Sync/EmuDEN` (the Downloads folder had a trailing separator); now `~/Sync/EmuDEN`. "Sync now" wrote saves, states and settings there as plain files. File times came back a second early on Linux (rounding) |
 | Settings | Works, fixed one | Device page: Legion Go S, tier Medium, 1920x1200 8.0 in 120 Hz, Ryzen Z2 Go. Display had a "Full screen" switch that read Off under gamescope; Game Mode is always full screen now and the switch is gone there |
-| In-app browser | Fallback by design | No WebKitGTK on SteamOS: the fallback page and the Downloads folder, as above |
+| In-app browser | Works | SteamOS has GTK 3 but no WebKitGTK; the AppImage carries Debian's WebKitGTK 4.1 (`usr/lib/webkit`, `docs/in-app-browser.md`). From the Steam shortcut in Game Mode the page is drawn inside the app's window: `https://example.org` loaded (title "Example Domain"), a `.bps` from a page on 127.0.0.1 and a GitHub `.zip` over https (redirect to codeload.github.com) went into the inbox and to the opener. The same in Desktop mode (Plasma X11). No variables needed; audio and video in pages do not play (no GStreamer plugins) |
 | Linux build | Fixed | `http_curl.cpp` had raw line breaks inside character literals and did not compile |
 | Second screen | Not applicable | One screen |
 | Steam integration | Works as designed | EmuDEN is a Steam shortcut with its artwork, takes Steam Input's pad, and Steam's browser opens its links. No Steam shelf inside EmuDEN (Android has one through DroidDeck): in Game Mode Steam itself is the launcher, and starting a Steam game from inside a running Steam app was not tried (no Steam game was started) |

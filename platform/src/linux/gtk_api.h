@@ -142,7 +142,6 @@ constexpr int NAVIGATION_LINK_CLICKED = 0;
     X(void, g_object_unref, (gpointer))                                                                          \
     X(void, g_free, (gpointer))                                                                                  \
     X(void, g_hash_table_destroy, (GHashTable*))                                                                 \
-    X(gboolean, g_setenv, (const char*, const char*, gboolean))                                                  \
     X(std::int64_t, g_get_monotonic_time, ())                                                                    \
     X(void, gtk_disable_setlocale, ())                                                                           \
     X(gboolean, gtk_init_check, (int*, char***))                                                                 \
