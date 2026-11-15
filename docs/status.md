@@ -68,6 +68,12 @@ the link cable with each instance playing its own Game Boy, 6000 frames, no desy
 Cristal with both saves loaded, walking on both Game Boys; gpSP Emerald hacks hosting and joining at
 60 fps.
 
+Over Wi-Fi: Retroid (host) and PC (guest) found each other and played Tetris Mario vs. Luigi, 3000
+frames, no desync; when the PC was closed the Retroid said "PC two left" and played on. Legion Go S
+(host) and PC (guest): Tetris in step at 60 fps; gpSP Emerald joined (netpacket up on both). Not
+checked: a Cable Club or Union Room reached with the link up, a trade, melonDS DS, Retroid with
+Legion directly, the generic lockstep path with another console's core on a device.
+
 ## Engine apps through the Emulator Control Protocol (branch feat/ecp)
 
 A console's core can be an engine app (`"type": "engine-app"` in a plugin manifest) that
