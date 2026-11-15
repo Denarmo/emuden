@@ -155,8 +155,7 @@ void PlayerScreen::Begin(const std::filesystem::path& content, bool resume) {
     aspect_sent_ = 0;
     svc.player->SetAspectOverride(0);
     LoadPicture();
-    capture_ = -1;
-    swallow_nav_ = false;
+    LoadShortcutMap();
     resume_told_ = false;
     svc.input->SetNavFromPads(false);
     wait_release_ = true;
@@ -214,7 +213,7 @@ void PlayerScreen::OpenMenu(View view) {
 }
 
 void PlayerScreen::OpenPage(const std::string& page) {
-    if (phase_ != Phase::Running || capture_ >= 0) {
+    if (phase_ != Phase::Running) {
         return;
     }
     const View view = page == "buttons" ? View::Buttons : View::Options;
@@ -339,6 +338,7 @@ void PlayerScreen::FeedPads() {
     }
     chord_fast_ = hold_fast;
     chord_rewind_ = hold_rewind;
+    FeedShortcuts(pads, MAX_PORTS);
     for (int port = 0; port < MAX_PORTS; ++port) {
         svc.player->SetPad(port, pads[port]);
     }
@@ -417,7 +417,6 @@ void PlayerScreen::Update(ui::Context& ctx) {
     if (snapshot.state == player::State::Failed) {
         return Fail(snapshot.error.empty() ? game_.name + " stopped." : snapshot.error);
     }
-    TickCapture();
     // The state is taken on the first frame the core runs, not in Open.
     if (!resume_told_ && snapshot.resumed) {
         resume_told_ = true;
@@ -474,15 +473,6 @@ bool PlayerScreen::OnEvent(const input::Event& event) {
             key_rewind_ = event.down;
         }
         return true;
-    }
-    if (capture_ >= 0 || swallow_nav_) {
-        // The next button pressed is the answer, not navigation; Esc gives up.
-        if (capture_ >= 0 && event.type == Type::Nav && event.nav == Nav::Back &&
-            event.family == input::PadFamily::Keyboard) {
-            capture_ = -1;
-            Rebuild();
-        }
-        return event.type == Type::Nav || event.type == Type::PointerDown || event.type == Type::PointerUp;
     }
     if (InSaveCheck()) {
         return false; // the page's rows have the input; Back leaves (OnNav)
@@ -611,6 +601,9 @@ bool PlayerScreen::OnNav(Nav nav) {
         break;
     case View::Screens:
         Show(View::Main, "menu.screens");
+        break;
+    case View::ButtonPick:
+        Show(View::Buttons, std::string("buttons.control.") + player::PadButtonName(pick_));
         break;
     case View::Closed:
         break;

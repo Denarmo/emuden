@@ -49,11 +49,13 @@ void PlayerScreen::BuildMenu() {
     panel->background = theme.dialog;
     panel->SetPadding(24, 26);
 
-    const char* titles[] = {"",        "",        "Save state", "Load state", "Core options",
-                            "Buttons", "Players", "Picture",    "Adjust the picture", "Screens"};
+    const char* titles[] = {"",        "",        "Save state", "Load state",         "Core options",
+                            "Buttons", "Players", "Picture",    "Adjust the picture", "Screens", ""};
     const bool main = view_ == View::Main;
-    panel->Emplace<ui::Label>(main ? game_.name : titles[static_cast<int>(view_)], theme.text_heading,
-                              gfx::FONT_BOLD);
+    const std::string title = main                       ? game_.name
+                              : view_ == View::ButtonPick ? PadButtonText(PadFamilyShown(), pick_) + " does"
+                                                          : titles[static_cast<int>(view_)];
+    panel->Emplace<ui::Label>(title, theme.text_heading, gfx::FONT_BOLD);
     auto* under = panel->Emplace<ui::Label>(main ? console_.name + "  \xC2\xB7  " + core_.name : game_.name,
                                             theme.text_small);
     under->tone = ui::Tone::Dim;
@@ -76,6 +78,9 @@ void PlayerScreen::BuildMenu() {
         break;
     case View::Buttons:
         BuildButtons(list);
+        break;
+    case View::ButtonPick:
+        BuildButtonPick(list);
         break;
     case View::Players:
         BuildPlayers(list);

@@ -24,18 +24,16 @@ float GlyphWidth(ui::Context& ctx, input::PadFamily family, input::PadButton but
 float DrawGlyph(ui::Context& ctx, input::PadFamily family, input::PadButton button, float x, float y,
                 float height, gfx::Color ink);
 
-/// A row of the Buttons page: what it does at the left; at the right the glyph of a button,
-/// or a text when `button` is PadButton::Count.
+/// A row of the Buttons page: the glyph of a pad button at the left, what it does at the right.
 class GlyphRow final : public ui::Node {
 public:
-    GlyphRow(std::string id, std::string label, input::PadFamily family, input::PadButton button,
-             std::string text = {});
+    GlyphRow(std::string id, input::PadFamily family, input::PadButton button, std::string text);
 
 protected:
     void DrawContent(ui::Context& ctx) override;
 
 private:
-    std::string label_, text_;
+    std::string text_;
     input::PadFamily family_;
     input::PadButton button_;
 };

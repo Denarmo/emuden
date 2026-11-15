@@ -84,11 +84,10 @@ float DrawGlyph(ui::Context& ctx, PadFamily family, PadButton button, float x, f
     return width;
 }
 
-GlyphRow::GlyphRow(std::string row_id, std::string label, PadFamily family, PadButton button,
-                   std::string text)
-    : label_(std::move(label)), text_(std::move(text)), family_(family), button_(button) {
+GlyphRow::GlyphRow(std::string row_id, PadFamily family, PadButton button, std::string text)
+    : text_(std::move(text)), family_(family), button_(button) {
     id = std::move(row_id);
-    this->label = label_;
+    label = PadButtonText(family, button) + ": " + text_;
     focusable = true;
     height = 48;
 }
@@ -97,17 +96,11 @@ void GlyphRow::DrawContent(ui::Context& ctx) {
     const ui::Theme& theme = *ctx.theme;
     gfx::Canvas& canvas = *ctx.canvas;
     canvas.FillRect(rect, focused ? theme.panel_strong : theme.panel, theme.radius);
-    canvas.DrawText(label_, rect.x + 20, TextTop(rect.y, rect.h, theme.text_body), theme.text_body, theme.fg);
-    const float right = rect.Right() - 20;
-    if (button_ != PadButton::Count && !PadButtonText(family_, button_).empty()) {
-        const float h = 30;
-        const float w = GlyphWidth(ctx, family_, button_, h);
-        DrawGlyph(ctx, family_, button_, right - w, rect.CenterY() - h * 0.5f, h, theme.fg);
-    } else if (!text_.empty()) {
-        const float w = ctx.Text().Measure(text_, theme.text_body, gfx::FONT_BOLD);
-        canvas.DrawText(text_, right - w, TextTop(rect.y, rect.h, theme.text_body), theme.text_body,
-                        theme.fg, gfx::FONT_BOLD);
-    }
+    const float h = 30;
+    DrawGlyph(ctx, family_, button_, rect.x + 20, rect.CenterY() - h * 0.5f, h, theme.fg);
+    const float w = ctx.Text().Measure(text_, theme.text_body);
+    canvas.DrawText(text_, rect.Right() - 20 - w, TextTop(rect.y, rect.h, theme.text_body), theme.text_body,
+                    theme.fg);
 }
 
 HintLine::HintLine(PadFamily family, std::vector<Item> items) : family_(family), items_(std::move(items)) {

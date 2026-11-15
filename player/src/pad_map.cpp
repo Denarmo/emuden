@@ -40,8 +40,15 @@ std::int16_t Axis(float value) {
     return static_cast<std::int16_t>(std::clamp(value, -1.0f, 1.0f) * 32767.0f);
 }
 
+constexpr std::array<std::string_view, SHORTCUTS> SHORTCUT_NAMES = {
+    "menu", "fast_forward", "rewind", "save_state", "load_state", "next_picture", "swap_screens", "frame_rate"};
+
 std::string RemapKey(std::string_view system, int button) {
     return std::format("player.buttons.{}.{}", system, GAME_NAMES[static_cast<std::size_t>(button)]);
+}
+
+std::string ShortcutKey(std::string_view system, int shortcut) {
+    return std::format("player.shortcuts.{}.{}", system, SHORTCUT_NAMES[static_cast<std::size_t>(shortcut)]);
 }
 
 } // namespace
@@ -116,6 +123,9 @@ void ResetButtons(store::Settings& settings, std::string_view system) {
     for (int button = 0; button < GAME_BUTTONS; ++button) {
         settings.Remove(RemapKey(system, button));
     }
+    for (int shortcut = 0; shortcut < SHORTCUTS; ++shortcut) {
+        settings.Remove(ShortcutKey(system, shortcut));
+    }
 }
 
 bool HasRemap(const store::Settings& settings, std::string_view system) {
@@ -124,7 +134,44 @@ bool HasRemap(const store::Settings& settings, std::string_view system) {
             return true;
         }
     }
+    for (int shortcut = 0; shortcut < SHORTCUTS; ++shortcut) {
+        if (settings.Has(ShortcutKey(system, shortcut))) {
+            return true;
+        }
+    }
     return false;
+}
+
+const char* ShortcutName(Shortcut shortcut) {
+    const auto index = static_cast<std::size_t>(shortcut);
+    return index < SHORTCUT_NAMES.size() ? SHORTCUT_NAMES[index].data() : "";
+}
+
+ShortcutMap LoadShortcuts(const store::Settings* settings, std::string_view system) {
+    ShortcutMap map;
+    map.fill(PadButton::Count);
+    if (!settings) {
+        return map;
+    }
+    for (int shortcut = 0; shortcut < SHORTCUTS; ++shortcut) {
+        const std::string key = ShortcutKey(system, shortcut);
+        if (settings->Has(key)) {
+            map[static_cast<std::size_t>(shortcut)] = PadButtonFromName(settings->GetString(key));
+        }
+    }
+    return map;
+}
+
+void SaveShortcut(store::Settings& settings, std::string_view system, Shortcut shortcut, PadButton source) {
+    const int index = static_cast<int>(shortcut);
+    if (index < 0 || index >= SHORTCUTS) {
+        return;
+    }
+    if (source == PadButton::Count) {
+        settings.Remove(ShortcutKey(system, index));
+    } else {
+        settings.SetString(ShortcutKey(system, index), PadButtonName(source));
+    }
 }
 
 RetroPad MapPad(const input::PadState& pad, std::string_view system, const ButtonMap& map) {

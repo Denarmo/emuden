@@ -42,8 +42,20 @@ ButtonMap LoadButtons(const store::Settings* settings, std::string_view system,
 /// Remembers that `source` presses game button `button` on `system`.
 void SaveButton(store::Settings& settings, std::string_view system, int button,
                 input::PadButton source);
-/// Forgets every remap of `system`.
+/// Forgets every remap and shortcut of `system`.
 void ResetButtons(store::Settings& settings, std::string_view system);
 bool HasRemap(const store::Settings& settings, std::string_view system);
+
+/// What a pad button can do in a game besides pressing a game button.
+enum class Shortcut { Menu, FastForward, Rewind, SaveState, LoadState, NextPicture, SwapScreens, FrameRate, Count };
+inline constexpr int SHORTCUTS = static_cast<int>(Shortcut::Count);
+/// "menu", "fast_forward", ... as kept in the settings.
+const char* ShortcutName(Shortcut shortcut);
+/// For each shortcut, the pad button that does it (PadButton::Count = none). None by default.
+using ShortcutMap = std::array<input::PadButton, SHORTCUTS>;
+ShortcutMap LoadShortcuts(const store::Settings* settings, std::string_view system);
+/// Puts `shortcut` on `source` for `system`; PadButton::Count takes it off.
+void SaveShortcut(store::Settings& settings, std::string_view system, Shortcut shortcut,
+                  input::PadButton source);
 
 } // namespace den::player

@@ -319,9 +319,8 @@ void PlayerScreen::SecondPointer(const input::Event& event) {
     }
     const float scale = std::max(0.001f, SecondScreenScale());
     if (view_ != View::Closed) {
-        // The menu is touched where it is drawn; a question or a button being asked for
-        // on the main display comes first.
-        if (menu_second_ && capture_ < 0 && !swallow_nav_ && !GetStage().DialogOpen()) {
+        // The menu is touched where it is drawn; a question on the main display comes first.
+        if (menu_second_ && !GetStage().DialogOpen()) {
             Pointer(event, scale, pal::NowSeconds());
         }
         return;

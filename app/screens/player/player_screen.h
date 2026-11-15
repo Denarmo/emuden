@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "den/app/app.h"
+#include "den/player/buttons.h"
 #include "dual_screen.h"
 #include "player_view.h"
 
@@ -100,7 +101,7 @@ public:
 
 private:
     enum class Phase { New, Checking, Choosing, Preparing, Running, Left };
-    enum class View { Closed, Main, Save, Load, Options, Buttons, Players, Picture, PictureAdjust, Screens };
+    enum class View { Closed, Main, Save, Load, Options, Buttons, Players, Picture, PictureAdjust, Screens, ButtonPick };
 
     // player_screen.cpp: the session.
     void Open();
@@ -153,10 +154,15 @@ private:
     void BuildPictureAdjust(ui::Node* list);
     void LoadPicture();
     void ChoosePicture(const std::string& id);
-    void StartCapture(int game_button);
-    void TickCapture();
-    std::uint32_t HeldButtons() const;
     input::PadFamily PadFamilyShown() const;
+    // player_shortcuts.cpp: what each pad button does, game buttons and shortcuts.
+    void BuildButtonPick(ui::Node* list);
+    std::vector<player::Shortcut> ShortcutsHere() const;
+    std::string ControlText(input::PadButton control) const;
+    void Assign(input::PadButton control, int game_button, player::Shortcut shortcut);
+    void LoadShortcutMap();
+    void FeedShortcuts(input::PadState* pads, int count);
+    void RunShortcut(player::Shortcut shortcut);
     void SaveSlot(int slot);
     void LoadSlot(int slot);
 
@@ -215,10 +221,9 @@ private:
     std::string picture_ = "auto";   // the kept choice: a preset id of den::player, or "auto"
     int picture_scope_ = 1;          // "Apply to": a PictureScope
     bool options_for_game_ = false;  // "Apply to": this game, or every game of the console
-    int capture_ = -1;               // the game button waiting for a pad button; -1 = none
-    bool capture_armed_ = false;     // every button was released since the capture started
-    double capture_since_ = 0;
-    bool swallow_nav_ = false;       // until the captured button is released
+    input::PadButton pick_ = input::PadButton::Count; // the control whose choices are shown
+    player::ShortcutMap shortcuts_{};
+    std::uint32_t shortcut_down_ = 0; // the shortcut buttons held last frame
 };
 
 } // namespace den::app

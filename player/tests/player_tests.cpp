@@ -186,6 +186,22 @@ TEST_CASE("remapped buttons are kept per console") {
     REQUIRE(std::string(PadButtonName(PadButtonFromName("north"))) == "north");
 }
 
+TEST_CASE("shortcuts are kept per console and reset with the buttons") {
+    using input::PadButton;
+    const fs::path dir = FreshDir("shortcuts");
+    store::Settings settings(dir / "settings.json");
+    REQUIRE(LoadShortcuts(&settings, "gba")[static_cast<int>(Shortcut::Rewind)] == PadButton::Count);
+    SaveShortcut(settings, "gba", Shortcut::Rewind, PadButton::L3);
+    REQUIRE(HasRemap(settings, "gba"));
+    REQUIRE(LoadShortcuts(&settings, "gba")[static_cast<int>(Shortcut::Rewind)] == PadButton::L3);
+    REQUIRE(LoadShortcuts(&settings, "snes")[static_cast<int>(Shortcut::Rewind)] == PadButton::Count);
+    SaveShortcut(settings, "gba", Shortcut::Rewind, PadButton::Count);
+    REQUIRE_FALSE(HasRemap(settings, "gba"));
+    SaveShortcut(settings, "gba", Shortcut::SaveState, PadButton::R3);
+    ResetButtons(settings, "gba");
+    REQUIRE(LoadShortcuts(&settings, "gba")[static_cast<int>(Shortcut::SaveState)] == PadButton::Count);
+}
+
 TEST_CASE("the sound's rate follows its queue") {
     REQUIRE(DriftRatio(0.064, 0.064) == Catch::Approx(1.0));
     REQUIRE(DriftRatio(0.2, 0.064) > 1.0);
