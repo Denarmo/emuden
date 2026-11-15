@@ -517,6 +517,8 @@ and shader, so draws and speed stayed the same. Since 1.1.6 the core samples whe
 line of wrong texels every 64 pixels, GT4's menu buttons a seam), has a widescreen option (the player's
 Widescreen row: CMR3's own 16:9 mode, GT4's text fix with 16:9 set in its options) and cheaper GS
 transfers: CMR3's village start runs at 98.9% (was 95.9%) and 98.7% in 16:9, both threads near 100% of a core.
+Since 1.1.7 (Play! 0.77-34) texture setups reuse their framebuffer lookup and V4-32 unpacks copy straight
+from DMA: CMR3's village start runs at 100% (17.08 s of game time in 17.03 s); GT4's race start stays near 97.5%.
 GT4's race view is still noise with Play!'s OpenGL renderer on every platform: the game reads its 32-bit
 frame back as 8-bit textures through palettes it renders, which only Play!'s Vulkan renderer emulates.
 The PCSX2 notes below are history.
