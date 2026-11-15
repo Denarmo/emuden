@@ -60,6 +60,9 @@ void PlayerScreen::Build() {
     if (phase_ == Phase::New) {
         Open();
     }
+    // The save check centres its dialog; the menu after it lays out from the edges again.
+    Root().align = ui::Align::Stretch;
+    Root().justify = ui::Align::Start;
     if (InSaveCheck()) {
         return BuildSaveCheck();
     }
@@ -201,6 +204,7 @@ void PlayerScreen::OpenMenu(View view) {
     }
     Svc().player->Pause();
     log::Info("player", "paused at frame {}", Svc().player->GetSnapshot().frames);
+    rewind_toggle_ = false;
     Svc().input->SetNavFromPads(true);
     direct_ = false;
     // The quick settings may have chosen another picture since.
@@ -324,6 +328,15 @@ void PlayerScreen::FeedPads() {
     // Consoles without a right stick use it to hold fast-forward and rewind.
     stick_fast_ = console_.right_stick_holds && stick > STICK_HOLD;
     stick_rewind_ = console_.right_stick_holds && stick < -STICK_HOLD;
+    // Select with a shoulder button is a switch: each press turns it on or off.
+    if (hold_fast && !chord_fast_) {
+        fast_toggle_ = !fast_toggle_;
+        rewind_toggle_ = false;
+    }
+    if (hold_rewind && !chord_rewind_) {
+        rewind_toggle_ = !rewind_toggle_;
+        fast_toggle_ = fast_toggle_ && !rewind_toggle_;
+    }
     chord_fast_ = hold_fast;
     chord_rewind_ = hold_rewind;
     for (int port = 0; port < MAX_PORTS; ++port) {
@@ -333,8 +346,12 @@ void PlayerScreen::FeedPads() {
 
 void PlayerScreen::ApplySpeed() {
     const bool playing = view_ == View::Closed;
-    const bool rewind = playing && (key_rewind_ || stick_rewind_ || chord_rewind_);
-    const bool fast = !rewind && (fast_toggle_ || (playing && (key_fast_ || stick_fast_ || chord_fast_)));
+    // A rewind switched on stops where the history runs out.
+    if (rewind_toggle_ && rewind_sent_ && Svc().player->GetSnapshot().rewind_states == 0) {
+        rewind_toggle_ = false;
+    }
+    const bool rewind = playing && (key_rewind_ || stick_rewind_ || rewind_toggle_);
+    const bool fast = !rewind && (fast_toggle_ || (playing && (key_fast_ || stick_fast_)));
     if (fast != fast_sent_) {
         Svc().player->SetFastForward(fast);
         fast_sent_ = fast;

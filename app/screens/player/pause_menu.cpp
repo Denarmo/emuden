@@ -128,7 +128,7 @@ void PlayerScreen::BuildMain(ui::Node* list) {
             const input::PadFamily family = PadFamilyShown();
             return console_.right_stick_holds
                        ? std::string("Hold the right stick left")
-                       : "Hold " + PadButtonText(family, input::PadButton::Select) + " + " +
+                       : "Press " + PadButtonText(family, input::PadButton::Select) + " + " +
                              PadButtonText(family, input::PadButton::L1);
         }));
     }

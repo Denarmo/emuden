@@ -208,7 +208,8 @@ private:
     bool stick_fast_ = false, stick_rewind_ = false;
     bool fast_toggle_ = false;
     bool fast_sent_ = false, rewind_sent_ = false;
-    bool chord_fast_ = false, chord_rewind_ = false;
+    bool chord_fast_ = false, chord_rewind_ = false; // Select with a shoulder, last frame
+    bool rewind_toggle_ = false;
 
     // The pause menu's pages.
     std::string picture_ = "auto";   // the kept choice: a preset id of den::player, or "auto"
