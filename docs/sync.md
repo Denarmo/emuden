@@ -167,7 +167,7 @@ of the moment the game was left, the device ("On Legion Go S") and how long ago.
   open leaves it as "Exit to home" does and waits for its files, 10 s at most; closing again
   does not wait.
 - Interface layouts (`carousel`, `shelf3d`) show the same cards as a "Continue" tab first
-  (`tabs.continue`, on by default; look key `continue`), the picture above the name.
+  (`tabs.continue`, on by default; look key `continue`, else the Recent tab's), the picture above the name.
 
 ## 4. HTTP for plugins (platform and `den.http`)
 

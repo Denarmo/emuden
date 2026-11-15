@@ -330,7 +330,10 @@ private:
                 entry.id = ContinueId(card);
                 list.push_back(std::move(entry));
             }
-            add("continue", Tr("home.tab_continue"), spec_->LookFor("continue", "recent"), 0.75f, std::move(list));
+            // A plugin without a "continue" look gives it its Recent tab's.
+            const ConsoleLook look = spec_->consoles.contains("continue") ? spec_->LookFor("continue", "")
+                                                                          : spec_->LookFor("recent", "recent");
+            add("continue", Tr("home.tab_continue"), look, 0.75f, std::move(list));
             tabs_.back().cards = cards_;
         }
         if (spec_->tab_recent) {
