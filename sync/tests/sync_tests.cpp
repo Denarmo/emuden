@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <map>
 #include <mutex>
@@ -63,6 +64,7 @@ struct Cloud {
     std::mutex mutex;
     int next_rev = 1;
     std::vector<std::string> puts;
+    std::function<void(const std::string& path)> on_put; // before the file is stored
 };
 
 class MemoryProvider final : public Provider {
@@ -91,7 +93,10 @@ public:
         return {};
     }
     Result<std::string> Put(const std::string& path, const fs::path& local, const std::string& rev,
-                            std::int64_t modified) override {
+                            std::int64_t modified, const Progress&) override {
+        if (cloud_.on_put) {
+            cloud_.on_put(path);
+        }
         std::lock_guard lock(cloud_.mutex);
         auto& file = cloud_.files[path];
         if (!rev.empty() && file.rev != 0 && std::to_string(file.rev) != rev) {
@@ -130,6 +135,8 @@ struct Device {
     std::shared_ptr<Engine> engine;
     std::int64_t clock = 1'800'000'000;
 
+    std::map<std::string, library::PlayTotals> own_play, other_play;
+
     Device(Cloud& cloud, const std::string& name, std::vector<std::string> categories = {"saves", "states"}) {
         settings = std::make_unique<store::Settings>(scratch.dir / "settings.json");
         EngineConfig config;
@@ -140,6 +147,10 @@ struct Device {
         config.entries = [this] { return entries; };
         config.providers = {{"test.cloud", "Cloud", std::move(categories)}};
         config.provider_factory = [&cloud](const std::string&) { return std::make_unique<MemoryProvider>(cloud); };
+        config.own_play = [this] { return own_play; };
+        config.set_other_play = [this](const std::map<std::string, library::PlayTotals>& others) {
+            other_play = others;
+        };
         engine = CreateEngine(config);
         settings->SetString("sync.active", "test.cloud");
     }
@@ -332,7 +343,7 @@ TEST_CASE("the folder store keeps plain files and refuses a stale write") {
     fs::create_directories(root);
     auto store = CreateFolderStore("emuden.sync.syncthing", root);
     Write(scratch.dir / "local.srm", "one");
-    const Result<std::string> put = store->Put("saves/gba/Game.srm", scratch.dir / "local.srm", "", 1'700'000'000);
+    const Result<std::string> put = store->Put("saves/gba/Game.srm", scratch.dir / "local.srm", "", 1'700'000'000, {});
     REQUIRE(put);
     CHECK(Read(root / "saves" / "gba" / "Game.srm") == "one");
     Write(root / "saves" / "gba" / ".syncthing.Game.srm.tmp", "partial");
@@ -347,7 +358,7 @@ TEST_CASE("the folder store keeps plain files and refuses a stale write") {
     CHECK(Read(scratch.dir / "back.srm") == "one");
 
     Write(root / "saves" / "gba" / "Game.srm", "changed by another device", 1'700'000'500);
-    CHECK(store->Put("saves/gba/Game.srm", scratch.dir / "local.srm", put.value(), 1).error() == "conflict");
+    CHECK(store->Put("saves/gba/Game.srm", scratch.dir / "local.srm", put.value(), 1, {}).error() == "conflict");
     REQUIRE(store->Delete("saves/gba/Game.srm").ok);
     CHECK(store->List("")->empty());
 }
@@ -383,4 +394,138 @@ TEST_CASE("the journal and the plan agree on what changed") {
     CHECK(ops.at("saves/gba/C.srm") == Op::DeleteRemote);
     CHECK(ops.at("saves/gba/New.srm") == Op::Download);
     CHECK(ops.at("saves/gba/Gone.srm") == Op::Forget);
+}
+
+TEST_CASE("the journal is written after every file, so a run cut short loses nothing") {
+    Cloud cloud;
+    Device a(cloud, "A");
+    a.entries = {Game("gba:1", "gba", a.scratch.dir / "roms" / "One.gba"),
+                 Game("gba:2", "gba", a.scratch.dir / "roms" / "Two.gba")};
+    Write(a.Save("gba:1"), "one", 1'800'000'100);
+    Write(a.Save("gba:2"), "two", 1'800'000'100);
+    const fs::path journal = a.scratch.dir / "sync" / "test.cloud" / "journal.json";
+    std::atomic<bool> cancel{false};
+    std::string seen;
+    cloud.on_put = [&](const std::string& path) {
+        if (path == "saves/gba/Two.srm") {
+            seen = Read(journal); // the first file is on disk before the second goes
+            cancel = true;
+        }
+    };
+    REQUIRE(a.engine->RunOnce({}, &cancel).ok);
+    CHECK(seen.find("saves/gba/One.srm") != std::string::npos);
+    // The next run starts where that one stopped: no conflict, nothing sent twice.
+    cloud.on_put = nullptr;
+    cloud.puts.clear();
+    REQUIRE(a.Sync().ok);
+    CHECK(cloud.puts.empty());
+    CHECK(a.engine->Conflicts().empty());
+    CHECK(cloud.files.at("saves/gba/Two.srm").data == "two");
+}
+
+TEST_CASE("saves go before games, and the run counts as a sync before the games go up") {
+    Cloud cloud;
+    Device a(cloud, "A", {"saves", "games"});
+    const fs::path rom = a.scratch.dir / "roms" / "Big.gba";
+    Write(rom, "a big game");
+    a.entries = {Game("gba:1", "gba", rom)};
+    Write(a.Save("gba:1"), "save", 1'800'000'100);
+    a.engine->SetUploadGames(true);
+    bool save_first = false;
+    std::int64_t last_sync = 0;
+    bool games_pass = false;
+    cloud.on_put = [&](const std::string& path) {
+        if (path == "games/gba/Big.gba") {
+            std::lock_guard lock(cloud.mutex);
+            save_first = cloud.files.contains("saves/gba/Big.srm");
+            last_sync = a.engine->State().last_sync;
+            games_pass = a.engine->State().games_pass;
+        }
+    };
+    REQUIRE(a.Sync().ok);
+    CHECK(save_first);
+    CHECK(last_sync == a.clock);
+    CHECK(games_pass);
+    CHECK(a.engine->GameState("gba:1").synced > 0);
+    CHECK(cloud.files.contains("games/gba/Big.gba"));
+}
+
+TEST_CASE("games go up once: never again, never back, and never deleted") {
+    Cloud cloud;
+    Device a(cloud, "A", {"games"});
+    const fs::path one = a.scratch.dir / "roms" / "One.gba";
+    const fs::path two = a.scratch.dir / "roms" / "Two.gba";
+    Write(one, "game one");
+    Write(two, "game two");
+    a.entries = {Game("gba:1", "gba", one), Game("gba:2", "gba", two)};
+    a.engine->SetUploadGames(true);
+    // A game starts while the first one goes up: the second waits for a later run.
+    cloud.on_put = [&](const std::string&) { a.engine->Pump("gba:1"); };
+    REQUIRE(a.Sync().ok);
+    CHECK(cloud.puts == std::vector<std::string>{"games/gba/One.gba"});
+    cloud.on_put = nullptr;
+    a.engine->Pump("");
+    REQUIRE(a.Sync().ok);
+    CHECK(cloud.puts == std::vector<std::string>{"games/gba/One.gba", "games/gba/Two.gba"});
+
+    // Already up: not again, with the journal gone and the file touched.
+    fs::remove(a.scratch.dir / "sync" / "test.cloud" / "journal.json");
+    Write(one, "game one", 1'900'000'000);
+    REQUIRE(a.Sync().ok);
+    CHECK(cloud.puts.size() == 2);
+
+    // A game from the library is never uploaded back.
+    cloud.files["games/gba/Three.gba"] = {"game three", 1, cloud.next_rev++};
+    REQUIRE(a.engine->DownloadGame("test.cloud", {"games/gba/Three.gba"}, nullptr).ok);
+    const fs::path three = a.engine->GamesFolder() / "gba" / "Three.gba";
+    a.entries.push_back(Game("gba:3", "gba", three));
+    cloud.files.erase("games/gba/Three.gba");
+    REQUIRE(a.Sync().ok);
+    CHECK(cloud.puts.size() == 2);
+
+    // Deleted here: the remote copy stays; and nothing local goes because the remote did.
+    fs::remove(two);
+    a.entries = {Game("gba:1", "gba", one), Game("gba:3", "gba", three)};
+    REQUIRE(a.Sync().ok);
+    CHECK(cloud.files.contains("games/gba/Two.gba"));
+    CHECK(fs::exists(three));
+}
+
+TEST_CASE("play time adds up across devices without counting anything twice") {
+    Cloud cloud;
+    Device a(cloud, "Legion Go S", {"saves", "config"}), b(cloud, "Retroid Pocket", {"saves", "config"});
+    a.entries = {Game("gba:a", "gba", a.scratch.dir / "roms" / "Lazarus.gba")};
+    b.entries = {Game("gba:b", "gba", b.scratch.dir / "roms" / "Lazarus.gba")};
+    a.own_play["gba:a"] = {100, 1'800'000'000, 2};
+    b.own_play["gba:b"] = {50, 1'800'000'500, 1};
+    REQUIRE(a.Sync().ok);
+    REQUIRE(b.Sync().ok);
+    REQUIRE(a.Sync().ok);
+    REQUIRE(b.other_play.contains("gba:b"));
+    CHECK(b.other_play.at("gba:b").seconds == 100);
+    CHECK(b.other_play.at("gba:b").count == 2);
+    REQUIRE(a.other_play.contains("gba:a"));
+    CHECK(a.other_play.at("gba:a").seconds == 50);
+    CHECK(a.other_play.at("gba:a").last_played == 1'800'000'500);
+
+    // More play on one device replaces its part on the other, however often they sync.
+    a.own_play["gba:a"] = {160, 1'800'001'000, 3};
+    REQUIRE(a.Sync().ok);
+    REQUIRE(b.Sync().ok);
+    REQUIRE(b.Sync().ok);
+    CHECK(b.other_play.at("gba:b").seconds == 160);
+    cloud.puts.clear();
+    REQUIRE(a.Sync().ok);
+    REQUIRE(b.Sync().ok);
+    CHECK(cloud.puts.empty()); // a device's file goes up only when its own play changed
+
+    // A conflict copy names the device it came from.
+    Write(a.Save("gba:a"), "legion save", 1'800'002'000);
+    REQUIRE(a.Sync().ok);
+    Write(b.Save("gba:b"), "retroid save", 1'800'003'000);
+    fs::remove(b.scratch.dir / "sync" / "test.cloud" / "journal.json");
+    REQUIRE(b.Sync().ok);
+    REQUIRE(b.engine->Conflicts().size() == 1);
+    CHECK(b.engine->Conflicts()[0].from == "Legion Go S");
+    CHECK(b.other_play.at("gba:b").seconds == 160);
 }

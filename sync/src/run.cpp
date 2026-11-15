@@ -2,9 +2,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // One sync run: catalog, listing, journal, plan, then every action, each file on its own
-// (a file that fails is tried again on the next run).
+// (a file that fails is tried again on the next run). Saves, states, settings and BIOS files
+// come first; the run counts as a sync once they are done. Game uploads follow, one at a
+// time, until a game starts, another run is asked for or the app ends. The journal is written
+// after every action, so a run cut short loses nothing it did.
 
 #include <algorithm>
+#include <chrono>
 #include <system_error>
 
 #include "den/base/files.h"
@@ -46,7 +50,7 @@ public:
         fs::create_directories(temp_dir_, ec);
         games_folder_ = engine_.GamesFolder();
         HashCache hashes(data / "sync" / "hashes.json");
-        config_ = CreateSettingsFiles(engine_.config_.settings, engine_.config_.layers, data / "settings.json", pc);
+        config_ = engine_.MakeConfigFiles();
 
         CatalogRequest request;
         request.data_dir = data;
@@ -92,6 +96,15 @@ public:
         plan.categories = categories;
         plan.upload_games = request.upload_games;
         std::vector<Action> actions = MakePlan(plan);
+        // Game uploads go in a pass of their own; adopting or forgetting a game is quick.
+        std::vector<Action> uploads;
+        std::erase_if(actions, [&](const Action& action) {
+            if (action.op == Op::Upload && CategoryOf(action.path) == GAMES) {
+                uploads.push_back(action);
+                return true;
+            }
+            return false;
+        });
         std::stable_partition(actions.begin(), actions.end(), [&](const Action& action) {
             const std::string game = GameOf(action.path);
             return !game.empty() && std::find(first_games.begin(), first_games.end(), game) != first_games.end();
@@ -99,40 +112,90 @@ public:
         {
             std::lock_guard lock(engine_.mutex_);
             engine_.state_.total = static_cast<int>(actions.size());
+            engine_.state_.games_total = static_cast<int>(uploads.size());
         }
         engine_.Touch();
         const std::string running = engine_.RunningGame();
         for (const Action& action : actions) {
-            if (cancel_ != nullptr && cancel_->load()) {
+            if (Cancelled()) {
                 break;
             }
             const std::string game = GameOf(action.path);
             if (!running.empty() && game == running && action.op != Op::Forget) {
                 Change([](SyncState& s) { ++s.waiting; });
             } else {
-                Current(action.path);
+                Current(action.path, local_.contains(action.path) ? local_.at(action.path).size : 0);
                 Do(action);
+                SaveJournal(action.op != Op::Adopt && action.op != Op::Forget);
             }
             Change([](SyncState& s) { ++s.done; });
         }
-        journal.Save();
+        SaveJournal(true);
         hashes.Save();
+        if (listed && !Cancelled()) {
+            Synced(id);
+        }
+        UploadGames(uploads);
         fs::remove_all(temp_dir_, ec);
+        return listed ? Status() : Status::Fail("The provider could not be reached.");
+    }
+
+private:
+    bool Cancelled() const {
+        return cancel_ != nullptr && cancel_->load();
+    }
+
+    // Atomically, after each transfer, and at least every second for the quick ones.
+    void SaveJournal(bool now) {
+        const auto time = std::chrono::steady_clock::now();
+        if (now || time - saved_ >= std::chrono::seconds(1)) {
+            journal_->Save();
+            saved_ = time;
+        }
+    }
+
+    // The regular part is done: that is the last sync, and the games' marks.
+    void Synced(const std::string& id) {
         std::map<std::string, std::int64_t> synced;
-        for (const auto& [path, entry] : journal.entries) {
+        for (const auto& [path, entry] : journal_->entries) {
             const std::string game = GameOf(path);
             if (!game.empty() && (CategoryOf(path) == SAVES || CategoryOf(path) == STATES)) {
                 synced[game] = std::max(synced[game], entry.synced);
             }
         }
+        const std::int64_t now = engine_.Now();
         {
             std::lock_guard lock(engine_.mutex_);
             engine_.game_synced_ = std::move(synced);
+            engine_.state_.last_sync = now;
         }
-        return listed ? Status() : Status::Fail("The provider could not be reached.");
+        if (engine_.config_.settings != nullptr) {
+            engine_.config_.settings->SetNumber(engine_.Key("last", id), static_cast<double>(now));
+        }
+        engine_.Touch();
     }
 
-private:
+    // One game at a time; the provider resumes a cut upload where it stopped.
+    void UploadGames(const std::vector<Action>& uploads) {
+        if (uploads.empty() || Cancelled() || engine_.Stopping()) {
+            return;
+        }
+        engine_.games_pass_.store(true);
+        Change([](SyncState& s) { s.games_pass = true; });
+        for (const Action& action : uploads) {
+            if (Cancelled() || engine_.Stopping() || !engine_.RunningGame().empty()) {
+                break;
+            }
+            if (const auto item = local_.find(action.path); item != local_.end()) {
+                Current(action.path, item->second.size);
+                Upload(item->second, std::string());
+                SaveJournal(true);
+            }
+            Change([](SyncState& s) { ++s.games_done; });
+        }
+        engine_.games_pass_.store(false);
+    }
+
     void Error(const std::string& message) {
         log::Warn("sync", "{}", message);
         Change([&](SyncState& s) {
@@ -151,10 +214,20 @@ private:
         engine_.Touch();
     }
 
-    void Current(const std::string& path) {
+    void Current(const std::string& path, std::uint64_t size) {
         Change([&](SyncState& s) {
             s.current = path;
             s.fraction = -1;
+            s.size = size;
+        });
+    }
+
+    void Fraction(double done, double total) {
+        Change([&](SyncState& s) {
+            s.fraction = total > 0 ? static_cast<float>(done / total) : done <= 1 ? static_cast<float>(done) : -1;
+            if (total > 1) {
+                s.size = static_cast<std::uint64_t>(total);
+            }
         });
     }
 
@@ -192,11 +265,7 @@ private:
         case Op::Compare:
         case Op::Conflict: {
             const fs::path temp = Temp(path);
-            const Status got = provider_.Get(path, temp, [this](double done, double total) {
-                Change([&](SyncState& s) {
-                    s.fraction = total > 0 ? static_cast<float>(done / total) : done <= 1 ? static_cast<float>(done) : -1;
-                });
-            });
+            const Status got = provider_.Get(path, temp, [this](double done, double total) { Fraction(done, total); });
             if (!got.ok) {
                 Error(path + ": " + got.error);
                 break;
@@ -251,10 +320,14 @@ private:
             file = Temp(item.path);
             WriteFileAtomic(file, item.text);
         }
-        Result<std::string> put = provider_.Put(item.path, file, rev, item.modified);
+        Result<std::string> put = provider_.Put(item.path, file, rev, item.modified,
+                                                [this](double done, double total) { Fraction(done, total); });
         if (item.file.empty()) {
             std::error_code ec;
             fs::remove(file, ec);
+        }
+        if (!put && put.error() == "cancelled" && (Cancelled() || engine_.Stopping())) {
+            return false; // it goes on in the next run
         }
         if (!put) {
             Error(item.path + ": " + (put.error() == "conflict" ? "changed on another device; it is sorted out "
@@ -317,7 +390,7 @@ private:
         if (local.modified >= remote.modified) {
             const fs::path loser = Temp(local.path);
             fs::copy_file(temp, loser, fs::copy_options::overwrite_existing, ec);
-            engine_.KeepLoser(local.path, loser, "another device", local.game_id);
+            engine_.KeepLoser(local.path, loser, engine_.OtherDevice(), local.game_id);
             Upload(local, remote.rev);
         } else {
             const fs::path loser = Temp(local.path);
@@ -342,6 +415,7 @@ private:
     std::unique_ptr<ConfigFiles> config_;
     fs::path sync_dir_, temp_dir_, games_folder_;
     int temp_ = 0;
+    std::chrono::steady_clock::time_point saved_;
 };
 
 Status EngineImpl::RunOnce(const std::vector<std::string>& first_games, const std::atomic<bool>* cancel) {
@@ -350,7 +424,8 @@ Status EngineImpl::RunOnce(const std::vector<std::string>& first_games, const st
     if (id.empty() || stop_.load()) {
         return {};
     }
-    std::unique_ptr<Provider> provider = MakeProvider(id, cancel != nullptr ? cancel : &stop_);
+    run_cancel_.store(stop_.load());
+    std::unique_ptr<Provider> provider = MakeProvider(id, &run_cancel_);
     if (!provider) {
         return Status::Fail("The sync plugin is not installed.");
     }
@@ -369,11 +444,14 @@ Status EngineImpl::RunOnce(const std::vector<std::string>& first_games, const st
     } catch (const std::exception& e) {
         status = Status::Fail(e.what());
     }
+    games_pass_.store(false);
     {
         std::lock_guard lock(mutex_);
         state_.running = false;
+        state_.games_pass = false;
         state_.current.clear();
         state_.fraction = -1;
+        state_.size = 0;
         if (status.ok) {
             state_.last_sync = Now();
         } else if (state_.errors.empty()) {

@@ -50,6 +50,9 @@ std::optional<Saved> LoadSaved(const std::filesystem::path& file) {
             record.play_seconds = static_cast<std::int64_t>(Number(value, "play_seconds"));
             record.play_count = static_cast<int>(Number(value, "play_count"));
             record.added = static_cast<std::int64_t>(Number(value, "added"));
+            record.other.seconds = static_cast<std::int64_t>(Number(value, "other_seconds"));
+            record.other.last_played = static_cast<std::int64_t>(Number(value, "other_last_played"));
+            record.other.count = static_cast<int>(Number(value, "other_count"));
             saved.records[id] = record;
         }
     }
@@ -78,7 +81,10 @@ bool SaveSaved(const std::filesystem::path& file, const Saved& saved) {
                             {"last_played", JsonNumber(static_cast<double>(record.last_played))},
                             {"play_seconds", JsonNumber(static_cast<double>(record.play_seconds))},
                             {"play_count", JsonNumber(record.play_count)},
-                            {"added", JsonNumber(static_cast<double>(record.added))}}));
+                            {"added", JsonNumber(static_cast<double>(record.added))},
+                            {"other_seconds", JsonNumber(static_cast<double>(record.other.seconds))},
+                            {"other_last_played", JsonNumber(static_cast<double>(record.other.last_played))},
+                            {"other_count", JsonNumber(record.other.count)}}));
     }
     JsonValue sessions = JsonArray();
     for (const Session& session : saved.sessions) {

@@ -308,6 +308,43 @@ public:
         RecordChanged(id);
     }
 
+    std::map<std::string, PlayTotals> OwnPlay() const override {
+        std::lock_guard lock(mutex_);
+        std::map<std::string, PlayTotals> out;
+        for (const auto& [id, record] : saved_.records) {
+            if (record.play_count > 0 || record.play_seconds > 0) {
+                out[id] = {record.play_seconds, record.last_played, record.play_count};
+            }
+        }
+        return out;
+    }
+
+    void SetOtherPlay(const std::map<std::string, PlayTotals>& others) override {
+        std::lock_guard lock(mutex_);
+        bool changed = false;
+        for (auto& [id, record] : saved_.records) {
+            if (!others.contains(id) && (record.other.seconds != 0 || record.other.count != 0)) {
+                record.other = {};
+                changed = true;
+            }
+        }
+        for (const auto& [id, play] : others) {
+            PlayTotals& other = saved_.records[id].other;
+            if (other.seconds != play.seconds || other.count != play.count || other.last_played != play.last_played) {
+                other = play;
+                changed = true;
+            }
+        }
+        if (!changed) {
+            return;
+        }
+        for (Entry& entry : entries_) {
+            ApplyRecord(entry);
+        }
+        SaveSaved(dir_ / "library.json", saved_);
+        ++revision_;
+    }
+
     std::vector<CoverChoice> CoverChoices(const std::string& id,
                                           const std::function<bool()>& stopping) override {
         const std::optional<Entry> entry = Find(id);
@@ -495,9 +532,9 @@ private:
         const auto found = saved_.records.find(entry.id);
         const Record record = found != saved_.records.end() ? found->second : Record{};
         entry.favourite = record.favourite;
-        entry.last_played = record.last_played;
-        entry.play_seconds = record.play_seconds;
-        entry.play_count = record.play_count;
+        entry.last_played = std::max(record.last_played, record.other.last_played);
+        entry.play_seconds = record.play_seconds + record.other.seconds;
+        entry.play_count = record.play_count + record.other.count;
         entry.added = record.added;
     }
 

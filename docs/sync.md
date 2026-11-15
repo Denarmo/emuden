@@ -8,9 +8,10 @@ engine; a plugin only stores and fetches files. This is the contract between the
 ## 1. Rules
 
 - **What syncs**, each a category the user turns on per provider: `saves` (battery saves),
-  `states` (save states and their thumbnails, resume state included), `config` (settings and
-  per-game settings), `games` (ROM files, download on demand), `bios` (off by default; only
-  what the user put in EmuDEN's BIOS folder).
+  `states` (save states and their thumbnails, resume state included), `config` (settings,
+  per-game settings and play time), `games` (an online library of the user's games: each goes
+  up once, and downloads on demand), `bios` (off by default; only what the user put in
+  EmuDEN's BIOS folder).
 - **Never synced:** consoles of group `pc` (Steam and other PC launchers), their library
   entries and anything an engine app keeps itself. Google Drive never receives PC or Steam
   data in any form (owner's decision, 2026-11-12). Caches, logs, the plugin folders, signing
@@ -30,7 +31,7 @@ game lives:
 |---|---|
 | saves | `saves/<system>/<rom stem>.<ext>` (`.srm`, and other save files a core writes) |
 | states | `states/<system>/<rom stem>.slot<N>.state`, `.slot<N>.png`, `<rom stem>.resume.state` |
-| config | `config/settings.json`, `config/settings-overrides.json`, `config/games/<system>/<rom stem>.json` |
+| config | `config/settings.json`, `config/settings-overrides.json`, `config/games/<system>/<rom stem>.json`, `config/playtime/<device id>.json` |
 | games | `games/<system>/<rom file name>` (multi-file games: the index file and its members) |
 | bios | `bios/<file name>` |
 
@@ -44,14 +45,21 @@ same stem (rare) sync under the first and the conflict is logged. Device-only se
 
 - A **catalog** lists the local files of the enabled categories with portable name, size,
   modification time and SHA-256 (hashed only when size or time changed since the last run).
+  Games are known by their size (`size:<bytes>`) and never hashed.
 - A **journal** per provider (`<data>/sync/<provider id>/journal.json`) remembers, per
-  portable name, the hash and remote revision of the last version both sides agreed on.
+  portable name, the hash and remote revision of the last version both sides agreed on. It
+  is written (atomically) after every transfer and at least every second otherwise, so a run
+  cut short by the app closing keeps what it did and the next run makes no false conflicts.
 - A **plan** compares catalog, journal and the provider's listing:
   local changed only → upload; remote changed only → download; both → conflict; new on one
   side → copy to the other. Deletes only as in section 1.
+- **Order:** saves, then states, settings and BIOS files; a game that just ended goes first.
+  Once these are done the run counts as a sync: the last sync time and the games' "Saves
+  synced" marks are set then, not when the game uploads end.
 - **Conflicts:** the newer file by modification time wins; the loser is kept beside it as
   `<name>.conflict-<device>-<yyyymmdd-hhmmss>` (locally under `<data>/sync/conflicts/`) and
-  the sync page lists it with "Use this one instead".
+  the sync page lists it with "Use this one instead". A remote copy is named after the other
+  device when only one other is known (from the play time files), else "another device".
 - Downloads land in a temporary file and replace the target atomically; a save or state of a
   game that is running is never replaced (it waits for the session to end).
 - **When:** on app start, when a game session ends (that game's saves and states first), on
@@ -59,8 +67,45 @@ same stem (rare) sync under the first and the conflict is logged. Device-only se
   when the user asks; uploads of games happen only when the user turns on "Upload my games"
   on that device.
 - One provider at a time is the active one; the others can be set up but stay idle.
-- Status for the UI: last sync time, files up and down, conflicts, errors, the current file
-  with progress.
+- Status for the UI: last sync time, files up and down, conflicts, errors, "N of M", the
+  current file with its percent and size (uploads too, when the provider reports them), and
+  the game uploads still to do.
+
+### 3.1 Games: an online library
+
+The `games` category is not a two-way sync. The remote is a library of the user's games that
+every device can download from:
+
+- A game goes up once, and only from a device with "Upload my games" on. It never goes up
+  when the remote has its portable name (taken as the same game when the size matches, and
+  the journal entry rebuilt from the listing), when the journal knows it (uploaded or
+  downloaded before), however its file's time changes, and a game downloaded from the
+  library never goes back.
+- Nothing is deleted: a game deleted on a device stays in the library, and one gone from the
+  library stays on the devices.
+- Uploads are a pass of their own after the regular sync, one game at a time. The pass stops
+  (it does not fail) when a game starts, when another run is asked for (a game ended, "Sync
+  now", a download or "Use this one"), or when the app ends; the timer does not stop it. The
+  next run syncs saves first and then goes on with the games. Google Drive resumes a cut
+  upload where it stopped, also after a restart (section 7.1).
+- "Your game library" (route `sync.games`) lists everything on the remote, per console, with
+  "On this device" for what this device has.
+
+### 3.2 Play time
+
+Play time (the library's seconds, plays and last play) syncs in `config` without ever
+counting a session twice:
+
+- Each device has an id of its own (16 hex digits, `sync.device_id`, made once; not its
+  name). It uploads only its own record, `config/playtime/<device id>.json`:
+  `{"version": 1, "device": "<name>", "games": {"<system>/<rom stem>": {"seconds", "count",
+  "last_played"}}}`, from what it played itself.
+- The other devices' files are kept as they came under `<data>/sync/playtime/` and added up
+  into the library, which keeps them apart from its own record (`library.json`,
+  `other_seconds`, `other_count`, `other_last_played`). An entry shows its own time plus the
+  others', and the latest of the last plays. A new file from a device replaces that device's
+  part, so syncing again adds nothing.
+- Games of `pc` consoles are never in these files.
 
 ## 4. HTTP for plugins (platform and `den.http`)
 
@@ -135,7 +180,10 @@ plugin.provider = {
   -- journal knows (nil for a new file), for providers that can refuse a write over a newer
   -- remote version (nil, "conflict"). modified is the local file's time, Unix seconds:
   -- keep it and give it back in list().
-  put = function(path, local_path, rev, modified) end,
+  -- progress(done, total) may be called with the bytes sent so far. A long upload should look
+  -- at den.sync.status().stopping between its steps and give up with (nil, "cancelled")
+  -- when it is set: the engine then goes on with it in a later run.
+  put = function(path, local_path, rev, modified, progress) end,
   delete = function(path) end,
   -- Optional: free space and who is signed in, for the sync page.
   status = function() end,
@@ -207,12 +255,14 @@ XDG data folder or the app's files on Android.
 ## 6. Screens
 
 Settings > Sync: the active provider, the categories (per device), "Sync now", last sync,
-conflicts, "Games" (download a game from the remote, per console, with sizes) and "Upload my
-games" (off). A game's details page shows "Saves synced" and the conflict, if any.
+conflicts, "Games" (the game library: download a game from the remote, per console, with
+sizes) and "Upload my games" (off). A game's details page shows "Saves synced" and the conflict, if any.
 
 As built (`app/screens/sync/`): the section's rows are "Sync with" (Off or a provider),
-"Set up <provider>" (opens the plugin's page), "Sync now" (last sync at the right, the first
-error or the last run's counts below), "Conflicts" (route `sync.conflicts`: each kept copy,
+"Set up <provider>" (opens the plugin's page), "Sync now" (at the right the last sync, or
+"Syncing N of M" and "Uploading game N of M" while it runs; below, live, the current file
+with its percent and size, else the first error, the files waiting for a game, the games
+still to upload or the last run's counts), "Conflicts" (route `sync.conflicts`: each kept copy,
 Confirm is "Use this one instead", Option deletes the copy), one toggle per category the
 provider offers, then with games on "Games" (route `sync.games`), "Upload my games" and
 "Downloaded games go to", the folder store's "Sync folder" when there is one, and "Every 15
@@ -231,7 +281,10 @@ devices are merged rather than a conflict.
   owner creates in Google Cloud; until then the page says sync is not set up.
 - Files live in a visible `EmuDEN` folder in My Drive with one subfolder per category; `rev`
   is the Drive `version` (or `md5Checksum`); uploads are multipart under 5 MiB, resumable
-  above.
+  above, in 16 MiB chunks with progress after each. The resumable session is kept in the
+  plugin's storage (`upload:<path>`, with the file's size and time), so an upload cut by the
+  app closing, a game starting or the network goes on from the offset Google reports, in
+  the same run or a later one; a session Google dropped (after a week) starts once more.
 - Hosts: `oauth2.googleapis.com`, `www.googleapis.com`. Categories: all of section 1, and the
   host refuses any PC/Steam file to this provider regardless.
 

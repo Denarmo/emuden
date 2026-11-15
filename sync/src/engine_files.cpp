@@ -119,6 +119,7 @@ Status EngineImpl::UseConflict(std::size_t index) {
         }
     }
     const GameIndex games = Games();
+    YieldGames();
     std::lock_guard run(run_mutex_);
     const auto target = TargetOf(conflict.path, games, config_.data_dir, GamesFolder());
     if (!target) {
@@ -127,8 +128,8 @@ Status EngineImpl::UseConflict(std::size_t index) {
     std::error_code ec;
     const fs::path swap = config_.data_dir / "sync" / "conflicts" / "swap.tmp";
     if (CategoryOf(conflict.path) == CONFIG) {
-        auto files = CreateSettingsFiles(config_.settings, config_.layers, config_.data_dir / "settings.json",
-                                         PcSystems());
+        // On a job: the settings stores lock for every call, as they do for the main thread.
+        auto files = MakeConfigFiles();
         for (const LocalItem& item : files->Export(games)) {
             if (item.path == conflict.path) {
                 WriteFileAtomic(swap, item.text);
@@ -320,7 +321,10 @@ Status EngineImpl::DownloadGame(const std::string& provider_id, const std::vecto
     if (!provider) {
         return Status::Fail("The sync plugin is not installed.");
     }
+    YieldGames();
     std::lock_guard run(run_mutex_);
+    // A game from the library is never uploaded back: the journal knows it from here on.
+    Journal journal(SyncDir(provider_id) / "journal.json");
     for (const std::string& path : paths) {
         // games/<system>/<file> lands as <games folder>/<system>/<file>: never in a folder
         // the user's own games are in.
@@ -342,6 +346,11 @@ Status EngineImpl::DownloadGame(const std::string& provider_id, const std::vecto
         });
         if (got.ok) {
             fs::rename(part, target, ec);
+        }
+        if (got.ok && !ec) {
+            const std::uint64_t size = fs::file_size(target, ec);
+            journal.entries[path] = {GameHash(size), std::string(), size, Now()};
+            journal.Save();
         }
         if (!got.ok || ec) {
             fs::remove(part, ec);

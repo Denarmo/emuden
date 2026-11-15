@@ -79,7 +79,7 @@ public:
     }
 
     Result<std::string> Put(const std::string& path, const fs::path& local, const std::string& rev,
-                            std::int64_t modified) override {
+                            std::int64_t modified, const Progress&) override {
         const fs::path target = Remote(path);
         std::error_code ec;
         if (!rev.empty() && fs::is_regular_file(target, ec) && RevOf(target) != rev) {

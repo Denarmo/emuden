@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -49,6 +50,11 @@ struct SyncState {
     int waiting = 0;            // files of a running game, left for when it ends
     std::string current;        // the file being moved
     float fraction = -1;        // of it, negative when unknown
+    std::uint64_t size = 0;     // of it, bytes; 0 when unknown
+    /// The run is past saves, states, settings and BIOS files: it uploads games now, which
+    /// stops when a game starts or the app ends, and goes on in the next run.
+    bool games_pass = false;
+    int games_done = 0, games_total = 0;
     std::vector<std::string> errors;
 };
 
@@ -56,7 +62,7 @@ struct SyncState {
 struct Conflict {
     std::string path;           // portable name
     std::filesystem::path file; // the kept copy
-    std::string from;           // the device it came from, or "another device"
+    std::string from;           // the device it came from: its name, or "another device"
     std::int64_t time = 0;
     std::string game_id;
 };
@@ -85,11 +91,16 @@ struct EngineConfig {
     library::Library* library = nullptr;
     plugins::Host* consoles = nullptr;       // which consoles are PC ones; may be null
     plugins::FeatureHost* features = nullptr;
-    std::string device;                      // this device's name, for conflict copies
+    std::string device;                      // this device's name, for conflict copies and play time
+    /// This device's id in play time files; empty: made once and kept in sync.device_id.
+    std::string device_id;
     std::function<std::int64_t()> now;       // Unix seconds; default: the clock
     /// Tests: the library's games, and the providers, instead of `library` and `features`.
     std::function<std::vector<library::Entry>()> entries;
     std::vector<ProviderInfo> providers;
+    /// Tests: this device's play and where the other devices' goes, instead of `library`.
+    std::function<std::map<std::string, library::PlayTotals>()> own_play;
+    std::function<void(const std::map<std::string, library::PlayTotals>&)> set_other_play;
     /// Tests: makes the provider instead of the plugin or the folder store.
     std::function<std::unique_ptr<Provider>(const std::string& id)> provider_factory;
 };

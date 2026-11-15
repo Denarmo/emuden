@@ -5,6 +5,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
+#include <random>
 #include <system_error>
 
 #include "den/base/files.h"
@@ -235,6 +237,48 @@ std::unique_ptr<Provider> EngineImpl::MakeProvider(const std::string& id, const 
     return CreatePluginProvider(config_.features, id, PcSystems(), cancel);
 }
 
+std::unique_ptr<ConfigFiles> EngineImpl::MakeConfigFiles() {
+    PlaySource play;
+    if (config_.own_play) {
+        play.own = config_.own_play;
+        play.set_others = config_.set_other_play;
+    } else if (library::Library* library = config_.library) {
+        play.own = [library] { return library->OwnPlay(); };
+        play.set_others = [library](const std::map<std::string, library::PlayTotals>& others) {
+            library->SetOtherPlay(others);
+        };
+    }
+    return CombineConfigFiles(
+        CreateSettingsFiles(config_.settings, config_.layers, config_.data_dir / "settings.json", PcSystems()),
+        CreatePlayFiles(std::move(play), config_.data_dir / "sync" / "playtime", DeviceId(), config_.device));
+}
+
+std::string EngineImpl::DeviceId() {
+    if (!config_.device_id.empty()) {
+        return config_.device_id;
+    }
+    if (config_.settings == nullptr) {
+        return {};
+    }
+    std::lock_guard lock(mutex_);
+    std::string id = config_.settings->GetString("sync.device_id");
+    if (id.empty()) {
+        std::random_device random;
+        std::mt19937_64 bits((static_cast<std::uint64_t>(random()) << 32) ^ random() ^
+                             static_cast<std::uint64_t>(pal::NowSeconds() * 1000));
+        char text[17];
+        std::snprintf(text, sizeof(text), "%016llx", static_cast<unsigned long long>(bits()));
+        id = text;
+        config_.settings->SetString("sync.device_id", id);
+    }
+    return id;
+}
+
+std::string EngineImpl::OtherDevice() {
+    const std::vector<std::string> names = OtherDeviceNames(config_.data_dir / "sync" / "playtime", DeviceId());
+    return names.size() == 1 ? names.front() : std::string("another device");
+}
+
 std::string EngineImpl::RunningGame() const {
     std::lock_guard lock(mutex_);
     return running_game_;
@@ -248,7 +292,7 @@ void EngineImpl::SyncGame(const std::string& game_id) {
     Request(game_id);
 }
 
-void EngineImpl::Request(const std::string& first_game) {
+void EngineImpl::Request(const std::string& first_game, bool timer) {
     if (Active().empty() || config_.jobs == nullptr) {
         return;
     }
@@ -257,6 +301,10 @@ void EngineImpl::Request(const std::string& first_game) {
         pending_games_.push_back(first_game);
     }
     pending_ = true;
+    // Games still uploading give way: the next run syncs the rest first, then goes on with them.
+    if (games_pass_.load() && !timer) {
+        run_cancel_.store(true);
+    }
     if (!job_running_) {
         StartRun();
     }
@@ -299,21 +347,24 @@ void EngineImpl::Pump(const std::string& running_game) {
             if (!ended.empty() && running_game.empty()) {
                 pending_games_.push_back(ended);
             }
+            if (!running_game.empty() && games_pass_.load()) {
+                run_cancel_.store(true); // no game uploads while the user plays
+            }
         }
     }
     const int minutes = IntervalMinutes();
     const double now = pal::NowSeconds();
-    bool due = false;
+    bool ended = false, timer = false;
     {
         std::lock_guard lock(mutex_);
-        due = !pending_games_.empty() && !job_running_;
+        ended = !pending_games_.empty() && (!job_running_ || games_pass_.load());
         if (minutes > 0 && now - last_timer_ >= minutes * 60.0) {
             last_timer_ = now;
-            due = true;
+            timer = true;
         }
     }
-    if (due) {
-        Request({});
+    if (ended || timer) {
+        Request({}, !ended);
     }
 }
 

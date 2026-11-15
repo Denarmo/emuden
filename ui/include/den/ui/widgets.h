@@ -83,6 +83,8 @@ struct RowSpec {
     std::string id;
     std::string label;
     std::string description;
+    /// The description as it is now, read at every draw (a row with a `description` only).
+    std::function<std::string()> live_description;
 
     std::function<void()> action;            // Action; also Confirm on a Value row
     std::function<std::string()> value;      // Value: the text at the right

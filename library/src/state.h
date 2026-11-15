@@ -24,6 +24,7 @@ struct Record {
     std::int64_t play_seconds = 0;
     int play_count = 0;
     std::int64_t added = 0;
+    PlayTotals other; // the other devices' play, from sync
 };
 
 struct Saved {

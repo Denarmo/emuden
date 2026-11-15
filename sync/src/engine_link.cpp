@@ -18,7 +18,7 @@ public:
     explicit ProviderLink(std::weak_ptr<EngineImpl> engine) : engine_(std::move(engine)) {}
 
     // {active, running, last_sync, done, total, uploaded, downloaded, conflicts, waiting,
-    //  errors = {...}, error?, current? = {path, fraction}, folder?}
+    //  stopping, errors = {...}, error?, current? = {path, fraction}, folder?}
     JsonValue StatusOf(const std::string& provider) override {
         const auto engine = engine_.lock();
         if (!engine) {
@@ -40,6 +40,8 @@ public:
             {"downloaded", JsonNumber(state.downloaded)},
             {"conflicts", JsonNumber(active ? static_cast<double>(engine->Conflicts().size()) : 0)},
             {"waiting", JsonNumber(state.waiting)},
+            // A call that takes long (a game upload) gives up when this is set and goes on later.
+            {"stopping", JsonBool(active && engine->Stopping())},
             {"errors", std::move(errors)},
         });
         if (!state.errors.empty()) {

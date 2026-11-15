@@ -3,6 +3,7 @@
 
 // The journal and the plan: what changed on which side since both last agreed.
 
+#include <algorithm>
 #include <system_error>
 
 #include "den/base/files.h"
@@ -61,19 +62,40 @@ bool Journal::Save() const {
                                                         {"deleted", std::move(list)}})));
 }
 
+std::string GameHash(std::uint64_t size) {
+    return "size:" + std::to_string(size);
+}
+
 namespace {
 
+// Games are a library that is uploaded once, not synced: a game the remote has (or that came
+// from it, or went up before) never goes up again, and nothing deletes one on either side.
 void PlanGame(const PlanRequest& request, const std::string& path, const LocalItem* local,
-              const RemoteFile* remote, const JournalEntry* journal, std::vector<Action>& out) {
-    if (local && remote && !journal) {
-        if (local->size == remote->size) {
+              const RemoteFile* remote, const JournalEntry* journal, bool deleted, std::vector<Action>& out) {
+    if (local && remote) {
+        if (!journal && local->size == remote->size) {
             out.push_back({Op::Adopt, path});
         }
-    } else if (local && request.upload_games && (!journal || local->hash != journal->hash)) {
-        out.push_back({Op::Upload, path});
-    } else if (!local && !remote && journal) {
-        out.push_back({Op::Forget, path});
+    } else if (local) {
+        if (!journal && request.upload_games) {
+            out.push_back({Op::Upload, path});
+        }
+    } else if (journal || deleted) {
+        out.push_back({Op::Forget, path}); // gone here: the remote copy stays
     }
+}
+
+int Rank(const std::string& category) {
+    if (category == SAVES) {
+        return 0;
+    }
+    if (category == STATES) {
+        return 1;
+    }
+    if (category == CONFIG) {
+        return 2;
+    }
+    return category == GAMES ? 4 : 3;
 }
 
 } // namespace
@@ -105,7 +127,7 @@ std::vector<Action> MakePlan(const PlanRequest& request) {
         const JournalEntry* journal = j != request.journal->entries.end() ? &j->second : nullptr;
         const bool deleted = request.journal->deleted.contains(path);
         if (category == GAMES) {
-            PlanGame(request, path, local, remote, journal, out);
+            PlanGame(request, path, local, remote, journal, deleted, out);
             continue;
         }
         if (local && remote) {
@@ -136,6 +158,10 @@ std::vector<Action> MakePlan(const PlanRequest& request) {
             out.push_back({Op::Forget, path});
         }
     }
+    // Saves first, games last: a game upload can take hours.
+    std::stable_sort(out.begin(), out.end(), [](const Action& a, const Action& b) {
+        return Rank(CategoryOf(a.path)) < Rank(CategoryOf(b.path));
+    });
     return out;
 }
 

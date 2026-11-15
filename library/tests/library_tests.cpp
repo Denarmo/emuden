@@ -124,6 +124,18 @@ TEST_CASE("the library scans, keeps records and remembers them") {
         CHECK(library->Sessions().back().seconds == 240);
         CHECK(library->Find(tetris_id)->play_seconds == 210);
         CHECK_FALSE(library->Find("gb:none"));
+        // Other devices' play (from sync) shows with this device's, and is kept apart from it.
+        library->SetOtherPlay({{tetris_id, {1000, 1800000000, 4}}});
+        CHECK(library->Find(tetris_id)->play_seconds == 1210);
+        CHECK(library->Find(tetris_id)->play_count == 7);
+        CHECK(library->Find(tetris_id)->last_played == 1800000000);
+        CHECK(library->RecentlyPlayed(1)[0].id == tetris_id);
+        CHECK(library->OwnPlay().at(tetris_id).seconds == 210);
+        CHECK(library->OwnPlay().at(tetris_id).count == 3);
+        // A new sum replaces the old one: nothing adds up twice.
+        library->SetOtherPlay({{tetris_id, {1500, 1800000000, 5}}});
+        CHECK(library->Find(tetris_id)->play_seconds == 1710);
+        library->SetOtherPlay({{tetris_id, {1000, 1800000000, 4}}});
     }
     {
         // A second run shows the last scan at once, with its records, and asks nothing again.
@@ -136,7 +148,8 @@ TEST_CASE("the library scans, keeps records and remembers them") {
         const auto tetris = library->Find(tetris_id);
         REQUIRE(tetris);
         CHECK(tetris->favourite);
-        CHECK(tetris->play_seconds == 210);
+        CHECK(tetris->play_seconds == 1210); // the other devices' part is kept too
+        CHECK(library->OwnPlay().at(tetris_id).seconds == 210);
         CHECK(tetris->added > 0);
         CHECK(library->Sessions().size() == 5);
         CHECK_FALSE(tetris->cover.empty());

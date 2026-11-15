@@ -96,6 +96,10 @@ Catalog BuildCatalog(const CatalogRequest& request, HashCache& hashes);
 std::int64_t FileTime(const std::filesystem::path& file);
 void SetFileTime(const std::filesystem::path& file, std::int64_t unix_seconds);
 
+/// The hash games are known by: their size. They are never hashed, which takes minutes for
+/// a disc image, and never uploaded over a remote copy.
+std::string GameHash(std::uint64_t size);
+
 struct JournalEntry {
     std::string hash; // the local content both sides agreed on
     std::string rev;  // the remote version at that time
@@ -138,9 +142,11 @@ struct PlanRequest {
     bool upload_games = false;
 };
 
-/// What to do for every path that local, remote or the journal knows. Nothing is deleted
-/// locally; a remote delete only for a path in the journal's `deleted`. Games are never
-/// downloaded by a plan, and uploaded only with `upload_games`.
+/// What to do for every path that local, remote or the journal knows, saves first, then
+/// states, settings and BIOS files, games last. Nothing is deleted locally; a remote delete
+/// only for a path in the journal's `deleted`, never a game. Games are never downloaded by a
+/// plan, and uploaded only with `upload_games`, once: never when the remote has the path or
+/// the journal knows it (uploaded or downloaded before).
 std::vector<Action> MakePlan(const PlanRequest& request);
 
 } // namespace den::sync

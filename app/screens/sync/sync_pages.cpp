@@ -109,7 +109,7 @@ private:
 class RemoteGamesScreen final : public ui::Page {
 public:
     void Build() override {
-        ui::Node* list = AddList(*this, "Games on your other devices", "sync.games.list");
+        ui::Node* list = AddList(*this, "Your game library", "sync.games.list");
         sync::Engine* engine = SyncSvc();
         if (engine == nullptr) {
             return;

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <format>
 
+#include "../home/games.h"
 #include "../plugins/feature_api.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
@@ -40,10 +41,10 @@ const char* CategoryHelp(const std::string& category) {
         return "Save states and their pictures, the resume state included";
     }
     if (category == sync::CONFIG) {
-        return "Settings and per-game settings; display, folders and controllers stay on this device";
+        return "Settings, per-game settings and play time; display, folders and controllers stay here";
     }
     if (category == sync::GAMES) {
-        return "Download games from the other devices when you ask for them";
+        return "An online library of your games: each goes up once, and downloads when you ask";
     }
     if (category == sync::BIOS) {
         return "Only what you put in EmuDEN's BIOS folder";
@@ -53,6 +54,10 @@ const char* CategoryHelp(const std::string& category) {
 
 std::string StatusText() {
     const sync::SyncState state = SyncSvc()->State();
+    if (state.running && state.games_pass) {
+        return std::format("Uploading game {} of {}", std::min(state.games_done + 1, state.games_total),
+                           state.games_total);
+    }
     if (state.running) {
         return state.total > 0 ? std::format("Syncing {} of {}", std::min(state.done + 1, state.total), state.total)
                                : std::string("Syncing");
@@ -60,16 +65,35 @@ std::string StatusText() {
     return SyncTimeText(state.last_sync);
 }
 
+// What moves now and how far it is: "Game.srm", "GT4.iso, 41% of 3.9 GB".
+std::string CurrentText(const sync::SyncState& state) {
+    const std::size_t slash = state.current.rfind('/');
+    std::string text = slash == std::string::npos ? state.current : state.current.substr(slash + 1);
+    if (state.fraction >= 0 && state.size > 0) {
+        text += std::format(", {}% of {}", static_cast<int>(state.fraction * 100), SizeText(state.size));
+    } else if (state.size >= (1u << 20)) {
+        text += ", " + SizeText(state.size);
+    }
+    return text;
+}
+
 std::string StatusHelp() {
     const sync::SyncState state = SyncSvc()->State();
+    if (state.running && !state.current.empty()) {
+        return CurrentText(state);
+    }
+    if (state.running && state.last_sync > 0 && state.games_pass) {
+        return "Saves and settings are synced; games go up one at a time";
+    }
     if (!state.errors.empty()) {
         return state.errors.front();
     }
-    if (state.running && !state.current.empty()) {
-        return state.current;
-    }
     if (state.waiting > 0) {
         return std::format("{} files wait until the game ends", state.waiting);
+    }
+    if (state.games_total > state.games_done) {
+        return std::format("{} games still to upload; they go on in the next sync",
+                           state.games_total - state.games_done);
     }
     return std::format("{} up, {} down last time", state.uploaded, state.downloaded);
 }
@@ -124,6 +148,7 @@ std::vector<ui::RowSpec> SyncRows() {
         "Sign in, choose the server or the folder"));
     ui::RowSpec status = ValueRow("sync.now", "Sync now", StatusText, [] { SyncSvc()->SyncNow(); });
     status.description = StatusHelp();
+    status.live_description = StatusHelp;
     rows.push_back(std::move(status));
     rows.push_back(ValueRow(
         "sync.conflicts", "Conflicts",
@@ -149,11 +174,11 @@ std::vector<ui::RowSpec> SyncRows() {
     }
     if (std::find(on.begin(), on.end(), sync::GAMES) != on.end()) {
         rows.push_back(ActionRow("sync.games", "Games", [] { Svc().stage->Push("sync.games"); },
-                                 "Download a game from your other devices"));
+                                 "Every game your devices uploaded; download any of them here"));
         ui::RowSpec upload = ToggleRow(
             "sync.upload_games", "Upload my games", [] { return SyncSvc()->UploadGames(); },
             [](bool value) { SyncSvc()->SetUploadGames(value); });
-        upload.description = "The games of this device go up, so the others can download them";
+        upload.description = "Each game of this device goes up once, after the saves, while no game runs";
         rows.push_back(std::move(upload));
         rows.push_back(ValueRow(
             "sync.games_folder", "Downloaded games go to", [] { return PathToUtf8(SyncSvc()->GamesFolder()); },

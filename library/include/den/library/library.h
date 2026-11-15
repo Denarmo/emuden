@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -64,6 +65,13 @@ struct Session {
     std::string id; // the entry's id
     std::int64_t started = 0; // unix seconds
     std::int64_t seconds = 0;
+};
+
+/// Play time as one device counts it. Sync adds up the devices' (docs/sync.md, section 3.2).
+struct PlayTotals {
+    std::int64_t seconds = 0;
+    std::int64_t last_played = 0; // unix seconds
+    int count = 0;
 };
 
 struct Folder {
@@ -136,6 +144,15 @@ public:
     /// Adds one play session to the entry's records and the session log. Time the log already
     /// holds for another game inside this session (a game opened over this one) is left out.
     virtual void RecordPlay(const std::string& id, std::int64_t started_unix, std::int64_t seconds) = 0;
+    /// What this device played, per entry id: without the other devices' time.
+    virtual std::map<std::string, PlayTotals> OwnPlay() const {
+        return {};
+    }
+    /// What the other devices played, per entry id, added up; replaces the earlier figures.
+    /// An entry shows its own time and theirs together, and the latest of the two last plays.
+    virtual void SetOtherPlay(const std::map<std::string, PlayTotals>& others) {
+        (void)others;
+    }
 
     /// The covers found for a game at the hack cover sources, downloaded, and the tagged box
     /// of the game it was made from. Blocks on the network: call it from a job.

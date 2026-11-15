@@ -232,7 +232,8 @@ void Row::DrawContent(Context& ctx) {
     } else {
         DrawTextIn(ctx, gfx::Rect{left, rect.y + 10, text_area.w, 26}, spec.label, theme.text_body,
                    gfx::FONT_REGULAR, theme.fg, Align::Start);
-        DrawTextIn(ctx, gfx::Rect{left, rect.y + 38, text_area.w, 22}, spec.description,
+        DrawTextIn(ctx, gfx::Rect{left, rect.y + 38, text_area.w, 22},
+                   spec.live_description ? spec.live_description() : spec.description,
                    theme.text_small, gfx::FONT_REGULAR, theme.text_dim, Align::Start);
     }
     const gfx::Rect value_area{right - value_width, rect.y, value_width, rect.h};

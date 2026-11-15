@@ -45,8 +45,9 @@ public:
     virtual Status Get(const std::string& path, const std::filesystem::path& local, const Progress& progress) = 0;
     /// Uploads `local` as `path` and returns the new rev. `rev` is the one the journal knows;
     /// a provider that refuses to write over a newer version fails with the error "conflict".
+    /// `progress`, when the provider reports it, gets the bytes sent so far.
     virtual Result<std::string> Put(const std::string& path, const std::filesystem::path& local,
-                                    const std::string& rev, std::int64_t modified) = 0;
+                                    const std::string& rev, std::int64_t modified, const Progress& progress) = 0;
     virtual Status Delete(const std::string& path) = 0;
     /// Free space, who is signed in: whatever the provider says, for the sync page.
     virtual JsonValue Info() {

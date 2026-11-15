@@ -26,7 +26,7 @@ bool Cancelled(const CatalogRequest& request) {
     return request.cancel != nullptr && request.cancel->load();
 }
 
-void Add(Catalog& out, HashCache& hashes, std::string path, const fs::path& file, const std::string& game) {
+void Add(Catalog& out, HashCache* hashes, std::string path, const fs::path& file, const std::string& game) {
     std::error_code ec;
     const std::uint64_t size = fs::file_size(file, ec);
     if (ec || !IsPortablePath(path)) {
@@ -37,7 +37,7 @@ void Add(Catalog& out, HashCache& hashes, std::string path, const fs::path& file
     item.file = file;
     item.size = size;
     item.modified = FileTime(file);
-    item.hash = hashes.Hash(file, size, item.modified);
+    item.hash = hashes != nullptr ? hashes->Hash(file, size, item.modified) : GameHash(size);
     item.game_id = game;
     if (!item.hash.empty()) {
         out[item.path] = std::move(item);
@@ -69,7 +69,7 @@ void AddGameFiles(const CatalogRequest& request, HashCache& hashes, const char* 
                 continue;
             }
             const std::string rest = name.substr(prefix.size() - 1);
-            Add(out, hashes, std::string(category) + "/" + system + "/" + game->stem + rest, file, game->id);
+            Add(out, &hashes, std::string(category) + "/" + system + "/" + game->stem + rest, file, game->id);
         }
     }
 }
@@ -106,7 +106,7 @@ void AddBios(const CatalogRequest& request, HashCache& hashes, Catalog& out) {
         std::string relative = PathToUtf8(it->path().lexically_relative(root));
         std::replace(relative.begin(), relative.end(), '\\', '/');
         if (!relative.empty() && relative.front() != '.') {
-            Add(out, hashes, std::string(BIOS) + "/" + relative, it->path(), {});
+            Add(out, &hashes, std::string(BIOS) + "/" + relative, it->path(), {});
         }
     }
 }
@@ -215,7 +215,7 @@ Catalog BuildCatalog(const CatalogRequest& request, HashCache& hashes) {
                 break;
             }
             for (const fs::path& file : GameFiles(game)) {
-                Add(out, hashes, std::string(GAMES) + "/" + game.system + "/" + PathToUtf8(file.filename()), file,
+                Add(out, nullptr, std::string(GAMES) + "/" + game.system + "/" + PathToUtf8(file.filename()), file,
                     game.id);
             }
         }
