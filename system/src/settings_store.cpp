@@ -242,6 +242,50 @@ void SettingsStore::ClearScope(const Scope& scope) {
     }
 }
 
+std::vector<std::string> SettingsStore::Scopes(Layer layer) const {
+    std::lock_guard lock(impl_->mutex);
+    std::vector<std::string> out;
+    for (const auto& [name, values] : layer == Layer::Game ? impl_->games : impl_->consoles) {
+        if (!values.empty()) {
+            out.push_back(name);
+        }
+    }
+    return out;
+}
+
+JsonValue SettingsStore::Overrides(const Scope& scope) const {
+    std::lock_guard lock(impl_->mutex);
+    JsonValue out = JsonObject();
+    const auto& layer = scope.layer() == Layer::Game ? impl_->games : impl_->consoles;
+    const auto found = layer.find(scope.layer() == Layer::Game ? scope.game : scope.system);
+    if (found != layer.end()) {
+        for (const auto& [key, value] : found->second) {
+            out.members.emplace_back(key, value);
+        }
+    }
+    return out;
+}
+
+void SettingsStore::SetOverrides(const Scope& scope, const JsonValue& values) {
+    std::lock_guard lock(impl_->mutex);
+    const Layer layer = scope.layer();
+    if (layer == Layer::Global) {
+        return;
+    }
+    auto& map = layer == Layer::Game ? impl_->games : impl_->consoles;
+    const std::string& name = layer == Layer::Game ? scope.game : scope.system;
+    if (values.members.empty()) {
+        map.erase(name);
+    } else {
+        map[name] = ReadValues(values);
+    }
+    impl_->Save();
+}
+
+std::filesystem::path SettingsStore::OverridesFile() const {
+    return impl_->file;
+}
+
 std::uint64_t SettingsStore::Revision() const {
     std::lock_guard lock(impl_->mutex);
     return impl_->revision;

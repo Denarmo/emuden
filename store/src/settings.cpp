@@ -140,6 +140,29 @@ void Settings::SetList(const std::string& key, const std::vector<std::string>& v
     impl_->Set(key, JsonArray(std::move(items)));
 }
 
+JsonValue Settings::StoredValues() const {
+    std::lock_guard lock(impl_->mutex);
+    return impl_->root;
+}
+
+void Settings::SetValues(const std::vector<std::pair<std::string, JsonValue>>& values) {
+    std::lock_guard lock(impl_->mutex);
+    for (const auto& [key, value] : values) {
+        bool found = false;
+        for (auto& [name, existing] : impl_->root.members) {
+            if (name == key) {
+                existing = value;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            impl_->root.members.emplace_back(key, value);
+        }
+    }
+    impl_->Save();
+}
+
 void Settings::Remove(const std::string& key) {
     std::lock_guard lock(impl_->mutex);
     std::erase_if(impl_->root.members, [&](const auto& member) { return member.first == key; });

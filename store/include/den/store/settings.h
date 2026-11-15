@@ -38,6 +38,11 @@ public:
     /// Removes the stored value; a default of the key shows through again.
     void Remove(const std::string& key);
 
+    /// Every stored value (the file's object), for sync.
+    JsonValue StoredValues() const;
+    /// Stores several values at once, any JSON type, with one write.
+    void SetValues(const std::vector<std::pair<std::string, JsonValue>>& values);
+
     /// The defaults layer: values in effect for keys the file does not hold (what suits this
     /// device). Never written to disk; a stored value always wins. Replaces the whole layer.
     void SetDefaults(std::vector<std::pair<std::string, JsonValue>> defaults);

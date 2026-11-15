@@ -167,6 +167,16 @@ public:
     /// Drops every override of a game (it left the library) or of a console.
     void ClearScope(const Scope& scope);
 
+    // For sync: whole layers.
+    /// The consoles (Layer::Console) or games (Layer::Game) that have overrides.
+    std::vector<std::string> Scopes(Layer layer) const;
+    /// The scope's own layer as an object of key and value.
+    JsonValue Overrides(const Scope& scope) const;
+    /// Replaces the scope's own layer with the object's members (an empty object clears it).
+    void SetOverrides(const Scope& scope, const JsonValue& values);
+    /// The file the console and game layers are kept in.
+    std::filesystem::path OverridesFile() const;
+
     /// Grows on every change.
     std::uint64_t Revision() const;
 
