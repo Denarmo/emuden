@@ -174,3 +174,20 @@ set(SPIRV_CROSS_ENABLE_C_API OFF CACHE BOOL "" FORCE)
 set(SPIRV_CROSS_ENABLE_UTIL OFF CACHE BOOL "" FORCE)
 set(SPIRV_CROSS_SKIP_INSTALL ON CACHE BOOL "" FORCE)
 den_fetch(spirvcross https://github.com/KhronosGroup/SPIRV-Cross.git vulkan-sdk-1.3.296.0 GIT_SHALLOW ON)
+
+# rcheevos (MIT, RetroAchievements) runs achievements (achievements/): the rc_client runtime,
+# the server API, game hashing and the libretro memory maps (rc_libretro.c reads libretro.h).
+den_fetch(rcheevos https://github.com/RetroAchievements/rcheevos.git v12.5.0 GIT_SHALLOW ON)
+file(GLOB den_rcheevos_sources "${rcheevos_SOURCE_DIR}/src/*.c" "${rcheevos_SOURCE_DIR}/src/rapi/*.c"
+    "${rcheevos_SOURCE_DIR}/src/rcheevos/*.c" "${rcheevos_SOURCE_DIR}/src/rhash/*.c")
+add_library(den_rcheevos STATIC ${den_rcheevos_sources})
+target_include_directories(den_rcheevos SYSTEM PUBLIC "${rcheevos_SOURCE_DIR}/include"
+    "${rcheevos_SOURCE_DIR}/src" "${CMAKE_SOURCE_DIR}/player/third_party/libretro")
+target_compile_definitions(den_rcheevos PUBLIC RC_CLIENT_SUPPORTS_HASH RC_STATIC)
+set_target_properties(den_rcheevos PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(MSVC)
+    target_compile_options(den_rcheevos PRIVATE /w /utf-8)
+    target_compile_definitions(den_rcheevos PRIVATE _CRT_SECURE_NO_WARNINGS)
+else()
+    target_compile_options(den_rcheevos PRIVATE -w)
+endif()
