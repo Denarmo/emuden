@@ -82,6 +82,9 @@ std::string StatusHelp() {
     if (state.running && !state.current.empty()) {
         return CurrentText(state);
     }
+    if (state.running && state.total == 0 && !state.games_pass) {
+        return "Looking for changes on this device and the other side";
+    }
     if (state.running && state.last_sync > 0 && state.games_pass) {
         return "Saves and settings are synced; games go up one at a time";
     }

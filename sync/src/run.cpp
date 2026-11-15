@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <optional>
 #include <system_error>
 
 #include "den/base/files.h"
@@ -64,11 +65,17 @@ public:
 
         std::map<std::string, RemoteFile> remote;
         bool listed = false;
+        // Google Drive lists everything for every call: once is enough there.
+        std::optional<Result<std::vector<RemoteFile>>> all;
+        if (id == GDRIVE_PROVIDER) {
+            Change([](SyncState& s) { s.current = "Looking for changes"; });
+            all = provider_.List("");
+        }
         for (const char* category : ORDER) {
             if (!categories.contains(category)) {
                 continue;
             }
-            Result<std::vector<RemoteFile>> files = provider_.List(std::string(category) + "/");
+            Result<std::vector<RemoteFile>> files = all ? *all : provider_.List(std::string(category) + "/");
             if (!files) {
                 Error(std::string("Listing ") + category + ": " + files.error());
                 categories.erase(category); // nothing of it is planned without its listing
@@ -86,6 +93,7 @@ public:
             }
         }
         remote_ = &remote;
+        Change([](SyncState& s) { s.current.clear(); });
 
         Journal journal(sync_dir_ / "journal.json");
         journal_ = &journal;
