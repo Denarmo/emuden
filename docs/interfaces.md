@@ -3,7 +3,7 @@
 What each module offers the others. Headers are in `<module>/include/den/<module>/`; include
 them as `"den/<module>/<file>.h"`. A directory never includes one listed after it in the
 root `CMakeLists.txt` (base, platform, gfx, input, ui, store, library, plugins, online,
-engine, player, system, app).
+engine, player, system, sync, app).
 
 ## Building one target
 
@@ -12,7 +12,7 @@ powershell -ExecutionPolicy Bypass -File tools\build.ps1 -Preset win -Target <ta
 ```
 
 Targets: `den_base`, `den_platform`, `den_gfx`, `den_input`, `den_ui`, `den_store`,
-`den_library`, `den_plugins`, `den_engine`, `den_player`, `den_system`, `den_app` (the
+`den_library`, `den_plugins`, `den_engine`, `den_player`, `den_system`, `den_sync`, `den_app` (the
 executable `bin/emuden.exe`), and `den_<module>_tests` for every module that has files in
 `<module>/tests`. Several targets: `-Target den_ui,den_ui_tests`. `-Test` runs ctest.
 
@@ -33,7 +33,8 @@ sources live once in `.deps/`.
 | `den/base/zip.h` | `ListZip`, `ExtractZipEntry` |
 | `den/base/archive.h` | zip or 7z by the file's first bytes: `ListArchive`, `CanExtractArchiveEntry`, `ExtractArchiveEntry`, `ArchiveReader` (several files of one solid 7z block), `IsArchiveExtension`. 7z through the LZMA SDK's decoder (`cmake/deps.cmake`): copy, LZMA, LZMA2, BCJ, BCJ2, delta; no password, no PPMd; a solid block is unpacked in memory, at most 1 GiB. rar is not read |
 | `den/base/jobs.h` | `Jobs::Run(name, fn(Job&), on_done)`: progress, message, cancel; `on_done` runs on the main thread |
-| `den/platform/pal.h` | window and GL context, `DataDir`, `AssetsDir`, `HttpGet` (redirects, streaming to a file, progress, cancel), `StartProcess`, `GetSecrets`, `GetCaps`, `StartLineServer` |
+| `den/platform/pal.h` | window and GL context, `DataDir`, `AssetsDir`, `HttpGet` (any method, bodies from memory or a file slice, answer headers, redirects, streaming to a file, progress, cancel), `StartProcess`, `GetSecrets` (the platform's credential store), `GetCaps`, `StartLineServer` |
+| `den/sync/engine.h` | device sync (`docs/sync.md`): `CreateEngine`, the active provider, categories, triggers, status, conflicts, remote games; `app/screens/sync/sync_glue.h` `SyncSvc()` |
 | `den/platform/apps.h` | `pal::apps`: the device's other apps where the platform can list them (Android): `Available`, `List` (id, label, icon PNG in the app cache; call it from a job), `Revision`, `Launch(id, Display::Default / Main / Second)`, `HasInputFocus`; for an app beside the game: `Raise(display)` (this app's own window over the other app) / `Lower(display, app)` (that app in front again), `ShowHandle` / `HideHandle`, `CatchBack(display, on)`, `TakeEvents()` (Handle, Back, Home) |
 | `den/platform/lifecycle.h` | `pal::MainWindowHidden()` (Android: another app covers the main window, the loop goes on), `PrepareFrame()` at the start of every frame (keeps the GL context usable; false = no GL this frame), `EventPumpHeld()` for `den::input` |
 | `den/platform/audio.h` | `pal::audio`: the system's media volume where an app may set it (Android): `HasSystemVolume`, `SystemVolumeSteps`, `SystemVolume`, `SetSystemVolume` |

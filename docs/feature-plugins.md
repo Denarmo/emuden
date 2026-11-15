@@ -96,8 +96,14 @@ Permissions (the sentence is what the install page shows):
 | `library.read` | `den.library.find`, `games` for `systems` | "See which games of these consoles you have" |
 | `patch` | `den.patch.*`; creates hacks in the library | "Create patched copies of your games" |
 | `library.write` | `den.library.update`, `remove` on hacks this plugin made | "Change the hacks it installed" |
+| `sync` | `den.sync`, `plugin.provider`; needs `feature.sync.categories` (`docs/sync.md`) | "Keep these in step between your devices: ..." |
+| `http.user_host` | `den.http.request` to the one server the user confirmed (`den.sync.set_server`) | "Connect to the server you enter" |
+| `http.local` | `den.http.request` to `127.0.0.1` and `localhost` on a port, http or https | "Connect to apps on this device" |
 
-Always there, without a permission: `den.json`, `den.storage`, `den.ui`, `den.log`,
+`den.http.request` (any method, bodies, multipart, answer headers) needs `http`,
+`http.user_host` or `http.local`; see `docs/sync.md`, section 4.
+
+Always there, without a permission: `den.json`, `den.storage`, `den.secrets` (`docs/sync.md`), `den.ui`, `den.log`,
 `den.files` on the plugin's own folder. Never there: `os`, `io`, `package`, `debug`,
 `require`, `dofile`, `loadfile`, `load` with binary chunks, `collectgarbage` with arguments.
 Loaded libraries: base (without those), `string`, `table`, `math`, `utf8`, `coroutine`.

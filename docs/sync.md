@@ -65,36 +65,75 @@ same stem (rare) sync under the first and the conflict is logged. Device-only se
 ## 4. HTTP for plugins (platform and `den.http`)
 
 `pal::HttpRequest` gains `method` (GET, POST, PUT, PATCH, DELETE, HEAD), `body` (in memory)
-or `body_file` (streamed upload), and `HttpResponse` gains response `headers`. All three
-backends (WinHTTP, curl, Android) implement them.
+or `body_file` (streamed upload) with `body_offset` and `body_length` (a slice of the file),
+`follow_redirects` and `loopback_any_certificate`; `HttpResponse` gains response `headers`
+(names in lower case, of the last answer after redirects). All three backends (WinHTTP,
+curl, Android) implement them.
 
-`den.http.request{url, method?, headers?, body?, body_file?, to_file?, on_progress?}` (wait)
-returns `{status, body?, headers}`; `body_file` and `to_file` are paths the host gave the
-plugin for this sync (section 5) or the plugin's own folder. `den.http.get` stays as it is.
+`den.http.request{...}` (wait) returns `{status, body, headers}` for every answer the server
+gave, 4xx and 5xx included; `nil, message` only when there was no answer (refused address,
+no connection, a limit). Fields:
 
-Hosts: `http.hosts` as before, plus two permissions:
+| Field | Meaning |
+|---|---|
+| `url` | required; see the hosts below |
+| `method` | GET (default), POST, PUT, PATCH, DELETE, HEAD; any letter case |
+| `headers` | a table of name and value; `Authorization` may be set (it may not for `den.http.get`); `User-Agent`, `Cookie`, `Referer`, `Host`, `Content-Length` are the host's |
+| `body` | text (binary is fine), at most 8 MiB |
+| `body_file`, `body_offset`, `body_length` | upload a file, or `body_length` bytes of it from `body_offset` (0 or absent: to its end); for resumable uploads |
+| `multipart` | a list of at most 16 parts the host builds the body of: `{name, value}` or `{name, file, filename?, content_type?}`; any part may add `headers`; `body`/`body_file` are accepted for `value`/`file`. The host sets `Content-Type: multipart/<type>; boundary=...` |
+| `multipart_type` | `form-data` (default; RomM), `related` (Google Drive's multipart upload, whose parts carry `content_type` and no `name`) or `mixed` |
+| `to_file` | the answer's body goes to this file (only for a 2xx answer; `body` is then absent) |
+| `on_progress` | a function called with the received fraction 0..1 (negative: size unknown) |
+
+Give one of `body`, `body_file` and `multipart`. `body_file`, `to_file` and a part's `file`
+are paths of the plugin's own folder, or the `local_path` the host passed to a provider
+call (`"sync:<token>"`, valid during that call only). `to_file` into the plugin's folder
+counts against its storage limit; a lent file has none. `den.http.get` stays as it is.
+
+`den.files.read(local_path)` reads a lent file too, as it is (binary-safe), up to 8 MiB.
+
+Hosts: `http.hosts` as before (https only), plus two permissions:
 - `http.user_host`: the plugin may reach one https or http host the user typed on its setup
   page (`den.sync.set_server(url)` asks the user to confirm it; shown as "Connect to the
-  server you enter"). A RomM server on the home network is plain http; the confirm page says
-  so.
-- `http.local`: `http://127.0.0.1:<port>` and `http://localhost:<port>` (Syncthing's REST
-  API). Shown as "Connect to apps on this device".
+  server you enter"). Only the URL's scheme, host and port are kept (its path is not), and
+  every path of that origin may be requested. A RomM server on the home network is plain
+  http; the confirm page says so.
+- `http.local`: `http://` and `https://` to `127.0.0.1:<port>` and `localhost:<port>`; the
+  port is required. Over https any certificate is accepted there (Syncthing's
+  self-signed one), never for another host. Shown as "Connect to apps on this device".
+
+Requests to the user's server and to this device have no pause between them and their
+redirects are not followed: a 3xx comes back as it is (`headers.location`). Requests to
+`http.hosts` follow redirects and keep the per-host pause of `den.http.get`.
+
+Answer headers: names in lower case; a header that came several times is one value joined
+with `", "`.
 
 ## 5. Provider plugins (`den.sync`, permission `sync`)
 
 A feature plugin with `sync` in `permissions` and `"sync": {"categories": [...]}` in its
-`feature` object is a provider. It returns, beside the usual entry points:
+`feature` object is a provider. `categories` is required with `sync`, may list only
+`saves`, `states`, `config`, `games` and `bios`, and none twice; `feature.sync` without the
+`sync` permission refuses the manifest. The install page shows "Keep these in step between
+your devices: saves, save states, settings, games, BIOS files" for what it lists. The
+plugin returns, beside the usual entry points:
 
 ```lua
 plugin.provider = {
   -- Remote files under the provider's EmuDEN folder: { {path, size, modified, rev} }.
   -- prefix is one of the category folders ("saves/", ...); nil lists everything.
+  -- modified is the file's own time as put() gave it (Unix seconds), not the upload time.
   list = function(prefix) end,
   -- Writes the remote file into local_path (a temporary file the host made).
-  get = function(path, local_path) end,
-  -- Uploads local_path as path; returns the new rev. rev is the one the journal knows,
-  -- for providers that can refuse a write over a newer remote version (nil, "conflict").
-  put = function(path, local_path, rev) end,
+  -- progress(done, total) may be called (or passed on as den.http.request's on_progress,
+  -- whose one argument, a fraction, it also takes).
+  get = function(path, local_path, progress) end,
+  -- Uploads local_path as path; returns the new rev (text or number). rev is the one the
+  -- journal knows (nil for a new file), for providers that can refuse a write over a newer
+  -- remote version (nil, "conflict"). modified is the local file's time, Unix seconds:
+  -- keep it and give it back in list().
+  put = function(path, local_path, rev, modified) end,
   delete = function(path) end,
   -- Optional: free space and who is signed in, for the sync page.
   status = function() end,
@@ -102,24 +141,82 @@ plugin.provider = {
 ```
 
 Paths are portable names (section 2). The host calls these from the sync engine's job, one
-at a time per provider, and treats `nil, message` as a failure of that file (retried on the
-next run). `den.sync.status()`, `den.sync.now()` and `den.sync.enabled_categories()` let the
-plugin's page show and start syncing; `den.sync.set_server(url)` is section 4.
+at a time per provider, without opening the plugin's page (the script is started for it and
+kept 60 s after the last call), and treats `nil, message` or an error as a failure of that
+file (retried on the next run). A `rev` the provider leaves empty is taken as
+`<size>@<modified>`.
 
-Credentials (tokens, API keys, RomM password) go to `den.secrets.get/set/remove`: like
-`den.storage` but kept in the platform's credential store (Windows Credential Manager,
-Android Keystore-encrypted file, libsecret or a 0600 file on Linux) and never synced.
+`den.sync`, present only with the `sync` permission:
+
+| Call | Result |
+|---|---|
+| `den.sync.status()` | the table below |
+| `den.sync.now()` | `true`, or `nil, message` (the plugin is not the active provider) |
+| `den.sync.enabled_categories()` | the categories on for this provider on this device, `{"saves", ...}` |
+| `den.sync.folder()` | the folder store's absolute path, or `nil` |
+| `den.sync.use_folder(path?)` (wait) | the absolute path, or `nil, message`. Without `path` the app's folder picker opens. `"~/..."` is under the user's home on a desktop and the shared storage's root on Android; other paths must be absolute. A path the plugin names is confirmed by the user ("Keep the sync files here?"). Refused: a drive's root, EmuDEN's data, a game folder of the library |
+| `den.sync.set_server(url)` (wait) | `true` once the user confirmed it, or `nil, message` (`"declined"`). Needs `http.user_host`. The page warns when the address is plain http. Confirming the same server again asks nothing |
+| `den.sync.download_game(paths)` (wait) | `true`, or `nil, message`. `paths` (a list, or one text) are portable names under `games/`: the index file and its members. The host calls `provider.get` for each into `<games folder>/<system>/<file name>` and adds that folder to the library with its console |
+
+`den.sync.status()` (fields the plugin does not know are to be skipped):
+
+```lua
+{ active = true,            -- this plugin is the active provider on this device
+  running = false,          -- a run goes on
+  last_sync = 1794700000,   -- end of the last run that reached the provider, 0 = never
+  done = 3, total = 10,     -- files of the current (or last) run
+  uploaded = 2, downloaded = 1,
+  conflicts = 0,            -- conflict copies kept, not yet dealt with
+  waiting = 0,              -- files of a running game, left for when it ends
+  errors = { "saves/gba/Game.srm: ..." },  -- of the last run, at most 20
+  error = "saves/gba/Game.srm: ...",       -- the first of them, absent when none
+  current = { path = "saves/gba/Game.srm", fraction = 0.5 },  -- absent when idle
+  folder = "/storage/emulated/0/Sync/EmuDEN" }                -- with the folder store
+```
+
+`den.json.encode` of an empty table gives `[]` (a table without a first element and without
+other keys is an empty array); use `den.json.decode("{}")`'s value, or a table with a key,
+for an object.
+
+Credentials (tokens, API keys, RomM password) go to `den.secrets.get/set/remove(name)`:
+like `den.storage` (any JSON value) but kept in the platform's credential store (Windows
+Credential Manager, Android Keystore-encrypted file, a 0600 file on Linux) and never
+synced. Always there, no permission needed. A name is up to 64 letters, digits, `.`, `_`
+or `-`; a value at most 2 KiB as JSON; at most 32 per plugin. Removing a plugin with its
+data removes its secrets.
 
 A provider without a remote store of its own (Syncthing) uses the host's **folder store**:
 `den.sync.use_folder(path)` (the user picks the folder; on Android a path under shared
 storage) makes the host keep the remote side as plain files in that folder; `list/get/put`
-are then not needed from the plugin.
+are then not needed from the plugin. The folder store skips files and folders starting with
+`.` (Syncthing's `.stfolder`, `.stversions`, temporary files) and `~syncthing~*`, and refuses
+a write over a file that changed since the journal saw it (a conflict on the next run).
+
+Host settings, all kept on the device: `sync.active` (provider id), `sync.categories.<id>`,
+`sync.folder.<id>`, `sync.upload_games`, `sync.games_folder` (default `<data>/games`),
+`sync.interval_minutes` (15; 0 = only at start, game end and Sync now).
+
+For trying a provider: put it in `<data>/plugins-dev/<id>/` (plugin.json, main.lua), set
+`"plugins.developer": true` in `<data>/settings.json` and start the app; it is listed under
+Plugins as "Developer" and asks for its permissions before it first runs. `<data>` is the
+`user` folder next to the program when it exists (portable), else `%APPDATA%\EmuDEN`, the
+XDG data folder or the app's files on Android.
 
 ## 6. Screens
 
 Settings > Sync: the active provider, the categories (per device), "Sync now", last sync,
 conflicts, "Games" (download a game from the remote, per console, with sizes) and "Upload my
 games" (off). A game's details page shows "Saves synced" and the conflict, if any.
+
+As built (`app/screens/sync/`): the section's rows are "Sync with" (Off or a provider),
+"Set up <provider>" (opens the plugin's page), "Sync now" (last sync at the right, the first
+error or the last run's counts below), "Conflicts" (route `sync.conflicts`: each kept copy,
+Confirm is "Use this one instead", Option deletes the copy), one toggle per category the
+provider offers, then with games on "Games" (route `sync.games`), "Upload my games" and
+"Downloaded games go to", the folder store's "Sync folder" when there is one, and "Every 15
+minutes". The engine is `sync/` (`den/sync/engine.h`); settings sync merges (remote values
+win key by key, keys only this device has stay); settings met for the first time on two
+devices are merged rather than a conflict.
 
 ## 7. The three plugins (official source, `Denarmo/emuden-plugins`)
 
