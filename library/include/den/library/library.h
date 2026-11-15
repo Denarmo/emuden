@@ -58,6 +58,7 @@ struct SystemInfo {
 };
 
 struct SystemDef;
+class SystemTable;
 class Hacks;
 
 /// One time a game was played, as RecordPlay booked it.
@@ -192,6 +193,8 @@ public:
     /// the built-in rules of the same id and add new ones; a console left out of a later call
     /// is gone again, and its games are hidden. The next scan uses them.
     virtual void SetSystems(std::vector<SystemDef> systems) = 0;
+    /// The consoles the library works with now: the built-in ones and the plugins'.
+    virtual SystemTable Consoles() const;
     /// Adds the host folders an earlier app's profile lists as game folders (its
     /// config/qt-config.ini, read only). Fails when there is no such profile.
     virtual Status ImportFolders(const std::filesystem::path& old_profile) = 0;

@@ -489,6 +489,10 @@ private:
         return entry.system.empty() || systems_.Find(entry.system) != nullptr;
     }
 
+    SystemTable Consoles() const override {
+        return SystemsCopy();
+    }
+
     SystemTable SystemsCopy() const {
         std::lock_guard lock(mutex_);
         return systems_;
@@ -717,6 +721,10 @@ private:
 };
 
 } // namespace
+
+SystemTable Library::Consoles() const {
+    return SystemTable();
+}
 
 std::unique_ptr<Library> CreateLibrary(const Config& config) {
     auto library = std::make_unique<RealLibrary>(config);
