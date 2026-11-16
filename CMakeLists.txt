@@ -12,6 +12,9 @@ if(MSVC)
 endif()
 
 option(DEN_BUILD_TESTS "Build the unit tests" ON)
+# The automation and test endpoints and the sample plugin host (each still needs its environment
+# variable at run time). Off leaves them out of the app.
+option(EMUDEN_DEV_TOOLS "Build the developer and test tools into the app" ON)
 
 include(cmake/deps.cmake)
 include(cmake/module.cmake)

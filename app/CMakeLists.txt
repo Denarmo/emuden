@@ -4,6 +4,17 @@ file(GLOB_RECURSE app_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/screens/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/pages/*.cpp")
+# Developer tools and the stand-ins built when they are left out (EMUDEN_DEV_TOOLS).
+set(dev_tools_files automation fake_host sample_pages test_endpoint web_endpoint)
+set(dev_tools_stubs automation_off fake_host_off)
+if(EMUDEN_DEV_TOOLS)
+    set(left_out ${dev_tools_stubs})
+else()
+    set(left_out ${dev_tools_files})
+endif()
+foreach(name ${left_out})
+    list(FILTER app_sources EXCLUDE REGEX "/${name}[.]cpp$")
+endforeach()
 
 if(ANDROID)
     # SDL's activity loads libmain.so and calls SDL_main (shells/android). SDL is linked in,

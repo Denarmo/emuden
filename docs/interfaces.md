@@ -21,6 +21,11 @@ Sources in `<module>/src` (recursively) and tests in `<module>/tests` are globbe
 file needs no CMake edit. Third-party code comes from `cmake/deps.cmake` (`den_fetch`), whose
 sources live once in `.deps/`.
 
+`-DEMUDEN_DEV_TOOLS=OFF` leaves the developer tools out of the app: the automation endpoint
+(`app/src/automation.cpp`), the player's and the browser's test endpoints (`test_endpoint.cpp`,
+`web_endpoint.cpp`) and the sample plugin host (`fake_host.cpp`, `sample_pages.cpp`). It is on by
+default; each tool still starts only when its environment variable is set.
+
 ## Foundation
 
 | Header | What |

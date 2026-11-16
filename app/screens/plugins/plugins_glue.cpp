@@ -7,6 +7,7 @@
 #include <format>
 #include <map>
 #include <memory>
+#include <utility>
 
 #include "den/app/app.h"
 #include "den/app/pages.h"
@@ -36,9 +37,12 @@ std::map<std::string, Tracked>& TrackedJobs() {
 }
 
 void CreateHost() {
+    // Null when the app is built without the developer tools.
     if (pal::GetEnv("EMUDEN_FAKE_PLUGINS") == "1") {
-        HostSlot() = CreateSampleFeatureHost();
-        return;
+        if (auto fake = CreateSampleFeatureHost()) {
+            HostSlot() = std::move(fake);
+            return;
+        }
     }
     Services& svc = Svc();
     plugins::FeatureConfig config;
