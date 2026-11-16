@@ -32,6 +32,9 @@
         <intent>
             <action android:name="io.github.ecp.action.PLAY" />
         </intent>
+        <intent>
+            <action android:name="io.github.ecp.action.CONFIGURE" />
+        </intent>
         <!-- Retroid's and AYN's dual-screen panels (screenControlsAvailable). -->
         <package android:name="com.retroidpocket.dualscreen.assistant" />
         <package android:name="com.odin.dualscreen.assistant" />
@@ -89,6 +92,14 @@
             android:authorities="${applicationId}.games"
             android:exported="false"
             android:grantUriPermissions="true" />
+        <!-- The BIOS and game folders an engine app keeps reading (ECP configure); read-only,
+             reachable only through the grants EngineApps.share makes. -->
+        <provider
+            android:name=".SharedDocuments"
+            android:authorities="${applicationId}.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS" />
 
         <!-- Shows nothing: started on a display to move the input focus there. -->
         <activity

@@ -59,6 +59,7 @@ public:
         launch.fullscreen = request.fullscreen;
         launch.install = request.engine;
         launch.controlled = true;
+        launch.setup = request.engine_setup;
         launch.settings = request.option_hints;
         for (const auto& [key, value] : StoredValues()) {
             Put(launch.settings, key, value);

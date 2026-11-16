@@ -56,4 +56,11 @@ Status Open(const PlayRequest& request);
 /// Brings the engine's PLAY activity back to the front after the menu. Main thread.
 Status Resume(const std::string& package, apps::Display display);
 
+/// Lets the app read a file or a folder (and everything in it) for good: a content URI it is
+/// granted read access to, which it may keep across restarts (ECP configure). Main thread.
+Result<std::string> Share(const std::string& package, const std::filesystem::path& path);
+/// Sends the engine its setup outside a session: `fields` is the configure request's fields as
+/// a JSON object (ECP section 6.6). Fails when the app has no CONFIGURE receiver. Main thread.
+Status Configure(const std::string& package, const std::string& cert_sha256, const std::string& fields);
+
 } // namespace den::pal::engine_apps

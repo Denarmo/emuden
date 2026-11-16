@@ -67,6 +67,8 @@ struct OpenRequest {
     bool resume = true;
     /// An engine app plays the game instead of a libretro core (`core` is then unused).
     std::optional<engine::Install> engine;
+    /// Its own setup (the player's BIOS and game folders), sent before the game.
+    std::optional<engine::EngineSetup> engine_setup;
     std::string title;
     bool fullscreen = true; // the engine's own window
     /// RetroAchievements hardcore: no state is loaded (the resume state neither) and no rewind.

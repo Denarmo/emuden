@@ -39,9 +39,39 @@ bool Ok(const JsonValue& result) {
 const std::vector<std::string>& FrontendCapabilities() {
     static const std::vector<std::string> capabilities = {
         "pause", "menu", "states", "state_thumbnails", "reset", "fast_forward",
-        "rewind", "settings", "perf", "volume",
+        "rewind", "settings", "perf", "volume", "configure",
     };
     return capabilities;
+}
+
+std::vector<std::pair<std::string, JsonValue>> ConfigureFields(const ConfigureInfo& info,
+                                                               const std::vector<SettingDef>& schema) {
+    Fields fields;
+    if (!info.bios.empty()) {
+        fields.emplace_back("bios", Strings(info.bios));
+    }
+    if (!info.game_folders.empty()) {
+        fields.emplace_back("game_folders", Strings(info.game_folders));
+    }
+    Fields settings;
+    for (const auto& [key, value] : info.settings) {
+        const auto setting = std::find_if(schema.begin(), schema.end(), [&](const SettingDef& s) { return s.key == key; });
+        if (setting != schema.end()) {
+            settings.emplace_back(key, TypedValue(&*setting, value));
+        } else if (!schema.empty()) {
+            continue; // an engine that does not have the setting is not sent it
+        } else if (value == "true" || value == "false") {
+            settings.emplace_back(key, JsonBool(value == "true"));
+        } else if (const auto number = ParseJson(value); number && number->kind == JsonValue::Kind::Number) {
+            settings.emplace_back(key, *number);
+        } else {
+            settings.emplace_back(key, JsonString(value));
+        }
+    }
+    if (!settings.empty()) {
+        fields.emplace_back("settings", JsonObject(std::move(settings)));
+    }
+    return fields;
 }
 
 Channel::Channel(Opening opening, LaunchInfo launch, std::string frontend_version)
@@ -167,6 +197,38 @@ bool Channel::Handshake() {
                             schema_.push_back(std::move(*setting));
                         }
                     }
+                }
+                break;
+            }
+            std::lock_guard lock(mutex_);
+            events_.push_back(std::move(*frame));
+        }
+    }
+
+    // The engine's own setup, before the launch, so a BIOS it carries is there for the game.
+    if (Has("configure") && launch_.configure) {
+        std::int64_t id;
+        Fields fields;
+        {
+            std::lock_guard lock(mutex_);
+            id = next_id_++;
+            fields = ConfigureFields(*launch_.configure, schema_);
+        }
+        if (!WriteNow(Message("configure", id, std::move(fields)))) {
+            return false;
+        }
+        for (;;) {
+            std::optional<JsonValue> frame = ReadFrame(stream);
+            if (!frame) {
+                return false;
+            }
+            if (frame->String("type") == "result" && NumberOf(*frame, "id", 0) == static_cast<double>(id)) {
+                if (Ok(*frame)) {
+                    log::Info("engine", "ecp: configured ({} BIOS files, {} game folders, {} settings, setup {})",
+                              NumberOf(*frame, "bios", 0), NumberOf(*frame, "game_folders", 0),
+                              NumberOf(*frame, "settings", 0), BoolOf(*frame, "setup_done", false) ? "done" : "not done");
+                } else {
+                    log::Warn("engine", "ecp: configure failed: {}", ErrorText(*frame));
                 }
                 break;
             }

@@ -35,4 +35,12 @@ Status Resume(const std::string&, apps::Display) {
     return Status::Fail("This device starts no apps.");
 }
 
+Result<std::string> Share(const std::string&, const std::filesystem::path&) {
+    return Status::Fail("This device starts no apps.");
+}
+
+Status Configure(const std::string&, const std::string&, const std::string&) {
+    return Status::Fail("This device starts no apps.");
+}
+
 } // namespace den::pal::engine_apps

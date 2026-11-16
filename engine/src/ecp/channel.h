@@ -36,6 +36,18 @@ struct Opening {
     double connect_seconds = 10;
 };
 
+/// What the configure request says (section 6.6): locations as the engine reads them (paths,
+/// or content URIs on Android).
+struct ConfigureInfo {
+    std::vector<std::string> bios;
+    std::vector<std::string> game_folders;
+    std::vector<std::pair<std::string, std::string>> settings; // by key, as text
+};
+
+/// The configure request's fields. Without a schema the values are guessed from their text.
+std::vector<std::pair<std::string, JsonValue>> ConfigureFields(const ConfigureInfo& info,
+                                                               const std::vector<SettingDef>& schema);
+
 /// What the launch request says (section 5).
 struct LaunchInfo {
     std::string content; // the path, or "intent"
@@ -46,6 +58,8 @@ struct LaunchInfo {
     bool fullscreen = true;
     std::vector<std::pair<std::string, std::string>> settings; // by key, as text
     std::vector<std::string> menu_chord;
+    /// Sent as `configure` before the launch when the engine has it (section 6.6).
+    std::optional<ConfigureInfo> configure;
 };
 
 /// The capabilities EmuDEN drives; an engine's others are left out of the answer.

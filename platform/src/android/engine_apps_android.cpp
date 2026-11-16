@@ -139,4 +139,43 @@ Status Resume(const std::string& package, apps::Display display) {
     return Answer(call, answer);
 }
 
+Result<std::string> Share(const std::string& package, const std::filesystem::path& path) {
+    const jni::ActivityCall call;
+    const jmethodID method = call.Method("engineShare", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+    if (!method) {
+        return Status::Fail("This build cannot share files with engine apps.");
+    }
+    jstring name = call.env->NewStringUTF(package.c_str());
+    jstring file = call.env->NewStringUTF(PathToUtf8(path).c_str());
+    jobject answer = call.env->CallStaticObjectMethod(call.activity_class, method, name, file);
+    call.env->DeleteLocalRef(name);
+    call.env->DeleteLocalRef(file);
+    if (call.Threw()) {
+        return Status::Fail("The engine app could not be reached.");
+    }
+    std::string text = call.Take(answer);
+    if (text.empty() || text.rfind("error:", 0) == 0) {
+        return Status::Fail(text.empty() ? "The file could not be shared." : text.substr(6));
+    }
+    return text;
+}
+
+Status Configure(const std::string& package, const std::string& cert_sha256, const std::string& fields) {
+    const jni::ActivityCall call;
+    const jmethodID method = call.Method(
+        "engineConfigure", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+    if (!method) {
+        return Status::Fail("This build cannot set up engine apps.");
+    }
+    JNIEnv* env = call.env;
+    jstring name = env->NewStringUTF(package.c_str());
+    jstring cert = env->NewStringUTF(cert_sha256.c_str());
+    jstring json = env->NewStringUTF(fields.c_str());
+    jobject answer = env->CallStaticObjectMethod(call.activity_class, method, name, cert, json);
+    for (jstring text : {name, cert, json}) {
+        env->DeleteLocalRef(text);
+    }
+    return Answer(call, answer);
+}
+
 } // namespace den::pal::engine_apps

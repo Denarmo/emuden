@@ -10,6 +10,7 @@
 #include "../boot/boot.h"
 #include "../companion/second_screen.h"
 #include "../details/game_prefs.h"
+#include "../engine/engine_setup.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
@@ -138,14 +139,8 @@ void PlayerScreen::Begin(const std::filesystem::path& content, bool resume) {
     request.together = PlayerTogetherFor(game_, Param("together") == "1");
     if (core_.runner == plugins::Runner::Engine) {
         // An engine app runs it; the session talks to it through the engine host.
-        engine::Install install;
-        install.executable = core_.engine.executable;
-        install.source = "manifest";
-        install.level = core_.engine.level;
-        install.core_id = core_.id;
-        install.package = core_.engine.package;
-        install.cert_sha256 = core_.engine.cert_sha256;
-        request.engine = install;
+        request.engine = EngineInstallFor(core_);
+        request.engine_setup = EngineSetupFor(core_);
         request.fullscreen = EngineFullscreenFor(game_, svc.window->Fullscreen());
     }
     log::Info("player", "open {} with {}", game_.name, core_.id);

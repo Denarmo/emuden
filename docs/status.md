@@ -606,6 +606,11 @@ a standalone app driven over the Emulator Control Protocol (Denarmo/emulator-con
 worked example for emulator developers. It needs the player's own BIOS, so Play! stays the default.
 Started from EmuDEN on the Retroid, CMR3 runs in it; Start+Select and the bottom panel's Pause open
 EmuDEN's menu over the paused frame, and save/load state, resume and exit work (PS2 1.1.2, PSX2 ECP 1.3.2-ecp2).
+Since PS2 1.2.1 (PSX2 ECP 1.3.2-ecp4, now ecp5) EmuDEN sets PSX2 ECP up with ECP `configure`
+(docs/engines.md): the BIOS folder's `pcsx2/bios/` (a BIOS set of the psx2-ecp core), the library's PS2
+folders and the engine's option values, before each game and, once it is installed, outside a session.
+On the Retroid, PSX2 ECP opened from the Android launcher then went straight to its library (CMR3 and
+GT4 listed, read through EmuDEN's documents provider) with no setup wizard, and CMR3 booted from it.
 PS2 has Play!, built from the fork Denarmo/Play- so that it also runs on
 Android (GT4 PAL reaches its language menu at 50 fps on the Retroid Pocket Duo, and its save
 states load). Since 1.0.6 its OpenGL renderer streams draws and texture uploads through persistent

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "den/engine/host.h"
+#include "ecp/channel.h"
 
 namespace den::engine {
 
@@ -50,6 +51,10 @@ struct LinkContext {
 /// Starts `install` for the request at the install's protocol level.
 Result<std::unique_ptr<Link>> OpenLink(const Install& install, const LaunchRequest& request,
                                        const std::vector<std::string>& args, const LinkContext& context);
+
+/// The configure fields for an engine: paths on the desktop (`package` empty), content URIs
+/// granted to the app's package on Android.
+ecp::ConfigureInfo ConfigureInfoFor(const EngineSetup& setup, const std::string& package);
 
 /// Level 1 and up, on the desktop (a child speaking on its standard input and output) or as
 /// an app (Android, over a loopback connection).

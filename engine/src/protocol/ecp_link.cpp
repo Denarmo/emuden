@@ -126,8 +126,17 @@ private:
     std::unique_ptr<ecp::Channel> channel_;
 };
 
-ecp::LaunchInfo LaunchFor(const LaunchRequest& request, std::string content) {
+// Each location as the engine reads it: on Android a content URI granted to its package.
+std::optional<ecp::ConfigureInfo> ConfigureFor(const LaunchRequest& request, const std::string& package) {
+    if (!request.setup || request.setup->Empty()) {
+        return std::nullopt;
+    }
+    return ConfigureInfoFor(*request.setup, package);
+}
+
+ecp::LaunchInfo LaunchFor(const LaunchRequest& request, std::string content, const std::string& package = {}) {
     ecp::LaunchInfo launch;
+    launch.configure = ConfigureFor(request, package);
     launch.content = std::move(content);
     launch.system = request.system;
     launch.game_id = request.game_id;
@@ -141,6 +150,36 @@ ecp::LaunchInfo LaunchFor(const LaunchRequest& request, std::string content) {
 }
 
 } // namespace
+
+ecp::ConfigureInfo ConfigureInfoFor(const EngineSetup& setup, const std::string& package) {
+    const auto where = [&package](const std::vector<std::filesystem::path>& paths) {
+        std::vector<std::string> out;
+        for (const auto& path : paths) {
+            if (package.empty()) {
+                out.push_back(PathToUtf8(path));
+            } else if (auto uri = pal::engine_apps::Share(package, path)) {
+                out.push_back(uri.take());
+            } else {
+                log::Warn("engine", "{} could not be shared with {}: {}", PathToUtf8(path), package, uri.error());
+            }
+        }
+        return out;
+    };
+    ecp::ConfigureInfo info;
+    info.bios = where(setup.bios);
+    info.game_folders = where(setup.game_folders);
+    info.settings = setup.settings;
+    return info;
+}
+
+Status ConfigureApp(const Install& install, const EngineSetup& setup) {
+    if (install.package.empty() || !pal::engine_apps::Available()) {
+        return Status::Fail("Only engine apps are set up outside a session.");
+    }
+    const ecp::ConfigureInfo info = ConfigureInfoFor(setup, install.package);
+    const std::string fields = ecp::CompactJson(JsonObject(ecp::ConfigureFields(info, {})));
+    return pal::engine_apps::Configure(install.package, install.cert_sha256, fields);
+}
 
 Result<std::unique_ptr<Link>> OpenEcpLink(const Install& install, const LaunchRequest& request,
                                           const LinkContext& context) {
@@ -181,7 +220,7 @@ Result<std::unique_ptr<Link>> OpenEcpLink(const Install& install, const LaunchRe
         // on the other one.
         play.display = pal::apps::Display::Main;
         auto link = std::make_unique<EcpLink>(nullptr, install.package, request.game_id);
-        link->Attach(std::make_unique<ecp::Channel>(std::move(opening), LaunchFor(request, "intent"),
+        link->Attach(std::make_unique<ecp::Channel>(std::move(opening), LaunchFor(request, "intent", install.package),
                                                     context.app_version),
                      context.window);
         if (const Status started = pal::engine_apps::Play(play); !started) {

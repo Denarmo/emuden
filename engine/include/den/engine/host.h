@@ -41,6 +41,18 @@ struct Install {
     std::function<void(int port, const std::string& token)> attach;
 };
 
+/// The engine's own setup (ECP `configure`, SPEC 6.6): what the player gave EmuDEN, kept by
+/// the engine so that it opened on its own skips its first-run setup.
+struct EngineSetup {
+    std::vector<std::filesystem::path> bios;         // files or folders with the BIOS files
+    std::vector<std::filesystem::path> game_folders; // folders with the system's games
+    std::vector<std::pair<std::string, std::string>> settings; // by key, as text
+
+    bool Empty() const {
+        return bios.empty() && game_folders.empty() && settings.empty();
+    }
+};
+
 struct LaunchRequest {
     std::string system;  // "switch2"
     std::string game_id; // library entry id, echoed in events
@@ -55,6 +67,8 @@ struct LaunchRequest {
     /// it with no page of its own. The host still books its play time.
     bool controlled = false;
     std::string locale = "en";
+    /// Sent before the launch when the engine has `configure`.
+    std::optional<EngineSetup> setup;
 };
 
 struct Event {
@@ -129,6 +143,10 @@ struct Config {
 };
 
 std::unique_ptr<Host> CreateHost(const Config& config);
+
+/// Sets up an engine app outside a session (Android: the CONFIGURE broadcast, SPEC 6.6). Fails
+/// where engines are not apps or the installed app is not the pinned one. Main thread.
+Status ConfigureApp(const Install& install, const EngineSetup& setup);
 
 // Settings the host reads, per system ("engine.switch2.path").
 /// A folder or an executable; empty means auto-detect.

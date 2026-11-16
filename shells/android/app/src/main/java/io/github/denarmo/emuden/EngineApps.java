@@ -38,6 +38,7 @@ import java.util.List;
 final class EngineApps {
     private static final String TAG = "EmuDEN";
     static final String ACTION_PLAY = "io.github.ecp.action.PLAY";
+    static final String ACTION_CONFIGURE = "io.github.ecp.action.CONFIGURE";
     private static final String EXTRA = "io.github.ecp.extra.";
     private static final String ACTION_INSTALLED = "io.github.denarmo.emuden.ENGINE_INSTALLED";
     private static final int DISPLAY_MAIN = 1, DISPLAY_SECOND = 2;
@@ -261,6 +262,39 @@ final class EngineApps {
                 .setComponent(target)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
         return start(activity, intent, display);
+    }
+
+    /** A file or folder the engine may keep reading (ECP configure): its URI, or "error:...". */
+    static String share(Activity activity, String pkg, String path) {
+        try {
+            return SharedDocuments.share(activity, pkg, new File(path)).toString();
+        } catch (Exception e) {
+            Log.w(TAG, "could not share " + path + " with " + pkg, e);
+            return "error:" + path + " could not be shared";
+        }
+    }
+
+    /** ECP configure outside a session (section 6.6): a broadcast to the engine's receiver. */
+    static String configure(Activity activity, String pkg, String cert, String fields) {
+        String installed = query(activity, pkg);
+        if (installed.isEmpty() || cert.isEmpty() || !installed.startsWith(cert + "|")) {
+            return "error:The engine app is not the one the plugin names";
+        }
+        Intent intent = new Intent(ACTION_CONFIGURE).setPackage(pkg);
+        List<ResolveInfo> receivers = activity.getPackageManager().queryBroadcastReceivers(intent, 0);
+        if (receivers.isEmpty() || receivers.get(0).activityInfo == null) {
+            return "error:The engine app cannot be set up outside a game";
+        }
+        ActivityInfo receiver = receivers.get(0).activityInfo;
+        intent.setComponent(new ComponentName(receiver.packageName, receiver.name))
+                .putExtra(EXTRA + "CONFIGURE", fields);
+        try {
+            activity.sendBroadcast(intent);
+            return "";
+        } catch (RuntimeException e) {
+            Log.w(TAG, "the engine could not be set up", e);
+            return "error:The engine app could not be reached";
+        }
     }
 
     private static String start(Activity activity, Intent intent, int display) {

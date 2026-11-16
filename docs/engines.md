@@ -90,13 +90,33 @@ component `type` enum and the `ecp`, `executable` and `android` objects above.
 3. A thread of the link does the opening exchange: auth (TCP), hello (within 10 s), EmuDEN's
    hello with the capabilities it uses, `get_schema`, then `launch` with the menu chord
    (`start`, `select`) and the setting values: the manifest's hints, the user's values for the
-   engine, then for the game.
+   engine, then for the game. An engine with `configure` gets it first (below).
 4. While it runs, EmuDEN's window is hidden (desktop). When the engine sends `menu_request` it is
    raised (Android: the engine fires `MENU_INTENT`), the pause menu opens over the paused frame,
    and Resume brings the engine back (Android: the PLAY activity again with
    `FLAG_ACTIVITY_REORDER_TO_FRONT`).
 5. Closing the game saves the resume state in the engine's slot 0, sends `stop`, and ends the
    engine if it has not exited 20 s later. Play time counts from `first_frame` to the end.
+
+## Setting the engine up (`configure`)
+
+An engine that lists `configure` (ECP section 6.6) is set up with what the player gave EmuDEN, so
+the app opened on its own skips its first-run setup (`app/screens/engine/engine_setup.cpp`):
+
+- `bios`: the files and folders the console's BIOS sets name for the core, under the BIOS folder
+  (PS2: `pcsx2/bios/` for PSX2 ECP), when they are there.
+- `game_folders`: the folders the library found the system's games in (a folder inside another
+  is left out).
+- `settings`: the manifest's hints and the player's values for the engine (not per game).
+
+It goes in the session, after `get_schema` and before `launch`, and on Android also outside one:
+whenever the plugins, the installed apps, the library or the BIOS imports change (and every
+minute for option values), each installed engine app with `configure` in its manifest whose setup
+differs from the last one sent gets the `io.github.ecp.action.CONFIGURE` broadcast. What was
+sent is kept in `<data>/engines/configured.json`, on this device only. On Android the locations
+are `content://` URIs of `SharedDocuments`, a read-only documents provider with no roots: each
+shared path is granted to the engine's package with a persistable read grant (a prefix grant for
+folders), and only paths shared that way, and what is inside them, can be opened.
 
 ## What the menus show
 
