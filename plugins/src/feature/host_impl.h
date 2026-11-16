@@ -72,6 +72,9 @@ public:
                 std::function<void(double, double)> progress) override;
     std::string LendFile(const std::string& id, const fs::path& file) override;
     void ReturnFile(const std::string& token) override;
+    /// Blocks until the plugin's script has finished what was posted to it, or waits for an
+    /// answer (tests).
+    void Settle(const std::string& id) const;
 
 private:
     struct Running {

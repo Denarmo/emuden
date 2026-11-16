@@ -6,6 +6,8 @@
 // content comparison that keeps identical files from ever being a conflict.
 
 #include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <thread>
 
 #include <catch2/catch_test_macros.hpp>
@@ -169,28 +171,35 @@ TEST_CASE("a game's check does not wait for a full run's game uploads") {
     pair.handheld.entries.push_back(Game("gba:big", "gba", rom));
     pair.handheld.engine->SetUploadGames(true);
 
-    std::atomic<bool> uploading{false}, release{false};
+    // The upload is held until the check is done; a check that waited for it would let the
+    // hold run out instead.
+    std::mutex mutex;
+    std::condition_variable changed;
+    bool uploading = false, released = false, held_out = false;
     pair.cloud.on_put = [&](const std::string& path) {
         if (path == "games/gba/Big.gba") {
+            std::unique_lock lock(mutex);
             uploading = true;
-            while (!release) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(5));
-            }
+            changed.notify_all();
+            held_out = !changed.wait_for(lock, std::chrono::seconds(10), [&] { return released; });
         }
     };
     std::thread full([&] { pair.handheld.engine->RunOnce({}, nullptr); });
-    while (!uploading) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    {
+        std::unique_lock lock(mutex);
+        changed.wait(lock, [&] { return uploading; });
     }
     // The other device plays meanwhile.
     Write(pair.pc.Save("gba:pc"), "save 2", 1'800'000'200);
     REQUIRE(pair.pc.engine->SyncGameOnce("gba:pc", nullptr).ok);
-    const auto start = std::chrono::steady_clock::now();
     const GameCheck check = Check(pair.handheld, "gba:hh");
-    const auto took = std::chrono::steady_clock::now() - start;
-    release = true;
+    {
+        std::lock_guard lock(mutex);
+        released = true;
+    }
+    changed.notify_all();
     full.join();
     CHECK(check.downloaded == 1);
-    CHECK(took < std::chrono::seconds(2));
+    CHECK_FALSE(held_out);
     CHECK(Read(pair.handheld.Save("gba:hh")) == "save 2");
 }

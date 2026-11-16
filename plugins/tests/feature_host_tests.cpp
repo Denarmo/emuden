@@ -5,13 +5,13 @@
 // and the sample plugin (ROM Hacks, stage 1) producing its UI model.
 
 #include <array>
-#include <thread>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include "den/plugins/feature_manifest.h"
 #include "den/plugins/signature.h"
 #include "den/store/settings.h"
+#include "feature/host_impl.h"
 #include "feature_test_util.h"
 
 using namespace den;
@@ -135,19 +135,11 @@ std::optional<FeaturePlugin> Find(const FeatureHost& host, const std::string& id
     return std::nullopt;
 }
 
-// Waits until the plugin's pages satisfy `done` (its script runs on its own thread).
-template <typename Done>
-std::vector<PageModel> PagesWhen(FeatureHost& host, const std::string& id, Done done) {
-    std::vector<PageModel> pages;
-    for (int i = 0; i < 400; ++i) {
-        std::uint64_t revision = 0;
-        pages = host.Pages(id, revision);
-        if (done(pages)) {
-            break;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    }
-    return pages;
+// The plugin's pages once its script (on its own thread) has done what was posted to it.
+std::vector<PageModel> SettledPages(FeatureHost& host, const std::string& id) {
+    static_cast<feature::RealFeatureHost&>(host).Settle(id);
+    std::uint64_t revision = 0;
+    return host.Pages(id, revision);
 }
 
 const Element* FindType(const PageModel& page, ElementType type) {
@@ -266,14 +258,13 @@ TEST_CASE("a feature plugin is listed from the signed index, installed, run and 
 
     // Opened: the script's page, an event, Back.
     REQUIRE(host->Open("tester.notes").ok);
-    std::vector<PageModel> pages = PagesWhen(*host, "tester.notes",
-                                             [](const auto& p) { return p.size() == 1; });
+    std::vector<PageModel> pages = SettledPages(*host, "tester.notes");
     REQUIRE(pages.size() == 1);
     CHECK(pages[0].title == "Notes 1.0.0");
     REQUIRE(pages[0].body.size() == 1);
     CHECK(pages[0].body[0].arg_json == "5");
     host->Send("tester.notes", {"add", pages[0].body[0].arg_json, "typed"});
-    pages = PagesWhen(*host, "tester.notes", [](const auto& p) { return p.size() == 2; });
+    pages = SettledPages(*host, "tester.notes");
     REQUIRE(pages.size() == 2);
     CHECK(pages[1].title == "Added 5 typed");
     host->Back("tester.notes");
@@ -300,7 +291,7 @@ TEST_CASE("a feature plugin is listed from the signed index, installed, run and 
     host->Pump();
     CHECK_FALSE(Find(*host, "tester.notes")->running);
     REQUIRE(host->Open("tester.notes").ok);
-    pages = PagesWhen(*host, "tester.notes", [](const auto& p) { return p.size() == 1; });
+    pages = SettledPages(*host, "tester.notes");
     REQUIRE(pages.size() == 1);
     CHECK(pages[0].title == "Notes 1.1.0");
 
@@ -366,7 +357,7 @@ TEST_CASE("the sample plugin installs a hack from a patch file") {
 
     REQUIRE(host->Open(id).ok);
     std::vector<PageModel> pages =
-        PagesWhen(*host, id, [](const auto& p) { return p.size() == 1; });
+        SettledPages(*host, id);
     REQUIRE(pages.size() == 1);
     CHECK(pages[0].title == "ROM Hacks");
     const Element* shelf = FindType(pages[0], ElementType::Shelf);
@@ -377,18 +368,15 @@ TEST_CASE("the sample plugin installs a hack from a patch file") {
 
     // "Open Hackdex" asks the screen to open the browser; the plugin itself connects nowhere.
     host->Send(id, {"browse", "", ""});
-    std::vector<Ask> asks;
-    for (int i = 0; i < 400 && asks.empty(); ++i) {
-        asks = host->TakeAsks(id);
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    }
+    static_cast<feature::RealFeatureHost&>(*host).Settle(id);
+    const std::vector<Ask> asks = host->TakeAsks(id);
     REQUIRE(asks.size() == 1);
     CHECK(asks[0].kind == AskKind::OpenUrl);
     CHECK(asks[0].value == "https://www.hackdex.app/discover");
 
     // The patch from Downloads: its base is found by checksum, the install page follows.
     host->Send(id, {"take", shelf->items[0].arg_json, ""});
-    pages = PagesWhen(*host, id, [](const auto& p) { return p.size() == 2; });
+    pages = SettledPages(*host, id);
     REQUIRE(pages.size() == 2);
     CHECK(pages[1].title == "Install a hack");
     const Element* input = FindType(pages[1], ElementType::Input);
@@ -403,9 +391,7 @@ TEST_CASE("the sample plugin installs a hack from a patch file") {
     REQUIRE(detail->items.size() == 1);
 
     host->Send(id, {detail->items[0].action, "", ""});
-    pages = PagesWhen(*host, id, [](const auto& p) {
-        return p.size() == 1 && FindType(p[0], ElementType::Grid) != nullptr;
-    });
+    pages = SettledPages(*host, id);
     REQUIRE(pages.size() == 1);
     REQUIRE(f.services->orders.size() == 1);
     CHECK(f.services->orders[0].title == "Emerald Kaizo");
@@ -413,6 +399,7 @@ TEST_CASE("the sample plugin installs a hack from a patch file") {
     CHECK(f.services->orders[0].plugin == id);
     CHECK(f.services->orders[0].patch.filename() == "Emerald_Kaizo.bps");
     const Element* grid = FindType(pages[0], ElementType::Grid);
+    REQUIRE(grid != nullptr);
     REQUIRE(grid->items.size() == 1);
     CHECK(grid->items[0].badge == "Hack");
     CHECK(fs::exists(f.scratch.dir / "Downloads/Emerald_Kaizo.bps")); // the original stays
@@ -422,7 +409,7 @@ TEST_CASE("the sample plugin installs a hack from a patch file") {
     f.scratch.Write("elsewhere/Other Hack.bps", "BPS1 another");
     CHECK(host->RouteFile(f.scratch.dir / "elsewhere/Other Hack.bps") == id);
     CHECK(host->RouteFile(f.scratch.dir / "Downloads/holiday.jpg").empty());
-    pages = PagesWhen(*host, id, [](const auto& p) { return p.size() == 2; });
+    pages = SettledPages(*host, id);
     REQUIRE(pages.size() == 2);
     CHECK(FindType(pages[1], ElementType::Input)->value == "Other Hack");
 }

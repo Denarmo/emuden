@@ -178,6 +178,12 @@ std::vector<PageModel> RealFeatureHost::Pages(const std::string& id,
     return runner ? runner->Pages(revision) : std::vector<PageModel>();
 }
 
+void RealFeatureHost::Settle(const std::string& id) const {
+    if (const std::shared_ptr<Runner> runner = RunnerOf(id)) {
+        runner->Settle();
+    }
+}
+
 void RealFeatureHost::Send(const std::string& id, UiEvent event) {
     if (const std::shared_ptr<Runner> runner = RunnerOf(id); runner && !event.action.empty()) {
         JsonValue arg;
