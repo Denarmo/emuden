@@ -54,9 +54,6 @@ TEST_CASE("the folder picker's places and the distribution", "[platform]") {
         CHECK(std::filesystem::is_directory(root));
     }
     const den::pal::OsReleaseInfo release = den::pal::OsRelease();
-    if (den::pal::GetCaps().os == "linux") {
-        CHECK_FALSE(release.id.empty());
-    } else {
-        CHECK(release.id.empty());
-    }
+    // Read where there is one (Linux); empty elsewhere (Windows, Android).
+    CHECK(release.id.empty() != std::filesystem::exists("/etc/os-release"));
 }
