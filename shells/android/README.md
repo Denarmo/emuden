@@ -192,7 +192,7 @@ process is `TOP (resumed-multi-display-activity)`; "Back to Settings" and Back o
 display leave the same task and activity record in front; the handle dragged to another
 edge is found there again; both volume sliders; Home on the second display. Not run: an
 app that plays sound, the Presentation fallback, a GPU core, one display. See
-`docs/status.md`.
+`docs/history.md`.
 
 ## System keyboard
 

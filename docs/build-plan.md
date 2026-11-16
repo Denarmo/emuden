@@ -1,6 +1,6 @@
 # EmuDEN rebuild: build plan
 
-Based on the inventory, the three proposals and the verdicts, plus a read of `docs/emuden-plugins.md` and the `src/emuden` licence headers. Nothing was built, run or changed.
+Based on the old repository's feature inventory, the three proposals and the verdicts, plus a read of its `docs/emuden-plugins.md` and `src/emuden` licence headers (none of them are in this repository; the plugin contract now lives in `Denarmo/emuden-plugins`, `docs/manifest.md`). Nothing was built, run or changed.
 
 ## 1. Decision
 
@@ -123,7 +123,7 @@ The Qt frontend there is left alone.
 
 ## 6. Plugin and add-on contracts
 
-These carry over unchanged from `docs/emuden-plugins.md`, so `Denarmo/emuden-plugins` keeps working:
+These carry over unchanged from the old repository's `docs/emuden-plugins.md` (now `docs/manifest.md` and `docs/publishing.md` in `Denarmo/emuden-plugins`), so that repository keeps working:
 
 - `.emuplugin` zips with `plugin.json` (sections 2.1 to 2.9): ids, `systems[]`, `components[]`, platform keys such as `windows-x86_64`, settings schema, BIOS, `sync`, launch template.
 - `index.json` with the detached Ed25519 `index.json.sig`, `addons.json`, `cores.lock.json`, release-asset naming, `trusted_component_sha256`, `revoked`, `blocked_sha256`.

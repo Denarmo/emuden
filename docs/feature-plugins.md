@@ -486,7 +486,7 @@ and on desktop a file path on the command line, reach `FeatureHost::RouteFile`.
 
 ### 8.2 What was run, and what is the owner's to try
 
-Windows, 2026-11-13 (`docs/status.md`): the four plugins installed from the live index; each
+Windows, 2026-11-13 (`docs/history.md`): the four plugins installed from the live index; each
 start page loaded once in the browser page and rendered (hackdex.app passed its checkpoint);
 the whole path on a test site on `127.0.0.1` from a developer-folder copy of the same code.
 Nothing was clicked or downloaded on the real sites: an agent driving downloads there would
@@ -516,7 +516,7 @@ type by pad and touch against a fake host. Together: a BPS and a copy of its bas
 
 | Agent | Owns | Also edits (one line each) |
 |---|---|---|
-| A | `plugins/include/den/plugins/feature_*.h`, `plugins/src/feature/`, `plugins/tests/feature_*`, `assets/plugins/emuden.romhacks/` | `cmake/deps.cmake` (Lua), `plugins/CMakeLists.txt` (deps, bundled scripts), `platform`: `pal::OpenUrl`, `pal::DownloadsDir` |
+| A | `plugins/include/den/plugins/feature_*.h`, `plugins/src/feature/`, `plugins/tests/feature_*`, the ROM Hacks plugin (since moved to `Denarmo/emuden-plugins`, `plugins/emuden.romhacks/`) | `cmake/deps.cmake` (Lua), `plugins/CMakeLists.txt` (deps, bundled scripts), `platform`: `pal::OpenUrl`, `pal::DownloadsDir` |
 | B | `patching/`, `library/include/den/library/hacks.h`, `library/src/hacks*.cpp`, `library/tests/hacks_*` | root `CMakeLists.txt` (`patching`), `cmake/deps.cmake` (xdelta3, xz), `library/CMakeLists.txt`, `Entry::hack_of` in `library.h`, the scan of the hacks folder |
 | C | `app/screens/plugins/` | nothing shared |
 
