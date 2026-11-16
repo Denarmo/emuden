@@ -165,6 +165,45 @@ TEST_CASE("downloads: a hack's name and version from the page and the file") {
     REQUIRE(HackVersion("", "hack.ips").empty());
 }
 
+TEST_CASE("downloads: a game's clean name from the page, the file, the archive and the header") {
+    const auto name = [](std::string page, std::string file, std::string archive = {}, std::string header = {}) {
+        return GameName({std::move(page), std::move(file), std::move(archive), std::move(header)});
+    };
+    // A pre-patched hack: the page names it; the header names the game it was made from.
+    CHECK(name("Pok\xC3\xA9mon Generation 3 Evolved | Pok\xC3\xA9" "Community", "gen3evolved-v1.0.17.gba",
+               "gen3evolved-v1.0.17.zip", "Pokemon Fire") == "Pok\xC3\xA9mon Generation 3 Evolved");
+    CHECK(name("", "gen3evolved-v1.0.17.gba") == "Gen 3 Evolved");
+    CHECK(name("Pokemon Unbound - Hackdex", "pokemonunbound.gba") == "Pokemon Unbound");
+    CHECK(name("Release Version 1.3 \xC2\xB7 AntonioND/ucity \xC2\xB7 GitHub", "ucity.gbc") == "Ucity");
+    // File-name noise.
+    CHECK(name("", "Super_Mario_Bros_Deluxe_(1).gbc") == "Super Mario Bros Deluxe");
+    CHECK(name("", "[romsite.net] Tetris DX (patched).gbc") == "Tetris DX");
+    CHECK(name("", "romsite.com_Shantae_Advance.gba") == "Shantae Advance");
+    CHECK(name("", "Kirby%27s%20Dream%20Land%202.gb") == "Kirby's Dream Land 2");
+    CHECK(name("", "Back.to.the.Future.nes") == "Back to the Future");
+    CHECK(name("", "space_quest_remix_v2.1.gba") == "Space Quest Remix");
+    // A page about something else does not name the game.
+    CHECK(name("Top 10 GBA games of 2025 - Some Blog", "Space_Quest_Remix.gba") == "Space Quest Remix");
+    // The archive when the file says nothing, the header when nothing else does.
+    CHECK(name("", "rom.gba", "Lunar_Knights_Remix-v3.zip") == "Lunar Knights Remix");
+    CHECK(name("", "3f2a9c1b7e.gba", "", HeaderName("POKEMON EMER")) == "Pokemon Emer");
+    CHECK(name("", "3f2a9c1b7e.gba").size() > 0);
+
+    CHECK(TidyFileName("Wario Land 3 (World) (En,Ja).gbc"));
+    CHECK(TidyFileName("Pokemon - Emerald Version (USA, Europe).gba"));
+    CHECK(TidyFileName("Tetris.gb"));
+    CHECK_FALSE(TidyFileName("gen3evolved-v1.0.17.gba"));
+    CHECK_FALSE(TidyFileName("Super_Mario.gbc"));
+    CHECK_FALSE(TidyFileName("Tetris (1).gb"));
+    CHECK_FALSE(TidyFileName("Game ab12cd34ef.gba"));
+    CHECK_FALSE(TidyFileName("Kirby%20Dream.gb"));
+    CHECK_FALSE(TidyFileName("Zelda DX (patched).gbc"));
+    CHECK_FALSE(TidyFileName("[romsite.net] Tetris.gb"));
+    CHECK_FALSE(TidyFileName("._Tetris.gb"));
+    CHECK(HeaderName("POKEMON FIRE") == "Pokemon Fire");
+    CHECK(HeaderName("    ").empty());
+}
+
 TEST_CASE("downloads: which of the user's games a hack's name fits") {
     REQUIRE(NameScore("Pokemon - Emerald Version", "Pokemon Emerald Rogue") == 1);
     REQUIRE(NameScore("Pokemon - Fire Red Version", "Gaia (FireRed hack)") == 1);
@@ -177,7 +216,7 @@ TEST_CASE("downloads: a game goes into its console's folder and can be taken bac
     WriteFile(f.downloads / "Space Game (World).gba", MakeRom(8192, 3));
     const Outcomes done = f.Run("Space Game (World).gba");
     REQUIRE(done.record.outcome == Outcome::Added);
-    REQUIRE(done.record.message == "Added Space Game to Game Boy Advance");
+    REQUIRE(done.record.message == "Space Game has been added to the library");
     REQUIRE(fs::exists(f.roms / "gba" / "Space Game (World).gba"));
     REQUIRE_FALSE(fs::exists(f.downloads / "Space Game (World).gba"));
     REQUIRE(f.Named("Space Game"));
@@ -188,6 +227,33 @@ TEST_CASE("downloads: a game goes into its console's folder and can be taken bac
     REQUIRE_FALSE(fs::exists(f.roms / "gba" / "Space Game (World).gba"));
     REQUIRE(f.setup->History().front().undone);
     REQUIRE_FALSE(f.setup->Undo(done.record.id).ok);
+}
+
+TEST_CASE("downloads: a game is filed under its clean name, a Mac's resource forks are not games") {
+    Fixture f("clean");
+    f.Open();
+    const Bytes rom = MakeRom(65536, 21);
+    WriteFile(f.downloads / "gen3evolved-v1.0.17.zip",
+              Zip({{"gen3evolved-v1.0.17.gba", rom},
+                   {"._gen3evolved-v1.0.17.gba", Text("Mac resource fork")},
+                   {"__MACOSX/._gen3evolved-v1.0.17.gba", Text("Mac resource fork")}}));
+    const Outcomes done = f.Run("gen3evolved-v1.0.17.zip", "Pokemon Generation 3 Evolved | PokeCommunity");
+    INFO(done.record.message);
+    REQUIRE(done.record.outcome == Outcome::Added);
+    REQUIRE(done.record.games.size() == 1);
+    CHECK(done.record.games.front().name == "Pokemon Generation 3 Evolved");
+    CHECK(done.record.message == "Pokemon Generation 3 Evolved has been added to the library");
+    CHECK(ReadFile(f.roms / "gba" / "Pokemon Generation 3 Evolved.gba") == rom);
+    CHECK_FALSE(fs::exists(f.roms / "gba" / "gen3evolved-v1.0.17.gba"));
+    CHECK_FALSE(fs::exists(f.roms / "gba" / "._gen3evolved-v1.0.17.gba"));
+
+    // A tidy name stays as it is; a second copy of a messy one gets a free name.
+    WriteFile(f.downloads / "Space Game (Europe).gba", MakeRom(8192, 22));
+    CHECK(f.Run("Space Game (Europe).gba").record.outcome == Outcome::Added);
+    CHECK(fs::exists(f.roms / "gba" / "Space Game (Europe).gba"));
+    WriteFile(f.downloads / "Space_Game_(1).gba", MakeRom(8192, 23));
+    CHECK(f.Run("Space_Game_(1).gba").record.outcome == Outcome::Added);
+    CHECK(fs::exists(f.roms / "gba" / "Space Game.gba"));
 }
 
 TEST_CASE("downloads: undo removes the console folder the setup made") {
@@ -282,7 +348,7 @@ TEST_CASE("downloads: a patch with a checksum becomes a hack of the user's game"
     REQUIRE(second.record.outcome == Outcome::HackAdded);
     REQUIRE(second.record.replaced);
     REQUIRE(second.record.games.front().id == hack->id);
-    REQUIRE(second.record.message == "Updated Monster Quest Remix to 1.1");
+    REQUIRE(second.record.message == "Monster Quest Remix has been updated to 1.1");
 
     // Taking the hack back leaves no empty Hacks folder.
     REQUIRE(f.setup->Undo(second.record.id).ok);

@@ -335,7 +335,9 @@ the result. `docs/in-app-browser.md`, "Browser plugin", has the page and the set
 whose name fits: `choices` lists the games it may be for, best first), `missing_base`, `waiting`
 (a cue sheet whose tracks have not arrived), `bios` (left alone: EmuDEN doesn't use BIOS
 files), `unknown` (left in Downloads) and `failed`. `message` is the sentence for the user
-("Added uCity to Game Boy Color", "Updated Pokemon Emerald Legacy to 1.1.4"). `file` is a plain
+("Pokemon Generation 3 Evolved has been added to the library", "Pokemon Emerald Legacy has been
+added to the library, made from Pokemon - Emerald Version", "Pokemon Emerald Legacy has been
+updated to 1.1.4"; a file not added: what went wrong and that it is in EmuDEN's Downloads folder). `file` is a plain
 name of a file in the Downloads folder; anything else is refused. The script never reads a
 file and never sees the page.
 

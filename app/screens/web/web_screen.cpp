@@ -368,7 +368,11 @@ private:
             ++g_state.downloads;
             g_state.last_download = PathToUtf8(download.file);
             log::Info("web", "downloaded '{}' from {}", download.name, download.host);
-            if (Svc().stage) {
+            if (browser_) {
+                // The plugin's toast says what became of it; until then the bar says it is busy.
+                setting_up_ = download.name;
+                setting_up_at_ = pal::NowSeconds();
+            } else if (Svc().stage) {
                 GetStage().Toast("Downloaded " + download.name);
             }
             if (opener_.on_download) {
@@ -579,6 +583,9 @@ private:
             }
         } else if (const std::string toast = NewestToast(); !toast.empty()) {
             bar.line = toast;
+            setting_up_.clear();
+        } else if (!setting_up_.empty() && pal::NowSeconds() - setting_up_at_ < 120) {
+            bar.line += "  -  adding " + setting_up_ + " to the library...";
         } else if (state_.loading) {
             bar.line += "  -  loading";
         }
@@ -597,6 +604,8 @@ private:
     std::string refused_host_;
     gfx::Rect view_rect_;
     double refused_at_ = 0;
+    std::string setting_up_; // a download the browser plugin is setting up
+    double setting_up_at_ = 0;
     float cursor_x_ = -1, cursor_y_ = -1; // units inside the view
     float scroll_x_ = 0, scroll_y_ = 0;   // pixels not yet sent
     float scale_ = 1;

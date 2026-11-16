@@ -193,6 +193,9 @@ void AddSwitch2(Scan& scan, const fs::path& file, const std::string& stem, const
 void AddRom(Scan& scan, const fs::path& file, const SystemDef* def, const fs::path& root,
             bool loose_image = false) {
     const std::string name = PathToUtf8(file.filename());
+    if (name.starts_with("._")) {
+        return; // a Mac's resource fork ("AppleDouble") beside the real file, not a game
+    }
     const std::string extension = scan.systems.RomExtension(ToLower(name));
     std::string archive_member;
     // "no": this console's games are never packed. "pass": its emulator opens the zip itself

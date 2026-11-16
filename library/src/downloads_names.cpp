@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Names of downloaded hacks: the title from the page and the file, the version, and how well
-// one of the user's games fits them.
+// Names of downloaded games and hacks: the title from the page, the file, the archive and the
+// game's header, the version, and how well one of the user's games fits them.
 
 #include <algorithm>
 #include <cctype>
@@ -77,9 +77,33 @@ bool IsSiteText(const std::string& segment) {
     return false;
 }
 
-// "Pokemon_Unbound_v2.1.1" -> "Pokemon Unbound": separators become spaces, tags in brackets
-// and the version go.
+// "%20" -> " ": a name taken from an address.
+std::string UrlDecoded(const std::string& text) {
+    std::string out;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if (text[i] == '%' && i + 2 < text.size() && std::isxdigit(static_cast<unsigned char>(text[i + 1])) &&
+            std::isxdigit(static_cast<unsigned char>(text[i + 2]))) {
+            out.push_back(static_cast<char>(std::stoi(text.substr(i + 1, 2), nullptr, 16)));
+            i += 2;
+        } else {
+            out.push_back(text[i]);
+        }
+    }
+    return out;
+}
+
+// "Pokemon_Unbound_v2.1.1" -> "Pokemon Unbound": separators become spaces; tags in brackets,
+// a site's name in front, hashes, "patched" and the version go.
 std::string CleanName(std::string text) {
+    text = UrlDecoded(text);
+    static const std::regex SITE(R"(^\s*(www\.)?[a-z0-9-]+\.(com|net|org|io|info)(?=[\s_-])\s*[-_]?\s*)",
+                                 std::regex::icase);
+    text = std::regex_replace(text, SITE, "");
+    static const std::regex HASH(R"((^|[\s_.-])(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{8,}(?=$|[\s_.-]))",
+                                 std::regex::icase);
+    text = std::regex_replace(text, HASH, " ");
+    static const std::regex PATCHED(R"((^|[\s_.-])(un)?patched(?=$|[\s_.-]))", std::regex::icase);
+    text = std::regex_replace(text, PATCHED, " ");
     static const std::regex BRACKETS(R"(\s*[\(\[\{][^\)\]\}]*[\)\]\}])");
     text = std::regex_replace(text, BRACKETS, " ");
     if (text.find(' ') == std::string::npos) {
@@ -153,15 +177,71 @@ bool Shares(const std::string& a, const std::string& b) {
     return false;
 }
 
+// The page names the same thing as a file: a word in common, or the file's run-together word
+// in the page's words ("pokemonunbound" in "Pokemon Unbound").
+bool Fits(const std::string& page, const std::string& file) {
+    if (Shares(page, file)) {
+        return true;
+    }
+    std::string joined;
+    for (const std::string& word : Words(page)) {
+        joined += word;
+    }
+    const std::vector<std::string> words = Words(file);
+    return std::any_of(words.begin(), words.end(), [&](const std::string& word) {
+        return word.size() >= 6 && !IsCommon(word) && joined.find(word) != std::string::npos;
+    });
+}
+
+bool SaysSomething(const std::string& name) {
+    const std::vector<std::string> words = Words(name);
+    return std::any_of(words.begin(), words.end(), [](const std::string& word) {
+        return word.size() >= 3 && !IsCommon(word) && !std::all_of(word.begin(), word.end(), ::isdigit);
+    });
+}
+
+// "gen3evolved" -> "Gen 3 Evolved": an all lower-case name gets spaces between letters and
+// digits and capitals; a name with capitals of its own is left as its author wrote it.
+std::string Finish(std::string name) {
+    if (std::any_of(name.begin(), name.end(), [](char c) { return std::isupper(static_cast<unsigned char>(c)); })) {
+        return name;
+    }
+    std::string spaced;
+    for (std::size_t i = 0; i < name.size(); ++i) {
+        const auto c = static_cast<unsigned char>(name[i]);
+        const auto prev = i > 0 ? static_cast<unsigned char>(name[i - 1]) : ' ';
+        if ((std::isalpha(prev) && std::isdigit(c)) || (std::isdigit(prev) && std::isalpha(c))) {
+            spaced.push_back(' ');
+        }
+        spaced.push_back(static_cast<char>(c));
+    }
+    static constexpr std::string_view SMALL[] = {"of", "the", "and", "a", "an", "in", "on", "to", "for"};
+    std::string out;
+    std::size_t at = 0;
+    while (at < spaced.size()) {
+        const std::size_t end = std::min(spaced.find(' ', at), spaced.size());
+        std::string word = spaced.substr(at, end - at);
+        const bool small = std::find(std::begin(SMALL), std::end(SMALL), word) != std::end(SMALL);
+        if (!word.empty() && (!small || out.empty())) {
+            word[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(word[0])));
+        }
+        out += (out.empty() ? "" : " ") + word;
+        at = end + 1;
+    }
+    return out;
+}
+
+std::string StemOf(const std::string& file_name) {
+    const std::size_t dot = file_name.rfind('.');
+    return dot != std::string::npos && dot > 0 ? file_name.substr(0, dot) : file_name;
+}
+
 } // namespace
 
 std::string HackTitle(const std::string& page_title, const std::string& file_name) {
-    std::string stem = file_name;
-    if (const std::size_t dot = stem.rfind('.'); dot != std::string::npos && dot > 0) {
-        stem.resize(dot);
-    }
-    const std::string from_file = CleanName(stem);
-    const std::string from_page = TitleOfPage(page_title, file_name);
+    const std::string stem = StemOf(file_name);
+    const std::string from_file = Finish(CleanName(stem));
+    const std::string from_page = Finish(TitleOfPage(page_title, file_name));
     // A file name that is only a word like "patch" or a number says nothing.
     const std::vector<std::string> words = Words(from_file);
     const bool says_something = std::any_of(words.begin(), words.end(), [](const std::string& word) {
@@ -176,6 +256,58 @@ std::string HackTitle(const std::string& page_title, const std::string& file_nam
         return from_file;
     }
     return from_page.empty() ? (from_file.empty() ? std::string("Hack") : from_file) : from_page;
+}
+
+std::string GameName(const NameSources& sources) {
+    const std::string from_file = Finish(CleanName(StemOf(sources.file_name)));
+    const std::string from_archive =
+        sources.archive_name.empty() ? std::string() : Finish(CleanName(StemOf(sources.archive_name)));
+    std::string from_page = TitleOfPage(sources.page_title, sources.file_name);
+    if (!sources.archive_name.empty() && ToLower(from_page) == ToLower(CleanName(StemOf(sources.archive_name)))) {
+        from_page.clear(); // a file host's page named after the archive
+    }
+    from_page = Finish(from_page);
+    const bool file_says = SaysSomething(from_file), archive_says = SaysSomething(from_archive);
+    if (!from_page.empty() &&
+        (Fits(from_page, from_file) || Fits(from_page, from_archive) || (!file_says && !archive_says))) {
+        return from_page;
+    }
+    if (file_says) {
+        return from_file;
+    }
+    if (archive_says) {
+        return from_archive;
+    }
+    if (!sources.header_title.empty()) {
+        return sources.header_title;
+    }
+    return !from_file.empty() ? from_file : !from_archive.empty() ? from_archive : std::string("Game");
+}
+
+bool TidyFileName(const std::string& file_name) {
+    const std::string stem = StemOf(file_name);
+    if (stem.empty() || stem.front() == '.' || stem.find_first_of("_%") != std::string::npos) {
+        return false;
+    }
+    static const std::regex MESSY(
+        R"((\(\d+\)$)|( - copy$)|(\[[^\]]*\.[a-z]{2,4}\])|(\b(un)?patched\b)|(\bv(er)?\.?\s?\d)|)"
+        R"(((^|[\s.-])(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{8,}($|[\s.-])))",
+        std::regex::icase);
+    if (std::regex_search(stem, MESSY)) {
+        return false;
+    }
+    // A name of one lower-case word ("gen3evolved") is a file name, not a title.
+    const bool upper = std::any_of(stem.begin(), stem.end(), [](char c) { return std::isupper(static_cast<unsigned char>(c)); });
+    return upper && (stem.find(' ') != std::string::npos || stem.find('-') == std::string::npos);
+}
+
+std::string HeaderName(const std::string& header_title) {
+    std::string name;
+    for (const char c : header_title) {
+        name.push_back(std::isprint(static_cast<unsigned char>(c)) ? c : ' ');
+    }
+    name = Trim(std::regex_replace(name, std::regex(R"(\s+)"), " "));
+    return SaysSomething(name) ? Finish(ToLower(name)) : std::string();
 }
 
 std::string HackVersion(const std::string& page_title, const std::string& file_name) {

@@ -75,6 +75,11 @@ std::vector<fs::path> Members(const fs::path& sheet) {
 
 void Collect(const fs::path& dir, std::vector<fs::path>& out) {
     for (const fs::path& path : ListDirectory(dir)) {
+        // Hidden files and a Mac's "__MACOSX" folder and "._" resource forks are not games.
+        const std::string name = PathToUtf8(path.filename());
+        if (name.starts_with('.') || name == "__MACOSX") {
+            continue;
+        }
         if (IsDirectory(path)) {
             Collect(path, out);
         } else if (IsRegularFile(path)) {

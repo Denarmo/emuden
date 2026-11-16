@@ -6,6 +6,7 @@
 // does for the plugin what only a screen can: the file browser, questions, messages, opening
 // a game in the library, the in-app browser. Route "plugin.view", param id.
 
+#include <algorithm>
 #include <format>
 #include <utility>
 
@@ -255,7 +256,9 @@ private:
         for (Ask& ask : host.TakeAsks(id_)) {
             switch (ask.kind) {
             case AskKind::Toast:
-                GetStage().Toast(ask.message.empty() ? ask.title : ask.message, 4.0f);
+                // Long enough to read: about a second for every 15 characters.
+                GetStage().Toast(ask.message.empty() ? ask.title : ask.message,
+                                 std::clamp(2.0f + static_cast<float>(ask.message.size()) / 15.0f, 4.0f, 10.0f));
                 break;
             case AskKind::Confirm:
                 confirm_ask_ = ask.id;

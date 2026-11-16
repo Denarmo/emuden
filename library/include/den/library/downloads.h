@@ -44,6 +44,27 @@ std::string SniffSystem(const std::filesystem::path& file, const std::vector<std
 /// The name of a hack, from the title of the page it was downloaded from and the file's name:
 /// without its version, the site's name and file-name noise.
 std::string HackTitle(const std::string& page_title, const std::string& file_name);
+/// What a downloaded game can be named after.
+struct NameSources {
+    std::string page_title;   // the page it was downloaded from
+    std::string file_name;    // the game's file as it arrived
+    std::string archive_name; // the archive it came in; "" for none
+    std::string header_title; // the name in the game's header (HeaderName); "" for none
+};
+/// The clean name a downloaded game is filed and shown under ("gen3evolved-v1.0.17.gba" from
+/// "Pokémon Generation 3 Evolved | PokéCommunity" -> "Pokémon Generation 3 Evolved"): the page's
+/// title when it names the same thing as the file or the archive, else the cleaned file name,
+/// the archive's, and the header's. Headers come last: they hold 12 to 20 capitals, and a
+/// patched game's header names the game it was made from.
+std::string GameName(const NameSources& sources);
+/// True for a file name that is fine as it is ("Wario Land 3 (World) (En,Ja).gbc"): no
+/// underscores, URL escapes, copy numbers, hashes, site tags, versions or "patched", and not
+/// one lower-case word.
+bool TidyFileName(const std::string& file_name);
+/// "POKEMON FIRE" -> "Pokemon Fire"; "" when the header's text says nothing.
+std::string HeaderName(const std::string& header_title);
+/// The text in a game's header (GB, GBC, GBA, NDS, N64); "" for other consoles or none.
+std::string HeaderTitle(const std::filesystem::path& file, const std::string& system);
 /// "1.2.1" from "v1.2.1", "Version 1.2", "_v12"; "" when neither text has one.
 std::string HackVersion(const std::string& page_title, const std::string& file_name);
 /// How well a game's name fits a text (the hack's title and file name): the number of the

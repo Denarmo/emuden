@@ -358,4 +358,33 @@ Identity Identify(const fs::path& file, const SystemTable& systems, const std::v
     return {Kind::Unknown, {}, "it could be a game for " + names + ", and nothing in it says which"};
 }
 
+std::string HeaderTitle(const fs::path& file, const std::string& system) {
+    struct Place {
+        std::string_view system;
+        std::uint64_t offset;
+        std::size_t size;
+    };
+    static constexpr Place PLACES[] = {{"gb", 0x134, 16}, {"gbc", 0x134, 15}, {"gba", 0xA0, 12},
+                                       {"nds", 0x00, 12}, {"n64", 0x20, 20}};
+    for (const Place& place : PLACES) {
+        if (place.system != system) {
+            continue;
+        }
+        std::ifstream in(file, std::ios::binary);
+        if (system == "n64" && !HasBytes(ReadAt(in, 0, 4), 0, {0x80, 0x37, 0x12, 0x40})) {
+            return {}; // only the big-endian dump has the name in order
+        }
+        const Bytes bytes = ReadAt(in, place.offset, place.size);
+        std::string text;
+        for (const std::uint8_t byte : bytes) {
+            if (byte == 0) {
+                break;
+            }
+            text.push_back(byte >= 0x20 && byte < 0x7F ? static_cast<char>(byte) : ' ');
+        }
+        return text;
+    }
+    return {};
+}
+
 } // namespace den::library::downloads

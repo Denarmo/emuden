@@ -12,6 +12,7 @@
 #include "den/base/log.h"
 #include "den/library/names.h"
 #include "downloads_work.h"
+#include "hacks_store.h"
 
 namespace den::library::downloads {
 
@@ -62,7 +63,7 @@ void SetupWork::Run() {
     }
     if (ExtensionOf(file) == "rar") {
         record.outcome = Outcome::Unknown;
-        record.message = "EmuDEN can't open rar archives; " + record.download + " stays in Downloads";
+        record.message = record.download + " was not added: EmuDEN can't open rar archives. It is in EmuDEN's Downloads folder";
         return;
     }
     const Identity identity = Identify(file, systems, hints);
@@ -86,7 +87,7 @@ void SetupWork::Run() {
         }
         if (Status unpacked = Unpack(file, work, cancelled); !unpacked) {
             record.outcome = Outcome::Failed;
-            record.message = record.download + ": " + unpacked.error;
+            record.message = record.download + " was not added: " + unpacked.error + ". It is in EmuDEN's Downloads folder";
             std::error_code ec;
             fs::remove_all(work, ec);
             return;
@@ -169,7 +170,7 @@ void SetupWork::SetUpFiles(const std::vector<fs::path>& files, const fs::path& b
         record.outcome = Outcome::Unknown;
         const Identity identity = left.size() == 1 ? Identify(left.front(), systems, hints) : Identity{};
         const std::string why = !identity.why.empty() ? identity.why : "nothing in it is a game or a patch EmuDEN knows";
-        record.message = record.download + " stays in Downloads: " + why;
+        record.message = record.download + " was not added: " + why + ". It is in EmuDEN's Downloads folder";
     }
 }
 
@@ -204,11 +205,23 @@ void SetupWork::SetUpGames(std::vector<GameGroup> groups, const fs::path& base) 
             }
         }
         const fs::path sheet_dir = group.main.parent_path();
+        // A game of one file is filed under its clean name; a sheet's files keep the names it lists.
+        fs::path clean;
+        if (group.files.size() == 1 && !IsSheetFile(group.main) && !TidyFileName(PathToUtf8(group.main.filename()))) {
+            NameSources sources;
+            sources.file_name = PathToUtf8(group.main.filename());
+            sources.page_title = groups.size() == 1 ? request.page_title : std::string();
+            sources.archive_name = Key(base) != Key(setup.downloads_) ? record.download : std::string();
+            sources.header_title = HeaderName(HeaderTitle(group.main, group.system));
+            clean = PathFromUtf8(SafeFileName(GameName(sources)) + PathToUtf8(group.main.extension()));
+        }
         fs::path main;
         bool moved_any = false;
         for (const fs::path& file : group.files) {
             const fs::path relative = file.lexically_relative(sheet_dir);
-            fs::path target = !relative.empty() && *relative.begin() != ".." ? dir / relative : dir / file.filename();
+            fs::path target = !clean.empty()                                   ? dir / clean
+                              : !relative.empty() && *relative.begin() != ".." ? dir / relative
+                                                                               : dir / file.filename();
             if (IsRegularFile(target)) {
                 if (SameSize(file, target)) {
                     if (file == group.main) {
@@ -220,7 +233,8 @@ void SetupWork::SetUpGames(std::vector<GameGroup> groups, const fs::path& base) 
             }
             if (!MoveTo(file, target)) {
                 record.outcome = Outcome::Failed;
-                record.message = "Could not move " + PathToUtf8(file.filename()) + " to " + PathToUtf8(target.parent_path());
+                record.message = "Could not move " + PathToUtf8(file.filename()) + " to " + PathToUtf8(target.parent_path()) +
+                                 ". It is in EmuDEN's Downloads folder";
                 return;
             }
             moved_any = true;
@@ -234,12 +248,11 @@ void SetupWork::SetUpGames(std::vector<GameGroup> groups, const fs::path& base) 
             record.system_name = ConsoleName(systems, group.system);
         }
     }
-    (void)base;
     if (mains.empty()) {
         record.outcome = !waiting.empty() ? Outcome::Waiting : Outcome::Unknown;
         record.message = !waiting.empty() ? "Waiting for the rest of " + waiting.front() + "; it stays in Downloads"
                          : !already.empty() ? already.front() + " is already in your library"
-                                            : record.download + " stays in Downloads";
+                                            : record.download + " was not added. It is in EmuDEN's Downloads folder";
         return;
     }
     const std::vector<Entry> entries = WaitForGames(setup.library_, mains, cancelled);
@@ -249,11 +262,14 @@ void SetupWork::SetUpGames(std::vector<GameGroup> groups, const fs::path& base) 
     record.outcome = Outcome::Added;
     if (record.games.empty()) {
         // The scan did not list them in time; they are in place and show up with the next one.
-        record.message = "Added " + PathToUtf8(mains.front().stem()) + " to " + record.system_name;
+        record.message = ParseGameName(PathToUtf8(mains.front().stem())).base + " has been added to the library";
     } else if (record.games.size() == 1) {
-        record.message = "Added " + record.games.front().name + " to " + ConsoleName(systems, record.games.front().system);
+        record.message = record.games.front().name + " has been added to the library";
+    } else if (record.games.size() == 2) {
+        record.message = record.games[0].name + " and " + record.games[1].name + " have been added to the library";
     } else {
-        record.message = std::format("Added {} games: {}", record.games.size(), record.games.front().name);
+        record.message = std::format("{} games have been added to the library: {}", record.games.size(),
+                                     record.games.front().name);
         for (std::size_t i = 1; i < record.games.size() && i < 4; ++i) {
             record.message += ", " + record.games[i].name;
         }

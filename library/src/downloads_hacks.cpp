@@ -52,7 +52,8 @@ void SetupWork::SetUpPatch(const std::vector<fs::path>& patches) {
     };
     if (!chosen) {
         record.outcome = Outcome::Failed;
-        record.message = record.download + ": " + (first_error.empty() ? "the patch cannot be read" : first_error);
+        record.message = record.download + " was not added: " +
+                         (first_error.empty() ? "the patch cannot be read" : first_error) + ". It is in EmuDEN's Downloads folder";
         cleanup();
         return;
     }
@@ -123,7 +124,7 @@ void SetupWork::SetUpPatch(const std::vector<fs::path>& patches) {
     cleanup();
     if (!made) {
         record.outcome = Outcome::Failed;
-        record.message = title + ": " + made.error();
+        record.message = title + " was not added: " + made.error() + ". The patch is in EmuDEN's Downloads folder";
         return;
     }
     const Entry& hack = made.value();
@@ -132,8 +133,9 @@ void SetupWork::SetUpPatch(const std::vector<fs::path>& patches) {
     record.games.push_back({hack.id, hack.name, hack.system});
     record.hacks.push_back(hack.id);
     record.system_name = ConsoleName(systems, hack.system);
-    record.message = record.replaced ? std::format("Updated {}{}", hack.name, version.empty() ? "" : " to " + version)
-                                     : std::format("Added {} to {}, made from {}", hack.name, record.system_name, base->name);
+    record.message = record.replaced
+                         ? std::format("{} has been updated{}", hack.name, version.empty() ? "" : " to " + version)
+                         : std::format("{} has been added to the library, made from {}", hack.name, base->name);
     log::Info("downloads", "{}", record.message);
 }
 
