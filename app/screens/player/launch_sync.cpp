@@ -6,10 +6,8 @@
 // devices asks which one to keep. Offline, slow or skipped, the game starts as it is.
 
 #include <algorithm>
-#include <cstring>
 #include <ctime>
 #include <format>
-#include <fstream>
 
 #include "../home/game_widgets.h"
 #include "../details/game_prefs.h"
@@ -31,20 +29,6 @@ constexpr double CHECK_SECONDS = 3.0;
 // it may take a while to come down (Skip starts the game as it is here).
 constexpr double CONTINUE_SECONDS = 30.0;
 constexpr float ROW_HEIGHT = 52;
-
-// The name of the core that wrote a state file (its header: "DENSTAT1", a length, the name);
-// "" when it is not one.
-std::string StateCore(const std::filesystem::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    char header[9 + 255] = {};
-    in.read(header, sizeof(header));
-    const std::streamsize got = in.gcount();
-    if (got < 9 || std::memcmp(header, "DENSTAT1", 8) != 0) {
-        return {};
-    }
-    const auto size = static_cast<unsigned char>(header[8]);
-    return got >= 9 + size ? std::string(header + 9, size) : std::string();
-}
 
 // "Today, 14:05": the day as the library shows it, and the time within the last month.
 std::string When(std::int64_t unix_time) {
@@ -159,20 +143,41 @@ void PlayerScreen::MatchResumeCore() {
     if (core_.runner != plugins::Runner::Core || Param("resume") == "0" || !Param("core").empty()) {
         return;
     }
-    const std::string wrote = StateCore(sync::ResumeState(Svc().data_dir, game_.system, game_.id));
-    if (wrote.empty() || EqualsNoCase(wrote, core_.name)) {
-        return;
-    }
-    for (const plugins::CoreInfo& other : Svc().plugins->CoresFor(game_.system)) {
-        if (other.Ready() && EqualsNoCase(other.name, wrote)) {
-            if (const auto core = CoreForGame(game_, other.id)) {
-                log::Info("player", "the resume state of {} is {}'s: this time it starts with it", game_.name, wrote);
-                core_ = *core;
+    sync::ResumeCoreInput input;
+    input.own = core_.name;
+    input.wrote = sync::StateCore(sync::ResumeState(Svc().data_dir, game_.system, game_.id));
+    std::optional<plugins::CoreInfo> other;
+    if (!input.wrote.empty() && !EqualsNoCase(input.wrote, core_.name)) {
+        input.own_for_game = GameHasOwnCore(game_);
+        for (const plugins::CoreInfo& installed : Svc().plugins->CoresFor(game_.system)) {
+            if (installed.Ready() && EqualsNoCase(installed.name, input.wrote)) {
+                other = CoreForGame(game_, installed.id);
+                input.wrote_installed = other.has_value();
+                break;
             }
-            return;
         }
     }
-    log::Info("player", "the resume state of {} is {}'s, which is not installed here", game_.name, wrote);
+    switch (sync::ChooseResumeCore(input)) {
+    case sync::ResumeCoreChoice::Same:
+        return;
+    case sync::ResumeCoreChoice::Switch:
+        log::Info("player", "the resume state of {} is {}'s: this time it starts with it", game_.name, input.wrote);
+        core_ = *other;
+        return;
+    case sync::ResumeCoreChoice::Unusable:
+        // A core the game asks for (GBA DS and its second screen) is kept: the game starts
+        // from its save.
+        log::Info("player", "the resume state of {} is {}'s: {} plays it, from its save", game_.name, input.wrote,
+                  core_.name);
+        GetStage().Toast(std::format("Where you left off was saved with {}, which {} cannot load: starting from "
+                                     "the game's save",
+                                     input.wrote, core_.name),
+                         5.0f);
+        return;
+    case sync::ResumeCoreChoice::Missing:
+        log::Info("player", "the resume state of {} is {}'s, which is not installed here", game_.name, input.wrote);
+        return;
+    }
 }
 
 void PlayerScreen::SkipSaveCheck() {

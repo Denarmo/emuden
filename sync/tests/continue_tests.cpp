@@ -154,3 +154,27 @@ TEST_CASE("how long ago, in words") {
     CHECK(AgoText(0, 90 * 86400) == "3 months ago");
     CHECK(AgoText(2000, 1000) == "Just now"); // a clock a little ahead
 }
+
+TEST_CASE("A resume state another core wrote changes the core only when the game has none of its own") {
+    Scratch scratch;
+    const fs::path state = scratch.dir / "a.resume.state";
+    Write(state, std::string("DENSTAT1\x04mGBA", 13) + "payload");
+    CHECK(StateCore(state) == "mGBA");
+    Write(state, "not a state");
+    CHECK(StateCore(state).empty());
+    CHECK(StateCore(scratch.dir / "missing.state").empty());
+
+    ResumeCoreInput input{.own = "GBA DS", .wrote = "mGBA", .own_for_game = false, .wrote_installed = true};
+    CHECK(ChooseResumeCore(input) == ResumeCoreChoice::Switch);
+    input.wrote_installed = false;
+    CHECK(ChooseResumeCore(input) == ResumeCoreChoice::Missing);
+    // GBA DS lists Aria of Sorrow for its second screen: another device's mGBA state does not
+    // take it away.
+    input.own_for_game = true;
+    input.wrote_installed = true;
+    CHECK(ChooseResumeCore(input) == ResumeCoreChoice::Unusable);
+    input.wrote = "gba ds";
+    CHECK(ChooseResumeCore(input) == ResumeCoreChoice::Same);
+    input.wrote.clear();
+    CHECK(ChooseResumeCore(input) == ResumeCoreChoice::Same);
+}

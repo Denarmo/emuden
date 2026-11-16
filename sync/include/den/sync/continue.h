@@ -48,6 +48,29 @@ std::filesystem::path ResumeScreenshot(const std::filesystem::path& data_dir, co
 std::filesystem::path ResumeState(const std::filesystem::path& data_dir, const std::string& system,
                                   const std::string& game_id);
 
+/// The name of the core that wrote a state file (its header: "DENSTAT1", a length, the
+/// name); "" when it is not one or cannot be read.
+std::string StateCore(const std::filesystem::path& file);
+
+/// What a launch does when the resume state may be another core's.
+enum class ResumeCoreChoice {
+    Same,     // no resume state, or the game's core wrote it
+    Switch,   // this launch starts with the core that wrote it
+    Unusable, // the game keeps its own core, which cannot load the state
+    Missing,  // the core that wrote it is not installed here
+};
+
+struct ResumeCoreInput {
+    std::string own;   // the name of the core the game plays with
+    std::string wrote; // the name of the core that wrote the resume state ("" = none)
+    /// The game asks for its own core: chosen for it, or a core that lists it (GBA DS lists
+    /// the GBA games it has a second screen for). Such a core is never swapped for a launch.
+    bool own_for_game = false;
+    bool wrote_installed = false;
+};
+
+ResumeCoreChoice ChooseResumeCore(const ResumeCoreInput& input);
+
 /// "Just now", "5 min ago", "3 h ago", "Yesterday", "4 days ago", "3 weeks ago", "Long ago".
 std::string AgoText(std::int64_t then, std::int64_t now);
 

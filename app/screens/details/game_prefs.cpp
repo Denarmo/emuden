@@ -181,6 +181,16 @@ std::optional<plugins::CoreInfo> CoreForGame(const library::Entry& game, const s
     return core;
 }
 
+bool GameHasOwnCore(const library::Entry& game) {
+    if (system::HasStore() && !system::Store().Get(GAME_CORE_KEY, ScopeOf(game)).empty()) {
+        return true;
+    }
+    const std::vector<plugins::CoreInfo> cores = Svc().plugins->CoresFor(game.system);
+    return std::any_of(cores.begin(), cores.end(), [&game](const plugins::CoreInfo& core) {
+        return core.Ready() && CoreListsGame(core.games, game);
+    });
+}
+
 int ScreenSizeFor(const library::Entry& game) {
     return system::HasStore() ? system::Store().Get(SCREEN_SIZE_KEY, ScopeOf(game))
                               : static_cast<int>(Svc().settings->GetNumber(SCREEN_SIZE_KEY.name(), 0));

@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <algorithm>
+#include <cstring>
 #include <format>
+#include <fstream>
 
 #include "den/base/files.h"
 #include "den/base/json.h"
@@ -117,6 +119,28 @@ std::vector<ContinueItem> ContinueGames(const ContinueRequest& request) {
         out.resize(request.limit);
     }
     return out;
+}
+
+std::string StateCore(const fs::path& file) {
+    std::ifstream in(file, std::ios::binary);
+    char header[9 + 255] = {};
+    in.read(header, sizeof(header));
+    const std::streamsize got = in.gcount();
+    if (got < 9 || std::memcmp(header, "DENSTAT1", 8) != 0) {
+        return {};
+    }
+    const auto size = static_cast<unsigned char>(header[8]);
+    return got >= 9 + size ? std::string(header + 9, size) : std::string();
+}
+
+ResumeCoreChoice ChooseResumeCore(const ResumeCoreInput& input) {
+    if (input.wrote.empty() || EqualsNoCase(input.wrote, input.own)) {
+        return ResumeCoreChoice::Same;
+    }
+    if (input.own_for_game) {
+        return ResumeCoreChoice::Unusable;
+    }
+    return input.wrote_installed ? ResumeCoreChoice::Switch : ResumeCoreChoice::Missing;
 }
 
 std::string AgoText(std::int64_t then, std::int64_t now) {
