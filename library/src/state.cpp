@@ -53,6 +53,7 @@ std::optional<Saved> LoadSaved(const std::filesystem::path& file) {
             record.other.seconds = static_cast<std::int64_t>(Number(value, "other_seconds"));
             record.other.last_played = static_cast<std::int64_t>(Number(value, "other_last_played"));
             record.other.count = static_cast<int>(Number(value, "other_count"));
+            record.name = value.String("name");
             saved.records[id] = record;
         }
     }
@@ -84,7 +85,8 @@ bool SaveSaved(const std::filesystem::path& file, const Saved& saved) {
                             {"added", JsonNumber(static_cast<double>(record.added))},
                             {"other_seconds", JsonNumber(static_cast<double>(record.other.seconds))},
                             {"other_last_played", JsonNumber(static_cast<double>(record.other.last_played))},
-                            {"other_count", JsonNumber(record.other.count)}}));
+                            {"other_count", JsonNumber(record.other.count)},
+                            {"name", JsonString(record.name)}}));
     }
     JsonValue sessions = JsonArray();
     for (const Session& session : saved.sessions) {

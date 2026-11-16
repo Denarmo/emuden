@@ -29,6 +29,25 @@ Fixed after the first check: the page no longer moves down while toasts show (th
 the newest toast), undo removes the console folder a setup made, and the last hack's undo
 removes its empty Hacks folder; a chosen chip's bold label is no longer cut off.
 
+## Clean names and the library tidy-up (2026-11-16)
+
+Downloads are filed under a clean name (`downloads::GameName`: page title, file, archive,
+header; a Mac's `._` files and `__MACOSX` skipped) and told as "<name> has been added to the
+library". Settings > Library > "Tidy up the library" (`library/tidy.h`,
+`app/screens/settings/tidy_page.cpp`) runs the same cleaning over the library: a list first,
+then progress and a summary, with Undo (the renames are kept in
+`<data>/library/tidy-log.json`). A renamed game keeps its play time, favourite, sessions, own
+cover and the cover beside it, saves and states (named after the id) and its game settings.
+A game whose saves, states or settings sync (in a sync journal) keeps its file and only gets
+the clean name shown, as does one in a folder that cannot be written or whose clean name is
+taken: sync names files after the ROM's stem on every device. BIOS files, packed games, cue
+sheets and tracks, discs of a set, other regional versions and hacks are left alone. Removed:
+AppleDouble `._` files (by their first bytes), `.DS_Store`, and empty folders that are not a
+console's folder. Not done: hacks a site ships already patched are not filed under a base game
+(nothing in the file says which one it was made from).
+
+The browser's second screen: Bookmarks and Downloads tabs (docs/in-app-browser.md).
+
 ## RetroAchievements (2026-11-15)
 
 The `emuden.retroachievements` plugin (`docs/feature-plugins.md` 4.3) and the runtime in

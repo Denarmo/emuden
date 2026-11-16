@@ -197,7 +197,7 @@ private:
     library::downloads::Setup* Downloads() {
         std::lock_guard lock(mutex_);
         if (!downloads_ && !data_dir_.empty()) {
-            downloads_ = std::make_unique<library::downloads::Setup>(library_, DownloadsFolder(), data_dir_);
+            downloads_ = library::downloads::SharedSetup(library_, data_dir_);
         }
         return downloads_.get();
     }
@@ -205,7 +205,7 @@ private:
     library::Library& library_;
     std::filesystem::path data_dir_;
     std::mutex mutex_;
-    std::unique_ptr<library::downloads::Setup> downloads_;
+    std::shared_ptr<library::downloads::Setup> downloads_;
 };
 
 } // namespace

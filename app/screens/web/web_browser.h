@@ -123,5 +123,7 @@ struct PageState {
 const PageState& CurrentState();
 /// Puts the pad's pointer at a point of the view (logical units) and shows it.
 void SetCursor(float x, float y);
+/// Opens an address in the page that is open (the second screen's bookmarks).
+void GoTo(const std::string& url);
 
 } // namespace den::app::web

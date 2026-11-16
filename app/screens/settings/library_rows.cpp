@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Library: the game folders (add through the in-app browser, remove) and the rescan.
+// Library: the game folders (add through the in-app browser, remove), the rescan and the tidy-up.
 
 #include <format>
 
@@ -9,6 +9,7 @@
 #include "den/app/pages.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
+#include "den/library/tidy.h"
 
 namespace den::app {
 
@@ -73,6 +74,13 @@ std::vector<ui::RowSpec> LibraryRows() {
             return JobText(g_scan, std::format("{} games", Svc().library->Entries().size()));
         },
         Rescan));
+    rows.push_back(ActionRow("library.tidy", "Tidy up the library",
+                             [] { Svc().stage->Push("library.tidy"); },
+                             "Clean game names, files and leftovers; shows the changes first"));
+    if (library::tidy::CanUndo(Svc().data_dir)) {
+        rows.push_back(ActionRow("library.tidy_undo", "Undo the last tidy-up",
+                                 [] { Svc().stage->Push("library.tidy", {{"undo", "1"}}); }));
+    }
     return rows;
 }
 

@@ -25,6 +25,7 @@ struct Record {
     int play_count = 0;
     std::int64_t added = 0;
     PlayTotals other; // the other devices' play, from sync
+    std::string name; // the name the user sees instead of the file's; "" = the file's
 };
 
 struct Saved {

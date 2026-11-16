@@ -58,6 +58,12 @@ void DrawCompanionStage(ui::Context& ctx);
 ui::Stage& CompanionStage();
 /// The library entry the main screen is about: the focused game, or the one last focused.
 const std::string& CompanionGame();
+/// The pad drives the companion pages instead of the main screen (the browser hands it over
+/// with View); off again with false, Back on the first page, or when the screen goes.
+void SetCompanionPad(bool on);
+bool CompanionPad();
+/// A press of the pad for the companion pages, while CompanionPad().
+void CompanionNav(input::Nav nav);
 /// A page with no selection border (touch only) fills its root; shared by the pages.
 constexpr float COMPANION_HEIGHT = 600.0f; // logical units from top to bottom
 

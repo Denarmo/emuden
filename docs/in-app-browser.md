@@ -312,6 +312,14 @@ The plugin's pages (in emuden-plugins): Browse (address, Open the browser, bookm
 files of the folder no setup took are listed with "set up"), About. In the browser the bar says "adding ... to the library" until the setup's sentence comes, which shows as a toast (longer for a longer sentence) and in the bar. Each setup is told in a
 toast while the user browses on.
 
+On a device with a second screen (`app/screens/companion/companion_web.cpp`) the browser's
+second screen has two tabs: Bookmarks (a tap opens one in the page) and Downloads (every setup
+with its message; a setup's page says what it became in the library, or that the file is in
+the Downloads folder, with Undo). Touch works there at any time; View on the pad hands the pad
+to it (selection border, Confirm, Back) and back (View, or Back on its first page). The hint
+bar says "Other screen" then. Both screens use one downloads history
+(`downloads::SharedSetup`). A device with one screen keeps the menu on Start.
+
 ## Test endpoint
 
 With `EMUDEN_AUTOMATION=<port>` the page's endpoint listens on `<port>+3`, one line in and one

@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <chrono>
 #include <format>
+#include <map>
+#include <memory>
 
 #include "den/base/files.h"
 #include "den/base/json.h"
@@ -216,6 +218,19 @@ Status Setup::Undo(const std::string& record_id) {
     }
     Save();
     return {};
+}
+
+std::shared_ptr<Setup> SharedSetup(Library& library, const fs::path& data_dir) {
+    static std::mutex mutex;
+    static std::map<std::pair<Library*, std::string>, std::weak_ptr<Setup>> setups;
+    std::lock_guard lock(mutex);
+    std::weak_ptr<Setup>& slot = setups[{&library, PathToUtf8(data_dir)}];
+    std::shared_ptr<Setup> setup = slot.lock();
+    if (!setup) {
+        setup = std::make_shared<Setup>(library, data_dir / "downloads", data_dir);
+        slot = setup;
+    }
+    return setup;
 }
 
 } // namespace den::library::downloads

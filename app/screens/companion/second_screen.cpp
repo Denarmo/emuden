@@ -392,6 +392,33 @@ const std::string& CompanionGame() {
     return Get().game;
 }
 
+namespace {
+bool g_pad = false;
+}
+
+void SetCompanionPad(bool on) {
+    g_pad = on && SecondScreenReady() && !Get().claimed;
+    if (g_pad && CompanionStage().Top() && !CompanionStage().Top()->Focus()) {
+        CompanionStage().HandleEvent(input::Event::MakeNav(input::Nav::Down));
+    }
+}
+
+bool CompanionPad() {
+    if (g_pad && (!SecondScreenReady() || Get().claimed)) {
+        g_pad = false;
+    }
+    return g_pad;
+}
+
+void CompanionNav(input::Nav nav) {
+    // Back on the first page gives the pad back instead of closing the page under everything.
+    if (nav == input::Nav::Back && CompanionStage().Depth() <= 1) {
+        SetCompanionPad(false);
+        return;
+    }
+    CompanionStage().HandleEvent(input::Event::MakeNav(nav));
+}
+
 DEN_REGISTER_STARTUP(Start);
 DEN_REGISTER_FRAME(Frame);
 DEN_REGISTER_SETTINGS(15, "Second screen", Rows);

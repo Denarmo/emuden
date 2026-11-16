@@ -498,6 +498,27 @@ private:
         return systems_;
     }
 
+    void SetDisplayName(const std::string& id, const std::string& name) override {
+        std::lock_guard lock(mutex_);
+        saved_.records[id].name = name;
+        RecordChanged(id);
+    }
+
+    void MoveRecord(const std::string& old_id, const std::string& new_id) override {
+        std::lock_guard lock(mutex_);
+        if (const auto found = saved_.records.find(old_id); found != saved_.records.end()) {
+            saved_.records[new_id] = found->second;
+            saved_.records.erase(found);
+        }
+        for (Session& session : saved_.sessions) {
+            if (session.id == old_id) {
+                session.id = new_id;
+            }
+        }
+        SaveSaved(dir_ / "library.json", saved_);
+        ++revision_;
+    }
+
     // A game made by the app itself (a hack) is listed at once, without a scan.
     void AdoptEntry(Entry entry) {
         std::lock_guard lock(mutex_);
@@ -540,6 +561,9 @@ private:
         entry.play_seconds = record.play_seconds + record.other.seconds;
         entry.play_count = record.play_count + record.other.count;
         entry.added = record.added;
+        if (!record.name.empty()) {
+            entry.name = record.name;
+        }
     }
 
     void RecordChanged(const std::string& id) {

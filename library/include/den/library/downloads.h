@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <utility>
@@ -144,5 +145,9 @@ private:
     std::mutex running_;       // one setup or undo at a time
     std::vector<Record> history_;
 };
+
+/// The one Setup of a library and data folder (Downloads in `data_dir`/downloads), shared by
+/// everything that sets up or lists downloads, so they see one history.
+std::shared_ptr<Setup> SharedSetup(Library& library, const std::filesystem::path& data_dir);
 
 } // namespace den::library::downloads

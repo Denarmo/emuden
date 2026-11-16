@@ -203,6 +203,18 @@ public:
     virtual Hacks* HackStore() {
         return nullptr;
     }
+
+    /// Shows a game under `name` instead of its file's name ("" = the file's again).
+    virtual void SetDisplayName(const std::string& id, const std::string& name) {
+        (void)id;
+        (void)name;
+    }
+    /// What the library keeps by a game's id (play time, favourite, sessions, shown name) now
+    /// belongs to `new_id`: the game's file was renamed. The next scan lists it under it.
+    virtual void MoveRecord(const std::string& old_id, const std::string& new_id) {
+        (void)old_id;
+        (void)new_id;
+    }
 };
 
 /// An answer to a GET: status 0 when the request never got one.

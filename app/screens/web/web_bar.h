@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "den/app/app.h"
+#include "den/ui/page.h"
 
 namespace den::app::web {
 
@@ -32,5 +33,20 @@ struct BarInput {
 
 /// Draws the bar and returns where its buttons are.
 std::vector<BarHit> DrawWebBar(ui::Context& ctx, const gfx::Rect& area, const BarInput& in);
+
+/// What the page's hint bar offers.
+struct HintFacts {
+    bool live = false;      // a web view (not the fallback)
+    bool menu = false;      // the browser's menu is open
+    bool pad_away = false;  // the pad drives the second screen
+    bool browser = false;   // the browser plugin's page
+    bool two_screens = false;
+    bool can_back = false;
+};
+std::vector<ui::Hint> WebHints(const HintFacts& facts);
+
+/// The newest toast on the stage, which the bar repeats: toasts below the bar are under the
+/// native view.
+std::string NewestToast();
 
 } // namespace den::app::web

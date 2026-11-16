@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <format>
 
+#include "den/base/json.h"
 #include "den/ui/glyphs.h"
 #include "web_bar.h"
 
@@ -67,6 +68,36 @@ std::vector<BarHit> DrawWebBar(ui::Context& ctx, const gfx::Rect& area, const Ba
         canvas.FillRect(gfx::Rect{area.x, area.y + BAR_HEIGHT - 3, area.w * std::clamp(in.progress, 0.0f, 1.0f), 3}, theme.fg);
     }
     return hits;
+}
+
+std::vector<ui::Hint> WebHints(const HintFacts& f) {
+    using input::Nav;
+    const char* back = f.can_back ? "Back" : "Close";
+    if (!f.live) {
+        return {{Nav::Confirm, "Open in browser"}, {Nav::Back, "Close"}};
+    }
+    if (f.menu) {
+        return {{Nav::Confirm, "Choose"}, {Nav::Back, "Back"}};
+    }
+    if (f.pad_away) {
+        return {{Nav::Confirm, "Choose"}, {Nav::Back, "Back"}, {Nav::View, "Back to the page"}};
+    }
+    if (f.browser && f.two_screens) {
+        return {{Nav::Confirm, "Click"}, {Nav::Extra, "Address"}, {Nav::View, "Other screen"}, {Nav::Back, back},
+                {Nav::Menu, "Menu"}};
+    }
+    if (f.browser) {
+        return {{Nav::Confirm, "Click"}, {Nav::Option, "Type"}, {Nav::Extra, "Address"}, {Nav::Back, back},
+                {Nav::Menu, "Menu"}};
+    }
+    return {{Nav::Confirm, "Click"}, {Nav::Option, "Type"}, {Nav::Extra, "Reload"}, {Nav::Back, back},
+            {Nav::Menu, "Close"}};
+}
+
+std::string NewestToast() {
+    const auto state = ParseJson(Svc().stage->StateJson());
+    const JsonValue* toasts = state ? state->Find("toasts") : nullptr;
+    return toasts && !toasts->items.empty() ? toasts->items.back().string : std::string();
 }
 
 } // namespace den::app::web

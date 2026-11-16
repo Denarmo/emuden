@@ -10,7 +10,8 @@
 // goes back in the page's history or closes the page, X types text into the page, View
 // presses Enter, LB and RB go back and forward, Y reloads, Start closes. Mouse and touch go
 // straight to the page. The browser (mode "browser": any site) has the address bar on Y and
-// its menu on Start instead (web_menu.h).
+// its menu on Start instead (web_menu.h), and on a device with a second screen View hands the
+// pad to the bookmarks and downloads there (companion_web.cpp) and back.
 //
 // Without a web engine the page is the fallback of web_fallback.h: the user's own browser
 // and the Downloads folder. EMUDEN_WEB_FALLBACK=1 asks for it where an engine exists.
@@ -26,6 +27,7 @@
 #include "den/base/log.h"
 #include "den/platform/webview.h"
 #include "den/ui/glyphs.h"
+#include "../companion/second_screen.h"
 #include "web_bar.h"
 #include "web_browser.h"
 #include "web_fallback.h"
@@ -64,6 +66,7 @@ public:
         g_state.open = true;
     }
     ~WebScreen() override {
+        SetCompanionPad(false);
         Deliver();
         view_.reset();
         if (g_screen == this) {
@@ -131,7 +134,7 @@ public:
             g_state.offers = fallback_->Offers();
         }
         Deliver();
-        if (!view_ || !view_->Visible()) {
+        if (!view_ || !view_->Visible() || CompanionPad()) {
             return;
         }
         float lx = 0, ly = 0, rx = 0, ry = 0;
@@ -165,18 +168,8 @@ public:
     }
 
     std::vector<ui::Hint> Hints() const override {
-        if (!view_) {
-            return {{Nav::Confirm, "Open in browser"}, {Nav::Back, "Close"}};
-        }
-        if (menu_.IsOpen()) {
-            return {{Nav::Confirm, "Choose"}, {Nav::Back, "Back"}};
-        }
-        if (browser_) {
-            return {{Nav::Confirm, "Click"}, {Nav::Option, "Type"}, {Nav::Extra, "Address"},
-                    {Nav::Back, state_.can_go_back ? "Back" : "Close"}, {Nav::Menu, "Menu"}};
-        }
-        return {{Nav::Confirm, "Click"}, {Nav::Option, "Type"}, {Nav::Extra, "Reload"},
-                {Nav::Back, state_.can_go_back ? "Back" : "Close"}, {Nav::Menu, "Close"}};
+        return WebHints({view_ != nullptr, menu_.IsOpen(), CompanionPad(), browser_, SecondScreenReady(),
+                         state_.can_go_back});
     }
 
     void Draw(ui::Context& ctx, const gfx::Rect& area) override {
@@ -228,6 +221,12 @@ public:
         g_state.view_w = view_rect_.w;
         g_state.view_h = view_rect_.h;
         menu_.Draw(ctx, view_rect_);
+    }
+
+    void GoTo(const std::string& url) {
+        if (view_) {
+            view_->Navigate(url);
+        }
     }
 
     void SetCursorAt(float x, float y) {
@@ -427,6 +426,14 @@ private:
             }
             return;
         }
+        if (browser_ && nav == Nav::View && !repeat && (SecondScreenReady() || CompanionPad())) {
+            SetCompanionPad(!CompanionPad());
+            return;
+        }
+        if (CompanionPad()) {
+            CompanionNav(nav);
+            return;
+        }
         const bool usable = view_ && view_->Visible();
         if (browser_ && usable && !repeat && (nav == Nav::Extra || nav == Nav::Menu)) {
             BarPressed(nav == Nav::Extra ? BarAction::Address : BarAction::Menu);
@@ -548,13 +555,6 @@ private:
         return static_cast<int>(std::lround(units * scale_));
     }
 
-    // The newest toast, shown in the bar: toasts below the bar are under the view.
-    std::string NewestToast() const {
-        const auto state = ParseJson(GetStage().StateJson());
-        const JsonValue* toasts = state ? state->Find("toasts") : nullptr;
-        return toasts && !toasts->items.empty() ? toasts->items.back().string : std::string();
-    }
-
     void DrawMessage(ui::Context& ctx, const std::string& heading, const std::string& text) {
         const ui::Theme& theme = *ctx.theme;
         const float x = view_rect_.x + theme.margin, y = view_rect_.y + theme.margin;
@@ -621,6 +621,12 @@ const PageState& CurrentState() {
 void SetCursor(float x, float y) {
     if (g_screen) {
         g_screen->SetCursorAt(x, y);
+    }
+}
+
+void GoTo(const std::string& url) {
+    if (g_screen) {
+        g_screen->GoTo(url);
     }
 }
 
