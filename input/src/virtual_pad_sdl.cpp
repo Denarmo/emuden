@@ -127,12 +127,6 @@ bool Detach(int id) {
     return false;
 }
 
-void DetachAll() {
-    while (!Pads().empty()) {
-        Detach(static_cast<int>(Pads().back().id));
-    }
-}
-
 bool SetButton(int id, PadButton button, bool down) {
     Attachment* pad = Find(id);
     if (!pad) {

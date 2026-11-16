@@ -160,21 +160,4 @@ std::string Sha256Hex(const void* data, std::size_t size) {
     return hash.FinishHex();
 }
 
-std::optional<std::string> Md5File(const std::filesystem::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    if (!in) {
-        return std::nullopt;
-    }
-    Md5 hash;
-    std::vector<char> buffer(1u << 16);
-    while (in) {
-        in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-        hash.Update(buffer.data(), static_cast<std::size_t>(in.gcount()));
-    }
-    if (in.bad()) {
-        return std::nullopt;
-    }
-    return hash.FinishHex();
-}
-
 } // namespace den

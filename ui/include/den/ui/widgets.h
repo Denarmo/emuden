@@ -121,7 +121,5 @@ std::unique_ptr<Label> MakeHeading(std::string text);
 std::unique_ptr<Node> MakeList(float gap = 8);
 /// A horizontal scrolling shelf of tiles.
 std::unique_ptr<Node> MakeShelf(float gap = 16);
-/// Empty space that takes the free room along the parent's axis.
-std::unique_ptr<Node> MakeSpacer(float grow = 1);
 
 } // namespace den::ui

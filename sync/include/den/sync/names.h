@@ -53,9 +53,6 @@ public:
     bool Never(const std::string& system) const {
         return never_.contains(system);
     }
-    const std::set<std::string>& NeverSystems() const {
-        return never_;
-    }
     /// "system/stem" of games that share a stem with an earlier one (they do not sync).
     const std::vector<std::string>& Duplicates() const {
         return duplicates_;

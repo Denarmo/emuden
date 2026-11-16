@@ -44,7 +44,6 @@ public:
     void Forget(const std::string& path);
     /// Uploads finished decodes and drops textures unused for a while. Once per frame.
     void Pump();
-    void SetCapacity(std::size_t textures);
 
 private:
     struct Impl;

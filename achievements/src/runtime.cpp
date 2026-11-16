@@ -193,10 +193,6 @@ bool Runtime::Hardcore() const {
     return rc_client_get_hardcore_enabled(impl_->client) != 0;
 }
 
-void Runtime::SetUnofficial(bool on) {
-    rc_client_set_unofficial_enabled(impl_->client, on ? 1 : 0);
-}
-
 void Runtime::LoadGame(std::uint32_t console, const std::string& hash, GameMemory memory,
                        std::function<void(Status)> done) {
     Impl& self = *impl_;

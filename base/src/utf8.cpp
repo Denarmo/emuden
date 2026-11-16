@@ -44,24 +44,6 @@ std::uint32_t NextCodePoint(std::string_view text, std::size_t& at) {
     return code;
 }
 
-void AppendCodePoint(std::string& out, std::uint32_t code) {
-    if (code < 0x80) {
-        out.push_back(static_cast<char>(code));
-    } else if (code < 0x800) {
-        out.push_back(static_cast<char>(0xC0 | (code >> 6)));
-        out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
-    } else if (code < 0x10000) {
-        out.push_back(static_cast<char>(0xE0 | (code >> 12)));
-        out.push_back(static_cast<char>(0x80 | ((code >> 6) & 0x3F)));
-        out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
-    } else {
-        out.push_back(static_cast<char>(0xF0 | (code >> 18)));
-        out.push_back(static_cast<char>(0x80 | ((code >> 12) & 0x3F)));
-        out.push_back(static_cast<char>(0x80 | ((code >> 6) & 0x3F)));
-        out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
-    }
-}
-
 std::size_t CodePointCount(std::string_view text) {
     std::size_t count = 0;
     for (std::size_t at = 0; at < text.size(); ++count) {

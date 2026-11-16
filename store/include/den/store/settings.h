@@ -46,8 +46,6 @@ public:
     /// The defaults layer: values in effect for keys the file does not hold (what suits this
     /// device). Never written to disk; a stored value always wins. Replaces the whole layer.
     void SetDefaults(std::vector<std::pair<std::string, JsonValue>> defaults);
-    bool HasDefault(const std::string& key) const;
-    std::vector<std::string> DefaultKeys() const;
 
 private:
     struct Impl;

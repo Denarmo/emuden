@@ -35,9 +35,6 @@ public:
     bool Started() const {
         return started_;
     }
-    int LocalPlayer() const {
-        return local_;
-    }
     int Delay() const {
         return delay_;
     }

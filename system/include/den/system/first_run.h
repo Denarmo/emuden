@@ -21,8 +21,6 @@ struct StartInfo {
 /// Call once per start, before the first screen: says what kind of start this is and
 /// records the version for the next one.
 StartInfo NoteStart(store::Settings& settings);
-/// The answer NoteStart gave this run.
-const StartInfo& ThisStart();
 
 /// "setup.done": the app shows the setup route first until this is set.
 bool SetupDone(const store::Settings& settings);

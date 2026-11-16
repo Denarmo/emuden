@@ -52,10 +52,6 @@ public:
         return ping_ms_;
     }
     pal::net::Address Peer() const;
-    /// Bytes waiting to be written.
-    std::size_t Backlog() const {
-        return out_.size() - out_at_;
-    }
 
     static constexpr double TIMEOUT_SECONDS = 8.0;
     static constexpr double PING_SECONDS = 0.5;

@@ -297,10 +297,4 @@ std::unique_ptr<Node> MakeShelf(float gap) {
     return node;
 }
 
-std::unique_ptr<Node> MakeSpacer(float grow) {
-    auto node = std::make_unique<Node>();
-    node->grow = grow;
-    return node;
-}
-
 } // namespace den::ui

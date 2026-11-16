@@ -97,8 +97,6 @@ void NoteGpu(const std::string& renderer, const std::string& version);
 const DeviceProfile& Device();
 /// Whether EMUDEN_FAKE_DEVICE replaced the real device.
 bool DeviceIsFake();
-/// The defaults in effect.
-const std::vector<DeviceDefault>& DeviceDefaults();
 /// Grows whenever the profile or its defaults changed.
 std::uint64_t DeviceRevision();
 

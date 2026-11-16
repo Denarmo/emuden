@@ -159,10 +159,6 @@ void TextureCache::Forget(const std::string& path) {
     }
 }
 
-void TextureCache::SetCapacity(std::size_t textures) {
-    impl_->capacity = textures;
-}
-
 void TextureCache::Pump() {
     ++impl_->frame;
     for (int budget = 4; budget > 0; --budget) {

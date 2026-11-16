@@ -15,8 +15,6 @@ constexpr const char* FIRST_START_KEY = "app.first_start_unix";
 constexpr const char* LAST_VERSION_KEY = "app.last_version";
 constexpr const char* SETUP_DONE_KEY = "setup.done";
 
-StartInfo g_start;
-
 } // namespace
 
 StartInfo NoteStart(store::Settings& settings) {
@@ -33,12 +31,7 @@ StartInfo NoteStart(store::Settings& settings) {
     if (info.previous_version != Version()) {
         settings.SetString(LAST_VERSION_KEY, Version());
     }
-    g_start = info;
     return info;
-}
-
-const StartInfo& ThisStart() {
-    return g_start;
 }
 
 bool SetupDone(const store::Settings& settings) {

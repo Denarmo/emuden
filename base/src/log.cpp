@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <fstream>
@@ -14,7 +13,7 @@ namespace den::log {
 namespace {
 std::mutex g_mutex;
 std::ofstream g_file;
-std::atomic<Level> g_minimum{Level::Info};
+constexpr Level MINIMUM = Level::Info;
 const auto g_start = std::chrono::steady_clock::now();
 } // namespace
 
@@ -24,12 +23,8 @@ void SetFile(const std::filesystem::path& file) {
     g_file.open(file, std::ios::binary | std::ios::trunc);
 }
 
-void SetMinimum(Level level) {
-    g_minimum = level;
-}
-
 void Write(Level level, std::string_view tag, std::string_view text) {
-    if (level < g_minimum.load()) {
+    if (level < MINIMUM) {
         return;
     }
     static constexpr const char* NAMES[] = {"debug", "info", "warn", "error"};

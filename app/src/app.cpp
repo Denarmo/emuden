@@ -131,6 +131,7 @@ int Run(int argc, char** argv) {
     auto window = pal::CreateAppWindow(desc);
     if (!window) {
         log::Error("app", "{}", window.error());
+        system::ShutdownSettings();
         pal::Shutdown();
         return 1;
     }
@@ -160,6 +161,7 @@ int Run(int argc, char** argv) {
         if (!ready) {
             log::Error("app", "{}", ready.error);
             window->reset();
+            system::ShutdownSettings();
             pal::Shutdown();
             return 1;
         }
@@ -322,6 +324,7 @@ int Run(int argc, char** argv) {
     }
     svc = Services{};
     system::ShutdownDevice();
+    system::ShutdownSettings();
     window->reset();
     pal::Shutdown();
     return exit_code;

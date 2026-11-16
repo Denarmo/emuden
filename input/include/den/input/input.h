@@ -129,7 +129,6 @@ enum class Axis { LeftX, LeftY, RightX, RightY, LeftTrigger, RightTrigger };
 int Attach(PadFamily family);
 /// Unplugs it. False for an id that is not attached.
 bool Detach(int id);
-void DetachAll();
 bool SetButton(int id, PadButton button, bool down);
 /// Sticks -1..1 (down and right positive), triggers 0..1.
 bool SetAxis(int id, Axis axis, float value);

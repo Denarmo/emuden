@@ -38,6 +38,5 @@ private:
 
 std::string Md5Hex(const void* data, std::size_t size);
 std::string Sha256Hex(const void* data, std::size_t size);
-std::optional<std::string> Md5File(const std::filesystem::path& file);
 
 } // namespace den

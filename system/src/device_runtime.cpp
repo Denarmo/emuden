@@ -121,10 +121,6 @@ bool DeviceIsFake() {
     return g_device.fake;
 }
 
-const std::vector<DeviceDefault>& DeviceDefaults() {
-    return g_device.defaults;
-}
-
 std::uint64_t DeviceRevision() {
     return g_device.revision;
 }

@@ -142,7 +142,6 @@ public:
 
     void SetHardcore(bool on);
     bool Hardcore() const;
-    void SetUnofficial(bool on);
 
     /// Starts a game by its RetroAchievements hash (HashFile). `done` says whether the server
     /// knows the game; memory is read from `memory` from then on.

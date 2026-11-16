@@ -74,20 +74,6 @@ void Settings::SetDefaults(std::vector<std::pair<std::string, JsonValue>> defaul
     }
 }
 
-bool Settings::HasDefault(const std::string& key) const {
-    std::lock_guard lock(impl_->mutex);
-    return impl_->defaults.contains(key);
-}
-
-std::vector<std::string> Settings::DefaultKeys() const {
-    std::lock_guard lock(impl_->mutex);
-    std::vector<std::string> keys;
-    for (const auto& [key, value] : impl_->defaults) {
-        keys.push_back(key);
-    }
-    return keys;
-}
-
 std::string Settings::GetString(const std::string& key, const std::string& fallback) const {
     std::lock_guard lock(impl_->mutex);
     const JsonValue* value = impl_->Find(key);

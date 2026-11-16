@@ -14,7 +14,6 @@ enum class Level { Debug, Info, Warning, Error };
 
 /// Lines go to stderr and, once set, to this file too (truncated when opened).
 void SetFile(const std::filesystem::path& file);
-void SetMinimum(Level level);
 void Write(Level level, std::string_view tag, std::string_view text);
 
 template <typename... Args>

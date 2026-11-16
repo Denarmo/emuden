@@ -81,9 +81,6 @@ public:
     const std::string& Route() const {
         return route_;
     }
-    const Params& GetParams() const {
-        return params_;
-    }
     std::string Param(const std::string& key) const;
 
 private:
