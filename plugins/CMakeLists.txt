@@ -34,3 +34,16 @@ if(TARGET den_plugins_tests)
     target_include_directories(den_plugins_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
     target_link_libraries(den_plugins_tests PRIVATE den_lua)
 endif()
+
+# Fails when a bundled manifest differs from the official one in an emuden-plugins checkout
+# beside this one; tools/sync_bundled_plugins.py copies them. emuden.ps2 is left out until
+# the PS2 plugin work in progress has landed in both repositories.
+set(EMUDEN_PLUGINS_DIR "${CMAKE_SOURCE_DIR}/../emuden-plugins" CACHE PATH "An emuden-plugins checkout")
+if(TARGET den_plugins_tests AND EXISTS "${EMUDEN_PLUGINS_DIR}/plugins")
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME den_bundled_plugins_in_sync
+            COMMAND Python3::Interpreter -I "${CMAKE_SOURCE_DIR}/tools/sync_bundled_plugins.py"
+                --check --plugins "${EMUDEN_PLUGINS_DIR}" --skip emuden.ps2)
+    endif()
+endif()
