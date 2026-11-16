@@ -12,6 +12,9 @@
 // copies online behind. Such a game, and one in a folder that cannot be written, only gets
 // its clean name shown. BIOS files, packed games, cue sheets and their tracks, discs of a set,
 // hacks (named by EmuDEN already) and anything outside the library folders are left alone.
+//
+// A game whose header says it was made from another game in the library (rom_codes.h
+// FindHackBase) is linked to it as a hack where it is: its file does not move.
 
 #pragma once
 
@@ -29,7 +32,8 @@ enum class ChangeKind {
     Rename,      // the file gets the clean name
     ShowName,    // only the name shown changes (synced, or a folder that cannot be written)
     RemoveJunk,  // a Mac's "._" resource fork or ".DS_Store"
-    RemoveFolder // an empty folder in a game folder (not a console's folder)
+    RemoveFolder, // an empty folder in a game folder (not a console's folder)
+    LinkHack      // a hack patched before it came, shown with the game it was made from
 };
 
 struct Change {
@@ -39,6 +43,7 @@ struct Change {
     std::filesystem::path to;    // Rename: the new file
     std::string name;            // Rename, ShowName: the clean name
     std::string why;             // ShowName: why the file keeps its name
+    std::string base_id;         // LinkHack: the game it is a hack of (`name` is that game's)
 };
 
 struct Plan {
@@ -60,7 +65,7 @@ struct Moved {
 using MovedFn = std::function<void(const Moved&)>;
 
 struct Done {
-    int renamed = 0, named = 0, removed = 0;
+    int renamed = 0, named = 0, removed = 0, linked = 0;
     std::vector<std::string> errors;
 };
 

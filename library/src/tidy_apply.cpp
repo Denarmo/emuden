@@ -108,7 +108,7 @@ Done Apply(Library& library, const Plan& plan, const fs::path& data_dir, const M
            const std::function<void(float)>& progress) {
     Done done;
     const std::vector<Folder> folders = library.Folders();
-    JsonValue renames = JsonArray(), names = JsonArray(), removed = JsonArray();
+    JsonValue renames = JsonArray(), names = JsonArray(), removed = JsonArray(), links = JsonArray();
     for (std::size_t i = 0; i < plan.changes.size(); ++i) {
         const Change& change = plan.changes[i];
         std::error_code ec;
@@ -136,6 +136,12 @@ Done Apply(Library& library, const Plan& plan, const fs::path& data_dir, const M
             ++done.named;
             names.items.push_back(JsonObject({{"id", JsonString(change.id)}}));
             break;
+        case ChangeKind::LinkHack:
+            library.SetHackOf(change.id, change.base_id);
+            ++done.linked;
+            links.items.push_back(JsonObject({{"id", JsonString(change.id)}}));
+            log::Info("library", "tidy: {} is a hack of {}", PathToUtf8(change.from.filename()), change.name);
+            break;
         case ChangeKind::RemoveJunk:
         case ChangeKind::RemoveFolder:
             if (fs::remove(change.from, ec) && !ec) {
@@ -157,7 +163,7 @@ Done Apply(Library& library, const Plan& plan, const fs::path& data_dir, const M
     WriteFileAtomic(LogFile(data_dir),
                     WriteJson(JsonObject({{"time", JsonNumber(static_cast<double>(now.count()))},
                                           {"renamed", std::move(renames)}, {"named", std::move(names)},
-                                          {"removed", std::move(removed)}})));
+                                          {"removed", std::move(removed)}, {"linked", std::move(links)}})));
     return done;
 }
 
@@ -183,6 +189,11 @@ Status Undo(Library& library, const fs::path& data_dir, const MovedFn& moved) {
             if (Status done = RenameGame(library, data_dir, back, moved); !done) {
                 failed = done.error;
             }
+        }
+    }
+    if (const JsonValue* links = root->Find("linked")) {
+        for (const JsonValue& item : links->items) {
+            library.SetHackOf(item.String("id"), {});
         }
     }
     if (const JsonValue* named = root->Find("named")) {

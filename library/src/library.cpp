@@ -504,6 +504,17 @@ private:
         RecordChanged(id);
     }
 
+    void SetHackOf(const std::string& id, const std::string& base_id) override {
+        std::lock_guard lock(mutex_);
+        saved_.records[id].hack_of = base_id;
+        for (Entry& entry : entries_) {
+            if (entry.id == id) {
+                entry.hack_of = base_id;
+            }
+        }
+        RecordChanged(id);
+    }
+
     void RetryCovers() override {
         const SystemTable systems = SystemsCopy();
         for (const Entry& entry : Entries()) {
@@ -572,6 +583,9 @@ private:
         entry.added = record.added;
         if (!record.name.empty()) {
             entry.name = record.name;
+        }
+        if (!record.hack_of.empty() && entry.hack_of.empty()) {
+            entry.hack_of = record.hack_of;
         }
     }
 

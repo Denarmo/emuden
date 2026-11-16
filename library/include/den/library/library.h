@@ -209,6 +209,11 @@ public:
         (void)id;
         (void)name;
     }
+    /// Links a game to the game it is a hack of ("" = not a hack again), without moving its file.
+    virtual void SetHackOf(const std::string& id, const std::string& base_id) {
+        (void)id;
+        (void)base_id;
+    }
     /// What the library keeps by a game's id (play time, favourite, sessions, shown name) now
     /// belongs to `new_id`: the game's file was renamed. The next scan lists it under it.
     virtual void MoveRecord(const std::string& old_id, const std::string& new_id) {

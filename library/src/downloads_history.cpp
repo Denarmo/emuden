@@ -190,15 +190,17 @@ Status Setup::Undo(const std::string& record_id) {
         }
         record = *found;
     }
-    for (const std::string& id : record.hacks) {
-        if (Status removed = HacksOf(library_).Remove(id, {}); !removed && library_.Find(id)) {
-            return removed;
-        }
-    }
+    // Files go back first: a hack downloaded patched already is among them, and Remove then
+    // only takes its entry and what lies beside it.
     for (const auto& [name, placed] : record.moved) {
         const fs::path file = PathFromUtf8(placed);
         if (IsRegularFile(file) && !MoveTo(file, FreeName(downloads_, PathFromUtf8(name).filename()))) {
             return Status::Fail("Could not move " + PathToUtf8(file.filename()) + " back to Downloads");
+        }
+    }
+    for (const std::string& id : record.hacks) {
+        if (Status removed = HacksOf(library_).Remove(id, {}); !removed && library_.Find(id)) {
+            return removed;
         }
     }
     for (auto it = record.folders.rbegin(); it != record.folders.rend(); ++it) {

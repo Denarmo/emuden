@@ -389,3 +389,38 @@ TEST_CASE("downloads: a patch for a game the user does not have stays") {
     REQUIRE(done.record.outcome == Outcome::MissingBase);
     REQUIRE(fs::exists(f.downloads / "hack.bps"));
 }
+
+TEST_CASE("downloads: a ROM patched already becomes a hack of the user's game with its code") {
+    Fixture f("prepatched");
+    const auto gba = [](std::string_view title, std::string_view code, int seed) {
+        Bytes rom = MakeRom(65536, seed);
+        std::fill(rom.begin() + 0xA0, rom.begin() + 0xB2, 0);
+        std::copy(title.begin(), title.end(), rom.begin() + 0xA0);
+        std::copy(code.begin(), code.end(), rom.begin() + 0xAC);
+        return rom;
+    };
+    WriteFile(f.roms / "gba" / "Monster Quest (USA).gba", gba("MONSTERQUEST", "AMQE", 31));
+    f.Open();
+    const Bytes hack_rom = gba("MQREMIX", "AMQE", 32);
+    WriteFile(f.downloads / "mq_remix_v2.0.gba", hack_rom);
+    const Outcomes done = f.Run("mq_remix_v2.0.gba", "Monster Quest Remix | Hackdex");
+    INFO(done.record.message);
+    REQUIRE(done.record.outcome == Outcome::HackAdded);
+    CHECK(done.record.message == "Monster Quest Remix has been added to the library, made from Monster Quest");
+    REQUIRE(done.record.games.size() == 1);
+    const auto hack = f.library->Find(done.record.games.front().id);
+    REQUIRE(hack);
+    CHECK(hack->hack_of == f.Named("Monster Quest")->id);
+    CHECK(ReadFile(f.roms / "gba" / "Hacks" / "Monster Quest Remix.gba") == hack_rom);
+    CHECK_FALSE(fs::exists(f.downloads / "mq_remix_v2.0.gba"));
+
+    // Taken back: the download returns to Downloads, the hack and its Hacks folder go.
+    REQUIRE(f.setup->Undo(done.record.id).ok);
+    CHECK(ReadFile(f.downloads / "mq_remix_v2.0.gba") == hack_rom);
+    CHECK_FALSE(f.library->Find(hack->id));
+    CHECK_FALSE(fs::exists(f.roms / "gba" / "Hacks"));
+
+    // A game with the same code named as that game is a game, not a hack.
+    WriteFile(f.downloads / "Monster Quest (Europe).gba", gba("MONSTERQUEST", "AMQE", 33));
+    CHECK(f.Run("Monster Quest (Europe).gba").record.outcome == Outcome::Added);
+}

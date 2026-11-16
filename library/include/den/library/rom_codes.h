@@ -10,7 +10,9 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <string>
+#include <vector>
 #include <string_view>
 
 #include "den/library/artwork.h"
@@ -26,8 +28,14 @@ struct RomCode {
 /// GBA: title 0xA0, code 0xAC. GB and GBC: title 0x134, and the code at 0x13F on a cartridge
 /// that marks Game Boy Color support. NDS: title 0x00, code 0x0C. N64: title 0x20, code 0x3B
 /// (any byte order). SNES: the internal name at 0x7FC0 or 0xFFC0 (after a copier's 512 bytes),
-/// whichever has a valid checksum pair. Other consoles: nothing.
+/// whichever has a valid checksum pair. PS1 and PS2: the disc's boot serial as the code
+/// (ReadDiscSerial). Other consoles: nothing.
 RomCode ReadRomCode(const std::filesystem::path& rom, std::string_view system);
+
+/// The serial ("SLUS-20946") of the program SYSTEM.CNF boots (BOOT2, or BOOT on a PS1 disc),
+/// read from the disc's ISO 9660 file system: a cooked .iso, raw .bin/.img sectors (mode 1 or
+/// mode 2), or the first track a .cue or .m3u names. "" for anything else (CHD, CSO, PBP).
+std::string ReadDiscSerial(const std::filesystem::path& disc);
 
 /// ReadRomCode of a library entry (nothing for a game in an archive), with `manifest_title`
 /// (the title the console's manifest reads) when the reader has no title for it.
@@ -45,5 +53,19 @@ std::string GameOfTitle(std::string_view system, std::string_view title);
 /// fitted to the collection (MatchThumbnail). "" when nothing fits.
 std::string FindBaseGame(const ThumbnailIndex& index, std::string_view system, std::string_view original_name,
                          const RomCode& header);
+
+/// Whether `name` only names `game`: each of its words (bracketed tags, "the", "version",
+/// revisions and regions left out) is among the game's ("Pokemon FireRed USA" of "Pokemon -
+/// FireRed Version (USA, Europe)"); "Pokemon FireRed Plus" is not.
+bool NameOfGame(std::string_view name, std::string_view game);
+
+/// The game among `games` an already patched ROM is a hack of: same console, the same code
+/// (the same header title on consoles without codes), not a hack itself, another file, and
+/// named as another game (NameOfGame false, also against the code's known game). The base
+/// is the code's known game, or for other codes one whose name is all in the hack's ("Space
+/// Quest" of "Space Quest Redux"); a hack renamed outright is not linked then. Placeholder
+/// codes ("0000", "AAAA") are not compared. nullopt when none is.
+std::optional<Entry> FindHackBase(const std::vector<Entry>& games, std::string_view system,
+                                  const std::filesystem::path& rom, std::string_view name, const RomCode& header);
 
 } // namespace den::library

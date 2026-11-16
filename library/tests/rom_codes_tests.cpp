@@ -6,6 +6,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "../../patching/tests/encoders.h"
+#include "den/base/files.h"
 #include "den/library/rom_codes.h"
 
 using namespace den;
@@ -114,4 +115,60 @@ TEST_CASE("rom codes: Game Boy Color, N64 in any byte order, SNES with a copier 
     const RomCode smw = ReadRomCode(Dir() / "kaizo.smc", "snes");
     CHECK(smw.title == "SUPER MARIOWORLD");
     CHECK(FindBaseGame(Index(), "snes", "Kaizo Mario World", smw) == "Super Mario World (USA)");
+}
+
+TEST_CASE("rom codes: only a name that names the game itself is the same game") {
+    CHECK(NameOfGame("Pokemon FireRed", "Pokemon - FireRed Version (USA, Europe)"));
+    CHECK(NameOfGame("pokemon_firered_usa", "Pokemon - FireRed Version (USA, Europe) (Rev 1)"));
+    CHECK(NameOfGame("Pokemon FireRed v1.1", "Pokemon FireRed"));
+    CHECK_FALSE(NameOfGame("Pokemon FireRed Plus", "Pokemon - FireRed Version (USA, Europe)"));
+    CHECK_FALSE(NameOfGame("Pokemon Radical Red", "Pokemon FireRed"));
+    CHECK_FALSE(NameOfGame("", "Pokemon FireRed"));
+}
+
+TEST_CASE("rom codes: a patched ROM is a hack of the library's game with its code") {
+    const auto entry = [](const char* name, const fs::path& path) {
+        Entry e;
+        e.system = "gba";
+        e.name = name;
+        e.path = PathToUtf8(path);
+        e.id = "gba:" + std::string(name);
+        return e;
+    };
+    const std::vector<Entry> games = {
+        entry("Pokemon - FireRed Version", Gba("Pokemon - FireRed Version (USA, Europe).gba", "POKEMON FIRE", "BPRE")),
+        entry("Space Quest", Gba("Space Quest.gba", "SPACEQUEST", "ASQE")),
+        entry("Homebrew One", Gba("Homebrew One.gba", "HOMEBREW1", "0000")),
+    };
+    // Renamed in its header, the code kept.
+    const fs::path radical = Gba("radical_red_v4.1.gba", "RADICALRED", "BPRE");
+    const auto base = FindHackBase(games, "gba", radical, "Pokemon Radical Red", ReadRomCode(radical, "gba"));
+    REQUIRE(base);
+    CHECK(base->name == "Pokemon - FireRed Version");
+    // Another dump of the same game is not a hack.
+    const fs::path rev = Gba("Pokemon FireRed (Rev 1).gba", "POKEMON FIRE", "BPRE");
+    CHECK_FALSE(FindHackBase(games, "gba", rev, "Pokemon FireRed", ReadRomCode(rev, "gba")));
+    // Its own file, another code, a placeholder code, no header: none.
+    CHECK_FALSE(FindHackBase(games, "gba", PathFromUtf8(games[1].path), "Space Quest Deluxe",
+                             ReadRomCode(PathFromUtf8(games[1].path), "gba")));
+    const fs::path other = Gba("Other.gba", "OTHERGAME", "AOTE");
+    CHECK_FALSE(FindHackBase(games, "gba", other, "Other", ReadRomCode(other, "gba")));
+    const fs::path brew = Gba("Homebrew Two.gba", "HOMEBREW2", "0000");
+    CHECK_FALSE(FindHackBase(games, "gba", brew, "Homebrew Two", ReadRomCode(brew, "gba")));
+    CHECK_FALSE(FindHackBase(games, "gba", radical, "Pokemon Radical Red", RomCode{}));
+}
+
+TEST_CASE("rom codes: with a code no list knows, the base is the game named within the hack's name") {
+    Entry quest;
+    quest.system = "gba";
+    quest.name = "Space Quest";
+    quest.id = "gba:quest";
+    quest.path = PathToUtf8(Gba("Space Quest (USA).gba", "SPACEQUEST", "ASQE"));
+    const fs::path redux = Gba("Space Quest Redux.gba", "SPACEQUEST", "ASQE");
+    const auto base = FindHackBase({quest}, "gba", redux, "Space Quest Redux", ReadRomCode(redux, "gba"));
+    REQUIRE(base);
+    CHECK(base->id == "gba:quest");
+    // Renamed outright: which of the two is the hack cannot be told.
+    const fs::path galaxy = Gba("Galaxy Run.gba", "GALAXYRUN", "ASQE");
+    CHECK_FALSE(FindHackBase({quest}, "gba", galaxy, "Galaxy Run", ReadRomCode(galaxy, "gba")));
 }

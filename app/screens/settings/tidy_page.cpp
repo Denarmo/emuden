@@ -59,6 +59,8 @@ std::string Line(const tidy::Change& change) {
         return "Delete " + PathToUtf8(change.from) + "  (a Mac's leftover file)";
     case tidy::ChangeKind::RemoveFolder:
         return "Delete the empty folder " + PathToUtf8(change.from);
+    case tidy::ChangeKind::LinkHack:
+        return std::format("{}  is a hack of  {}", PathToUtf8(change.from.filename()), change.name);
     }
     return {};
 }
@@ -105,10 +107,11 @@ public:
             AddRows(list, std::move(rows));
             return;
         }
-        int renames = 0, names = 0, junk = 0;
+        int renames = 0, names = 0, junk = 0, hacks = 0;
         for (const tidy::Change& change : plan_.changes) {
             (change.kind == tidy::ChangeKind::Rename     ? renames
              : change.kind == tidy::ChangeKind::ShowName ? names
+             : change.kind == tidy::ChangeKind::LinkHack ? hacks
                                                          : junk)++;
         }
         if (plan_.changes.empty()) {
@@ -128,6 +131,10 @@ public:
                                              Count(renames, "file gets", "files get"),
                                              Count(names, "game gets", "games get"),
                                              Count(junk, "leftover file or empty folder", "leftover files and empty folders")));
+        if (hacks > 0) {
+            list->Emplace<ui::Label>(std::format("{} with the game {} made from (the files stay where they are).",
+                                                 Count(hacks, "hack goes", "hacks go"), hacks == 1 ? "it was" : "they were"));
+        }
         list->Emplace<ui::Label>("Saves, states, play time and game settings go with the new names. Games without "
                                  "box art look for it again; a hack finds the box of the game it was made from by "
                                  "its header and gets the HACK sticker.")
@@ -215,8 +222,9 @@ private:
                 },
                 [this](float fraction) { progress_ = fraction; });
             std::lock_guard lock(mutex_);
-            summary_ = std::format("Done: {} renamed, {} shown clean, {} deleted.", Count(done.renamed, "file", "files"),
-                                   Count(done.named, "name", "names"), Count(done.removed, "leftover", "leftovers"));
+            summary_ = std::format("Done: {} renamed, {} shown clean, {} deleted{}.", Count(done.renamed, "file", "files"),
+                                   Count(done.named, "name", "names"), Count(done.removed, "leftover", "leftovers"),
+                                   done.linked > 0 ? ", " + Count(done.linked, "hack", "hacks") + (done.linked == 1 ? " linked to its game" : " linked to their games") : "");
             done_ = std::move(done);
             step_ = Step::Done;
         });

@@ -26,6 +26,7 @@ struct Record {
     std::int64_t added = 0;
     PlayTotals other; // the other devices' play, from sync
     std::string name; // the name the user sees instead of the file's; "" = the file's
+    std::string hack_of; // a hack the tidy-up linked to its base game in place; "" = none
 };
 
 struct Saved {

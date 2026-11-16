@@ -155,3 +155,64 @@ TEST_CASE("tidy: clean names, play time, saves and settings move to the new id; 
     CHECK(f.AtPath(f.roms / "gba" / "messy_synced_game.gba")->name != "Messy Synced Game");
     CHECK_FALSE(CanUndo(f.data));
 }
+
+TEST_CASE("tidy: a hack patched before it came is linked to its game where it is; undo unlinks it") {
+    const fs::path dir = fs::temp_directory_path() / "emuden-tidy-hack-test";
+    fs::remove_all(dir);
+    const auto gba = [&](const char* file, std::string_view title, std::string_view code, int seed) {
+        Bytes rom = MakeRom(0x8000, seed);
+        std::fill(rom.begin() + 0xA0, rom.begin() + 0xB2, 0);
+        std::copy(title.begin(), title.end(), rom.begin() + 0xA0);
+        std::copy(code.begin(), code.end(), rom.begin() + 0xAC);
+        WriteFile(dir / "roms" / "gba" / file, rom);
+        return dir / "roms" / "gba" / file;
+    };
+    gba("Pokemon - FireRed Version (USA, Europe).gba", "POKEMON FIRE", "BPRE", 1);
+    const fs::path hack = gba("Pokemon Radical Red.gba", "RADICALRED", "BPRE", 2);
+    gba("Pokemon FireRed (Rev 1).gba", "POKEMON FIRE", "BPRE", 3); // the same game: no hack
+    Jobs jobs{2};
+    Config config;
+    config.data_dir = dir / "user";
+    config.jobs = &jobs;
+    config.offline = true;
+    std::unique_ptr<Library> library = CreateLibrary(config);
+    REQUIRE(library->AddFolder(PathToUtf8(dir / "roms")).ok);
+    jobs.Wait(library->Scan());
+
+    const Plan plan = MakePlan(*library, config.data_dir);
+    std::vector<const Change*> links;
+    for (const Change& change : plan.changes) {
+        if (change.kind == ChangeKind::LinkHack) {
+            links.push_back(&change);
+        }
+    }
+    REQUIRE(links.size() == 1);
+    CHECK(links[0]->from == hack);
+    CHECK(links[0]->name == "Pokemon - FireRed Version");
+
+    const Done done = Apply(*library, plan, config.data_dir, {});
+    CHECK(done.linked == 1);
+    jobs.Wait(library->Scan());
+    std::string hack_of, base_id;
+    for (const Entry& entry : library->Entries()) {
+        if (PathFromUtf8(entry.path) == hack) {
+            hack_of = entry.hack_of;
+            CHECK(entry.name == "Pokemon Radical Red"); // the file stays, under its name
+        }
+        if (entry.name == "Pokemon - FireRed Version") {
+            base_id = entry.id;
+        }
+    }
+    CHECK(!base_id.empty());
+    CHECK(hack_of == base_id);
+    CHECK(fs::exists(hack));
+    CHECK(MakePlan(*library, config.data_dir).changes.empty()); // linked once
+
+    REQUIRE(Undo(*library, config.data_dir, {}).ok);
+    jobs.Wait(library->Scan());
+    for (const Entry& entry : library->Entries()) {
+        if (PathFromUtf8(entry.path) == hack) {
+            CHECK(entry.hack_of.empty());
+        }
+    }
+}

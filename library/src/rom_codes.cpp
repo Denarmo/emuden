@@ -63,6 +63,17 @@ constexpr Known KNOWN_CODES[] = {
     {"n64", "NZSE", "Legend of Zelda, The - Majora's Mask (USA)"},
     {"n64", "NKTE", "Mario Kart 64 (USA)"},
     {"n64", "NMQE", "Paper Mario (USA)"},
+    {"psx", "SCUS-94163", "Final Fantasy VII (USA) (Disc 1)"},
+    {"psx", "SLUS-00892", "Final Fantasy VIII (USA) (Disc 1)"},
+    {"psx", "SCUS-94900", "Crash Bandicoot (USA)"},
+    {"psx", "SCUS-94228", "Spyro the Dragon (USA)"},
+    {"psx", "SLUS-00594", "Metal Gear Solid (USA) (Disc 1)"},
+    {"psx", "SLUS-00707", "Silent Hill (USA)"},
+    {"psx", "SCUS-94194", "Gran Turismo (USA)"},
+    {"ps2", "SLUS-20312", "Final Fantasy X (USA)"},
+    {"ps2", "SLUS-20370", "Kingdom Hearts (USA)"},
+    {"ps2", "SLUS-20062", "Grand Theft Auto III (USA)"},
+    {"ps2", "SLUS-20946", "Grand Theft Auto - San Andreas (USA)"},
 };
 
 // The same for consoles whose headers have no code: their header titles.
@@ -181,6 +192,10 @@ RomCode ReadRomCode(const fs::path& rom, std::string_view system) {
         std::error_code ec;
         return ReadSnes(in, fs::file_size(rom, ec));
     }
+    if (system == "psx" || system == "ps2") {
+        in.close();
+        return {{}, ReadDiscSerial(rom)};
+    }
     return {};
 }
 
@@ -193,6 +208,14 @@ RomCode HeaderOf(const Entry& entry, std::string_view manifest_title) {
 }
 
 std::string GameOfCode(std::string_view system, std::string_view code) {
+    if (code.size() == 10) { // a disc's serial: its region is in the letters, so only exactly
+        for (const Known& known : KNOWN_CODES) {
+            if (known.system == system && known.key == code) {
+                return std::string(known.game);
+            }
+        }
+        return {};
+    }
     if (code.size() != 4) {
         return {};
     }
@@ -224,6 +247,80 @@ std::string GameOfTitle(std::string_view system, std::string_view title) {
         }
     }
     return {};
+}
+
+namespace {
+
+std::vector<std::string> Words(std::string_view name) {
+    std::vector<std::string> words;
+    std::string word;
+    int depth = 0;
+    const auto flush = [&] {
+        const bool revision = (word.size() > 1 && word[0] == 'v' && std::isdigit(static_cast<unsigned char>(word[1]))) ||
+                              word.starts_with("rev");
+        const bool noise = word == "the" || word == "version" || word == "usa" || word == "europe" ||
+                           word == "japan" || word == "world" || revision;
+        if (!word.empty() && !noise) {
+            words.push_back(word);
+        }
+        word.clear();
+    };
+    for (const char c : name) {
+        const auto byte = static_cast<unsigned char>(c);
+        if (c == '(' || c == '[') {
+            ++depth;
+        } else if ((c == ')' || c == ']') && depth > 0) {
+            --depth;
+        } else if (depth == 0 && (std::isalnum(byte) || byte >= 0x80 ||
+                                  (c == '.' && !word.empty() && std::isdigit(static_cast<unsigned char>(word.back()))))) {
+            word.push_back(static_cast<char>(std::tolower(byte)));
+            continue;
+        }
+        flush();
+    }
+    flush();
+    std::sort(words.begin(), words.end());
+    words.erase(std::unique(words.begin(), words.end()), words.end());
+    return words;
+}
+
+} // namespace
+
+bool NameOfGame(std::string_view name, std::string_view game) {
+    const std::vector<std::string> mine = Words(name), its = Words(game);
+    return !mine.empty() && std::includes(its.begin(), its.end(), mine.begin(), mine.end());
+}
+
+std::optional<Entry> FindHackBase(const std::vector<Entry>& games, std::string_view system, const fs::path& rom,
+                                  std::string_view name, const RomCode& header) {
+    // Homebrew leaves placeholder codes ("0000", "AAAA") that many games share.
+    const std::string_view code = header.code;
+    const bool placeholder = !code.empty() && (code.find_first_not_of(code[0]) == std::string_view::npos ||
+                                               code.find_first_not_of("0123456789") == std::string_view::npos);
+    if ((header.code.empty() && header.title.empty()) || placeholder) {
+        return std::nullopt;
+    }
+    // Which of two files is the hack: the base is the code's known game, or (an unknown code)
+    // the game whose whole name is in the hack's ("Space Quest" of "Space Quest Redux").
+    const std::string known = !header.code.empty() ? GameOfCode(system, header.code) : GameOfTitle(system, header.title);
+    if (!known.empty() && NameOfGame(name, known)) {
+        return std::nullopt;
+    }
+    std::error_code ec;
+    for (const Entry& game : games) {
+        if (game.system != system || !game.hack_of.empty() || !game.archive_member.empty() ||
+            fs::equivalent(PathFromUtf8(game.path), rom, ec) || NameOfGame(name, game.name) ||
+            !NameOfGame(game.name, !known.empty() ? std::string_view(known) : name)) {
+            continue;
+        }
+        const RomCode other = ReadRomCode(PathFromUtf8(game.path), game.system);
+        const bool same = !header.code.empty() ? other.code == header.code
+                                               : other.code.empty() && Upper(other.title) == Upper(header.title);
+        if (same) {
+            return game;
+        }
+    }
+    return std::nullopt;
 }
 
 std::string FindBaseGame(const ThumbnailIndex& index, std::string_view system, std::string_view original_name,

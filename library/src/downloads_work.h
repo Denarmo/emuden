@@ -7,7 +7,9 @@
 
 #include <filesystem>
 #include <functional>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "den/library/downloads.h"
@@ -37,6 +39,9 @@ struct SetupWork {
                     bool from_archive);
     void SetUpGames(std::vector<GameGroup> groups, const std::filesystem::path& base);
     void SetUpPatch(const std::vector<std::filesystem::path>& patches);
+    /// A ROM that is a hack of a game in the library already (rom_codes.h FindHackBase), filed
+    /// as a hack of it under `name`. The hack and its base's name, or nullopt when it is none.
+    std::optional<std::pair<Entry, std::string>> SetUpPatchedRom(const GameGroup& group, const std::string& name);
     bool Cancelled() const {
         return cancelled && cancelled();
     }

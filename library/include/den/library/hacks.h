@@ -38,6 +38,9 @@ struct BaseMatch {
 struct HackRequest {
     std::string base_id; // library entry to patch
     std::filesystem::path patch;
+    /// In place of `patch`: a ROM patched already (a hack downloaded as a whole game), moved
+    /// in as it is.
+    std::filesystem::path patched;
     std::string title, version, description, plugin, source;
     std::filesystem::path cover; // empty = the base's cover
     bool keep_old = false;       // an installed older version stays as a game of its own

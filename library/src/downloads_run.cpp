@@ -187,6 +187,7 @@ void SetupWork::SetUpGames(std::vector<GameGroup> groups, const fs::path& base) 
     Record& record = out.record;
     std::vector<fs::path> mains;
     std::vector<std::string> already, waiting;
+    std::vector<std::pair<Entry, std::string>> hacks; // already patched ROMs and their bases' names
     for (GameGroup& group : groups) {
         if (!group.missing.empty()) {
             waiting.push_back(PathToUtf8(group.main.filename()) + " (missing " + group.missing.front() +
@@ -206,14 +207,22 @@ void SetupWork::SetUpGames(std::vector<GameGroup> groups, const fs::path& base) 
         }
         const fs::path sheet_dir = group.main.parent_path();
         // A game of one file is filed under its clean name; a sheet's files keep the names it lists.
+        // A hack of a game in the library goes with it, as the hacks made from patches do.
         fs::path clean;
-        if (group.files.size() == 1 && !IsSheetFile(group.main) && !TidyFileName(PathToUtf8(group.main.filename()))) {
+        if (group.files.size() == 1 && !IsSheetFile(group.main)) {
             NameSources sources;
             sources.file_name = PathToUtf8(group.main.filename());
             sources.page_title = groups.size() == 1 ? request.page_title : std::string();
             sources.archive_name = Key(base) != Key(setup.downloads_) ? record.download : std::string();
             sources.header_title = HeaderName(HeaderTitle(group.main, group.system));
-            clean = PathFromUtf8(SafeFileName(GameName(sources)) + PathToUtf8(group.main.extension()));
+            const std::string name = GameName(sources);
+            if (auto hack = SetUpPatchedRom(group, name)) {
+                hacks.push_back(std::move(*hack));
+                continue;
+            }
+            if (!TidyFileName(PathToUtf8(group.main.filename()))) {
+                clean = PathFromUtf8(SafeFileName(name) + PathToUtf8(group.main.extension()));
+            }
         }
         fs::path main;
         bool moved_any = false;
@@ -247,6 +256,18 @@ void SetupWork::SetUpGames(std::vector<GameGroup> groups, const fs::path& base) 
             mains.push_back(main);
             record.system_name = ConsoleName(systems, group.system);
         }
+    }
+    for (const auto& [hack, base_name] : hacks) {
+        record.games.push_back({hack.id, hack.name, hack.system});
+        record.system_name = ConsoleName(systems, hack.system);
+    }
+    if (mains.empty() && !hacks.empty()) {
+        record.outcome = Outcome::HackAdded;
+        record.message = hacks.size() == 1
+                             ? std::format("{} has been added to the library, made from {}", hacks[0].first.name, hacks[0].second)
+                             : std::format("{} hacks have been added to the library: {}", hacks.size(), hacks[0].first.name);
+        log::Info("downloads", "{}", record.message);
+        return;
     }
     if (mains.empty()) {
         record.outcome = !waiting.empty() ? Outcome::Waiting : Outcome::Unknown;

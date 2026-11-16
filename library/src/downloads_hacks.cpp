@@ -11,6 +11,7 @@
 #include "den/base/files.h"
 #include "den/base/log.h"
 #include "den/library/hacks.h"
+#include "den/library/rom_codes.h"
 #include "downloads_work.h"
 
 namespace den::library::downloads {
@@ -25,6 +26,30 @@ std::string ConsoleName(const SystemTable& systems, const std::string& id) {
 }
 
 } // namespace
+
+std::optional<std::pair<Entry, std::string>> SetupWork::SetUpPatchedRom(const GameGroup& group, const std::string& name) {
+    Library& library = setup.library_;
+    const std::optional<Entry> base = FindHackBase(library.Entries(), group.system, group.main, name,
+                                                   ReadRomCode(group.main, group.system));
+    if (!base) {
+        return std::nullopt;
+    }
+    HackRequest order;
+    order.base_id = base->id;
+    order.patched = group.main;
+    order.title = name;
+    order.version = HackVersion(request.page_title, out.record.download);
+    order.plugin = request.plugin;
+    order.source = request.host;
+    Result<Entry> made = HacksOf(library).InstallHack(order);
+    if (!made) {
+        log::Warn("downloads", "{} kept as a game of its own: {}", name, made.error());
+        return std::nullopt;
+    }
+    out.record.moved.push_back({PathToUtf8(group.main.filename()), made.value().path});
+    out.record.hacks.push_back(made.value().id);
+    return std::pair{made.take(), base->name};
+}
 
 void SetupWork::SetUpPatch(const std::vector<fs::path>& patches) {
     Record& record = out.record;

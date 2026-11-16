@@ -7,12 +7,14 @@
 #include <algorithm>
 #include <cstring>
 #include <fstream>
+#include <map>
 #include <set>
 
 #include "den/base/files.h"
 #include "den/base/json.h"
 #include "den/library/downloads.h"
 #include "den/library/names.h"
+#include "den/library/rom_codes.h"
 #include "den/library/tidy.h"
 #include "downloads_work.h"
 #include "hacks_store.h"
@@ -49,7 +51,7 @@ bool Walk(const fs::path& dir, int depth, const SystemTable& systems, bool root,
                 empty = false;
             }
         } else if (IsJunk(path)) {
-            plan.changes.push_back({ChangeKind::RemoveJunk, {}, {}, path, {}, {}, {}});
+            plan.changes.push_back({ChangeKind::RemoveJunk, {}, {}, path, {}, {}, {}, {}});
         } else {
             empty = false;
         }
@@ -58,7 +60,7 @@ bool Walk(const fs::path& dir, int depth, const SystemTable& systems, bool root,
     const std::string name = PathToUtf8(dir.filename());
     const bool keeps = root || (systems.FromFolderName(name) != nullptr && ToLower(name) != "hacks");
     if (empty && !keeps) {
-        plan.changes.push_back({ChangeKind::RemoveFolder, {}, {}, dir, {}, {}, {}});
+        plan.changes.push_back({ChangeKind::RemoveFolder, {}, {}, dir, {}, {}, {}, {}});
         return true;
     }
     return false;
@@ -67,6 +69,41 @@ bool Walk(const fs::path& dir, int depth, const SystemTable& systems, bool root,
 bool IsSheet(const fs::path& file) {
     const std::string extension = ToLower(PathToUtf8(file.extension()));
     return extension == ".cue" || extension == ".gdi" || extension == ".m3u" || extension == ".ccd";
+}
+
+// Hacks patched before they came, by the code in their headers: the games of a console that
+// share a code are compared with each other only.
+void LinkHacks(const std::vector<Entry>& entries, Plan& plan, std::set<std::string>& linked) {
+    std::map<std::pair<std::string, std::string>, std::vector<Entry>> by_code;
+    for (const Entry& entry : entries) {
+        if (entry.hack_of.empty() && entry.archive_member.empty() && IsRegularFile(PathFromUtf8(entry.path))) {
+            const RomCode header = ReadRomCode(PathFromUtf8(entry.path), entry.system);
+            const std::string key = !header.code.empty() ? header.code : header.title.empty() ? "" : "title:" + ToLower(header.title);
+            if (!key.empty()) {
+                by_code[{entry.system, key}].push_back(entry);
+            }
+        }
+    }
+    for (const auto& [key, games] : by_code) {
+        for (const Entry& game : games) {
+            if (games.size() < 2 || downloads::IsBiosName(PathToUtf8(PathFromUtf8(game.path).filename()))) {
+                continue;
+            }
+            const fs::path file = PathFromUtf8(game.path);
+            const auto base = FindHackBase(games, game.system, file, game.name, ReadRomCode(file, game.system));
+            if (base && !linked.contains(base->id)) {
+                Change change;
+                change.kind = ChangeKind::LinkHack;
+                change.id = game.id;
+                change.system = game.system;
+                change.from = file;
+                change.name = base->name;
+                change.base_id = base->id;
+                plan.changes.push_back(std::move(change));
+                linked.insert(game.id);
+            }
+        }
+    }
 }
 
 bool Syncs(const std::vector<std::string>& synced, const std::string& system, const std::string& stem) {
@@ -113,7 +150,10 @@ Plan MakePlan(Library& library, const fs::path& data_dir) {
     const SystemTable systems = library.Consoles();
     const std::vector<std::string> synced = SyncedStems(data_dir);
     std::set<std::string> taken; // lower-case paths the plan gives to games
-    for (const Entry& entry : library.Entries()) {
+    std::set<std::string> linked; // games the plan links to their base games
+    const std::vector<Entry> entries = library.Entries();
+    LinkHacks(entries, plan, linked);
+    for (const Entry& entry : entries) {
         const fs::path file = PathFromUtf8(entry.path);
         const SystemDef* def = systems.Find(entry.system);
         if (def == nullptr || !def->scanner.empty() || !entry.hack_of.empty() || !entry.archive_member.empty() ||
@@ -122,6 +162,9 @@ Plan MakePlan(Library& library, const fs::path& data_dir) {
             continue;
         }
         ++plan.games;
+        if (linked.contains(entry.id)) {
+            continue; // a hack keeps its name
+        }
         const std::string file_name = PathToUtf8(file.filename());
         if (downloads::TidyFileName(file_name)) {
             continue;

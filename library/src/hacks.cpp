@@ -133,6 +133,9 @@ public:
         if (!base) {
             return Status::Fail("That game is not in the library any more");
         }
+        if (!request.patched.empty()) {
+            return Place(request, *base, request.patched, PathToUtf8(request.patched.extension()), {});
+        }
         const auto info = patching::Inspect(request.patch);
         if (!info) {
             return info.status();
@@ -316,11 +319,15 @@ private:
         if (Status restored = patching::RestoreHeader(original, form, patched); !restored) {
             return restored;
         }
+        return Place(request, base, patched, form.reordered ? ".z64" : PathToUtf8(original.extension()),
+                     forms.value().front().sums.sha1);
+    }
 
-        // Into the hacks folder, under the title.
+    // Moves a patched ROM into the hacks folder under the title, with what says it is a hack.
+    Result<Entry> Place(const HackRequest& request, const Entry& base, const fs::path& patched,
+                        const std::string& extension, const std::string& base_sha1) {
         const HackPlace place = PlaceForHack(base, hooks_.library->Folders(), hooks_.systems(), library_dir_);
         const std::string title = Trim(request.title).empty() ? base.name + " (Hack)" : Trim(request.title);
-        const std::string extension = form.reordered ? ".z64" : PathToUtf8(original.extension());
         std::string file_name = SafeFileName(title);
         fs::path target = place.dir / PathFromUtf8(file_name + extension);
         const auto installed = ReadSidecar(target);
@@ -342,8 +349,8 @@ private:
         sidecar.version = request.version;
         sidecar.description = request.description;
         sidecar.base_id = base.id;
-        sidecar.base_sha1 = forms.value().front().sums.sha1;
-        sidecar.patch_sha256 = Sha256File(request.patch).value_or(std::string());
+        sidecar.base_sha1 = base_sha1;
+        sidecar.patch_sha256 = request.patch.empty() ? std::string() : Sha256File(request.patch).value_or(std::string());
         sidecar.plugin = request.plugin;
         sidecar.source = request.source;
         sidecar.installed = UnixNow();

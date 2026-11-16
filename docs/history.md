@@ -70,8 +70,9 @@ the clean name shown, as does one in a folder that cannot be written or whose cl
 taken: sync names files after the ROM's stem on every device. BIOS files, packed games, cue
 sheets and tracks, discs of a set, other regional versions and hacks are left alone. Removed:
 AppleDouble `._` files (by their first bytes), `.DS_Store`, and empty folders that are not a
-console's folder. Not done: hacks a site ships already patched are not filed under a base game
-(nothing in the file says which one it was made from).
+console's folder. A hack a site ships already patched is linked to the game it was made from
+where it is (`ChangeKind::LinkHack`; its file and id do not change, so saves and sync stay);
+undo unlinks it.
 
 The browser's second screen: Bookmarks and Downloads tabs (docs/in-app-browser.md).
 
@@ -81,8 +82,19 @@ which hacks keep when they rename the title, against a list of the games hacks a
 most; then a known header title (SNES 0x7FC0/0xFFC0 and Game Boy titles); then the title by
 words (MatchBaseGame). Its cover is that game's box with the foil HACK sticker drawn over it
 in lists, the game page, Continue cards, the carousel and the second screen (the cover file
-stays whole). The tidy-up makes games without box art look again. Not done: PlayStation and
-PS2 boot serials (no list of serials to match them against).
+stays whole). The tidy-up makes games without box art look again. PlayStation and PS2 discs
+give the serial SYSTEM.CNF boots (`ReadDiscSerial`: ISO 9660 in a cooked .iso, raw mode 1 or
+mode 2 .bin/.img sectors, or the first track of a .cue or .m3u), matched exactly against the
+list (the region is in the serial's letters). Not read: CHD, CSO and PBP (the library does
+not decompress them).
+
+A ROM that arrives patched already (a hack shipped as a whole game) becomes a hack of the
+user's game like one made from a patch (`FindHackBase`): same console, same code (or header
+title without codes), named as another game. The base is the code's known game, or, for a
+code no list knows, the game whose name is all in the hack's ("Space Quest" of "Space Quest
+Redux"); a hack renamed outright and placeholder codes ("0000", "AAAA") are not linked. A
+download goes to the base game's Hacks folder with a sidecar ("X has been added to the
+library, made from Y"); undo moves it back to Downloads.
 
 ## RetroAchievements (2026-11-15)
 
