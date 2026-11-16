@@ -167,7 +167,9 @@ void RealFeatureHost::Reload(const std::string& id) {
     }
     Scan();
     if (was_open) {
-        Open(id);
+        if (const Status opened = Open(id); !opened) {
+            log::Warn("plugins", "{} did not open again after a reload: {}", id, opened.error);
+        }
     }
 }
 

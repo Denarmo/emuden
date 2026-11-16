@@ -10,6 +10,7 @@
 
 #include "den/base/files.h"
 #include "den/base/json.h"
+#include "den/base/log.h"
 #include "den/library/library.h"
 #include "engine_impl.h"
 
@@ -377,7 +378,9 @@ Status EngineImpl::DownloadGame(const std::string& provider_id, const std::vecto
                 const bool present = std::any_of(known.begin(), known.end(),
                                                  [&](const library::Folder& f) { return f.path == path; });
                 if (!present) {
-                    library->AddFolder(path, system);
+                    if (const Status added = library->AddFolder(path, system); !added) {
+                        log::Warn("sync", "{} did not join the library: {}", path, added.error);
+                    }
                 }
             }
             library->Scan();

@@ -10,6 +10,7 @@
 
 #include "den/app/app.h"
 #include "den/base/files.h"
+#include "den/base/log.h"
 #include "den/gfx/device.h"
 #include "fake_host.h"
 
@@ -68,7 +69,9 @@ void WriteSamplePictures(const std::filesystem::path& dir) {
                 p[3] = 255;
             }
         }
-        gfx::SavePng(file, W, H, rgba.data());
+        if (const Status saved = gfx::SavePng(file, W, H, rgba.data()); !saved) {
+            log::Warn("fake", "sample picture: {}", saved.error);
+        }
     }
 }
 
@@ -177,7 +180,9 @@ public:
 
     void Reload(const std::string& id) override {
         Close(id);
-        Open(id);
+        if (const Status opened = Open(id); !opened) {
+            log::Warn("fake", "reload {}: {}", id, opened.error);
+        }
     }
 
     std::vector<PageModel> Pages(const std::string& id, std::uint64_t& revision) const override {

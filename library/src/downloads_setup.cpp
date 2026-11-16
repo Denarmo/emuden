@@ -197,7 +197,8 @@ fs::path ConsoleDir(Library& library, const SystemTable& systems, const std::str
         *made = !IsDirectory(own / PathFromUtf8(system));
     }
     fs::create_directories(own / PathFromUtf8(system), ec);
-    library.AddFolder(PathToUtf8(own));
+    // Fails only when the folder is in the library already, which is what is wanted.
+    (void)library.AddFolder(PathToUtf8(own));
     return own / PathFromUtf8(system);
 }
 

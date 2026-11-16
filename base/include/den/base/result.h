@@ -12,7 +12,7 @@ namespace den {
 
 /// Outcome of an operation. `notes` carries things the user should know even when it
 /// succeeded (for example a file that was left alone).
-struct Status {
+struct [[nodiscard]] Status {
     bool ok = true;
     std::string error;
     std::vector<std::string> notes;
@@ -27,7 +27,7 @@ struct Status {
 
 /// A value or the reason there is none.
 template <typename T>
-class Result {
+class [[nodiscard]] Result {
 public:
     Result(T value) : value_(std::move(value)) {}
     Result(Status failure) : status_(std::move(failure)) {

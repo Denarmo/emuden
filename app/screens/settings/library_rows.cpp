@@ -54,7 +54,9 @@ std::vector<ui::RowSpec> LibraryRows() {
                 Svc().stage->Confirm("Remove this folder?",
                                      path + " leaves the library. Its files stay where they are.",
                                      "Remove", [path] {
-                                         Svc().library->RemoveFolder(path);
+                                         if (const Status removed = Svc().library->RemoveFolder(path); !removed) {
+                                             Svc().stage->Toast(removed.error);
+                                         }
                                          Rescan();
                                          RebuildTop();
                                      });

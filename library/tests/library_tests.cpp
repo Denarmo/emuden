@@ -261,7 +261,7 @@ TEST_CASE("live scan", "[.live]") {
     config.jobs = &jobs;
     config.offline = !GetEnv("EMUDEN_TEST_OFFLINE").empty();
     auto library = CreateLibrary(config);
-    library->AddFolder(roms);
+    REQUIRE(library->AddFolder(roms));
     jobs.Wait(library->Scan());
     std::map<std::string, std::vector<Entry>> by_system;
     for (Entry& entry : library->Entries()) {

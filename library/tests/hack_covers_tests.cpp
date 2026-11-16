@@ -201,7 +201,7 @@ TEST_CASE("the box of the original is tagged, and a picked cover is the game's")
     config.jobs = &jobs;
     config.offline = true;
     auto library = CreateLibrary(config);
-    library->AddFolder(PathToUtf8(roms));
+    REQUIRE(library->AddFolder(PathToUtf8(roms)));
     jobs.Wait(library->Scan());
     REQUIRE(library->Entries().size() == 1);
     const std::string id = library->Entries()[0].id;
@@ -230,7 +230,7 @@ TEST_CASE("live hack covers", "[.livehacks]") {
     config.data_dir = data.empty() ? FreshDir("livehacks") : PathFromUtf8(data);
     config.jobs = &jobs;
     auto library = CreateLibrary(config);
-    library->AddFolder(roms);
+    REQUIRE(library->AddFolder(roms));
     jobs.Wait(library->Scan());
     for (const Entry& entry : library->Entries()) {
         const std::string file = PathToUtf8(PathFromUtf8(entry.cover).filename());

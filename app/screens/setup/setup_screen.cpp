@@ -179,7 +179,9 @@ private:
         for (const library::Folder& folder : Svc().library->Folders()) {
             rows.push_back(ValueRow(std::format("setup.folder.{}", index++), folder.path,
                                     [] { return Tr("setup.remove"); }, [path = folder.path] {
-                                        Svc().library->RemoveFolder(path);
+                                        if (const Status removed = Svc().library->RemoveFolder(path); !removed) {
+                                            Svc().stage->Toast(removed.error);
+                                        }
                                         Svc().library->Scan();
                                     }));
         }

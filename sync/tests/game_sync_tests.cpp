@@ -184,7 +184,8 @@ TEST_CASE("a game's check does not wait for a full run's game uploads") {
             held_out = !changed.wait_for(lock, std::chrono::seconds(10), [&] { return released; });
         }
     };
-    std::thread full([&] { pair.handheld.engine->RunOnce({}, nullptr); });
+    // Only the hold matters here; the run's own result is checked by the other tests.
+    std::thread full([&] { (void)pair.handheld.engine->RunOnce({}, nullptr); });
     {
         std::unique_lock lock(mutex);
         changed.wait(lock, [&] { return uploading; });

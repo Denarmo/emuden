@@ -173,7 +173,10 @@ void PlayerSession::WriteThumbnail(const fs::path& file) {
     unsigned width = 0, height = 0;
     std::vector<std::uint8_t> rgba;
     if (core_->ReadPicture(&width, &height, &rgba) && width > 0 && height > 0) {
-        gfx::SavePng(file, static_cast<int>(width), static_cast<int>(height), rgba.data());
+        if (const Status saved = gfx::SavePng(file, static_cast<int>(width), static_cast<int>(height), rgba.data());
+            !saved) {
+            log::Warn("player", "state picture: {}", saved.error);
+        }
     }
 }
 

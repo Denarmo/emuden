@@ -113,7 +113,9 @@ void RealHost::RemoveOrphans() {
         }
     }
     for (const std::string& key : cores) {
-        ledger_.Remove(key);
+        if (const Status removed = ledger_.Remove(key); !removed) {
+            log::Warn("plugins", "core {} of a removed source stays: {}", key, removed.error);
+        }
     }
     if (!cores.empty()) {
         ledger_.Save();
