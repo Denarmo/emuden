@@ -64,7 +64,7 @@ std::vector<fs::path> Members(const fs::path& sheet) {
     for (const std::string& named : FilesNamedBy(sheet)) {
         fs::path file = PathFromUtf8(named);
         for (const fs::path& candidate : beside) {
-            if (Key(candidate) == Key(file) || ToLower(PathToUtf8(candidate.filename())) == ToLower(PathToUtf8(file.filename()))) {
+            if (PathKey(candidate) == PathKey(file) || ToLower(PathToUtf8(candidate.filename())) == ToLower(PathToUtf8(file.filename()))) {
                 file = candidate;
             }
         }
@@ -222,14 +222,14 @@ std::vector<Entry> WaitForGames(Library& library, const std::vector<fs::path>& f
                                 const std::function<bool()>& cancelled) {
     std::vector<std::string> keys;
     for (const fs::path& file : files) {
-        keys.push_back(Key(file));
+        keys.push_back(PathKey(file));
     }
     library.Scan();
     const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(120);
     while (std::chrono::steady_clock::now() < until && !(cancelled && cancelled())) {
         std::vector<Entry> found;
         for (const Entry& entry : library.Entries()) {
-            if (std::find(keys.begin(), keys.end(), Key(PathFromUtf8(entry.path))) != keys.end()) {
+            if (std::find(keys.begin(), keys.end(), PathKey(PathFromUtf8(entry.path))) != keys.end()) {
                 found.push_back(entry);
             }
         }
@@ -266,7 +266,7 @@ std::vector<GameGroup> GroupGames(const std::vector<fs::path>& files, const Syst
         }
         group.system = identity.system;
         for (const fs::path& member : group.files) {
-            claimed.push_back(Key(member));
+            claimed.push_back(PathKey(member));
         }
         groups.push_back(std::move(group));
     }
@@ -279,9 +279,9 @@ std::vector<GameGroup> GroupGames(const std::vector<fs::path>& files, const Syst
             if (&inner == &outer || inner.files.empty()) {
                 continue;
             }
-            if (std::any_of(outer.files.begin(), outer.files.end(), [&](const fs::path& f) { return Key(f) == Key(inner.main); })) {
+            if (std::any_of(outer.files.begin(), outer.files.end(), [&](const fs::path& f) { return PathKey(f) == PathKey(inner.main); })) {
                 for (const fs::path& f : inner.files) {
-                    if (std::none_of(outer.files.begin(), outer.files.end(), [&](const fs::path& o) { return Key(o) == Key(f); })) {
+                    if (std::none_of(outer.files.begin(), outer.files.end(), [&](const fs::path& o) { return PathKey(o) == PathKey(f); })) {
                         outer.files.push_back(f);
                     }
                 }
@@ -291,7 +291,7 @@ std::vector<GameGroup> GroupGames(const std::vector<fs::path>& files, const Syst
     }
     std::erase_if(groups, [](const GameGroup& group) { return group.files.empty(); });
     for (const fs::path& file : files) {
-        if (std::find(claimed.begin(), claimed.end(), Key(file)) != claimed.end()) {
+        if (std::find(claimed.begin(), claimed.end(), PathKey(file)) != claimed.end()) {
             continue;
         }
         const Identity identity = Identify(file, systems, hints);

@@ -24,22 +24,6 @@ std::string Extension(const fs::path& path) {
 
 } // namespace
 
-std::string SafeFileName(const std::string& name) {
-    std::string out;
-    for (const char c : name) {
-        const auto u = static_cast<unsigned char>(c);
-        const bool bad = u < 0x20 || std::strchr("<>:\"/\\|?*", c) != nullptr;
-        out.push_back(bad ? '_' : c);
-    }
-    while (!out.empty() && (out.back() == '.' || out.back() == ' ')) {
-        out.pop_back();
-    }
-    if (out.size() > 120) {
-        out.resize(120);
-    }
-    return out.empty() ? "game" : out;
-}
-
 fs::path GamePaths::BatterySave() const {
     return save_dir / PathFromUtf8(base + ".srm");
 }

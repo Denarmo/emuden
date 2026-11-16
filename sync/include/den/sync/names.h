@@ -15,6 +15,7 @@
 #include <string_view>
 #include <vector>
 
+#include "den/base/names.h"
 #include "den/library/library.h"
 
 namespace den::sync {
@@ -60,9 +61,6 @@ private:
     std::set<std::string> never_;
     std::vector<std::string> duplicates_;
 };
-
-/// A name safe as a file name on every device, as the player names a game's files.
-std::string SafeFileName(const std::string& name);
 
 /// The category of a portable path ("saves/gba/Game.srm" gives "saves"), "" when unknown.
 std::string CategoryOf(std::string_view path);

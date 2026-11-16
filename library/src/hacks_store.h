@@ -67,7 +67,7 @@ HackPlace PlaceForHack(const Entry& base, const std::vector<Folder>& folders, co
                        const std::filesystem::path& library_dir);
 
 /// A title as a file name: no characters a file system refuses, never empty.
-std::string SafeFileName(std::string_view title);
+std::string HackFileName(std::string_view title);
 
 /// The cover file beside a ROM (same name, an image extension), empty when there is none.
 std::filesystem::path CoverBeside(const std::filesystem::path& rom);

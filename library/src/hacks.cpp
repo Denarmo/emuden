@@ -328,7 +328,7 @@ private:
                         const std::string& extension, const std::string& base_sha1) {
         const HackPlace place = PlaceForHack(base, hooks_.library->Folders(), hooks_.systems(), library_dir_);
         const std::string title = Trim(request.title).empty() ? base.name + " (Hack)" : Trim(request.title);
-        std::string file_name = SafeFileName(title);
+        std::string file_name = HackFileName(title);
         fs::path target = place.dir / PathFromUtf8(file_name + extension);
         const auto installed = ReadSidecar(target);
         if (IsRegularFile(target) && !installed) {
@@ -337,7 +337,7 @@ private:
         }
         if (installed && request.keep_old && installed->version != request.version && !request.version.empty()) {
             // The installed version stays as it is, with its saves; this one is a game beside it.
-            file_name = SafeFileName(title + " (" + request.version + ")");
+            file_name = HackFileName(title + " (" + request.version + ")");
             target = place.dir / PathFromUtf8(file_name + extension);
         }
         if (!MoveFile(patched, target)) {

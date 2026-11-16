@@ -5,6 +5,7 @@
 #include <array>
 
 #include "den/base/files.h"
+#include "den/base/names.h"
 #include "den/library/artwork.h"
 #include "den/library/names.h"
 
@@ -128,19 +129,6 @@ constexpr KnownHack KNOWN_HACKS[] = {
     {"pokemonlightplatinum", "ruby"}, {"pokemonrocketedition", "firered"},
 };
 
-int HexValue(char c) {
-    if (c >= '0' && c <= '9') {
-        return c - '0';
-    }
-    if (c >= 'a' && c <= 'f') {
-        return c - 'a' + 10;
-    }
-    if (c >= 'A' && c <= 'F') {
-        return c - 'A' + 10;
-    }
-    return -1;
-}
-
 } // namespace
 
 // The thumbnail collection replaces these in file names.
@@ -172,20 +160,6 @@ std::string UrlEncodeSegment(std::string_view segment) {
     return out;
 }
 
-std::string UrlDecode(std::string_view text) {
-    std::string out;
-    for (std::size_t i = 0; i < text.size(); ++i) {
-        if (text[i] == '%' && i + 2 < text.size() && HexValue(text[i + 1]) >= 0 &&
-            HexValue(text[i + 2]) >= 0) {
-            out.push_back(static_cast<char>(HexValue(text[i + 1]) * 16 + HexValue(text[i + 2])));
-            i += 2;
-        } else {
-            out.push_back(text[i]);
-        }
-    }
-    return out;
-}
-
 std::vector<std::string> ParseThumbnailIndex(std::string_view html) {
     std::vector<std::string> names;
     constexpr std::string_view MARK = "href=\"";
@@ -202,7 +176,7 @@ std::vector<std::string> ParseThumbnailIndex(std::string_view html) {
             ToLower(link.substr(link.size() - 4)) != ".png") {
             continue;
         }
-        names.push_back(UrlDecode(link.substr(0, link.size() - 4)));
+        names.push_back(PercentDecode(link.substr(0, link.size() - 4)));
     }
     return names;
 }

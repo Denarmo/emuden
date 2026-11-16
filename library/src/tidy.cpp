@@ -173,7 +173,7 @@ Plan MakePlan(Library& library, const fs::path& data_dir) {
         sources.file_name = file_name;
         sources.header_title = downloads::HeaderName(downloads::HeaderTitle(file, entry.system));
         const std::string name = downloads::GameName(sources);
-        const std::string stem = SafeFileName(name);
+        const std::string stem = HackFileName(name);
         if (stem.empty() || stem == PathToUtf8(file.stem())) {
             continue;
         }

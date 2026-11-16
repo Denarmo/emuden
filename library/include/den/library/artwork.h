@@ -54,7 +54,6 @@ std::vector<std::string> ParseThumbnailIndex(std::string_view html);
 std::string ThumbnailFileName(std::string_view name);
 
 std::string UrlEncodeSegment(std::string_view segment);
-std::string UrlDecode(std::string_view text);
 
 /// Draws a 200x300 placeholder cover (a colour per system, the title's initials) as a PNG.
 bool WritePlaceholderCover(const std::filesystem::path& file, std::string_view title,

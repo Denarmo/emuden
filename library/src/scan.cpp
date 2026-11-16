@@ -8,6 +8,7 @@
 #include <tuple>
 
 #include "den/base/files.h"
+#include "den/base/names.h"
 #include "den/base/archive.h"
 #include "den/library/content.h"
 #include "den/library/names.h"
@@ -25,10 +26,6 @@ constexpr int MAX_DEPTH = 3;
 
 bool Contains(const std::vector<std::string>& names, std::string_view value) {
     return std::find(names.begin(), names.end(), value) != names.end();
-}
-
-std::string PathKey(const fs::path& file) {
-    return ToLower(PathToUtf8(file.lexically_normal()));
 }
 
 std::string Hex16(std::uint64_t value) {

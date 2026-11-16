@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <cstring>
+#include <algorithm>
 
 #include "den/base/files.h"
 #include "den/base/log.h"
+#include "den/base/names.h"
 #include "den/sync/names.h"
 
 namespace den::sync {
@@ -71,22 +72,6 @@ const GameRef* GameIndex::ByFileName(const std::string& system, std::string_view
     return best;
 }
 
-std::string SafeFileName(const std::string& name) {
-    std::string out;
-    for (const char c : name) {
-        const auto u = static_cast<unsigned char>(c);
-        const bool bad = u < 0x20 || std::strchr("<>:\"/\\|?*", c) != nullptr;
-        out.push_back(bad ? '_' : c);
-    }
-    while (!out.empty() && (out.back() == '.' || out.back() == ' ')) {
-        out.pop_back();
-    }
-    if (out.size() > 120) {
-        out.resize(120);
-    }
-    return out.empty() ? "game" : out;
-}
-
 namespace {
 
 std::vector<std::string_view> Parts(std::string_view path) {
@@ -136,13 +121,8 @@ bool IsPortablePath(std::string_view path) {
         if (part.empty() || part == "." || part == ".." || part.back() == '.' || part.back() == ' ') {
             return false;
         }
-        for (const char c : part) {
-            if (static_cast<unsigned char>(c) < 0x20 || std::strchr("<>:\"\\|?*", c) != nullptr) {
-                return false;
-            }
-        }
     }
-    return true;
+    return std::none_of(path.begin(), path.end(), [](char c) { return IsRefusedNameChar(c, /*allow_slash=*/true); });
 }
 
 bool IsPcPath(std::string_view path, const std::set<std::string>& pc) {

@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "den/base/names.h"
 #include "den/library/downloads.h"
 
 namespace den::library::downloads {
@@ -48,8 +49,6 @@ struct SetupWork {
 };
 
 std::string ExtensionOf(const std::filesystem::path& file);
-/// A lower-case normal path, for comparing.
-std::string Key(const std::filesystem::path& path);
 /// A cue sheet, GD-ROM list or disc list that exists.
 bool IsSheetFile(const std::filesystem::path& file);
 std::vector<std::filesystem::path> SheetMembers(const std::filesystem::path& sheet);

@@ -6,28 +6,12 @@
 #include <algorithm>
 
 #include "den/base/files.h"
+#include "den/base/names.h"
 #include "den/platform/webview.h"
 
 namespace den::pal {
 
 namespace {
-
-int Hex(char c) {
-    return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
-}
-
-std::string PercentDecode(std::string_view text) {
-    std::string out;
-    for (std::size_t i = 0; i < text.size(); ++i) {
-        if (text[i] == '%' && i + 2 < text.size() && Hex(text[i + 1]) >= 0 && Hex(text[i + 2]) >= 0) {
-            out.push_back(static_cast<char>(Hex(text[i + 1]) * 16 + Hex(text[i + 2])));
-            i += 2;
-        } else {
-            out.push_back(text[i]);
-        }
-    }
-    return out;
-}
 
 /// The value of `key=` among the header's parameters, without its quotes; empty when absent.
 std::string Parameter(const std::string& header, std::string_view key) {

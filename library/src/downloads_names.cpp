@@ -9,6 +9,7 @@
 #include <regex>
 
 #include "den/base/files.h"
+#include "den/base/names.h"
 #include "den/library/downloads.h"
 
 namespace den::library::downloads {
@@ -77,25 +78,10 @@ bool IsSiteText(const std::string& segment) {
     return false;
 }
 
-// "%20" -> " ": a name taken from an address.
-std::string UrlDecoded(const std::string& text) {
-    std::string out;
-    for (std::size_t i = 0; i < text.size(); ++i) {
-        if (text[i] == '%' && i + 2 < text.size() && std::isxdigit(static_cast<unsigned char>(text[i + 1])) &&
-            std::isxdigit(static_cast<unsigned char>(text[i + 2]))) {
-            out.push_back(static_cast<char>(std::stoi(text.substr(i + 1, 2), nullptr, 16)));
-            i += 2;
-        } else {
-            out.push_back(text[i]);
-        }
-    }
-    return out;
-}
-
 // "Pokemon_Unbound_v2.1.1" -> "Pokemon Unbound": separators become spaces; tags in brackets,
 // a site's name in front, hashes, "patched" and the version go.
 std::string CleanName(std::string text) {
-    text = UrlDecoded(text);
+    text = PercentDecode(text);
     static const std::regex SITE(R"(^\s*(www\.)?[a-z0-9-]+\.(com|net|org|io|info)(?=[\s_-])\s*[-_]?\s*)",
                                  std::regex::icase);
     text = std::regex_replace(text, SITE, "");

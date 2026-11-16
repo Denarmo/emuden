@@ -29,18 +29,7 @@ std::string ConsoleName(const SystemTable& systems, const std::string& id) {
 
 // A name that can be a folder: no separators or characters Windows refuses.
 std::string FolderName(const std::string& name) {
-    std::string out;
-    for (const char c : name) {
-        out.push_back(std::string_view("<>:\"/\\|?*").find(c) == std::string_view::npos &&
-                              static_cast<unsigned char>(c) >= 0x20
-                          ? c
-                          : ' ');
-    }
-    out = Trim(out);
-    while (!out.empty() && (out.back() == '.' || out.back() == ' ')) {
-        out.pop_back();
-    }
-    return out.empty() ? std::string("Game") : out;
+    return SafeFileName(name, {.replacement = ' ', .trim_front = " ", .max_bytes = 0, .fallback = "Game"});
 }
 
 bool SameSize(const fs::path& a, const fs::path& b) {
@@ -128,7 +117,7 @@ void SetupWork::SetUpFiles(const std::vector<fs::path>& files, const fs::path& b
             ++bios;
         } else if (identity.kind == Kind::Patch) {
             patches.push_back(file);
-        } else if (identity.kind == Kind::Archive && from_archive && Key(file.parent_path()) == Key(base)) {
+        } else if (identity.kind == Kind::Archive && from_archive && PathKey(file.parent_path()) == PathKey(base)) {
             // An archive in the archive, one level deep.
             const fs::path inner = file.parent_path() / PathFromUtf8(WorkDirName(file));
             if (Unpack(file, inner, cancelled)) {
@@ -147,7 +136,7 @@ void SetupWork::SetUpFiles(const std::vector<fs::path>& files, const fs::path& b
                 continue;
             }
             for (const fs::path& member : SheetMembers(sheet)) {
-                if (Key(member) == Key(others.front())) {
+                if (PathKey(member) == PathKey(others.front())) {
                     others = {sheet};
                     record.download = PathToUtf8(sheet.filename());
                 }
@@ -177,10 +166,6 @@ void SetupWork::SetUpFiles(const std::vector<fs::path>& files, const fs::path& b
 bool IsSheetFile(const fs::path& file) {
     const std::string extension = ExtensionOf(file);
     return (extension == "cue" || extension == "gdi" || extension == "m3u") && IsRegularFile(file);
-}
-
-std::string Key(const fs::path& path) {
-    return ToLower(PathToUtf8(path.lexically_normal()));
 }
 
 void SetupWork::SetUpGames(std::vector<GameGroup> groups, const fs::path& base) {
@@ -213,7 +198,7 @@ void SetupWork::SetUpGames(std::vector<GameGroup> groups, const fs::path& base) 
             NameSources sources;
             sources.file_name = PathToUtf8(group.main.filename());
             sources.page_title = groups.size() == 1 ? request.page_title : std::string();
-            sources.archive_name = Key(base) != Key(setup.downloads_) ? record.download : std::string();
+            sources.archive_name = PathKey(base) != PathKey(setup.downloads_) ? record.download : std::string();
             sources.header_title = HeaderName(HeaderTitle(group.main, group.system));
             const std::string name = GameName(sources);
             if (auto hack = SetUpPatchedRom(group, name)) {
@@ -221,7 +206,7 @@ void SetupWork::SetUpGames(std::vector<GameGroup> groups, const fs::path& base) 
                 continue;
             }
             if (!TidyFileName(PathToUtf8(group.main.filename()))) {
-                clean = PathFromUtf8(SafeFileName(name) + PathToUtf8(group.main.extension()));
+                clean = PathFromUtf8(HackFileName(name) + PathToUtf8(group.main.extension()));
             }
         }
         fs::path main;

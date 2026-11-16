@@ -126,7 +126,7 @@ std::pair<std::string, std::string> PickCover(const JsonValue& game, const std::
     return game.items.size() < 3 ? std::pair<std::string, std::string>{} : PickRegion(game.items[2].items, order);
 }
 
-bool SafeFileName(const std::string& name) {
+bool IsPlainName(const std::string& name) {
     return !name.empty() && name.size() <= 128 && std::all_of(name.begin(), name.end(), [](char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' ||
                c == '_' || c == '.';
@@ -220,15 +220,15 @@ const LaunchBoxCovers::Manifest* LaunchBoxCovers::LoadManifest(bool& answered) {
                 }
             }
             if (const std::string device = value.String("device");
-                device.starts_with("Platforms/") && SafeFileName(device.substr(10))) {
+                device.starts_with("Platforms/") && IsPlainName(device.substr(10))) {
                 platform.device = device;
             }
-            if (SafeFileName(platform.dir)) {
+            if (IsPlainName(platform.dir)) {
                 manifest.platforms.emplace(name, std::move(platform));
             }
         }
     }
-    if (!SafeFileName(manifest.version) || !manifest.images.starts_with("https://")) {
+    if (!IsPlainName(manifest.version) || !manifest.images.starts_with("https://")) {
         return nullptr;
     }
     // Letter files of older versions are not read again.
@@ -318,7 +318,7 @@ std::optional<LaunchBoxCovers::Match> LaunchBoxCovers::FindMatch(const Manifest&
         // Several games with one key (a remake, a re-release): the first with a fitting cover.
         for (const JsonValue& game : matches->items) {
             auto [region, image] = PickCover(game, order);
-            if (SafeFileName(image)) {
+            if (IsPlainName(image)) {
                 return Match{&game, platform, bucket, std::move(region), std::move(image)};
             }
         }
@@ -372,7 +372,7 @@ std::optional<LaunchBoxFaces> LaunchBoxCovers::FindFaces(const SystemDef& system
             return {};
         }
         auto [region, image] = PickRegion(regions->items, order);
-        return SafeFileName(image) ? manifest->images + image : std::string();
+        return IsPlainName(image) ? manifest->images + image : std::string();
     };
     LaunchBoxFaces out{pick("back"), pick("spine"), pick("cart"), pick("cart_back"), pick("disc")};
     if (out.back.empty() && out.spine.empty() && out.cart.empty() && out.cart_back.empty() && out.disc.empty()) {

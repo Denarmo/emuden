@@ -12,12 +12,10 @@
 #include <string>
 #include <vector>
 
+#include "den/base/names.h"
 #include "den/base/result.h"
 
 namespace den::player {
-
-/// A name safe as a file name on every device.
-std::string SafeFileName(const std::string& name);
 
 struct GamePaths {
     std::filesystem::path save_dir;  // <data>/saves/<system>: the core's own files too

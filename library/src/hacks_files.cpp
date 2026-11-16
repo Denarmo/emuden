@@ -10,6 +10,7 @@
 
 #include "den/base/files.h"
 #include "den/base/json.h"
+#include "den/base/names.h"
 #include "den/store/document.h"
 #include "hacks_store.h"
 
@@ -27,12 +28,6 @@ fs::path SidecarPath(const fs::path& rom) {
     fs::path file = rom;
     file += ".hack.json";
     return file;
-}
-
-std::string Key(const fs::path& path) {
-    std::string key = ToLower(PathToUtf8(path.lexically_normal()));
-    std::replace(key.begin(), key.end(), '\\', '/');
-    return key;
 }
 
 double Number(const JsonValue& object, std::string_view key) {
@@ -67,10 +62,7 @@ bool HasSystemFolder(const SystemTable& systems, const fs::path& root) {
 // the file is a loose one.
 fs::path ConsoleFolder(const fs::path& file, const Folder& folder, const SystemTable& systems) {
     const fs::path root = PathFromUtf8(folder.path);
-    const std::string file_key = Key(file);
-    const std::string root_key = Key(root);
-    if (file_key.size() <= root_key.size() + 1 || !file_key.starts_with(root_key) ||
-        file_key[root_key.size()] != '/') {
+    if (!IsUnderKey(file, PathKey(root))) {
         return {};
     }
     if (!folder.system.empty() && systems.Find(folder.system) != nullptr) {
@@ -186,31 +178,12 @@ HackPlace PlaceForHack(const Entry& base, const std::vector<Folder>& folders, co
     return {root / PathFromUtf8(HACKS_FOLDER), root};
 }
 
-std::string SafeFileName(std::string_view title) {
-    std::string name;
-    for (const char c : title) {
-        const auto byte = static_cast<unsigned char>(c);
-        const bool refused = byte < 0x20 || std::string_view("<>:\"/\\|?*").find(c) != std::string_view::npos;
-        if (!refused && c != ' ') {
-            name.push_back(c);
-        } else if (!name.empty() && name.back() != ' ') {
-            name.push_back(' ');
-        }
-    }
-    // Not in the middle of a UTF-8 character.
-    constexpr std::size_t LIMIT = 120;
-    if (name.size() > LIMIT) {
-        std::size_t cut = LIMIT;
-        while (cut > 0 && (static_cast<unsigned char>(name[cut]) & 0xC0) == 0x80) {
-            --cut;
-        }
-        name.resize(cut);
-    }
-    name = Trim(name);
-    while (!name.empty() && (name.back() == '.' || name.back() == ' ')) {
-        name.pop_back();
-    }
-    return name.empty() ? "Hack" : name;
+std::string HackFileName(std::string_view title) {
+    return SafeFileName(title, {.replacement = ' ',
+                                .collapse_spaces = true,
+                                .trim_front = " ",
+                                .byte_cut = false,
+                                .fallback = "Hack"});
 }
 
 fs::path CoverBeside(const fs::path& rom) {
@@ -311,7 +284,7 @@ Result<std::vector<patching::RomForm>> ChecksumCache::Get(const fs::path& rom, s
     // The file clock counts in a type std::to_string does not take everywhere.
     const std::string written =
         std::to_string(static_cast<std::int64_t>(fs::last_write_time(rom, ec).time_since_epoch().count()));
-    const std::string key = Key(rom);
+    const std::string key = PathKey(rom);
     {
         std::lock_guard lock(mutex_);
         if (!loaded_) {

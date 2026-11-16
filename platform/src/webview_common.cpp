@@ -7,6 +7,7 @@
 #include <string_view>
 
 #include "den/base/files.h"
+#include "den/base/names.h"
 #include "webview_native.h"
 
 namespace den::pal {
@@ -90,22 +91,11 @@ bool WebUrlAllowed(const std::string& url, const std::vector<std::string>& allow
 }
 
 std::string WebSafeFileName(const std::string& name) {
-    constexpr std::string_view REFUSED = "<>\"|?*";
-    std::string out;
-    for (const char c : name) {
-        if (c == '/' || c == '\\' || c == ':') {
-            out.clear(); // only what follows the last folder or drive
-        } else if (static_cast<unsigned char>(c) >= 0x20 && REFUSED.find(c) == std::string_view::npos) {
-            out.push_back(c);
-        }
-    }
-    while (!out.empty() && (out.back() == '.' || out.back() == ' ')) {
-        out.pop_back();
-    }
-    while (!out.empty() && (out.front() == '.' || out.front() == ' ')) {
-        out.erase(out.begin());
-    }
-    return out.empty() ? "download" : out;
+    // Only what follows the last folder or drive.
+    const std::size_t last = name.find_last_of("/\\:");
+    const std::string_view file =
+        last == std::string::npos ? std::string_view(name) : std::string_view(name).substr(last + 1);
+    return SafeFileName(file, {.replacement = '\0', .trim_front = ". ", .max_bytes = 0, .fallback = "download"});
 }
 
 bool WebView::Available() {
