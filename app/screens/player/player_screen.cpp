@@ -15,6 +15,7 @@
 #include "den/base/files.h"
 #include "den/base/log.h"
 #include "den/library/content.h"
+#include "den/platform/lifecycle.h"
 #include "../together/together.h"
 #include "picture_choice.h"
 #include "../achievements/achievements_glue.h"
@@ -152,6 +153,7 @@ void PlayerScreen::Begin(const std::filesystem::path& content, bool resume) {
         svc.player->SetVolume(0); // the boot screen brings the sound up with the picture
     }
     ReadWidescreen();
+    bfi_.Start(game_);
     started_ = pal::NowSeconds();
     started_unix_ = std::chrono::duration_cast<std::chrono::seconds>(
                         std::chrono::system_clock::now().time_since_epoch())
@@ -442,6 +444,9 @@ void PlayerScreen::Update(ui::Context& ctx) {
         FeedPads();
     }
     ApplySpeed();
+    // Black frames only on a game nothing is over, on the display drawn in step with vsync.
+    bfi_.Update(snapshot, view_ == View::Closed && !held_ && !BootShowing() && !pal::MainWindowHidden(),
+                !swapped_);
     svc.player->Advance(ctx.dt);
     // An engine app paused and handed its menu over.
     if (svc.player->TakeMenuRequest() && view_ == View::Closed) {

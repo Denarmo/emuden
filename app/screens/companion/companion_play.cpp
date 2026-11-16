@@ -262,6 +262,7 @@ private:
                                     [screen_value] { return screen_value; }, [this] { Open(View::Screen); }));
         }
         if (screen) {
+            rows.push_back(BfiRow(*screen, snapshot));
             if (!snapshot.external) {
                 rows.push_back(ActionRow("companion.section.controls", "Controls and core",
                                          [this] { Open(View::Controls); }));
@@ -278,6 +279,34 @@ private:
             rows.push_back(std::move(row));
         }
         AddRows(&root, std::move(rows), ROW_HEIGHT);
+    }
+
+    // Black frame insertion, as in the pause menu: a toggle, or why it cannot be had here.
+    ui::RowSpec BfiRow(const PlayerScreen& screen, const player::Snapshot& snapshot) {
+        const std::string refused = screen.Bfi().Refusal(snapshot);
+        if (!refused.empty() && !screen.Bfi().On()) {
+            ui::RowSpec row = ValueRow("companion.bfi", BFI_LABEL, [] { return std::string("Not available"); });
+            row.description = refused;
+            return row;
+        }
+        ui::RowSpec row = ToggleRow(
+            "companion.bfi", BFI_LABEL,
+            [] {
+                PlayerScreen* now = PlayerScreen::Current();
+                return now && now->Bfi().On();
+            },
+            [this](bool on) {
+                if (PlayerScreen* now = PlayerScreen::Current()) {
+                    now->SetBfi(on);
+                }
+                Rebuild();
+            });
+        row.description = screen.Bfi().Status(snapshot);
+        row.live_description = [] {
+            PlayerScreen* now = PlayerScreen::Current();
+            return now ? now->Bfi().Status(Svc().player->GetSnapshot()) : std::string();
+        };
+        return row;
     }
 
     void BuildStates(ui::Node& root) {

@@ -43,6 +43,8 @@ struct Services {
     /// Pixels the app's own title bar takes at the top of the window (0 without one); the
     /// screens are drawn below it and their pointer positions start under it.
     int title_bar_px = 0;
+    /// The frame drawn now is a black one of black frame insertion: no screenshot is taken of it.
+    bool black_frame = false;
 };
 
 Services& Svc();

@@ -10,6 +10,7 @@
 #include "../home/collections.h"
 #include "../home/games.h"
 #include "../home/strings.h"
+#include "../player/black_frames.h"
 #include "../player/player_view.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
@@ -27,7 +28,7 @@ ui::RowSpec InheritRow(const std::string& id, const std::string& label, const st
                        const system::Scope& scope, std::vector<JsonValue> stored,
                        std::vector<std::string> labels) {
     const auto same = [](const JsonValue& a, const JsonValue& b) {
-        return a.kind == b.kind && a.number == b.number && a.string == b.string;
+        return a.kind == b.kind && a.number == b.number && a.string == b.string && a.boolean == b.boolean;
     };
     const auto index_of = [stored, same](const JsonValue& value) {
         for (std::size_t i = 0; i < stored.size(); ++i) {
@@ -84,6 +85,7 @@ public:
         const system::Scope scope = ScopeOf(game);
         std::vector<ui::RowSpec> rows;
         if (console->runner == plugins::Runner::Engine) {
+            rows.push_back(ValueRow("game_settings.bfi", BFI_LABEL, [] { return std::string("Not with an engine"); }));
             rows.push_back(InheritRow("game_settings.engine_screen", Tr("engine.screen"), ENGINE_SCREEN_KEY.name(),
                                       scope, Strings({"app", "fullscreen", "window"}),
                                       {Tr("engine.screen_app"), Tr("engine.screen_full"), Tr("engine.screen_window")}));
@@ -141,6 +143,10 @@ private:
         }
         rows.push_back(InheritRow("game_settings.screen_size", Tr("game_settings.screen_size"),
                                   SCREEN_SIZE_KEY.name(), scope, std::move(sizes), ScreenSizeNames()));
+        ui::RowSpec bfi = InheritRow("game_settings.bfi", BFI_LABEL, BFI_KEY.name(), scope,
+                                     {JsonBool(false), JsonBool(true)}, {"Off", "On"});
+        bfi.description = "On this device only";
+        rows.push_back(std::move(bfi));
     }
 
     static void OptionRows(ui::Node* list, const library::Entry& game, const system::Scope& scope) {

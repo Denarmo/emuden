@@ -9,6 +9,7 @@
 #include <format>
 
 #include "../details/game_prefs.h"
+#include "../player/black_frames.h"
 #include "../home/strings.h"
 #include "bios_import.h"
 #include "console_state.h"
@@ -217,6 +218,7 @@ private:
         } else if (chosen) {
             rows.push_back(ValueRow("console.core", "Core", [text = name(*chosen)] { return text; }));
         }
+        rows.push_back(BfiConsoleRow(system));
         if (chosen) {
             for (const std::string& file : chosen->missing_bios) {
                 ui::RowSpec bios = ValueRow("console.bios." + file, file, [] { return std::string("Missing"); });
@@ -249,6 +251,8 @@ private:
 
     static void EngineRows(const plugins::Console& console, std::vector<ui::RowSpec>& rows) {
         const std::string system = console.id;
+        // The engine app draws the game on its own.
+        rows.push_back(ValueRow("console.bfi", BFI_LABEL, [] { return std::string("Not with an engine"); }));
         ui::RowSpec engine = ValueRow(
             "console.engine", "Engine program",
             [system] {

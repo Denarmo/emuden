@@ -41,6 +41,8 @@ void NoteLaunchFrom(const gfx::Rect& where);
 bool BootCarries(const std::string& game_id);
 /// True while the boot screen covers the game: the player gives the game no buttons.
 bool BootCovers();
+/// True while any of it is drawn, the fade into the game included.
+bool BootShowing();
 
 /// The second display's part (second_screen.cpp draws it over its page).
 void DrawBootSecond(ui::Context& ctx);

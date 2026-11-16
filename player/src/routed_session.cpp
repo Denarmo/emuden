@@ -46,6 +46,9 @@ public:
     std::vector<GameScreen> Screens() const override {
         return active_->Screens();
     }
+    void SetBfi(const BfiRequest& request) override {
+        active_->SetBfi(request);
+    }
     void CapturePreviewFrame() override {
         active_->CapturePreviewFrame();
     }

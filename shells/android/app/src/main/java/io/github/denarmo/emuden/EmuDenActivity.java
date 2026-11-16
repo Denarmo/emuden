@@ -367,6 +367,19 @@ public class EmuDenActivity extends SDLActivity {
         return activity != null ? (AudioManager) activity.getSystemService(AUDIO_SERVICE) : null;
     }
 
+    /** Called from native code (platform/src/android/refresh_android.cpp). */
+    public static float[] displayRefreshRates() {
+        EmuDenActivity activity = self;
+        return activity == null ? new float[0] : DisplayRefresh.rates(activity);
+    }
+
+    public static void displayRequestRefresh(float hz) {
+        EmuDenActivity activity = self;
+        if (activity != null) {
+            DisplayRefresh.request(activity, hz);
+        }
+    }
+
     /** Called from native code (platform/src/android/apps_android.cpp), from a job's thread. */
     public static String[] appsList() {
         EmuDenActivity activity = self;

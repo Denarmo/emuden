@@ -292,6 +292,7 @@ int Run(int argc, char** argv) {
             ctx.show_hints = !input.TouchOnly();
             ctx.dt = dt;
             ctx.time = now;
+            svc.black_frame = false;
             stage.Frame(ctx);
             for (const auto& overlay : registry.Overlays()) {
                 overlay(ctx);

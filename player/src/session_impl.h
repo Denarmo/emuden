@@ -89,6 +89,8 @@ public:
     }
     Status SaveScreenshot(const std::filesystem::path& png) override;
     void SetTogether(TogetherRequest request) override;
+    // session_pacing.cpp
+    void SetBfi(const BfiRequest& request) override;
 
 private:
     void Notify(FrameEvent event) {
@@ -131,6 +133,8 @@ private:
     Status ReadStateFile(const std::filesystem::path& file);
     void WriteThumbnail(const std::filesystem::path& file);
     void MeasureFps(double seconds);
+    void PlanBfiFrame();
+    bool AdvanceBfi(double seconds);
     gfx::Rect PictureRect(const gfx::Canvas& canvas, const gfx::Rect& area) const;
     bool PreparePicture(gfx::Canvas& canvas, PictureSource& source);
     void DrawRegion(gfx::Canvas& canvas, const PictureSource& source, const PictureRegion& region,
@@ -172,6 +176,9 @@ private:
     int fps_frames_ = 0;
     double save_timer_ = 0.0;
     bool pending_resume_ = false;
+    BfiRequest bfi_;
+    BfiCadence bfi_cadence_;
+    bool bfi_ran_ = false; // the last Advance paced the game for black frames
 
     // Rewind.
     unsigned rewind_interval_ = 2;

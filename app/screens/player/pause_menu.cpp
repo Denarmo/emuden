@@ -167,6 +167,12 @@ void PlayerScreen::BuildMain(ui::Node* list) {
                                                 : "For this game";
         rows.push_back(std::move(wide));
     }
+    if (snapshot.can_picture || external) {
+        // A little taller, for the line under it that says what it does or why it cannot.
+        AddRows(list, std::move(rows), ROW_HEIGHT);
+        rows.clear();
+        AddRows(list, {BfiRow(snapshot)}, VOLUME_HEIGHT);
+    }
     if (dual_.Active()) {
         // Two screens: which display or which place each has.
         rows.push_back(ActionRow("menu.swap", "Swap screens", [this] {
@@ -227,6 +233,26 @@ void PlayerScreen::BuildMain(ui::Node* list) {
     rows.push_back(ActionRow("menu.exit", "Exit to home", [this] { Leave(); }));
     options_ = Svc().player->Options();
     AddRows(list, std::move(rows), ROW_HEIGHT);
+}
+
+ui::RowSpec PlayerScreen::BfiRow(const player::Snapshot& snapshot) {
+    const std::string refused = bfi_.Refusal(snapshot);
+    if (!refused.empty() && !bfi_.On()) {
+        // Nothing to turn on here; the row says why.
+        ui::RowSpec row = ValueRow("menu.bfi", BFI_LABEL, [] { return std::string("Not available"); },
+                                   [this, refused] { GetStage().Toast(refused); });
+        row.description = refused;
+        return row;
+    }
+    ui::RowSpec row = ToggleRow("menu.bfi", BFI_LABEL, [this] { return bfi_.On(); }, [this](bool on) { SetBfi(on); });
+    row.description = bfi_.Status(snapshot);
+    row.live_description = [this] { return bfi_.Status(Svc().player->GetSnapshot()); };
+    return row;
+}
+
+void PlayerScreen::SetBfi(bool on) {
+    bfi_.SetOn(on);
+    Rebuild();
 }
 
 void PlayerScreen::BuildSlots(ui::Node* list, bool save) {

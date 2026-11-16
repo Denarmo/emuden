@@ -9,6 +9,7 @@
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
+#include "black_frames.h"
 #include "dual_screen.h"
 #include "picture_choice.h"
 
@@ -61,6 +62,18 @@ std::vector<ui::RowSpec> PlayerRows() {
     }
     for (ui::RowSpec& row : DualScreenSettingRows()) {
         rows.push_back(std::move(row));
+    }
+    {
+        ui::RowSpec bfi = Switch(BFI_KEY.name().c_str(), BFI_LABEL, false,
+                                 "Sharper motion at 120 Hz and above, on this device only; a console or a game "
+                                 "can have its own in its settings. It flickers");
+        rows.push_back(std::move(bfi));
+        ui::RowSpec strength = ChoiceRow(
+            BFI_STRENGTH_KEY.name(), "Black frames", {"Every refresh between", "Half of them, brighter"},
+            [] { return Svc().settings->GetString(BFI_STRENGTH_KEY.name(), "full") == "half" ? 1 : 0; },
+            [](int index) { Svc().settings->SetString(BFI_STRENGTH_KEY.name(), index == 1 ? "half" : "full"); });
+        strength.description = "At 180 Hz and above, how many refreshes between the game's frames are black";
+        rows.push_back(std::move(strength));
     }
     rows.push_back(Switch("player.overlay_on_second_screen", "Pause menu on the second screen", true,
                           "With two displays the menu opens beside the game, not over it"));

@@ -138,6 +138,7 @@ void PlayerScreen::ApplyOverlay() {
 
 void PlayerScreen::StopDisplays() {
     dual_.Stop();
+    bfi_.Stop();
     if (g_overlay == this) {
         ClearSecondScreenOverlay();
         g_overlay = nullptr;
@@ -265,12 +266,16 @@ void PlayerScreen::DrawGameLayer(ui::Context& ctx, const gfx::Rect& area, bool m
     // The picture pages leave the game as it is, beside the menu: it is what is being chosen.
     const bool choosing = menu_here && (view_ == View::Picture || view_ == View::PictureAdjust);
     const gfx::Rect room = choosing ? PlaceMenu(area, true).room : area;
+    // A black frame of black frame insertion: the game's place stays black on this display,
+    // and the second display shows its screen as always.
+    const bool black = snapshot.bfi_black && !swapped_;
+    svc.black_frame = black;
     if (dual_.Active()) {
         // Each screen at its own size; what the second display shows is drawn by its own frame.
         const bool integer = size_ == ScreenSize::PixelPerfect ||
                              svc.settings->GetBool("player.integer_scale", false);
-        dual_.DrawMain(ctx, room, integer, view_ == View::Closed);
-    } else {
+        dual_.DrawMain(ctx, room, integer, view_ == View::Closed, black);
+    } else if (!black) {
         const Placement placement = Place(size_, room, snapshot.frame_width, snapshot.frame_height,
                                           snapshot.aspect, canvas.Scale());
         if (placement.aspect != aspect_sent_) {

@@ -40,8 +40,9 @@ public:
     bool Split() const {
         return split_;
     }
-    /// The main display's part. `button` shows the swap button of the one-screen layout.
-    void DrawMain(ui::Context& ctx, const gfx::Rect& room, bool integer, bool button);
+    /// The main display's part. `button` shows the swap button of the one-screen layout;
+    /// `blank` leaves the screens black (a black frame of black frame insertion).
+    void DrawMain(ui::Context& ctx, const gfx::Rect& room, bool integer, bool button, bool blank = false);
     /// A press on the main display, in the canvas's units. True when it was for the swap
     /// button and not for the game.
     bool Pointer(const input::Event& event, float x, float y);

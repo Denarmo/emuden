@@ -152,8 +152,11 @@ TEST_CASE("settings sync without what belongs to the device") {
     a.settings->SetString("console.steam.path", "C:/Steam");
     a.settings->SetList("library.collection_games.best", {"gba:1", "steam:2"});
     a.settings->SetString("core_options.flycast.emuden_renderer", "Vulkan");
+    a.settings->SetBool("player.bfi", true); // black frames depend on this device's display
+    a.settings->SetString("player.bfi_strength", "half");
     REQUIRE(a.Sync().ok);
     const std::string uploaded = cloud.files.at("config/settings.json").data;
+    CHECK(uploaded.find("player.bfi") == std::string::npos);
     CHECK(uploaded.find("Dark") != std::string::npos);
     CHECK(uploaded.find("ui.scale") == std::string::npos);
     CHECK(uploaded.find("emuden_renderer") == std::string::npos);

@@ -24,6 +24,7 @@
 #include "den/engine/host.h"
 #include "den/gfx/canvas.h"
 #include "den/input/input.h"
+#include "den/player/bfi.h"
 #include "den/player/screens.h"
 
 namespace den::store {
@@ -153,6 +154,21 @@ struct Snapshot {
     bool together = false;
     /// The game waits for the other device's buttons or state.
     bool waiting_for_peer = false;
+    /// Black frame insertion, while it is asked for (SetBfi): the plan for the display, or
+    /// why there is none.
+    BfiPlan bfi;
+    bool bfi_black = false;     // the refresh being drawn now is a black one
+    bool bfi_steady = true;     // the frames keep up with the display
+    double bfi_display_hz = 0;  // the refreshes the frames actually get per second
+};
+
+/// What the screen asks of black frame insertion (den/player/bfi.h).
+struct BfiRequest {
+    bool on = false;
+    /// Planned, but no black frames for now: a menu or the start of the game is over it.
+    bool hold = false;
+    float refresh_hz = 0; // the display the game is on
+    BfiStrength strength = BfiStrength::Full;
 };
 
 struct CoreOption {
@@ -248,6 +264,11 @@ public:
     virtual std::vector<GameScreen> Screens() const {
         return {};
     }
+    /// Black frame insertion from the next Advance. While a plan is active, Advance emulates
+    /// one game frame per cycle of refreshes and Snapshot::bfi_black tells the refreshes the
+    /// screen draws black (it draws them: Draw and DrawScreen show the game as always). Off
+    /// while fast-forwarding, rewinding and playing with another device.
+    virtual void SetBfi(const BfiRequest& /*request*/) {}
     /// The next preview keeps the latest picture as the frame of the previews from then on.
     virtual void CapturePreviewFrame() {}
     /// Draws one screen of Screens() into exactly `target` of the frame being drawn, through

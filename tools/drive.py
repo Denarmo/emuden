@@ -27,6 +27,8 @@ its commands are sent there:
     drive.py audio reset                start the sound counters again
     drive.py wav C:/tmp/a.wav 3         record 3 s of the device's output; answers with its level
                                         and the gaps in it
+    drive.py bfi 240 pixels             the next 240 frames as drawn (G game, g again, B black)
+                                        with the times between them and their middle pixels
 
 Several commands run in order when separated by "+":
 
@@ -85,7 +87,7 @@ def main(argv):
     for n, command in enumerate(c for c in commands if c):
         if n:
             time.sleep(pause)
-        own = command[0] in ("vpad", "player", "audio", "wav")
+        own = command[0] in ("vpad", "player", "audio", "wav", "bfi")
         reply = send(port + 1 if own else port, " ".join(command), wait)
         print(reply)
         failed = failed or reply.startswith("error")

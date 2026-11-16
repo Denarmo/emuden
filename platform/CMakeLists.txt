@@ -17,6 +17,8 @@ if(ANDROID)
     list(APPEND platform_exclude "/src/sdl/engine_apps_desktop.cpp")
     # The app goes on while its activity is stopped, and Android has a media volume.
     list(APPEND platform_exclude "/src/sdl/lifecycle_desktop.cpp")
+    # Refresh rates are the window's preferred display mode (src/android).
+    list(APPEND platform_exclude "/src/sdl/refresh_desktop.cpp")
     # The web view is android.webkit.WebView (src/android).
     list(APPEND platform_exclude "/src/posix/webview_posix.cpp")
 else()

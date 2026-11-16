@@ -229,8 +229,8 @@ void Automation::Pump() {
 }
 
 void Automation::AfterDraw(int width, int height) {
-    if (!server_ || !shot_id_) {
-        return;
+    if (!server_ || !shot_id_ || Svc().black_frame) {
+        return; // a black frame of black frame insertion is not the picture: the next one is
     }
     const std::vector<std::uint8_t> pixels = Svc().device->ReadPixels(width, height);
     const std::filesystem::path file = PathFromUtf8(shot_path_);

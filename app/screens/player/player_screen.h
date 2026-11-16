@@ -21,6 +21,7 @@
 
 #include "den/app/app.h"
 #include "den/player/buttons.h"
+#include "black_frames.h"
 #include "dual_screen.h"
 #include "player_view.h"
 
@@ -102,6 +103,12 @@ public:
     bool WantsSecond() const;
     /// An engine app plays it: its window over the main one is the game, not an app beside it.
     bool External() const;
+    /// Black frame insertion for this game (the pause menu's and the quick settings' toggle).
+    const BlackFrames& Bfi() const {
+        return bfi_;
+    }
+    /// Turns it on or off and shows the rows again with what it says now.
+    void SetBfi(bool on);
     /// The core the game runs with ("mgba").
     const std::string& CoreId() const {
         return core_.id;
@@ -161,6 +168,7 @@ private:
     void BuildOptions(ui::Node* list);
     void BuildButtons(ui::Node* list);
     void BuildPlayers(ui::Node* list);
+    ui::RowSpec BfiRow(const player::Snapshot& snapshot);
     // picture_pages.cpp: the picture preset and its sliders.
     void BuildPicture(ui::Node* list);
     void BuildPictureAdjust(ui::Node* list);
@@ -192,6 +200,7 @@ private:
     double started_ = 0;
 
     DualScreens dual_;               // a console with two screens
+    BlackFrames bfi_;
     ScreenSize size_ = ScreenSize::Fit;
     float aspect_sent_ = 0;
     int fps_mode_ = 0;

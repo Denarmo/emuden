@@ -14,11 +14,16 @@
 //   vpad trigger left|right <0..1> [ms]
 //   player                                    JSON: the session, its sound counters, the pads
 //   audio reset                               the sound counters start again
+//   bfi [frames] [pixels]                     the next frames (240) as drawn: G a new game frame,
+//                                             g the same again, B a black one, with the times
+//                                             between them; "pixels" also reads back the middle
+//                                             pixel of each (it stalls the GPU a little)
 //   wav <file> [seconds]                      records the device's output (3 s), answers
 //                                             with what it held once the file is written
 //
 // Buttons: south east west north up down left right l1 r1 l2 r2 l3 r3 start select guide.
 
+#include <algorithm>
 #include <cstdlib>
 #include <format>
 #include <memory>
@@ -30,6 +35,7 @@
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
+#include "den/gfx/gl.h"
 #include "dual_screen.h"
 
 namespace den::app {
@@ -46,11 +52,23 @@ struct Release {
     int axis_x = -1, axis_y = -1; // virtual_pad::Axis to put back to rest; -1 = none
 };
 
+// The frames as drawn, for the black frame insertion checks.
+struct Trace {
+    std::uint64_t request = 0;
+    int left = 0;
+    bool pixels = false;
+    std::uint64_t game_frames = 0;
+    std::string pattern;
+    std::vector<double> times;
+    std::vector<int> luma;
+};
+
 struct Endpoint {
     std::unique_ptr<pal::LineServer> server;
     std::vector<Release> releases;
     std::uint64_t wav_request = 0;
     std::string wav_path;
+    Trace trace;
 };
 
 Endpoint& Get() {
@@ -119,13 +137,64 @@ std::string PlayerJson() {
         "\"audio\":{{\"sample_rate\":{:.0f},\"frames_queued\":{},\"frames_dropped\":{},\"overruns\":{},"
         "\"underruns\":{},\"frames_starved\":{},\"refills\":{},\"target_ms\":{:.1f},\"queue_ms\":{:.1f},\"queue_avg_ms\":{:.1f},"
         "\"queue_min_ms\":{:.1f},\"queue_max_ms\":{:.1f},\"ratio\":{:.5f},\"ratio_min\":{:.5f},"
-        "\"ratio_max\":{:.5f}}}}}",
+        "\"ratio_max\":{:.5f}}},\"bfi\":{{\"cycle\":{},\"black\":{},\"refusal\":{},\"refresh_hz\":{:.2f},"
+        "\"display_hz\":{:.2f},\"steady\":{},\"black_now\":{}}}}}",
         StateName(s.state), Quoted(s.game_id), Quoted(s.core_name), s.frames, s.measured_fps, s.core_fps,
         svc.fps, s.fast_forward, s.rewinding, s.can_rewind, s.rewind_states, s.audio_capturing,
         s.game_buttons[0], s.game_buttons[1], s.game_buttons[2], s.game_buttons[3],
         input::FamilyName(svc.input->ActiveFamily()), pads, a.sample_rate, a.frames_queued,
         a.frames_dropped, a.overruns, a.underruns, a.frames_starved, a.refills, a.target_ms, a.queue_ms, a.queue_avg_ms,
-        a.queue_min_ms, a.queue_max_ms, a.ratio, a.ratio_min, a.ratio_max);
+        a.queue_min_ms, a.queue_max_ms, a.ratio, a.ratio_min, a.ratio_max, s.bfi.cycle, s.bfi.black,
+        Quoted(player::BfiReason(s.bfi)), s.bfi.refresh_hz, s.bfi_display_hz, s.bfi_steady, s.bfi_black);
+}
+
+void TraceFrame() {
+    Endpoint& endpoint = Get();
+    Trace& trace = endpoint.trace;
+    if (!trace.request || !endpoint.server) {
+        return;
+    }
+    Services& svc = Svc();
+    const std::uint64_t frames = svc.player->GetSnapshot().frames;
+    trace.pattern += svc.black_frame ? 'B' : frames != trace.game_frames ? 'G' : 'g';
+    trace.game_frames = frames;
+    trace.times.push_back(pal::NowSeconds());
+    if (trace.pixels) {
+        // What this frame shows in the middle of the window, as the swap will show it.
+        svc.canvas->Flush();
+        int w = 0, h = 0;
+        svc.window->PixelSize(w, h);
+        std::uint8_t pixel[4] = {};
+        gl::ReadPixels(w / 2, h / 2, 1, 1, gl::RGBA, gl::UNSIGNED_BYTE, pixel);
+        trace.luma.push_back((pixel[0] + pixel[1] + pixel[2]) / 3);
+    }
+    if (--trace.left > 0) {
+        return;
+    }
+    std::vector<double> gaps;
+    for (std::size_t i = 1; i < trace.times.size(); ++i) {
+        gaps.push_back((trace.times[i] - trace.times[i - 1]) * 1000.0);
+    }
+    double sum = 0, low = gaps.empty() ? 0 : gaps.front(), high = 0;
+    for (const double gap : gaps) {
+        sum += gap;
+        low = std::min(low, gap);
+        high = std::max(high, gap);
+    }
+    const double average = gaps.empty() ? 0 : sum / static_cast<double>(gaps.size());
+    int late = 0; // over one and a half of the average: a refresh missed
+    for (const double gap : gaps) {
+        late += gap > average * 1.5 ? 1 : 0;
+    }
+    std::string luma;
+    for (const int value : trace.luma) {
+        luma += (luma.empty() ? "" : ",") + std::to_string(value);
+    }
+    endpoint.server->Reply(trace.request,
+                           std::format("{{\"pattern\":\"{}\",\"gap_avg_ms\":{:.3f},\"gap_min_ms\":{:.3f},"
+                                       "\"gap_max_ms\":{:.3f},\"late\":{},\"luma\":[{}]}}",
+                                       trace.pattern, average, low, high, late, luma));
+    trace = Trace{};
 }
 
 std::string VirtualPad(std::istringstream& in, Endpoint& endpoint) {
@@ -256,6 +325,24 @@ void Pump() {
             reply = PlayerJson();
         } else if (command == "screens") {
             reply = DualScreenJson();
+        } else if (command == "bfi") {
+            Trace& trace = endpoint.trace;
+            if (trace.request) {
+                endpoint.server->Reply(trace.request, "error replaced by a newer trace");
+            }
+            trace = Trace{};
+            int frames = 240;
+            for (std::string word; in >> word;) {
+                if (word == "pixels") {
+                    trace.pixels = true;
+                } else {
+                    frames = std::clamp(std::atoi(word.c_str()), 2, 2000);
+                }
+            }
+            trace.request = request->id;
+            trace.left = frames;
+            trace.game_frames = svc.player->GetSnapshot().frames;
+            continue; // answered when the frames are drawn
         } else if (command == "audio") {
             svc.player->ResetAudioStats();
         } else if (command == "wav") {
@@ -299,5 +386,6 @@ void Start() {
 
 DEN_REGISTER_STARTUP([] { Start(); });
 DEN_REGISTER_FRAME([] { Pump(); });
+DEN_REGISTER_OVERLAY([](ui::Context&) { TraceFrame(); });
 
 } // namespace den::app

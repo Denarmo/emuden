@@ -505,6 +505,7 @@ void PlayerSession::RunForward(int frames, bool sound_on_all) {
 }
 
 void PlayerSession::Advance(double seconds) {
+    PlanBfiFrame();
     if (!core_ || snapshot_.state != State::Running) {
         return;
     }
@@ -532,6 +533,8 @@ void PlayerSession::Advance(double seconds) {
         }
     } else if (snapshot_.fast_forward) {
         RunForward(fast_forward_speed_, false);
+    } else if (AdvanceBfi(seconds)) {
+        // One game frame per cycle of refreshes, the others black.
     } else if (std::fabs(step_ - 1.0) < LOCK_TOLERANCE) {
         // The display runs at the core's rate: one frame per display frame, no judder. The
         // sound's rate control takes up the small difference.
@@ -564,15 +567,6 @@ void PlayerSession::Advance(double seconds) {
     if (save_timer_ >= SAVE_EVERY_SECONDS) {
         save_timer_ = 0.0;
         FlushSaves();
-    }
-}
-
-void PlayerSession::MeasureFps(double seconds) {
-    fps_window_ += seconds;
-    if (fps_window_ >= 0.5) {
-        snapshot_.measured_fps = fps_frames_ / fps_window_;
-        fps_window_ = 0.0;
-        fps_frames_ = 0;
     }
 }
 

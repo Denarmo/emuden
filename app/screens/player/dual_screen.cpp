@@ -186,7 +186,7 @@ std::string DualScreens::Summary() const {
     return text;
 }
 
-void DualScreens::DrawMain(ui::Context& ctx, const gfx::Rect& room, bool integer, bool button) {
+void DualScreens::DrawMain(ui::Context& ctx, const gfx::Rect& room, bool integer, bool button, bool blank) {
     gfx::Canvas& canvas = *ctx.canvas;
     room_ = room;
     integer_ = integer;
@@ -204,7 +204,8 @@ void DualScreens::DrawMain(ui::Context& ctx, const gfx::Rect& room, bool integer
         layout = LayoutFor(room);
         rects_[0] = player::LayoutScreens({layout, room, scale, integer, Swapped()}, screens_[0], screens_[1]);
     }
-    for (int i = 0; i < 2; ++i) {
+    // Blank: a black frame; the screens keep their places for the touches.
+    for (int i = 0; i < 2 && !blank; ++i) {
         Svc().player->DrawScreen(canvas, i, rects_[0][static_cast<std::size_t>(i)]);
     }
     if (button && !split_ && layout == ScreenLayout::One) {

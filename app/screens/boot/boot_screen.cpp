@@ -255,6 +255,10 @@ bool BootCovers() {
     return b.active && b.end == Boot::End::None;
 }
 
+bool BootShowing() {
+    return Get().active;
+}
+
 void DrawBootSecond(ui::Context& ctx) {
     const Boot& b = Get();
     if (b.active) {
