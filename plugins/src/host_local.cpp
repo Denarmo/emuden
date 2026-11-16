@@ -5,6 +5,8 @@
 // of its own, any other is a third party's, held to the rules of an added source without its
 // namespace. And the console plugins an update no longer brings, carried over.
 
+#include <set>
+
 #include "den/plugins/feature_manifest.h"
 #include "real_host.h"
 
@@ -194,24 +196,36 @@ void RealHost::LoadLocalManifests() {
     }
 }
 
-// Before this file existed every console plugin of the official list was on the device:
-// built in, or brought by the list. One it has no manifest of now was built in then.
+// Before this file existed every console plugin of the official list was on the device: built
+// in, or brought by the list. One the app does not bring now came from an earlier version.
 void RealHost::FindCarryOvers() {
     const fs::path file = plugins_dir_ / CARRY_OVER_FILE;
     if (const auto text = ReadTextFile(file)) {
         if (const auto root = ParseJson(*text); root && root->Find("plugins") != nullptr) {
             for (const JsonValue& item : root->Find("plugins")->items) {
-                carry_overs_.push_back({item.String("id"), item.String("name"), json::Strings(item, "systems", false)});
+                carry_overs_.push_back({item.String("id"), item.String("name"), json::Strings(item, "systems", false),
+                                        json::Bool(item, "installed", false)});
             }
         }
         return;
     }
+    std::set<std::string> bundled;
+    if (deps_.bundled) {
+        std::size_t count = 0;
+        const BundledManifest* manifests = BundledManifests(count);
+        for (std::size_t i = 0; i < count; ++i) {
+            bundled.insert(manifests[i].id);
+        }
+    }
     if (views_[0].index) {
         for (const IndexPlugin& plugin : views_[0].index->plugins) {
-            if (plugin.kind == "console" && std::none_of(manifests_.begin(), manifests_.end(), [&](const Loaded& l) {
-                    return l.manifest.id == plugin.id;
-                })) {
-                carry_overs_.push_back({plugin.id, plugin.name, plugin.systems});
+            if (plugin.kind != "console" || bundled.contains(plugin.id)) {
+                continue;
+            }
+            const auto it = std::find_if(manifests_.begin(), manifests_.end(),
+                                         [&](const Loaded& l) { return l.manifest.id == plugin.id; });
+            if (it == manifests_.end() || (it->from_index && !it->local && !it->developer && OriginOf(*it) == 0)) {
+                carry_overs_.push_back({plugin.id, plugin.name, plugin.systems, it != manifests_.end()});
             }
         }
     }
@@ -223,7 +237,8 @@ void RealHost::SaveCarryOvers() const {
     for (const CarryOver& carry : carry_overs_) {
         items.push_back(JsonObject({{"id", JsonString(carry.plugin_id)},
                                     {"name", JsonString(carry.name)},
-                                    {"systems", json::StringArray(carry.systems)}}));
+                                    {"systems", json::StringArray(carry.systems)},
+                                    {"installed", JsonBool(carry.installed)}}));
     }
     WriteFileAtomic(plugins_dir_ / CARRY_OVER_FILE, WriteJson(JsonObject({{"plugins", JsonArray(std::move(items))}})));
 }
@@ -235,29 +250,47 @@ std::vector<CarryOver> RealHost::CarryOvers() const {
 
 JobPtr RealHost::SettleCarryOver(const std::string& plugin_id, bool keep) {
     return config_.jobs->Run("Keep " + plugin_id, [this, plugin_id, keep](Job& job) {
-        if (keep) {
-            return KeepCarryOver(job, plugin_id);
+        Status status = keep ? KeepCarryOver(job, plugin_id) : Status{};
+        if (status.ok) {
+            std::lock_guard lock(mutex_);
+            std::erase_if(carry_overs_, [&](const CarryOver& c) { return c.plugin_id == plugin_id; });
+            SaveCarryOvers();
         }
-        std::lock_guard lock(mutex_);
-        std::erase_if(carry_overs_, [&](const CarryOver& c) { return c.plugin_id == plugin_id; });
-        SaveCarryOvers();
-        return Status{};
+        return status;
     });
 }
 
-// The signed package beside the official list: no list pins it, its signature does.
+// Kept as the signed package beside the official list has it (no list pins it, its signature
+// does), unless the list offers it still: then it is updated from there as before. A copy the
+// device has stays when there is no such package.
 Status RealHost::KeepCarryOver(Job& job, const std::string& plugin_id) {
-    std::string url;
+    std::string url, address;
+    bool installed = false;
     {
         std::lock_guard lock(mutex_);
         url = ResolveSourceUrl(views_[0].index_url, ManualPackagePath(plugin_id));
+        address = views_[0].address;
+        installed = std::any_of(manifests_.begin(), manifests_.end(),
+                                [&](const Loaded& l) { return l.manifest.id == plugin_id; });
     }
     job.SetMessage("Keeping " + plugin_id);
+    if (const Status fetched = FetchSource(job, address, true); !fetched.ok) {
+        return fetched;
+    }
+    {
+        std::lock_guard lock(mutex_);
+        if (views_[0].Offers() && views_[0].index->Find(plugin_id) != nullptr) {
+            return {};
+        }
+    }
     pal::HttpRequest request;
     request.url = url;
     request.max_body = MAX_PACKAGE_SIZE;
     request.progress = [&job](std::uint64_t, std::uint64_t) { return !job.CancelRequested(); };
     const pal::HttpResponse response = deps_.http(request);
+    if (response.status == 404 && installed) {
+        return {};
+    }
     if (!response.ok()) {
         return Status::Fail("The plugin could not be fetched" +
                             (response.error.empty() ? std::string(".") : ": " + response.error));
@@ -271,7 +304,8 @@ Status RealHost::KeepCarryOver(Job& job, const std::string& plugin_id) {
     Result<PackageProbe> probe = ProbePackage(temp);
     fs::remove(temp, ec);
     if (!probe) {
-        return probe.status();
+        // The copy on the device is as new as the package, or newer.
+        return installed && probe.error().starts_with("A newer ") ? Status{} : probe.status();
     }
     if (!probe->official || probe->id != plugin_id) {
         return Status::Fail("The plugin found is not the one EmuDEN signed.");

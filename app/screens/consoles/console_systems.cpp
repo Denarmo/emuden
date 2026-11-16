@@ -57,8 +57,8 @@ library::SystemDef ToSystemDef(const plugins::Console& console) {
     return def;
 }
 
-// A console plugin an update no longer brings stays where the library has games of it, and
-// goes where it has none. One at a time; one that cannot be fetched now is tried next start.
+// A console plugin an update no longer brings stays where it was installed or the library has
+// games of it, and goes elsewhere. One at a time; one that cannot be fetched now is tried next start.
 void SettleCarryOvers(Services& svc) {
     static std::set<std::string> tried;
     static JobPtr job;
@@ -74,8 +74,8 @@ void SettleCarryOvers(Services& svc) {
         if (!tried.insert(carry.plugin_id).second) {
             continue;
         }
-        const bool keep = std::any_of(carry.systems.begin(), carry.systems.end(),
-                                      [&](const std::string& system) { return seen.contains(system); });
+        const bool keep = carry.installed || std::any_of(carry.systems.begin(), carry.systems.end(),
+                                                         [&](const std::string& system) { return seen.contains(system); });
         log::Info("plugins", "{}: {} after the update", carry.plugin_id, keep ? "kept" : "no longer offered");
         job = svc.plugins->SettleCarryOver(carry.plugin_id, keep);
         return;

@@ -267,12 +267,13 @@ struct PackageProbe {
     std::string signature;   // and its plugin.json.sig, if any
 };
 
-/// A console plugin an earlier EmuDEN had built in or offered that this one neither brings nor
-/// offers: it stays on the devices that have games of it.
+/// A console plugin an earlier EmuDEN had built in or offered that this one does not bring: it
+/// stays where it was installed (a copy is on the device) or the library has games of it.
 struct CarryOver {
     std::string plugin_id;
     std::string name;
     std::vector<std::string> systems;
+    bool installed = false; // its manifest is on the device
 };
 
 class Host {
@@ -356,7 +357,8 @@ public:
     virtual std::vector<CarryOver> CarryOvers() const {
         return {};
     }
-    /// Keeps one (its signed package is fetched from beside the official list) or lets it go.
+    /// Keeps one (brought up to date from its signed package beside the official list, when
+    /// the list no longer offers it) or lets it go.
     virtual JobPtr SettleCarryOver(const std::string& /*plugin_id*/, bool /*keep*/) {
         return nullptr;
     }

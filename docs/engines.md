@@ -22,9 +22,11 @@ the library has no built-in Switch 2 entry, only its `switch2` scanner.
 
 A device that had Switch 2 while it was built in keeps it: on the first start of a version
 without it, the host notes the official console plugins its cached list named and it has no
-manifest of (`Host::CarryOvers`, `<data>/plugins/carry-over.json`); the app keeps those the
-library has records of (`Library::SystemsWithRecords`) by fetching the signed `manual/`
-package, and lets the others go. A new install has no cached list and never gets it.
+manifest of, or only a copy the list had brought (`Host::CarryOvers`,
+`<data>/plugins/carry-over.json`). The app keeps those with a copy on the device and those the
+library has records of (`Library::SystemsWithRecords`), bringing them up to date from the signed
+`manual/` package once the official list no longer offers them, and lets the others go. A new
+install has no cached list and never gets it.
 
 ## Declaring an engine core
 

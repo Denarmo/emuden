@@ -396,8 +396,10 @@ TEST_CASE("a carried-over plugin with no games is let go") {
     }
     fs::remove_all(f.dir / "data" / "plugins" / "emuden.switch2");
     fs::remove(f.dir / "data" / "plugins" / "carry-over.json");
+    f.PublishIndex(4, "");
     auto host = f.MakeHost();
     REQUIRE(host->CarryOvers().size() == 1);
+    CHECK_FALSE(host->CarryOvers()[0].installed);
     // A package that is not signed by EmuDEN is not kept.
     f.web[std::string(BASE) + ManualPackagePath("emuden.switch2")] = Zip({{"plugin.json", ENGINE_MANIFEST}});
     CHECK(f.Run(host->SettleCarryOver("emuden.switch2", true))->State() == JobState::Failed);
@@ -407,4 +409,37 @@ TEST_CASE("a carried-over plugin with no games is let go") {
     host = f.MakeHost();
     CHECK(host->CarryOvers().empty());
     CHECK_FALSE(host->FindConsole("switch2"));
+}
+
+TEST_CASE("a carried-over plugin the list had brought stays and is brought up to date") {
+    Fixture f;
+    // An earlier version had fetched the plugin's manifest from the list.
+    f.PublishIndex(3, f.Entry("emuden.switch2", "1.0.1", Earlier(ENGINE_MANIFEST), "switch2"));
+    {
+        auto host = f.MakeHost();
+        REQUIRE(f.Run(host->Refresh())->State() == JobState::Done);
+        REQUIRE(host->FindConsole("switch2"));
+    }
+    fs::remove(f.dir / "data" / "plugins" / "carry-over.json");
+    f.PublishIndex(4, "");
+    const std::string package = Zip({{"plugin.json", ENGINE_MANIFEST}, {"plugin.json.sig", Sign(ENGINE_MANIFEST, f.key)}});
+    SECTION("no package beside the list: the copy stays") {
+        auto host = f.MakeHost();
+        REQUIRE(host->CarryOvers().size() == 1);
+        CHECK(host->CarryOvers()[0].installed);
+        REQUIRE(f.Run(host->SettleCarryOver("emuden.switch2", true))->State() == JobState::Done);
+        CHECK(host->CarryOvers().empty());
+        REQUIRE(host->FindConsole("switch2"));
+        CHECK(host->ProbePackage(f.Write("p.emuplugin", package))->replaces == "1.0.1");
+    }
+    SECTION("the signed package replaces it") {
+        f.web[std::string(BASE) + ManualPackagePath("emuden.switch2")] = package;
+        auto host = f.MakeHost();
+        REQUIRE(host->CarryOvers().size() == 1);
+        REQUIRE(f.Run(host->SettleCarryOver("emuden.switch2", true))->State() == JobState::Done);
+        host = f.MakeHost();
+        REQUIRE(host->FindConsole("switch2"));
+        CHECK(host->ProbePackage(f.Write("p.emuplugin", package))->replaces == "1.0.2");
+        CHECK(host->CarryOvers().empty());
+    }
 }
