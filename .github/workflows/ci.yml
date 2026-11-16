@@ -1,12 +1,8 @@
-# Linux build and unit tests (tools/linux/build.sh) on every push to main and every pull request.
+# Linux build and unit tests (tools/linux/build.sh), run by hand from the Actions tab only:
+# builds and tests run on the owner's PC (tools/build.ps1, tools/linux/build.sh).
 name: CI
 
 on:
-  push:
-    branches: [main]
-    paths-ignore: ['docs/**', '**.md']
-  pull_request:
-    paths-ignore: ['docs/**', '**.md']
   workflow_dispatch:
 
 concurrency:

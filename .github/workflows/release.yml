@@ -1,12 +1,11 @@
 # Builds EmuDEN for Windows, Linux and Android and publishes them as a GitHub release.
-# Runs on a pushed tag "v*" (the release takes the tag's name) or by hand from the Actions tab
-# (a draft release named after the commit). Each build uploads straight to a draft release,
+# Run by hand from the Actions tab only (releases are normally built on the owner's PC and
+# uploaded with gh): on a tag "v*" the release takes the tag's name and is published; on a
+# branch it is a draft named after the commit. Each build uploads straight to a draft release,
 # which does not count against the artifact storage of a private repository.
 name: Release
 
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
 
 concurrency:
