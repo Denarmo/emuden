@@ -4,7 +4,6 @@
 // rc_client and its server: requests are sent from helper threads and their answers given
 // back to rcheevos on the main thread in Pump, so every rcheevos callback runs there.
 
-#include <thread>
 
 #include "den/achievements/games.h"
 #include "den/base/log.h"
@@ -81,7 +80,13 @@ Runtime::Runtime(Config config) : impl_(std::make_unique<Impl>()) {
     Impl& self = *impl_;
     self.config = std::move(config);
     if (!self.config.spawn) {
-        self.config.spawn = [](std::function<void()> work) { std::thread(std::move(work)).detach(); };
+        self.pool = std::make_unique<Jobs>(2);
+        self.config.spawn = [pool = self.pool.get()](std::function<void()> work) {
+            pool->Run("achievements", [work = std::move(work)](Job&) {
+                work();
+                return Status{};
+            });
+        };
     }
     self.client = rc_client_create(ReadMemory, ServerCall);
     rc_client_set_userdata(self.client, &self);

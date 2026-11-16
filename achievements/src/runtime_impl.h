@@ -9,6 +9,7 @@
 #include <mutex>
 
 #include "den/achievements/runtime.h"
+#include "den/base/jobs.h"
 #include "rc_client.h"
 #include "rc_libretro.h"
 
@@ -41,6 +42,9 @@ struct Runtime::Impl {
 
     std::function<void(int, const char*)> login_done;
     std::function<void(Status)> load_done;
+
+    /// Runs server calls when the config brings no spawn; joined before the rest goes.
+    std::unique_ptr<Jobs> pool;
 
     void MapMemory();
     void FreeMemory();

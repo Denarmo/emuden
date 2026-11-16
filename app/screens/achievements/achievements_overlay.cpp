@@ -12,7 +12,6 @@
 #include <ctime>
 #include <format>
 #include <set>
-#include <thread>
 
 #include "achievements_glue.h"
 #include "achievements_state.h"
@@ -104,7 +103,7 @@ std::string BadgeFile(const std::string& url) {
     }
     std::lock_guard lock(mutex);
     if (fetching.insert(url).second) {
-        std::thread([url, file] {
+        Svc().jobs->Run("achievement badge", [url, file](Job&) {
             std::error_code ec;
             std::filesystem::create_directories(file.parent_path(), ec);
             pal::HttpRequest request;
@@ -116,7 +115,8 @@ std::string BadgeFile(const std::string& url) {
             }
             std::lock_guard done(mutex);
             fetching.erase(url);
-        }).detach();
+            return Status{};
+        });
     }
     return {};
 }

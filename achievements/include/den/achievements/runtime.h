@@ -38,7 +38,7 @@ using HttpFn = std::function<HttpResponse(const HttpRequest&)>;
 
 struct Config {
     HttpFn http;
-    /// Runs work off the main thread; default: a thread of its own. Tests run it inline.
+    /// Runs work off the main thread; default: a small pool the runtime owns. Tests run it inline.
     std::function<void(std::function<void()>)> spawn;
     std::string client_name = "EmuDEN"; // the User-Agent starts with "<client_name>/<version>"
     std::string client_version = "0.1";
