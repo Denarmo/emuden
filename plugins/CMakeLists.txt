@@ -41,6 +41,8 @@ endif()
 # the PS2 plugin work in progress has landed in both repositories.
 set(EMUDEN_PLUGINS_DIR "${CMAKE_SOURCE_DIR}/../emuden-plugins" CACHE PATH "An emuden-plugins checkout")
 if(TARGET den_plugins_tests AND EXISTS "${EMUDEN_PLUGINS_DIR}/plugins")
+    # Its signed manual packages are checked against the keys compiled in.
+    target_compile_definitions(den_plugins_tests PRIVATE DEN_EMUDEN_PLUGINS_DIR="${EMUDEN_PLUGINS_DIR}")
     find_package(Python3 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND)
         add_test(NAME den_bundled_plugins_in_sync

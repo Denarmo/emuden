@@ -443,3 +443,26 @@ TEST_CASE("a carried-over plugin the list had brought stays and is brought up to
         CHECK(host->CarryOvers().empty());
     }
 }
+
+#ifdef DEN_EMUDEN_PLUGINS_DIR
+TEST_CASE("the Switch 2 package of an emuden-plugins checkout is signed with EmuDEN's key") {
+    const fs::path package = fs::path(DEN_EMUDEN_PLUGINS_DIR) / ManualPackagePath("emuden.switch2");
+    if (!IsRegularFile(package)) {
+        SKIP("no manual package in " DEN_EMUDEN_PLUGINS_DIR);
+    }
+    Fixture f;
+    Config config;
+    config.data_dir = f.dir / "official";
+    config.jobs = &f.jobs;
+    HostDeps deps;
+    deps.http = [](const pal::HttpRequest&) { return pal::HttpResponse{}; };
+    deps.bundled = false;
+    auto host = CreateHostWith(config, std::move(deps)); // the official keys
+    Result<PackageProbe> probe = host->ProbePackage(package);
+    INFO(probe.error());
+    REQUIRE(probe.ok());
+    CHECK(probe->official);
+    CHECK(probe->engine);
+    CHECK(probe->systems == std::vector<std::string>{"switch2"});
+}
+#endif
