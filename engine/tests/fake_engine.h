@@ -84,11 +84,11 @@ public:
         }
         return out;
     }
-    /// Waits for a message of the type, up to `seconds`.
+    /// Waits for a message of the type to be answered (its reply and events written), up to `seconds`.
     bool WaitFor(const std::string& type, double seconds = 5) {
         std::unique_lock lock(mutex_);
         return seen_.wait_for(lock, std::chrono::duration<double>(seconds), [&] {
-            for (const JsonValue& message : received_) {
+            for (const JsonValue& message : answered_) {
                 if (message.String("type") == type) {
                     return true;
                 }
@@ -257,8 +257,12 @@ private:
                 std::lock_guard lock(mutex_);
                 received_.push_back(*message);
             }
-            seen_.notify_all();
             Answer(*message);
+            {
+                std::lock_guard lock(mutex_);
+                answered_.push_back(*message);
+            }
+            seen_.notify_all();
         }
         Close();
         ended_ = true;
@@ -270,6 +274,7 @@ private:
     mutable std::mutex mutex_;
     std::condition_variable seen_;
     std::vector<JsonValue> received_;
+    std::vector<JsonValue> answered_;
     std::set<int> saved_;
     std::atomic<bool> connected_{false};
     std::atomic<bool> ended_{false};
