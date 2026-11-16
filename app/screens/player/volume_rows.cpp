@@ -5,12 +5,12 @@
 #include <cmath>
 #include <format>
 
-#include "../apps/beside.h"
+#include "den/app/beside.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/platform/audio.h"
 #include "den/platform/second_display.h"
-#include "volume_rows.h"
+#include "den/app/volume_rows.h"
 
 namespace den::app {
 

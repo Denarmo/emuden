@@ -9,7 +9,7 @@
 
 #include "den/app/app.h"
 #include "den/app/registry.h"
-#include "web_browser.h"
+#include "den/app/web_browser.h"
 
 namespace den::app::web {
 

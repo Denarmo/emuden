@@ -14,7 +14,7 @@
 #include "den/app/app.h"
 #include "den/platform/webview.h"
 #include "web_bar.h"
-#include "web_browser.h"
+#include "den/app/web_browser.h"
 #include "web_fallback.h"
 #include "web_menu.h"
 

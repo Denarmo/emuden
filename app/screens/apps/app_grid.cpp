@@ -3,8 +3,8 @@
 
 #include <algorithm>
 
-#include "app_grid.h"
-#include "apps_catalog.h"
+#include "den/app/app_grid.h"
+#include "den/app/apps_catalog.h"
 #include "den/app/app.h"
 
 namespace den::app {

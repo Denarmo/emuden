@@ -6,8 +6,8 @@
 #include <algorithm>
 #include <cmath>
 
-#include "../boot/boot.h"
-#include "../home/game_widgets.h"
+#include "den/app/boot.h"
+#include "den/app/game_widgets.h"
 #include "den/gfx/canvas.h"
 
 namespace den::app {

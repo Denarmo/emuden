@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "den/gfx/mesh_shapes.h"
-#include "game_objects.h"
+#include "den/app/game_objects.h"
 
 namespace den::app {
 

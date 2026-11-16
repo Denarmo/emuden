@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include "feature_api.h"
+#include "den/app/feature_api.h"
 
 namespace den::app {
 

@@ -6,17 +6,15 @@
 #include <algorithm>
 #include <format>
 
-#include "../achievements/achievements_glue.h"
-#include "../apps/apps_catalog.h"
-#include "../companion/second_screen.h"
-#include "../together/together.h"
+#include "den/app/apps_catalog.h"
+#include "den/app/second_screen.h"
 #include "den/app/pages.h"
 #include "den/base/files.h"
-#include "glyphs.h"
-#include "picture_choice.h"
+#include "den/app/glyphs.h"
+#include "den/app/picture_choice.h"
 #include "den/platform/audio.h"
 #include "player_screen.h"
-#include "volume_rows.h"
+#include "den/app/volume_rows.h"
 
 namespace den::app {
 
@@ -124,9 +122,17 @@ void PlayerScreen::BuildMain(ui::Node* list) {
     } else if (!external) {
         rows.push_back(ValueRow("menu.save", "Save states", [] { return std::string("Not with this core"); }));
     }
-    if (AchievementsForRunningGame()) {
-        rows.push_back(ActionRow("menu.achievements", "Achievements", [this] { GetStage().Push("achievements"); }));
-    }
+    const PauseContext pause{game_, snapshot};
+    const auto feature_rows = [&](PauseSlot slot) {
+        for (const PlayerHooks& hooks : AllPlayerHooks()) {
+            if (hooks.pause_rows && hooks.slot == slot) {
+                for (ui::RowSpec& row : hooks.pause_rows(pause)) {
+                    rows.push_back(std::move(row));
+                }
+            }
+        }
+    };
+    feature_rows(PauseSlot::AfterStates);
     if (snapshot.can_fast_forward && !snapshot.together) {
         rows.push_back(ToggleRow("menu.fast", "Fast-forward", [this] { return fast_toggle_; },
                                  [this](bool on) { fast_toggle_ = on; }));
@@ -205,10 +211,7 @@ void PlayerScreen::BuildMain(ui::Node* list) {
             "menu.players", "Players",
             [] { return std::format("{}", std::max(1, std::min(4, Svc().input->PadCount()))); },
             [this] { Show(View::Players); }));
-        rows.push_back(ValueRow(
-            "menu.together", "Play together",
-            [id = game_.id] { return Together::Get().PartyFor(id) ? Together::Get().StatusText() : std::string("Off"); },
-            [this] { GetStage().Push("together", {{"id", game_.id}, {"from", "game"}}); }));
+        feature_rows(PauseSlot::AfterPlayers);
     }
     // The volumes sit between the rows above and below, a little taller for their second line.
     AddRows(list, std::move(rows), ROW_HEIGHT);

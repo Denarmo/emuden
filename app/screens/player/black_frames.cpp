@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "black_frames.h"
+#include "den/app/black_frames.h"
 
 #include <cmath>
 #include <format>
@@ -10,7 +10,7 @@
 #include "den/app/pages.h"
 #include "den/base/log.h"
 #include "den/store/settings.h"
-#include "../details/game_prefs.h"
+#include "den/app/game_prefs.h"
 
 namespace den::app {
 

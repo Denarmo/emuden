@@ -8,8 +8,8 @@
 #include <cmath>
 #include <optional>
 
-#include "../player/player_screen.h"
-#include "boot.h"
+#include "den/app/player.h"
+#include "den/app/boot.h"
 #include "boot_draw.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
@@ -91,7 +91,7 @@ void Watch(float dt) {
         return;
     }
     const ui::Page* top = svc.stage->Top();
-    const PlayerScreen* player = PlayerScreen::Current();
+    const GamePlayer* player = CurrentPlayer();
     const bool gone = b.since_start > 0.5f && (!top || top->Route() != "player");
     if (gone || svc.stage->DialogOpen() || (player != nullptr && player->InStartCheck())) {
         b.end = Boot::End::Back; // a question to answer first, or it failed

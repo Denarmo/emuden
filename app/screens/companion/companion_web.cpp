@@ -12,7 +12,7 @@
 #include <memory>
 #include <thread>
 
-#include "../web/web_browser.h"
+#include "den/app/web_browser.h"
 #include "companion_page.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"

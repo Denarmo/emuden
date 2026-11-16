@@ -12,14 +12,12 @@
 #include <iterator>
 #include <format>
 
-#include "../apps/apps_catalog.h"
-#include "../achievements/achievements_glue.h"
-#include "../apps/beside.h"
-#include "../companion/second_screen.h"
+#include "den/app/apps_catalog.h"
+#include "den/app/beside.h"
+#include "den/app/second_screen.h"
 #include "den/base/log.h"
 #include "den/platform/lifecycle.h"
 #include "player_screen.h"
-#include "../together/together.h"
 
 namespace den::app {
 
@@ -57,6 +55,19 @@ void DrawTab(ui::Context& ctx, const gfx::Rect& area) {
 
 PlayerScreen* PlayerScreen::Current() {
     return g_current && g_current->phase_ == Phase::Running ? g_current : nullptr;
+}
+
+GamePlayer* CurrentPlayer() {
+    return PlayerScreen::Current();
+}
+
+std::string RunningGame() {
+    if (Svc().player == nullptr) {
+        return {};
+    }
+    const player::Snapshot snapshot = Svc().player->GetSnapshot();
+    const bool open = snapshot.state == player::State::Running || snapshot.state == player::State::Paused;
+    return open && !snapshot.external ? snapshot.game_id : std::string();
 }
 
 void PlayerScreen::SwapDisplays() {
@@ -251,10 +262,19 @@ void PlayerScreen::DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const p
         badge("\xC2\xAB Rewind", false);
     } else if (snapshot.fast_forward) {
         badge("Fast-forward \xC2\xBB", false);
-    } else if (snapshot.waiting_for_peer) {
-        badge(TogetherWaitText(), false);
+    } else {
+        for (const PlayerHooks& hooks : AllPlayerHooks()) {
+            if (const std::string text = hooks.status ? hooks.status(snapshot) : std::string(); !text.empty()) {
+                badge(text, false);
+                break;
+            }
+        }
     }
-    DrawAchievementOverlay(ctx, area);
+    for (const PlayerHooks& hooks : AllPlayerHooks()) {
+        if (hooks.overlay) {
+            hooks.overlay(ctx, area);
+        }
+    }
 }
 
 // The game on the display it has, and the menu over it when it is on the same one.

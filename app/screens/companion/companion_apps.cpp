@@ -7,12 +7,12 @@
 // left with the system's Back or Home gesture on this screen. Held, an app is pinned.
 // Route "companion.apps" on the companion stage.
 
-#include "../apps/app_grid.h"
-#include "../apps/apps_catalog.h"
+#include "den/app/app_grid.h"
+#include "den/app/apps_catalog.h"
 #include "companion_page.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
-#include "second_screen.h"
+#include "den/app/second_screen.h"
 
 namespace den::app {
 

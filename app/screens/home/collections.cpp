@@ -5,10 +5,10 @@
 #include <cctype>
 #include <format>
 
-#include "collections.h"
+#include "den/app/collections.h"
 #include "den/app/app.h"
-#include "games.h"
-#include "strings.h"
+#include "den/app/games.h"
+#include "den/app/strings.h"
 
 namespace den::app {
 

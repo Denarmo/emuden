@@ -11,7 +11,7 @@
 #include <future>
 #include <mutex>
 
-#include "../details/game_prefs.h"
+#include "den/app/game_prefs.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
@@ -19,7 +19,7 @@
 #include "den/library/steam.h"
 #include "den/plugins/feature_tune.h"
 #include "den/system/device.h"
-#include "feature_api.h"
+#include "den/app/feature_api.h"
 
 namespace den::app {
 

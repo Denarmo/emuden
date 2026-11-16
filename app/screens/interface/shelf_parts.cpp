@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "shelf_parts.h"
+#include "den/app/shelf_parts.h"
 
 #include <algorithm>
 

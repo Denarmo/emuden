@@ -8,15 +8,15 @@
 #include <map>
 #include <utility>
 
-#include "../details/launch.h"
-#include "../sync/sync_glue.h"
-#include "continue_row.h"
+#include "den/app/launch.h"
+#include "den/app/sync_glue.h"
+#include "den/app/continue_row.h"
 #include "den/app/app.h"
 #include "den/base/files.h"
 #include "den/sync/names.h"
 #include "den/sync/plan.h"
-#include "game_widgets.h"
-#include "games.h"
+#include "den/app/game_widgets.h"
+#include "den/app/games.h"
 
 namespace den::app {
 

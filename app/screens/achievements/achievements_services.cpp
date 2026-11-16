@@ -6,7 +6,7 @@
 
 #include <future>
 
-#include "achievements_glue.h"
+#include "den/app/achievements_glue.h"
 #include "achievements_state.h"
 #include "den/achievements/games.h"
 #include "den/base/files.h"

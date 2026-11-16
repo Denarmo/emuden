@@ -8,7 +8,7 @@
 
 #include "den/app/app.h"
 #include "den/base/files.h"
-#include "player_view.h"
+#include "den/app/player_view.h"
 
 namespace den::app {
 

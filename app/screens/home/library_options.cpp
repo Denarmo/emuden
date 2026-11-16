@@ -9,13 +9,13 @@
 #include <ctime>
 #include <map>
 
-#include "collections.h"
+#include "den/app/collections.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
-#include "games.h"
-#include "strings.h"
+#include "den/app/games.h"
+#include "den/app/strings.h"
 
 namespace den::app {
 

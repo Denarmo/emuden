@@ -6,12 +6,12 @@
 #include <algorithm>
 #include <cmath>
 
-#include "../boot/boot.h"
+#include "den/app/boot.h"
 #include "den/app/app.h"
 #include "den/base/log.h"
 #include "den/gfx/canvas.h"
-#include "interfaces.h"
-#include "shelf_parts.h"
+#include "den/app/interfaces.h"
+#include "den/app/shelf_parts.h"
 
 namespace den::app {
 

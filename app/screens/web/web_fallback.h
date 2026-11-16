@@ -15,7 +15,7 @@
 
 #include "den/app/app.h"
 #include "den/platform/downloads.h"
-#include "web_browser.h"
+#include "den/app/web_browser.h"
 
 namespace den::app::web {
 

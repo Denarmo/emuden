@@ -13,9 +13,9 @@
 #include "den/app/pages.h"
 #include "den/app/registry.h"
 #include "den/system/info.h"
-#include "../achievements/achievements_glue.h"
+#include "den/app/achievements_glue.h"
 #include "fake_host.h"
-#include "feature_api.h"
+#include "den/app/feature_api.h"
 
 namespace den::app {
 

@@ -14,14 +14,14 @@
 #include <cmath>
 #include <format>
 
-#include "../apps/app_grid.h"
-#include "../apps/apps_catalog.h"
-#include "../apps/beside.h"
-#include "../home/game_widgets.h"
-#include "../home/games.h"
-#include "../player/picture_choice.h"
-#include "../player/player_screen.h"
-#include "../player/volume_rows.h"
+#include "den/app/app_grid.h"
+#include "den/app/apps_catalog.h"
+#include "den/app/beside.h"
+#include "den/app/game_widgets.h"
+#include "den/app/games.h"
+#include "den/app/picture_choice.h"
+#include "den/app/player.h"
+#include "den/app/volume_rows.h"
 #include "companion_cells.h"
 #include "companion_page.h"
 #include "companion_pictures.h"
@@ -30,7 +30,7 @@
 #include "den/app/pages.h"
 #include "den/base/files.h"
 #include "den/platform/audio.h"
-#include "second_screen.h"
+#include "den/app/second_screen.h"
 
 namespace den::app {
 
@@ -227,14 +227,14 @@ private:
         }
         control("companion.exit", "Exit", false, [] {
             // The player screen saves the game and books its play time.
-            if (PlayerScreen* screen = PlayerScreen::Current()) {
+            if (GamePlayer* screen = CurrentPlayer()) {
                 screen->Exit();
             }
         });
 
         // The sections, each one step in, with what it holds now at the right.
         std::vector<ui::RowSpec> rows;
-        const PlayerScreen* screen = PlayerScreen::Current();
+        const GamePlayer* screen = CurrentPlayer();
         if (snapshot.can_save_states) {
             int used = 0;
             for (int slot = 0; slot < player::STATE_SLOTS; ++slot) {
@@ -282,7 +282,7 @@ private:
     }
 
     // Black frame insertion, as in the pause menu: a toggle, or why it cannot be had here.
-    ui::RowSpec BfiRow(const PlayerScreen& screen, const player::Snapshot& snapshot) {
+    ui::RowSpec BfiRow(const GamePlayer& screen, const player::Snapshot& snapshot) {
         const std::string refused = screen.Bfi().Refusal(snapshot);
         if (!refused.empty() && !screen.Bfi().On()) {
             ui::RowSpec row = ValueRow("companion.bfi", BFI_LABEL, [] { return std::string("Not available"); });
@@ -292,18 +292,18 @@ private:
         ui::RowSpec row = ToggleRow(
             "companion.bfi", BFI_LABEL,
             [] {
-                PlayerScreen* now = PlayerScreen::Current();
+                GamePlayer* now = CurrentPlayer();
                 return now && now->Bfi().On();
             },
             [this](bool on) {
-                if (PlayerScreen* now = PlayerScreen::Current()) {
+                if (GamePlayer* now = CurrentPlayer()) {
                     now->SetBfi(on);
                 }
                 Rebuild();
             });
         row.description = screen.Bfi().Status(snapshot);
         row.live_description = [] {
-            PlayerScreen* now = PlayerScreen::Current();
+            GamePlayer* now = CurrentPlayer();
             return now ? now->Bfi().Status(Svc().player->GetSnapshot()) : std::string();
         };
         return row;
@@ -349,7 +349,7 @@ private:
     }
 
     void BuildScreen(ui::Node& root, const player::Snapshot& snapshot) {
-        PlayerScreen* screen = PlayerScreen::Current();
+        GamePlayer* screen = CurrentPlayer();
         if (screen) {
             Caption(root, "Screen size");
             const auto& names = ScreenSizeNames();
@@ -357,7 +357,7 @@ private:
             const int current = screen->ScreenSizeIndex();
             CompanionGrid(root, count, count, GAP, [&](ui::Node& row, int index) -> ui::Node* {
                 auto* card = row.Emplace<CompanionCard>(names[static_cast<std::size_t>(index)], [index] {
-                    if (PlayerScreen* now = PlayerScreen::Current()) {
+                    if (GamePlayer* now = CurrentPlayer()) {
                         now->SetScreenSize(index);
                     }
                 });
@@ -407,7 +407,7 @@ private:
             ui::Node* row = root.Add(ui::MakeBox(ui::Axis::Row, GAP));
             row->height = BUTTON_HEIGHT;
             auto* swap = row->Emplace<CompanionCard>("Swap screens", [] {
-                if (PlayerScreen* now = PlayerScreen::Current()) {
+                if (GamePlayer* now = CurrentPlayer()) {
                     now->SwapDisplays();
                 }
             });
@@ -421,8 +421,8 @@ private:
             // Off, the frame rate, the frame rate with a graph of the frame times.
             const int fps = screen->FpsMode();
             auto* counter = row->Emplace<CompanionCard>(FPS_NAMES[fps], [fps] {
-                if (PlayerScreen* now = PlayerScreen::Current()) {
-                    now->SetFpsMode((fps + 1) % PlayerScreen::FPS_MODES);
+                if (GamePlayer* now = CurrentPlayer()) {
+                    now->SetFpsMode((fps + 1) % GamePlayer::FPS_MODES);
                 }
             });
             counter->id = "companion.fps";
@@ -432,12 +432,12 @@ private:
             if (screen->CanWidescreen()) {
                 const bool wide = screen->Widescreen();
                 auto* card = row->Emplace<CompanionCard>("Widescreen", [this, wide] {
-                    PlayerScreen* now = PlayerScreen::Current();
+                    GamePlayer* now = CurrentPlayer();
                     if (now && !now->WidescreenRestarts()) {
                         now->SetWidescreen(!wide);
                     } else if (now) {
                         GetStage().Confirm(WIDESCREEN_TITLE, WIDESCREEN_TEXT, "Start again", [wide] {
-                            if (PlayerScreen* still = PlayerScreen::Current()) {
+                            if (GamePlayer* still = CurrentPlayer()) {
                                 still->SetWidescreen(!wide);
                             }
                         });
@@ -504,7 +504,7 @@ private:
     void BuildControls(ui::Node& root) {
         const auto page = [](const char* name) {
             return [name] {
-                if (PlayerScreen* now = PlayerScreen::Current()) {
+                if (GamePlayer* now = CurrentPlayer()) {
                     now->OpenPage(name);
                 }
             };
@@ -527,7 +527,7 @@ private:
         for (int slot = 0; slot < player::STATE_SLOTS; ++slot) {
             slots |= Svc().player->HasState(slot) ? 1 << slot : 0;
         }
-        const PlayerScreen* screen = PlayerScreen::Current();
+        const GamePlayer* screen = CurrentPlayer();
         // The volumes are not in here: their sliders show the value as it changes, and a
         // page built again under a finger would end the drag.
         const system::AppBeside& beside = Beside();

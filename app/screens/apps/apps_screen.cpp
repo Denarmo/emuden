@@ -6,8 +6,8 @@
 // "from=game" (the pause menu, on a device with one display) it has no rail and Back
 // returns to the game.
 
-#include "app_grid.h"
-#include "apps_catalog.h"
+#include "den/app/app_grid.h"
+#include "den/app/apps_catalog.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/registry.h"

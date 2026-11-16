@@ -13,9 +13,9 @@
 #include <map>
 
 #include "cover_carousel.h"
-#include "game_faces.h"
-#include "game_objects.h"
-#include "shelf_parts.h"
+#include "den/app/game_faces.h"
+#include "den/app/game_objects.h"
+#include "den/app/shelf_parts.h"
 
 namespace den::app {
 

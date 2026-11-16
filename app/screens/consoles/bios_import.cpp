@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "bios_import.h"
+#include "den/app/bios_import.h"
 
 #include <algorithm>
 #include <cctype>

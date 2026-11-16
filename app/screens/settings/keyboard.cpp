@@ -7,8 +7,8 @@
 // system keyboard goes to the second display when the device has one, so the text stays
 // whole on the main one. Every frame both stages are told where their keyboard goes.
 
-#include "../companion/second_screen.h"
-#include "../player/player_screen.h"
+#include "den/app/second_screen.h"
+#include "den/app/player.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
@@ -34,7 +34,7 @@ void Frame() {
         return; // the desktop: the app's keys and a real keyboard, as the kit does by itself
     }
     const bool two = SecondScreenReady();
-    const PlayerScreen* player = PlayerScreen::Current();
+    const GamePlayer* player = CurrentPlayer();
     const bool swapped = player && player->Swapped();
 
     // The main window's pages: the keyboard on the other display, the line here.

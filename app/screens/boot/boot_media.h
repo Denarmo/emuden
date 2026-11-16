@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "../interface/game_faces.h"
-#include "../interface/game_objects.h"
+#include "den/app/game_faces.h"
+#include "den/app/game_objects.h"
 #include "den/library/library.h"
 #include "den/ui/node.h"
 

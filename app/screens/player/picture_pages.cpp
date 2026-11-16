@@ -9,7 +9,7 @@
 #include <format>
 
 #include "den/app/pages.h"
-#include "picture_choice.h"
+#include "den/app/picture_choice.h"
 #include "player_screen.h"
 
 namespace den::app {

@@ -9,9 +9,9 @@
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
-#include "black_frames.h"
+#include "den/app/black_frames.h"
 #include "dual_screen.h"
-#include "picture_choice.h"
+#include "den/app/picture_choice.h"
 
 namespace den::app {
 

@@ -5,7 +5,7 @@
 // pause menu over it. Route "player", parameter "id" (a library entry); "resume=0" starts
 // the game from the beginning instead of where it was left.
 //
-// With a second display (app/screens/companion/second_screen.h) the pause menu opens there
+// With a second display (app/include/den/app/second_screen.h) the pause menu opens there
 // and the game stays as it is ("player.overlay_on_second_screen"), and the game and the
 // quick settings can change places ("player.swap_displays").
 
@@ -20,19 +20,16 @@
 #include <vector>
 
 #include "den/app/app.h"
+#include "den/app/player.h"
+#include "den/app/player_hooks.h"
 #include "den/player/buttons.h"
-#include "black_frames.h"
+#include "den/app/black_frames.h"
 #include "dual_screen.h"
-#include "player_view.h"
+#include "den/app/player_view.h"
 
 namespace den::app {
 
-/// What is asked before a widescreen change that starts the game again.
-inline constexpr const char* WIDESCREEN_TITLE = "Start the game again?";
-inline constexpr const char* WIDESCREEN_TEXT =
-    "Widescreen changes when the game starts. Progress that is not saved is lost.";
-
-class PlayerScreen final : public ui::Page {
+class PlayerScreen final : public ui::Page, public GamePlayer {
 public:
     ~PlayerScreen() override;
 
@@ -49,78 +46,58 @@ public:
         return {};
     }
 
-    // For the quick settings of the second display (companion.play).
     /// The screen whose game is running; null when there is none.
     static PlayerScreen* Current();
-    /// Asking something before the game starts (which saves to use).
-    bool InStartCheck() const {
+
+    // GamePlayer: for the quick settings of the second display, the apps beside, sync.
+    bool InStartCheck() const override {
         return InSaveCheck();
     }
-    /// Opens one page of the pause menu by itself ("options", "buttons"); Back closes it.
-    void OpenPage(const std::string& page);
-    /// The game goes to the other display and the quick settings come to this one. A game
-    /// with two screens swaps which display has its top screen.
-    void SwapDisplays();
-    int ScreenSizeIndex() const {
+    void OpenPage(const std::string& page) override;
+    void SwapDisplays() override;
+    int ScreenSizeIndex() const override {
         return static_cast<int>(size_);
     }
-    void SetScreenSize(int index);
-    /// The frame rate overlay: 0 off, 1 the numbers, 2 the numbers and a graph of the frame times.
-    static constexpr int FPS_MODES = 3;
-    int FpsMode() const {
+    void SetScreenSize(int index) override;
+    int FpsMode() const override {
         return fps_mode_;
     }
-    void SetFpsMode(int mode);
-    /// The core can make the picture widescreen (a hack or the game's own patch).
-    bool CanWidescreen() const;
-    bool Widescreen() const {
+    void SetFpsMode(int mode) override;
+    bool CanWidescreen() const override;
+    bool Widescreen() const override {
         return widescreen_;
     }
-    /// The core reads its widescreen options only when the game starts.
-    bool WidescreenRestarts() const {
+    bool WidescreenRestarts() const override {
         return core_.widescreen_restart;
     }
-    /// Kept for this game. When WidescreenRestarts, the game starts again from the beginning
-    /// (a resumed state is not trusted to survive a reload of every core); ask first.
-    void SetWidescreen(bool on);
-    /// The game is on the second display and the quick settings in the main window.
-    bool Swapped() const {
+    void SetWidescreen(bool on) override;
+    bool Swapped() const override {
         return swapped_;
     }
-    /// Pauses with the menu open, as the menu button does; nothing when it is open already.
-    void Pause() {
+    void Pause() override {
         OpenMenu();
     }
-    /// Saves and leaves the game, as the pause menu's "Exit to home".
-    void Exit() {
+    void Exit() override {
         Leave();
     }
-    /// The display the game is on is covered by another app (true): it pauses without a
-    /// menu and goes on by itself when the display is back (false). A game that is paused
-    /// in its menu stays so.
-    void Hold(bool hold);
-    /// The game is set to play on the second display (whether or not that is there now).
-    bool WantsSecond() const;
-    /// An engine app plays it: its window over the main one is the game, not an app beside it.
-    bool External() const;
-    /// Black frame insertion for this game (the pause menu's and the quick settings' toggle).
-    const BlackFrames& Bfi() const {
+    void Hold(bool hold) override;
+    bool WantsSecond() const override;
+    bool External() const override;
+    const BlackFrames& Bfi() const override {
         return bfi_;
     }
-    /// Turns it on or off and shows the rows again with what it says now.
-    void SetBfi(bool on);
-    /// The core the game runs with ("mgba").
-    const std::string& CoreId() const {
+    void SetBfi(bool on) override;
+    const std::string& CoreId() const override {
         return core_.id;
     }
 
 private:
-    enum class Phase { New, Checking, Choosing, Preparing, Running, Left };
+    enum class Phase { New, Gated, Preparing, Running, Left };
     enum class View { Closed, Main, Save, Load, Options, Buttons, Players, Picture, PictureAdjust, Screens, ButtonPick };
 
     // player_screen.cpp: the session.
     void Open();
-    void Proceed(); // after the save check: unpacks the game, or starts it
+    void Proceed(); // after the gates: unpacks the game, or starts it
     void Begin(const std::filesystem::path& content, bool resume = true);
     void Fail(const std::string& message);
     void Leave();
@@ -133,21 +110,17 @@ private:
     void ApplySpeed();
     bool WrapFocus(input::Nav nav);
 
-    // launch_sync.cpp: the saves checked against the sync provider before the game starts.
-    struct SaveCheck;
-    bool StartSaveCheck();
-    void TickSaveCheck();
-    void SkipSaveCheck();
-    /// The resume state was written by another core (another device plays this console with
-    /// another one): this launch uses that core when it is installed here.
-    void MatchResumeCore();
-    void ShowCheckProgress(SaveCheck& check);
-    void AbandonSaveCheck(); // the screen goes: the check writes nothing more
-    void Choose(bool online);
-    void BuildSaveCheck();
+    // What other features hold the game for before it starts (den/app/player_hooks.h: sync's
+    // check for newer saves).
+    bool StartGate();
+    void TickGate();
+    void AbandonGate(); // the screen goes: the gate writes nothing more
     bool InSaveCheck() const {
-        return phase_ == Phase::Checking || phase_ == Phase::Choosing;
+        return phase_ == Phase::Gated;
     }
+    /// The resume state was written by another core (another device plays this console with
+    /// another one): this launch uses that core when it is installed here (player_start.cpp).
+    void MatchResumeCore();
 
     // player_displays.cpp: what is drawn where, on one display or two.
     void PlaceDisplays();
@@ -192,7 +165,7 @@ private:
     plugins::Console console_;
     plugins::CoreInfo core_;
     JobPtr prepare_;
-    std::shared_ptr<SaveCheck> check_;
+    std::unique_ptr<PlayerGate> gate_;
     std::shared_ptr<std::filesystem::path> prepared_;
     std::filesystem::path content_; // what the core was given
     bool widescreen_ = false;

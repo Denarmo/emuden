@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "den/ui/page.h"
-#include "second_screen.h"
+#include "den/app/second_screen.h"
 
 namespace den::app {
 

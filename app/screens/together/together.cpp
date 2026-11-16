@@ -7,7 +7,7 @@
 #include <map>
 #include <mutex>
 
-#include "../details/game_prefs.h"
+#include "den/app/game_prefs.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"

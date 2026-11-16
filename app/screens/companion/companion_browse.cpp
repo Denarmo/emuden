@@ -9,18 +9,18 @@
 #include <cctype>
 #include <format>
 
-#include "../details/game_prefs.h"
-#include "../details/launch.h"
-#include "../home/game_widgets.h"
-#include "../home/games.h"
-#include "../interface/shelf_parts.h"
-#include "../plugins/model_widgets.h"
+#include "den/app/game_prefs.h"
+#include "den/app/launch.h"
+#include "den/app/game_widgets.h"
+#include "den/app/games.h"
+#include "den/app/shelf_parts.h"
+#include "den/app/model_widgets.h"
 #include "companion_page.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/jobs.h"
-#include "second_screen.h"
+#include "den/app/second_screen.h"
 
 namespace den::app {
 

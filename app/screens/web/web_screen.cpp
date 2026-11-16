@@ -25,7 +25,7 @@
 #include "den/base/json.h"
 #include "den/base/log.h"
 #include "den/ui/glyphs.h"
-#include "../companion/second_screen.h"
+#include "den/app/second_screen.h"
 #include "web_page.h"
 
 namespace den::app::web {

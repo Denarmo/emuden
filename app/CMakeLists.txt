@@ -55,3 +55,12 @@ endif()
 add_custom_command(TARGET den_app POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
         "${CMAKE_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:den_app>/assets")
+
+# A feature folder of app/screens never includes another's files (tools/check_app_includes.py).
+if(DEN_BUILD_TESTS)
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME den_app_feature_includes
+            COMMAND Python3::Interpreter -I "${CMAKE_SOURCE_DIR}/tools/check_app_includes.py")
+    endif()
+endif()

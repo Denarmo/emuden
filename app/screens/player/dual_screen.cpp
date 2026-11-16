@@ -5,7 +5,7 @@
 #include <format>
 #include <iterator>
 
-#include "../companion/second_screen.h"
+#include "den/app/second_screen.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/base/log.h"

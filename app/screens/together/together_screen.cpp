@@ -7,8 +7,8 @@
 
 #include <format>
 
-#include "../player/player_screen.h"
-#include "../plugins/model_widgets.h"
+#include "den/app/player.h"
+#include "den/app/model_widgets.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/pages.h"
@@ -202,7 +202,7 @@ private:
 
     // From the pause menu, a game that runs with another core starts again with the party's.
     void AskRestart(std::function<void()> then) {
-        PlayerScreen* player = PlayerScreen::Current();
+        GamePlayer* player = CurrentPlayer();
         if (Param("from") != "game" || !player || (player->CoreId() == plan_.core_id && plan_.subsystem == 0)) {
             return then();
         }
@@ -267,7 +267,7 @@ private:
 void StartTogetherGame(const std::string& game_id, bool over_player) {
     ui::Stage& stage = *Svc().stage;
     stage.Pop(); // this page
-    PlayerScreen* player = PlayerScreen::Current();
+    GamePlayer* player = CurrentPlayer();
     const TogetherPlan& plan = Together::Get().Plan();
     if (over_player && player && player->CoreId() == plan.core_id && plan.subsystem == 0) {
         // The game runs with the party's core already: it goes on, together from now.

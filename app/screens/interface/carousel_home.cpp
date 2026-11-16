@@ -9,18 +9,18 @@
 #include <algorithm>
 #include <map>
 
-#include "../details/launch.h"
-#include "../home/continue_row.h"
-#include "../home/game_widgets.h"
-#include "../home/games.h"
-#include "../home/strings.h"
+#include "den/app/launch.h"
+#include "den/app/continue_row.h"
+#include "den/app/game_widgets.h"
+#include "den/app/games.h"
+#include "den/app/strings.h"
 #include "cover_carousel.h"
 #include "object_shelf.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/platform/pal.h"
-#include "interfaces.h"
+#include "den/app/interfaces.h"
 
 namespace den::app {
 

@@ -7,14 +7,14 @@
 #include <algorithm>
 #include <format>
 
-#include "../plugins/feature_api.h"
+#include "den/app/feature_api.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
-#include "../boot/boot.h"
-#include "interfaces.h"
+#include "den/app/boot.h"
+#include "den/app/interfaces.h"
 #include "object_build.h"
 
 namespace den::app {

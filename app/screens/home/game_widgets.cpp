@@ -9,8 +9,8 @@
 #include "den/base/files.h"
 #include "den/library/artwork.h"
 #include "den/platform/pal.h"
-#include "game_widgets.h"
-#include "games.h"
+#include "den/app/game_widgets.h"
+#include "den/app/games.h"
 
 namespace den::app {
 

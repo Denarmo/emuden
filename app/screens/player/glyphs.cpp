@@ -4,7 +4,7 @@
 #include <algorithm>
 
 #include "den/ui/theme.h"
-#include "glyphs.h"
+#include "den/app/glyphs.h"
 
 namespace den::app {
 

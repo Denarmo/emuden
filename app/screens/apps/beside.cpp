@@ -6,9 +6,9 @@
 // handle, Back, Home), and does what the state asks for (open, raise, lower, the handle,
 // hold the game, write its saves).
 
-#include "../player/player_screen.h"
-#include "apps_catalog.h"
-#include "beside.h"
+#include "den/app/player.h"
+#include "den/app/apps_catalog.h"
+#include "den/app/beside.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
 #include "den/base/log.h"
@@ -68,7 +68,7 @@ void Open(const BesideAction& action, ui::Stage& stage, BesideActions& then) {
 void Run(const BesideActions& actions, ui::Stage* stage) {
     Services& svc = Svc();
     system::AppBeside& machine = Machine();
-    PlayerScreen* screen = PlayerScreen::Current();
+    GamePlayer* screen = CurrentPlayer();
     BesideActions then;
     for (const BesideAction& action : actions) {
         switch (action.kind) {
@@ -123,7 +123,7 @@ void Run(const BesideActions& actions, ui::Stage* stage) {
 // otherwise: a game on the main display holds the focus from there. Not while an app beside
 // it plays (the focus is that app's), the game is on the second display or an engine app
 // plays it (the sound and the focus are the engine's).
-void HoldFocus(const system::AppBeside& machine, const PlayerScreen* screen) {
+void HoldFocus(const system::AppBeside& machine, const GamePlayer* screen) {
     static bool held = false;
     const bool hold = pal::audio::HasScreenControls() && screen && !screen->Swapped() && !screen->External() &&
                       machine.GetStage() == system::AppBeside::Stage::None;
@@ -139,7 +139,7 @@ void Frame() {
     }
     system::AppBeside& machine = Machine();
     pal::SecondDisplay& second = pal::GetSecondDisplay();
-    const PlayerScreen* screen = PlayerScreen::Current();
+    const GamePlayer* screen = CurrentPlayer();
     machine.SetTwoDisplays(second.Present());
     Run(machine.SetGame(screen != nullptr, screen && screen->Swapped() ? Screen::Second : Screen::Main));
     // An engine app over the main window is the game itself.

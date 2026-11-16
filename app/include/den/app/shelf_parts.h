@@ -13,8 +13,8 @@
 #include "den/gfx/mesh3d.h"
 #include "den/library/library.h"
 #include "den/ui/node.h"
-#include "game_faces.h"
-#include "game_objects.h"
+#include "den/app/game_faces.h"
+#include "den/app/game_objects.h"
 
 namespace den::app {
 

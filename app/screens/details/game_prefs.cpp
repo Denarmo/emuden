@@ -9,7 +9,7 @@
 #include "den/base/files.h"
 #include "core_options.h"
 #include "den/base/json.h"
-#include "game_prefs.h"
+#include "den/app/game_prefs.h"
 
 namespace den::app {
 

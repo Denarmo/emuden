@@ -16,9 +16,9 @@
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/platform/pal.h"
-#include "feature_api.h"
+#include "den/app/feature_api.h"
 #include "model_render.h"
-#include "../web/web_browser.h"
+#include "den/app/web_browser.h"
 
 namespace den::app {
 

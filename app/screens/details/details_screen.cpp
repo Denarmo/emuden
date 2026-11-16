@@ -3,17 +3,17 @@
 
 // A game's page: cover, name, console, records and the actions. Route "details", param id.
 
-#include "../home/collections.h"
-#include "../home/game_widgets.h"
-#include "../home/games.h"
-#include "../home/strings.h"
-#include "../sync/sync_glue.h"
+#include "den/app/collections.h"
+#include "den/app/game_widgets.h"
+#include "den/app/games.h"
+#include "den/app/strings.h"
+#include "den/app/sync_glue.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
-#include "game_prefs.h"
-#include "launch.h"
+#include "den/app/game_prefs.h"
+#include "den/app/launch.h"
 
 namespace den::app {
 

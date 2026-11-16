@@ -5,14 +5,14 @@
 // each game, and outside a session once one is installed and whenever its BIOS files, game
 // folders or option values change, so the app opened on its own has no first-run setup.
 
-#include "engine_setup.h"
+#include "den/app/engine_setup.h"
 
 #include <algorithm>
 #include <map>
 #include <set>
 #include <system_error>
 
-#include "../consoles/bios_import.h"
+#include "den/app/bios_import.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"

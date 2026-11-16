@@ -3,7 +3,7 @@
 
 #include <map>
 
-#include "console_state.h"
+#include "den/app/console_state.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"

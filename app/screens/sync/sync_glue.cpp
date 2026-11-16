@@ -6,16 +6,16 @@
 #include <format>
 #include <memory>
 
-#include "../home/games.h"
-#include "../player/player_screen.h"
-#include "../plugins/feature_api.h"
+#include "den/app/games.h"
+#include "den/app/player.h"
+#include "den/app/feature_api.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
 #include "den/platform/device.h"
 #include "den/plugins/feature_host.h"
 #include "den/system/device.h"
 #include "den/system/settings.h"
-#include "sync_glue.h"
+#include "den/app/sync_glue.h"
 
 namespace den::app {
 
@@ -54,16 +54,6 @@ void Create() {
         host->SetSyncLink(EngineSlot()->Link());
     }
     EngineSlot()->SyncNow(); // the app started
-}
-
-// The library id of the core game that runs now: its saves are never replaced meanwhile.
-std::string RunningGame() {
-    if (Svc().player == nullptr) {
-        return {};
-    }
-    const player::Snapshot snapshot = Svc().player->GetSnapshot();
-    const bool open = snapshot.state == player::State::Running || snapshot.state == player::State::Paused;
-    return open && !snapshot.external ? snapshot.game_id : std::string();
 }
 
 // After a game ended its saves, states and the picture of the moment it was left go up at
@@ -111,7 +101,7 @@ bool HoldQuit() {
     if (!EngineSlot() || !EngineSlot()->SyncsSaves()) {
         return false;
     }
-    if (auto* player = dynamic_cast<PlayerScreen*>(Svc().stage->Top()); player != nullptr && !RunningGame().empty()) {
+    if (auto* player = dynamic_cast<GamePlayer*>(Svc().stage->Top()); player != nullptr && !RunningGame().empty()) {
         player->Exit();
         return true;
     }

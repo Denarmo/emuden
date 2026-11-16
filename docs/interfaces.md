@@ -39,7 +39,7 @@ default; each tool still starts only when its environment variable is set.
 | `den/base/archive.h` | zip or 7z by the file's first bytes: `ListArchive`, `CanExtractArchiveEntry`, `ExtractArchiveEntry`, `ArchiveReader` (several files of one solid 7z block), `IsArchiveExtension`. 7z through the LZMA SDK's decoder (`cmake/deps.cmake`): copy, LZMA, LZMA2, BCJ, BCJ2, delta; no password, no PPMd; a solid block is unpacked in memory, at most 1 GiB. rar is not read |
 | `den/base/jobs.h` | `Jobs::Run(name, fn(Job&), on_done)`: progress, message, cancel; `on_done` runs on the main thread |
 | `den/platform/pal.h` | window and GL context, `DataDir`, `AssetsDir`, `HttpGet` (any method, bodies from memory or a file slice, answer headers, redirects, streaming to a file, progress, cancel), `StartProcess`, `GetSecrets` (the platform's credential store), `GetCaps`, `StartLineServer` |
-| `den/sync/engine.h` | device sync (`docs/sync.md`): `CreateEngine`, the active provider, categories, triggers, status, conflicts, remote games; `app/screens/sync/sync_glue.h` `SyncSvc()` |
+| `den/sync/engine.h` | device sync (`docs/sync.md`): `CreateEngine`, the active provider, categories, triggers, status, conflicts, remote games; `app/include/den/app/sync_glue.h` `SyncSvc()` |
 | `den/platform/apps.h` | `pal::apps`: the device's other apps where the platform can list them (Android): `Available`, `List` (id, label, icon PNG in the app cache; call it from a job), `Revision`, `Launch(id, Display::Default / Main / Second)`, `HasInputFocus`; for an app beside the game: `Raise(display)` (this app's own window over the other app) / `Lower(display, app)` (that app in front again), `ShowHandle` / `HideHandle`, `CatchBack(display, on)`, `TakeEvents()` (Handle, Back, Home) |
 | `den/platform/lifecycle.h` | `pal::MainWindowHidden()` (Android: another app covers the main window, the loop goes on), `PrepareFrame()` at the start of every frame (keeps the GL context usable; false = no GL this frame), `EventPumpHeld()` for `den::input` |
 | `den/platform/audio.h` | `pal::audio`: the system's media volume where an app may set it (Android): `HasSystemVolume`, `SystemVolumeSteps`, `SystemVolume`, `SetSystemVolume` |
@@ -119,6 +119,15 @@ DEN_REGISTER_OVERLAY([](den::ui::Context& ctx) { ... });  // drawn over the scre
 DEN_REGISTER_EVENT_FILTER([](const den::input::Event& e) { return false; }); // true eats it
 ```
 
+A feature never includes another feature's files (`../<feature>/...`; ctest's
+`den_app_feature_includes` runs `tools/check_app_includes.py`). What features share is in
+`app/include/den/app/` (`games.h`, `strings.h`, `launch.h`, `boot.h`, `game_prefs.h`, ...),
+included as `den/app/...`. The running game is `CurrentPlayer()` (`den/app/player.h`), and a
+feature adds to it with `DEN_REGISTER_PLAYER_HOOKS` (`den/app/player_hooks.h`): the core it
+chooses, a gate before the game starts (sync's save check), its part of the open request
+(achievements' hardcore, Together's connection), what happens when the game is left,
+pause-menu rows, a status line and an overlay over the picture.
+
 Routes the home screen already opens when they exist: `details` (param `id`, a library
 entry), `console` (param `system`). `setup` is shown first when registered and
 `setup.done` is not set. `BuildRailFrame` gives a page the rail; `BuildPlainFrame` a title.
@@ -171,13 +180,13 @@ A runnable folder: `powershell -ExecutionPolicy Bypass -File tools\package.ps1` 
   preset id or `"auto"` (`AutoPicture(system)`: the console's default), `PictureParams`,
   `SetPictureParam` and `ResetPictureParams` its sliders (`player.shader.<preset>.<param>`).
   The screen keeps the choice in the layered key `player.picture` (game, console, global;
-  `app/screens/player/picture_choice.h`). The presentation path in `player/src/session_video.cpp`
+  `app/include/den/app/picture_choice.h`). The presentation path in `player/src/session_video.cpp`
   is `PreparePicture` (the core's frame as a `PictureSource`), then `DrawRegion` per
   `PictureRegion` (a part of the picture, its target, and a slot that keeps the chain's
   targets apart): a two-screen layout calls it once per screen. The snapshot also has
   `audio_queued_ms`, `audio_underruns` and `picture`. While playing, Select + R1 holds
   fast-forward and Select + L1 rewind on every pad; button glyphs per pad family are drawn
-  by `app/screens/player/glyphs.h` (`DrawGlyph`, `HintLine`).
+  by `app/include/den/app/glyphs.h` (`DrawGlyph`, `HintLine`).
 - **Engine** (level 0 and the Emulator Control Protocol, levels 1 and 2; see `docs/engines.md`): `Available(system)`,
   `UnavailableReason`, `Find(system)` (the `Install` it would use), `Start(LaunchRequest)`,
   `Running`, `Current`, `Stop` (polite, forced after 5 s), `PollEvents()` giving `Started`,
@@ -243,7 +252,7 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
   which stays while the main window is hidden; a Presentation where the display takes none.
   Desktop: a second window, there when the app is started with `EMUDEN_SECOND_WINDOW=1` or
   the setting is "on".
-- `app/screens/companion/second_screen.h` drives it every frame, before the main window's
+- `app/include/den/app/second_screen.h` drives it every frame, before the main window's
   frame, with a `ui::Stage` of its own (`CompanionStage()`). Its pages are ordinary screens
   whose route starts with `companion.`: `companion.browse` (the game the main screen has in
   focus: cover, records, Play, favourite, Details, Game settings) and `companion.play` (quick
@@ -266,7 +275,7 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
   second display and the quick settings in the main window (`player.swap_displays`). The
   pad always goes to the game, or to the menu while it is open; touch works on whichever
   display shows the menu or the quick settings.
-- Quick settings reach the game through `PlayerScreen::Current()` (`player_screen.h`):
+- Quick settings reach the game through `CurrentPlayer()` (`den/app/player.h`):
   `OpenPage("options" | "buttons")` opens that page of the pause menu by itself (Back
   closes it), `SwapDisplays()`, `SetScreenSize(index)`, `Exit()`.
 - `ui::Page::Pointer(event, scale, time)` gives a page presses from a display its stage
@@ -292,17 +301,17 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
 
 - `den/system/app_shelf.h`: `system::AppShelf`, the list as it is shown: by name,
   favourites first, a search by words, the apps opened last. Pure data, unit-tested.
-- `app/screens/apps/apps_catalog.h`: `AppsAvailable()`, `Apps()` (the shelf, filled from
+- `app/include/den/app/apps_catalog.h`: `AppsAvailable()`, `Apps()` (the shelf, filled from
   `pal::apps::List()` on a job and again when `pal::apps::Revision()` moves),
   `AppsRevision()`, `ToggleAppFavourite`, `OpenApp(id, beside_game, stage)` and
   `PadWithOtherApp()`. Settings `apps.favourites`, `apps.recent`. `EMUDEN_FAKE_APPS=1`
   gives the desktop a made-up list for driving the screens (opening only shows a toast).
-- `app/screens/apps/app_grid.h`: `AddAppGrid(parent, options)`, the grid both pages use.
+- `app/include/den/app/app_grid.h`: `AddAppGrid(parent, options)`, the grid both pages use.
 - Routes: `apps` (in the rail only when `AppsAvailable()`; `from=game` is the pause menu's
   "Apps" row on a device with one display) and `companion.apps` on the companion stage (the
   quick settings' "Apps" button). Confirm or a tap opens, Option or a held finger pins,
   Extra searches.
-- `OpenApp` with `beside_game` goes through `app/screens/apps/beside.h`. Two displays: the
+- `OpenApp` with `beside_game` goes through `app/include/den/app/beside.h`. Two displays: the
   app opens on the display the quick settings are on (the second one, or the main one when
   the game is swapped to the second) and the game goes on on the other; one display: the
   game is paused in its menu and the app takes the display.
@@ -317,7 +326,7 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
   the quick settings show "Back to <app>" and "Close <app>" first while `SettingsOver`,
   `WantsTab()` makes the player draw a tab for the quick settings on the game's display,
   `PlayerScreen::Hold(bool)` pauses a game whose display is covered without a menu.
-- `app/screens/player/volume_rows.h`: `VolumeRows(prefix, other_app)`, the "Game" slider
+- `app/include/den/app/volume_rows.h`: `VolumeRows(prefix, other_app)`, the "Game" slider
   (`player.volume`, the game's share) and "Other app" (`pal::audio`, the system volume),
   each with the screen it belongs to (`ScreenName`); in the quick settings (the second one
   while an app is beside the game) and in the pause menu.
@@ -329,10 +338,10 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
 - Routes: `setup` (four steps; "Run setup again" in Settings), `library_options`,
   `hidden_games`, `statistics`, `game_settings` (param `id`), `collect` (param `id`).
   `library` also takes `collection=<name>`.
-- `app/screens/home/collections.h`: the user's collections (`library.collections`,
+- `app/include/den/app/collections.h`: the user's collections (`library.collections`,
   `library.collection_games.<name>`), the library order (`library.sort`) and layout
   (`library.view`: `grid` or `list`). `TouchGames()` (games.h) moves `GamesRevision()`.
-- `app/screens/details/game_prefs.h`: what one game or console overrides in the layered
+- `app/include/den/app/game_prefs.h`: what one game or console overrides in the layered
   settings. `CoreForGame(entry)` (the game's own core, `player.core`, with its own core
   options as option hints), `ScreenSizeFor(entry)` (`player.screen_size`),
   `EngineFullscreenFor` (`engine.screen`: app, fullscreen, window). Core options of a game
@@ -349,7 +358,7 @@ platform's web engine in a native view over part of the window (WebView2 on Wind
 android.webkit.WebView on Android, WebKitGTK on Linux when the system has it, a fake for
 tests). Without an engine the same route opens the site in the user's browser and offers the
 wanted files that then appear in the Downloads folder (`den/platform/downloads.h`:
-`pal::OpenInBrowser`, `pal::DownloadFolders`, `pal::DownloadWatch`). The route `web` (`app/screens/web/web_browser.h`:
+`pal::OpenInBrowser`, `pal::DownloadFolders`, `pal::DownloadWatch`). The route `web` (`app/include/den/app/web_browser.h`:
 `web::Open(OpenRequest)`, `web::RegisterOpener`) lets the user browse the hosts an opener
 allows and hands the opener the files the user downloads there (`<data>/inbox/web`; patch and
 archive formats, never a ROM image). Its test endpoint is on the automation port + 3.

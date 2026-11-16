@@ -7,7 +7,7 @@
 #include <format>
 
 #include "den/ui/glyphs.h"
-#include "web_browser.h"
+#include "den/app/web_browser.h"
 
 namespace den::app::web {
 

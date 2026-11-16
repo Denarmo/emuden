@@ -5,8 +5,8 @@
 #include <cmath>
 #include <string_view>
 
-#include "../interface/interfaces.h"
-#include "../interface/shelf_parts.h"
+#include "den/app/interfaces.h"
+#include "den/app/shelf_parts.h"
 #include "boot_media.h"
 #include "den/app/app.h"
 #include "den/gfx/canvas.h"

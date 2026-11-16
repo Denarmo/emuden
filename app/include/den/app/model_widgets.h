@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "../home/game_widgets.h"
+#include "den/app/game_widgets.h"
 #include "den/ui/widgets.h"
 
 namespace den::app {

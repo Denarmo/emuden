@@ -8,8 +8,8 @@
 
 #include "den/app/app.h"
 #include "den/base/files.h"
-#include "games.h"
-#include "strings.h"
+#include "den/app/games.h"
+#include "den/app/strings.h"
 
 namespace den::app {
 

@@ -7,16 +7,16 @@
 
 #include <algorithm>
 
-#include "../home/collections.h"
-#include "../home/games.h"
-#include "../home/strings.h"
-#include "../player/black_frames.h"
-#include "../player/player_view.h"
+#include "den/app/collections.h"
+#include "den/app/games.h"
+#include "den/app/strings.h"
+#include "den/app/black_frames.h"
+#include "den/app/player_view.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
-#include "game_prefs.h"
+#include "den/app/game_prefs.h"
 
 namespace den::app {
 

@@ -7,8 +7,8 @@
 #include <cctype>
 #include <format>
 
-#include "../home/collections.h"
-#include "../home/games.h"
+#include "den/app/collections.h"
+#include "den/app/games.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"

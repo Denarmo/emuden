@@ -8,11 +8,11 @@
 #include <cstdlib>
 #include <format>
 
-#include "../details/game_prefs.h"
-#include "../player/black_frames.h"
-#include "../home/strings.h"
-#include "bios_import.h"
-#include "console_state.h"
+#include "den/app/game_prefs.h"
+#include "den/app/black_frames.h"
+#include "den/app/strings.h"
+#include "den/app/bios_import.h"
+#include "den/app/console_state.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/pages.h"

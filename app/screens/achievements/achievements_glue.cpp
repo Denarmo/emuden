@@ -8,8 +8,8 @@
 #include <format>
 #include <future>
 
-#include "../plugins/feature_api.h"
-#include "achievements_glue.h"
+#include "den/app/feature_api.h"
+#include "den/app/achievements_glue.h"
 #include "achievements_state.h"
 #include "den/achievements/games.h"
 #include "den/app/registry.h"

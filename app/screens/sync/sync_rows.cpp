@@ -7,14 +7,14 @@
 #include <algorithm>
 #include <format>
 
-#include "../home/games.h"
-#include "../plugins/feature_api.h"
+#include "den/app/games.h"
+#include "den/app/feature_api.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/sync/names.h"
-#include "sync_glue.h"
+#include "den/app/sync_glue.h"
 
 namespace den::app {
 

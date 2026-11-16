@@ -1,14 +1,14 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../boot/boot.h"
-#include "../home/games.h"
-#include "../home/strings.h"
+#include "den/app/boot.h"
+#include "den/app/games.h"
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
-#include "game_prefs.h"
-#include "launch.h"
+#include "den/app/game_prefs.h"
+#include "den/app/launch.h"
 
 namespace den::app {
 

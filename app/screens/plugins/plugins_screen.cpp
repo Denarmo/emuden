@@ -12,9 +12,9 @@
 #include "den/app/pages.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
-#include "../interface/interfaces.h"
-#include "feature_api.h"
-#include "model_widgets.h"
+#include "den/app/interfaces.h"
+#include "den/app/feature_api.h"
+#include "den/app/model_widgets.h"
 
 namespace den::app {
 

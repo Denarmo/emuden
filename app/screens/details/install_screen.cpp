@@ -7,13 +7,13 @@
 
 #include <format>
 
-#include "../home/game_widgets.h"
-#include "../home/games.h"
-#include "../home/strings.h"
+#include "den/app/game_widgets.h"
+#include "den/app/games.h"
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/registry.h"
-#include "launch.h"
+#include "den/app/launch.h"
 
 namespace den::app {
 

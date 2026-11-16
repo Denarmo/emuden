@@ -6,9 +6,9 @@
 
 #include <memory>
 
-#include "../player/player_screen.h"
-#include "apps_catalog.h"
-#include "beside.h"
+#include "den/app/player.h"
+#include "den/app/apps_catalog.h"
+#include "den/app/beside.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
 #include "den/base/log.h"
@@ -140,7 +140,7 @@ void OpenApp(const std::string& id, bool beside_game, ui::Stage& stage) {
         return;
     }
     const system::AppItem app = *found;
-    if (beside_game && PlayerScreen::Current()) {
+    if (beside_game && CurrentPlayer()) {
         BesideOpen(app, stage);
     } else if (Fake()) {
         stage.Toast("Would open " + app.label);

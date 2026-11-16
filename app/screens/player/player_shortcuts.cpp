@@ -10,8 +10,8 @@
 
 #include "den/app/pages.h"
 #include "den/base/files.h"
-#include "glyphs.h"
-#include "picture_choice.h"
+#include "den/app/glyphs.h"
+#include "den/app/picture_choice.h"
 #include "player_screen.h"
 
 namespace den::app {

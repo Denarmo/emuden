@@ -25,12 +25,12 @@
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
-#include "../apps/beside.h"
-#include "../boot/boot.h"
-#include "../player/player_screen.h"
+#include "den/app/beside.h"
+#include "den/app/boot.h"
+#include "den/app/player.h"
 #include "den/platform/lifecycle.h"
 #include "den/platform/second_display.h"
-#include "second_screen.h"
+#include "den/app/second_screen.h"
 
 namespace den::app {
 
@@ -218,7 +218,7 @@ void Frame() {
         // Another app covers the main window (Android). The second screen stays only for a
         // game that plays there or in an engine app; otherwise the app is left and gives it
         // up as well.
-        const PlayerScreen* playing = PlayerScreen::Current();
+        const GamePlayer* playing = CurrentPlayer();
         wanted = wanted && playing && (playing->WantsSecond() || playing->External());
     }
     if (const system::AppBeside& beside = Beside();

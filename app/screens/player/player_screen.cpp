@@ -7,18 +7,16 @@
 #include <cmath>
 #include <format>
 
-#include "../boot/boot.h"
-#include "../companion/second_screen.h"
-#include "../details/game_prefs.h"
-#include "../engine/engine_setup.h"
+#include "den/app/boot.h"
+#include "den/app/second_screen.h"
+#include "den/app/game_prefs.h"
+#include "den/app/engine_setup.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
 #include "den/library/content.h"
 #include "den/platform/lifecycle.h"
-#include "../together/together.h"
-#include "picture_choice.h"
-#include "../achievements/achievements_glue.h"
+#include "den/app/picture_choice.h"
 #include "player_screen.h"
 
 namespace den::app {
@@ -53,7 +51,7 @@ PlayerScreen::~PlayerScreen() {
     if (prepare_) {
         prepare_->Cancel();
     }
-    AbandonSaveCheck();
+    AbandonGate();
     StopDisplays();
     if (phase_ == Phase::Running) {
         Svc().player->Close();
@@ -69,7 +67,8 @@ void PlayerScreen::Build() {
     Root().align = ui::Align::Stretch;
     Root().justify = ui::Align::Start;
     if (InSaveCheck()) {
-        return BuildSaveCheck();
+        gate_->Build(Root(), focus_after_build_);
+        return;
     }
     if (view_ != View::Closed && phase_ == Phase::Running) {
         BuildMenu();
@@ -84,7 +83,16 @@ void PlayerScreen::Open() {
     }
     game_ = *game;
     const auto console = svc.plugins->FindConsole(game_.system);
-    const auto core = Param("together") == "1" ? PlayerCoreFor(game_, true) : CoreForGame(game_, Param("core"));
+    const PlayerStart start{game_, *this};
+    std::optional<plugins::CoreInfo> core;
+    for (const PlayerHooks& hooks : AllPlayerHooks()) {
+        if (hooks.core && (core = hooks.core(start))) {
+            break;
+        }
+    }
+    if (!core) {
+        core = CoreForGame(game_, Param("core"));
+    }
     if (!console || !core || !core->Ready()) {
         return Fail((console ? console->name : game_.name) + ": its core is not installed. Open Consoles to install it.");
     }
@@ -95,7 +103,7 @@ void PlayerScreen::Open() {
     fps_mode_ = std::clamp(static_cast<int>(svc.settings->GetNumber(
                                FPS_KEY, svc.settings->GetBool(OLD_FPS_KEY, false) ? 1 : 0)),
                            0, FPS_MODES - 1);
-    if (!StartSaveCheck()) {
+    if (!StartGate()) {
         Proceed();
     }
 }
@@ -144,8 +152,12 @@ void PlayerScreen::Begin(const std::filesystem::path& content, bool resume) {
     }
     request.resume = resume && Param("resume") != "0";
     request.title = game_.name;
-    request.hardcore = AchievementsHardcore(game_);
-    request.together = PlayerTogetherFor(game_, Param("together") == "1");
+    const PlayerStart start{game_, *this};
+    for (const PlayerHooks& hooks : AllPlayerHooks()) {
+        if (hooks.open) {
+            hooks.open(start, request);
+        }
+    }
     if (core_.runner == plugins::Runner::Engine) {
         // An engine app runs it; the session talks to it through the engine host.
         request.engine = EngineInstallFor(core_);
@@ -193,7 +205,7 @@ void PlayerScreen::Leave() {
     if (prepare_) {
         prepare_->Cancel();
     }
-    AbandonSaveCheck();
+    AbandonGate();
     StopDisplays();
     if (phase_ == Phase::Running) {
         const player::Snapshot snapshot = svc.player->GetSnapshot();
@@ -206,7 +218,11 @@ void PlayerScreen::Leave() {
         }
         svc.player->Close();
     }
-    PlayerLeft(game_.id);
+    for (const PlayerHooks& hooks : AllPlayerHooks()) {
+        if (hooks.closed) {
+            hooks.closed(game_);
+        }
+    }
     phase_ = Phase::Left;
     svc.input->SetNavFromPads(true);
     GetStage().Pop();
@@ -389,7 +405,7 @@ void PlayerScreen::SetFpsMode(int mode) {
 void PlayerScreen::Update(ui::Context& ctx) {
     Services& svc = Svc();
     if (InSaveCheck()) {
-        TickSaveCheck();
+        TickGate();
         if (!focus_after_build_.empty()) {
             if (ui::Node* node = Root().FindById(focus_after_build_)) {
                 SetFocus(node, false);

@@ -11,7 +11,7 @@
 #include "den/base/files.h"
 #include "den/base/json.h"
 #include "den/platform/webview.h"
-#include "web_browser.h"
+#include "den/app/web_browser.h"
 
 namespace den::app::web {
 

@@ -8,7 +8,7 @@
 
 #include <qrcodegen.hpp>
 
-#include "model_widgets.h"
+#include "den/app/model_widgets.h"
 
 namespace den::app {
 

@@ -7,14 +7,14 @@
 
 #include <algorithm>
 
-#include "../details/launch.h"
-#include "collections.h"
+#include "den/app/launch.h"
+#include "den/app/collections.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/registry.h"
-#include "game_widgets.h"
-#include "games.h"
-#include "strings.h"
+#include "den/app/game_widgets.h"
+#include "den/app/games.h"
+#include "den/app/strings.h"
 
 namespace den::app {
 

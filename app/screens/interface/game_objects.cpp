@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "game_objects.h"
+#include "den/app/game_objects.h"
 
 #include <algorithm>
 #include <cmath>

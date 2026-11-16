@@ -7,7 +7,7 @@
 #include "den/base/files.h"
 #include "den/base/json.h"
 #include "den/base/log.h"
-#include "strings.h"
+#include "den/app/strings.h"
 
 namespace den::app {
 

@@ -5,7 +5,7 @@
 #include <cmath>
 
 #include "boot_draw.h"
-#include "../interface/shelf_parts.h"
+#include "den/app/shelf_parts.h"
 #include "boot_media.h"
 #include "den/app/app.h"
 #include "den/base/files.h"
