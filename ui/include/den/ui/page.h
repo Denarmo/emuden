@@ -136,9 +136,11 @@ public:
     /// for `fraction` (0..1; negative: none), for work that goes on behind the pages.
     void SetNote(std::string text, float fraction = -1.0f);
     /// A modal question. `on_yes` runs when the confirm button is chosen. The selection starts
-    /// on the cancel button unless `yes_first` (for questions whose yes loses nothing).
+    /// on the cancel button unless `yes_first` (for questions whose yes loses nothing). `on_no`
+    /// runs when the no button is chosen, not when the question is backed out of.
     void Confirm(std::string title, std::string message, std::string yes_label,
-                 std::function<void()> on_yes, std::string no_label = "Cancel", bool yes_first = false);
+                 std::function<void()> on_yes, std::string no_label = "Cancel", bool yes_first = false,
+                 std::function<void()> on_no = {});
     /// True while a question or a text entry is open.
     bool DialogOpen() const;
     /// Opens the on-screen text entry above the page. `on_done` gets the text when the user

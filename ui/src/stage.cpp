@@ -66,7 +66,7 @@ struct Stage::Impl {
     };
     struct Dialog {
         std::string title, message, yes, no;
-        std::function<void()> on_yes;
+        std::function<void()> on_yes, on_no;
         int selected = 0; // 0 = no, 1 = yes
         gfx::Rect yes_rect, no_rect;
     };
@@ -230,8 +230,11 @@ struct Stage::Impl {
         button(dialog->yes_rect, dialog->yes, dialog->selected == 1);
     }
 
-    void Choose(bool yes) {
-        std::function<void()> action = yes ? std::move(dialog->on_yes) : std::function<void()>();
+    // Backing out answers neither: only the no button runs `on_no`.
+    void Choose(bool yes, bool backed_out = false) {
+        std::function<void()> action = yes ? std::move(dialog->on_yes)
+                                       : backed_out ? std::function<void()>()
+                                                    : std::move(dialog->on_no);
         dialog.reset();
         if (action) {
             action();
@@ -246,7 +249,7 @@ struct Stage::Impl {
             } else if (event.nav == Nav::Confirm && !event.repeat) {
                 Choose(dialog->selected == 1);
             } else if (event.nav == Nav::Back) {
-                Choose(false);
+                Choose(false, true);
             }
         } else if (event.type == Type::PointerUp) {
             const float x = event.x / scale, y = event.y / scale;
@@ -311,13 +314,15 @@ void Stage::SetNote(std::string text, float fraction) {
 }
 
 void Stage::Confirm(std::string title, std::string message, std::string yes_label,
-                    std::function<void()> on_yes, std::string no_label, bool yes_first) {
+                    std::function<void()> on_yes, std::string no_label, bool yes_first,
+                    std::function<void()> on_no) {
     impl_->dialog = std::make_unique<Impl::Dialog>();
     impl_->dialog->title = std::move(title);
     impl_->dialog->message = std::move(message);
     impl_->dialog->yes = std::move(yes_label);
     impl_->dialog->no = std::move(no_label);
     impl_->dialog->on_yes = std::move(on_yes);
+    impl_->dialog->on_no = std::move(on_no);
     impl_->dialog->selected = yes_first ? 1 : 0;
 }
 

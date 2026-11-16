@@ -5,6 +5,7 @@
 // installed plugin to manage it. Route "plugins".
 
 #include <format>
+#include <functional>
 
 #include "den/app/app.h"
 #include "den/app/frame.h"
@@ -31,6 +32,29 @@ std::string Badge(const FeaturePlugin& plugin) {
         return "Update";
     }
     return plugin.trust == FeaturePlugin::Trust::Developer ? "Developer" : "";
+}
+
+// The update of an installed plugin: its consent page when it asks for more, else straight away.
+void StartUpdate(const FeaturePlugin& plugin) {
+    if (FeaturePluginJob(plugin.id)) {
+        return;
+    }
+    if (plugin.needs_consent) {
+        Svc().stage->Push("plugin.consent", {{"id", plugin.id}});
+    } else {
+        InstallFeaturePlugin(plugin.id, false);
+    }
+}
+
+// Opening a plugin with an update waiting asks to update it first; "Not now" opens it as it is.
+void OpenOrUpdate(const FeaturePlugin& plugin, std::function<void()> open) {
+    if (!plugin.update_available || FeaturePluginJob(plugin.id)) {
+        open();
+        return;
+    }
+    Svc().stage->Confirm("Update " + plugin.name + "?",
+                         "A newer version of " + plugin.name + " is available. Update it before opening it?",
+                         "Update", [plugin] { StartUpdate(plugin); }, "Not now", true, std::move(open));
 }
 
 void StartInstall(const FeaturePlugin& plugin) {
@@ -87,10 +111,12 @@ public:
                 // folder) is accepted first; an update waiting for consent still opens.
                 const bool accept = plugin.needs_consent && !plugin.update_available;
                 if (plugin.kind == plugins::KIND_INTERFACE) {
-                    tile->on_activate = [id = plugin.id] { UseInterface(id); };
+                    tile->on_activate = [plugin] { OpenOrUpdate(plugin, [id = plugin.id] { UseInterface(id); }); };
                 } else {
-                    tile->on_activate = [id = plugin.id, accept] {
-                        Svc().stage->Push(accept ? "plugin.consent" : "plugin.view", {{"id", id}});
+                    tile->on_activate = [plugin, accept] {
+                        OpenOrUpdate(plugin, [id = plugin.id, accept] {
+                            Svc().stage->Push(accept ? "plugin.consent" : "plugin.view", {{"id", id}});
+                        });
                     };
                 }
                 tile->on_focus = [this, id = plugin.id, look = plugin.kind == plugins::KIND_INTERFACE] {
