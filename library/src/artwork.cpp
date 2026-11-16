@@ -311,7 +311,7 @@ bool Artwork::ResolveHack(const Entry& entry, const SystemDef& system, const Thu
     }
     const fs::path raw_stem = WithSuffix(stem, ".raw");
     fs::path raw = FindCached(raw_stem);
-    const fs::path no_base = WithSuffix(stem, ".nobase");
+    const fs::path no_base = WithSuffix(stem, ".nobase2");  // "2": made after the header check
     if (raw.empty() && fetcher_ && !stopped() && !IsFresh(no_base, MISS_LIFETIME)) {
         const std::string name = FindBaseGame(index, system.id, original, HeaderOf(entry, query.header));
         bool answered = name.empty();
@@ -392,7 +392,7 @@ void Artwork::ForgetMisses(const Entry& entry, const SystemDef* system) {
     const std::string original = entry.original_name.empty() ? entry.name : entry.original_name;
     for (const char* kind : {"roms", "hacks"}) {
         const fs::path stem = cache_dir_ / kind / PathFromUtf8(system->id) / PathFromUtf8(CacheFileName(original));
-        for (const char* suffix : {".miss", ".miss2", ".nobase"}) {
+        for (const char* suffix : {".miss", ".miss2", ".nobase", ".nobase2"}) {
             std::error_code ec;
             fs::remove(WithSuffix(stem, suffix), ec);
         }
