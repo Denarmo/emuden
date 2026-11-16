@@ -127,7 +127,7 @@ bool IsPortablePath(std::string_view path) {
 
 bool IsPcPath(std::string_view path, const std::set<std::string>& pc) {
     const std::string system = SystemOf(path);
-    if (!system.empty() && pc.contains(system)) {
+    if (!system.empty() && (pc.contains(system) || pc.contains(CategoryOf(path) + "/" + system))) {
         return true;
     }
     for (const std::string_view part : Parts(path)) {
@@ -148,7 +148,7 @@ std::optional<LocalTarget> TargetOf(const std::string& path, const GameIndex& ga
     const std::string category = CategoryOf(path);
     const std::vector<std::string_view> parts = Parts(path);
     const std::string system = SystemOf(path);
-    if (!system.empty() && games.Never(system)) {
+    if (!system.empty() && (games.Never(system) || games.Never(category + "/" + system))) {
         return std::nullopt;
     }
     if ((category == SAVES || category == STATES) && parts.size() == 3) {

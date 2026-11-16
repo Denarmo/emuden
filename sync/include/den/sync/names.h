@@ -48,6 +48,7 @@ public:
     const std::vector<GameRef>& Games() const {
         return games_;
     }
+    /// A system that never syncs, or "<category>/<system>" for one category of it.
     bool Never(const std::string& system) const {
         return never_.contains(system);
     }
@@ -68,7 +69,8 @@ std::string CategoryOf(std::string_view path);
 std::string SystemOf(std::string_view path);
 /// A relative path with '/', no empty, "." or ".." parts and nothing a file system refuses.
 bool IsPortablePath(std::string_view path);
-/// Whether the path belongs to one of `pc` systems, or names one anywhere in it.
+/// Whether the path belongs to one of `pc` systems, or names one anywhere in it. An entry
+/// "<category>/<system>" ("states/gba") keeps only that category of the system.
 bool IsPcPath(std::string_view path, const std::set<std::string>& pc);
 
 /// Where the local file of a remote portable path is, when this device has its game.

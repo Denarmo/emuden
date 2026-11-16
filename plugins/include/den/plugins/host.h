@@ -122,6 +122,9 @@ struct Console {
     std::vector<std::string> cover_by_id; // cover addresses with "{id}" (library::SystemDef)
     int rcheevos_console = 0; // 0 also when the manifest's capabilities say no achievements
     bool netplay = true;      // capabilities.netplay: its games may be played together
+    bool save_states = true;  // capabilities.save_states (the resume state too)
+    bool rewind = true;       // capabilities.rewind
+    bool fast_forward = true; // capabilities.fast_forward
     std::vector<BiosSet> bios;
     bool developer = false;   // its plugin is in the developer folder, not signed
     /// presentation.screens: the screens of its cores' pictures (a core may have its own).
@@ -135,6 +138,10 @@ struct Console {
     /// content.sync: its games' saves and play time are synced (false for PC games, whose
     /// stores keep their own).
     bool sync = true;
+    /// The manifest's sync: which of them sync when the games do (sync is true).
+    bool sync_saves = true;
+    bool sync_states = true;
+    bool sync_settings = true;
 };
 
 /// A setting a plugin manifest declares for a console ("settings"). The Consoles screen

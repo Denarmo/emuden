@@ -118,6 +118,18 @@ TEST_CASE("console manifests: platforms, depends, settings and capabilities") {
     REQUIRE(parsed->depends.size() == 1);
     CHECK(parsed->depends[0].range == ">=1.0.0");
     CHECK_FALSE(parsed->systems[0].console.netplay);
+    CHECK(parsed->systems[0].console.save_states);
+    CHECK(parsed->systems[0].console.sync_states);
+    auto limited = ParseManifest(ConsoleJson("jdoe.dev", R"("capabilities":{"save_states":false,"rewind":false,"fast_forward":false},
+        "sync":{"states":false,"settings":false},)", pinned));
+    REQUIRE(limited.ok());
+    const Console& console = limited->systems[0].console;
+    CHECK_FALSE(console.save_states);
+    CHECK_FALSE(console.rewind);
+    CHECK_FALSE(console.fast_forward);
+    CHECK(console.sync_saves);
+    CHECK_FALSE(console.sync_states);
+    CHECK_FALSE(console.sync_settings);
     CHECK_FALSE(ParseManifest(ConsoleJson("jdoe.dev", R"("depends":[{"id":"jdoe.base","when":"x"}],)", pinned)).ok());
 
     auto settings = ParseManifest(ConsoleJson("jdoe.dev", R"("settings":[{"key":"fast","label":"Fast","type":"toggle","default":true,"section":"Speed",

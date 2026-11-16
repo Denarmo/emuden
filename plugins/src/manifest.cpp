@@ -257,6 +257,11 @@ Result<SystemDef> ParseSystem(const JsonValue& value, const JsonValue& root, con
         ParseBios(*bios, console);
     }
     ApplyCapabilities(root.Find("capabilities"), value.Find("capabilities"), console);
+    if (const JsonValue* sync = root.Find("sync")) {
+        console.sync_saves = json::Bool(*sync, "saves", true);
+        console.sync_states = json::Bool(*sync, "states", true);
+        console.sync_settings = json::Bool(*sync, "settings", true);
+    }
     system.cores = json::Strings(value, "cores", false);
     system.platforms = json::Strings(value, "platforms", false);
     system.default_core = value.String("default_core");

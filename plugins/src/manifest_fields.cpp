@@ -131,6 +131,9 @@ void ApplyCapabilities(const JsonValue* manifest_level, const JsonValue* system_
         return true;
     };
     console.netplay = on("netplay");
+    console.save_states = on("save_states");
+    console.rewind = on("rewind");
+    console.fast_forward = on("fast_forward");
     if (!on("achievements")) {
         console.rcheevos_console = 0;
     }

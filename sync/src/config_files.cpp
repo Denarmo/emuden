@@ -82,7 +82,7 @@ public:
         const std::int64_t modified = FileTime(layers_->OverridesFile());
         JsonValue consoles = JsonObject();
         for (const std::string& system : layers_->Scopes(system::Layer::Console)) {
-            if (!pc_.contains(system)) {
+            if (!Excluded(system)) {
                 JsonValue values = Portable(layers_->Overrides(system::Scope::Console(system)));
                 if (!values.members.empty()) {
                     consoles.members.emplace_back(system, std::move(values));
@@ -96,7 +96,7 @@ public:
         out.push_back(std::move(overrides));
         for (const std::string& id : layers_->Scopes(system::Layer::Game)) {
             const GameRef* game = games.ById(id);
-            if (game == nullptr) {
+            if (game == nullptr || Excluded(game->system)) {
                 continue;
             }
             JsonValue values = Portable(layers_->Overrides(system::Scope::Game(game->system, id)));
@@ -133,7 +133,7 @@ public:
             const JsonValue* consoles = root->Find("consoles");
             if (consoles != nullptr && consoles->kind == JsonValue::Kind::Object) {
                 for (const auto& [system, values] : consoles->members) {
-                    if (!pc_.contains(system) && values.kind == JsonValue::Kind::Object) {
+                    if (!Excluded(system) && values.kind == JsonValue::Kind::Object) {
                         Merge(system::Scope::Console(system), values);
                     }
                 }
@@ -151,12 +151,17 @@ public:
     }
 
 private:
+    // A PC console, or one whose manifest keeps its settings off sync.
+    bool Excluded(const std::string& system) const {
+        return pc_.contains(system) || pc_.contains(std::string(CONFIG) + "/" + system);
+    }
+
     bool Shared(const std::string& key) const {
         if (IsDeviceOnlySetting(key)) {
             return false;
         }
         for (const std::string& part : Parts(key)) {
-            if (pc_.contains(part)) {
+            if (Excluded(part)) {
                 return false;
             }
         }
@@ -176,7 +181,7 @@ private:
                 std::erase_if(kept.items, [&](const JsonValue& item) {
                     const std::size_t colon = item.string.find(':');
                     return item.kind == JsonValue::Kind::String && colon != std::string::npos &&
-                           pc_.contains(item.string.substr(0, colon));
+                           Excluded(item.string.substr(0, colon));
                 });
             }
             out.members.emplace_back(key, std::move(kept));

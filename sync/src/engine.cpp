@@ -202,6 +202,15 @@ std::set<std::string> EngineImpl::PcSystems() const {
         for (const plugins::Console& console : config_.consoles->Consoles()) {
             if (!console.sync) {
                 pc.insert(console.id);
+                continue;
+            }
+            // The categories its manifest keeps off sync.
+            for (const auto& [category, on] : {std::pair{SAVES, console.sync_saves},
+                                               std::pair{STATES, console.sync_states},
+                                               std::pair{CONFIG, console.sync_settings}}) {
+                if (!on) {
+                    pc.insert(std::string(category) + "/" + console.id);
+                }
             }
         }
     }

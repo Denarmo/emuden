@@ -179,7 +179,9 @@ void AddClearedGameLayers(Catalog& local, const Journal& journal, const GameInde
             continue;
         }
         const std::string name = path.substr(path.rfind('/') + 1);
-        if (games.Find(SystemOf(path), name.substr(0, name.size() - 5)) == nullptr) {
+        const std::string system = SystemOf(path);
+        if (games.Never(std::string(CONFIG) + "/" + system) ||
+            games.Find(system, name.substr(0, name.size() - 5)) == nullptr) {
             continue;
         }
         LocalItem item;

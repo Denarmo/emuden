@@ -55,6 +55,14 @@ struct TogetherRequest {
     std::vector<std::pair<std::string, std::string>> options;
 };
 
+/// What the console's manifest allows (its capabilities); a core or engine that cannot do one
+/// of them is not made to.
+struct Allowed {
+    bool save_states = true; // false: no states, the resume state neither
+    bool rewind = true;
+    bool fast_forward = true;
+};
+
 struct OpenRequest {
     std::filesystem::path core;       // plugins::CoreInfo::library
     std::filesystem::path content;    // the ROM
@@ -80,6 +88,7 @@ struct OpenRequest {
     std::filesystem::path cover;
     /// RetroAchievements hardcore: no state is loaded (the resume state neither) and no rewind.
     bool hardcore = false;
+    Allowed allowed;
     TogetherRequest together;
 };
 

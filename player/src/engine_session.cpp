@@ -154,6 +154,9 @@ public:
     }
 
     Status SaveState(int slot) override {
+        if (!request_.allowed.save_states) {
+            return Status::Fail("This console has no save states.");
+        }
         engine::Control* control = Live();
         if (control == nullptr) {
             return Status::Fail("The engine is not running.");
@@ -168,6 +171,9 @@ public:
     }
 
     Status LoadState(int slot) override {
+        if (!request_.allowed.save_states) {
+            return Status::Fail("This console has no save states.");
+        }
         engine::Control* control = Live();
         return control != nullptr ? control->LoadState(EngineSlot(slot)) : Status::Fail("The engine is not running.");
     }
@@ -182,6 +188,9 @@ public:
     }
 
     void SetFastForward(bool on) override {
+        if (!request_.allowed.fast_forward) {
+            return;
+        }
         if (engine::Control* control = Live()) {
             const double factor =
                 config_.settings ? config_.settings->GetNumber("player.fast_forward_speed", 3) : 3;
@@ -191,6 +200,9 @@ public:
     }
 
     void SetRewind(bool on) override {
+        if (!request_.allowed.rewind) {
+            return;
+        }
         if (engine::Control* control = Live()) {
             control->SetRewind(on);
         }
@@ -281,10 +293,11 @@ public:
         snapshot.fast_forward = fast_;
         snapshot.resumed = resumed_;
         const engine::Control* control = Live();
-        snapshot.can_save_states = control != nullptr && control->Has("states");
-        snapshot.can_rewind = control != nullptr && control->Has("rewind");
+        const Allowed& allowed = request_.allowed;
+        snapshot.can_save_states = allowed.save_states && control != nullptr && control->Has("states");
+        snapshot.can_rewind = allowed.rewind && control != nullptr && control->Has("rewind");
         snapshot.can_pause = control != nullptr && (control->Has("pause") || control->Has("menu"));
-        snapshot.can_fast_forward = control != nullptr && control->Has("fast_forward");
+        snapshot.can_fast_forward = allowed.fast_forward && control != nullptr && control->Has("fast_forward");
         snapshot.can_reset = control != nullptr && control->Has("reset");
         snapshot.can_options = control != nullptr && control->Has("settings");
         snapshot.can_volume = control != nullptr && (control->Has("volume") || HasSetting(*control, "audio.volume"));
@@ -408,7 +421,8 @@ private:
     }
 
     bool ResumeAllowed() const {
-        return config_.settings == nullptr || config_.settings->GetBool("player.resume", true);
+        return request_.allowed.save_states &&
+               (config_.settings == nullptr || config_.settings->GetBool("player.resume", true));
     }
 
     static bool HasSetting(const engine::Control& control, const std::string& key) {

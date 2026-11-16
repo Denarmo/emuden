@@ -210,3 +210,22 @@ TEST_CASE("an engine game started again does not hear the last session's app", "
     f.session->Close();
     REQUIRE(f.AdvanceUntil([&] { return !f.host->Running(); }));
 }
+
+TEST_CASE("a console without states or fast-forward does not offer them", "[player][engine]") {
+    EngineFixture f;
+    f.fake.Seed(0);
+    player::OpenRequest request = f.Request();
+    request.allowed.save_states = false;
+    request.allowed.fast_forward = false;
+    REQUIRE(f.session->Open(request));
+    REQUIRE(f.AdvanceUntil([&] { return f.fake.Got("list_states"); }));
+    const player::Snapshot snapshot = f.session->GetSnapshot();
+    CHECK_FALSE(snapshot.can_save_states);
+    CHECK_FALSE(snapshot.can_fast_forward);
+    CHECK_FALSE(snapshot.resumed); // the resume state is a state too
+    CHECK_FALSE(f.session->SaveState(0));
+    f.session->Close();
+    CHECK_FALSE(f.fake.Got("save_state"));
+    CHECK_FALSE(f.fake.Got("load_state"));
+    REQUIRE(f.AdvanceUntil([&] { return !f.host->Running(); }));
+}

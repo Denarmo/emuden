@@ -163,6 +163,7 @@ private:
     // Achievements.
     std::function<void(FrameEvent)> frame_hook_;
     bool hardcore_ = false;
+    Allowed allowed_;
     std::filesystem::path content_path_;
 
     // Settings as read at Open.

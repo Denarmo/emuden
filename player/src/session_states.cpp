@@ -184,6 +184,9 @@ Status PlayerSession::SaveState(int slot) {
     if (slot < 0 || slot >= STATE_SLOTS) {
         return Status::Fail("There is no such slot.");
     }
+    if (!allowed_.save_states) {
+        return Status::Fail("This console has no save states.");
+    }
     const Status status = WriteStateFile(paths_.State(slot));
     if (status) {
         WriteThumbnail(paths_.Thumbnail(slot));
@@ -197,6 +200,9 @@ Status PlayerSession::LoadState(int slot) {
     }
     if (hardcore_) {
         return Status::Fail("Hardcore mode is on: states cannot be loaded.");
+    }
+    if (!allowed_.save_states) {
+        return Status::Fail("This console has no save states.");
     }
     if (together_.party) {
         return Status::Fail("Not while playing together: it would leave the other device behind.");

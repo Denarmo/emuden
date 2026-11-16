@@ -58,9 +58,10 @@ Status PlayerSession::Open(const OpenRequest& request) {
 Status PlayerSession::Start(const OpenRequest& request) {
     const store::Settings* settings = config_.settings;
     hardcore_ = request.hardcore;
+    allowed_ = request.allowed;
     together_ = request.together;
     // A state of another core, or of the host's game, is no place to resume this one from.
-    resume_enabled_ = !together_.party && request.resume && !hardcore_ &&
+    resume_enabled_ = !together_.party && request.resume && !hardcore_ && allowed_.save_states &&
                       (!settings || settings->GetBool("player.resume", true));
     pad_by_label_ = !settings || settings->GetBool("player.pad_by_label", true);
     integer_scale_ = settings && settings->GetBool("player.integer_scale", false);
@@ -145,7 +146,8 @@ Status PlayerSession::Start(const OpenRequest& request) {
     pending_resume_ = resume_enabled_ && IsRegularFile(paths_.Resume());
     snapshot_.state = State::Running;
     snapshot_.picture = picture_;
-    snapshot_.can_save_states = core_->StateSize() > 0;
+    snapshot_.can_save_states = core_->StateSize() > 0 && allowed_.save_states;
+    snapshot_.can_fast_forward = allowed_.fast_forward;
     snapshot_.hardware_rendered = core_->HardwareRendered();
     snapshot_.hardcore = hardcore_;
     log::Info("player", "{} {} runs {} ({}x{}, {:.2f} fps, {} Hz{})", snapshot_.core_name,
@@ -303,7 +305,7 @@ void PlayerSession::SetScreenPointer(int screen, float u, float v, bool pressed)
 }
 
 void PlayerSession::SetFastForward(bool on) {
-    on = on && !together_.party; // the other device keeps the game's own speed
+    on = on && !together_.party && allowed_.fast_forward; // the other device keeps the game's own speed
     if (snapshot_.fast_forward == on) {
         return;
     }
@@ -339,7 +341,8 @@ void PlayerSession::Reset() {
 
 void PlayerSession::SetupRewind() {
     rewind_.reset();
-    const bool wanted = !config_.settings || config_.settings->GetBool("player.rewind", true);
+    const bool wanted =
+        allowed_.rewind && (!config_.settings || config_.settings->GetBool("player.rewind", true));
     const std::size_t size = core_->StateSize();
     // A GPU core's states are too slow to take every few frames.
     if (!wanted || core_->HardwareRendered() || size == 0 || size > REWIND_MAX_STATE_BYTES) {

@@ -29,6 +29,13 @@ TEST_CASE("portable names come from the system and the ROM's stem") {
     CHECK(IsPcPath("saves/steam/x.srm", {"steam"}));
     CHECK(IsPcPath("config/games/steam/x.json", {"steam"}));
     CHECK_FALSE(IsPcPath("saves/gba/Steam Deck.srm", {"steam"}));
+    // A console whose manifest keeps its states (or settings) off sync.
+    CHECK(IsPcPath("states/gba/x.state", {"states/gba"}));
+    CHECK_FALSE(IsPcPath("saves/gba/x.srm", {"states/gba"}));
+    CHECK(IsPcPath("config/games/gba/x.json", {"config/gba"}));
+    const GameIndex limited(entries, {"states/gba"});
+    CHECK(TargetOf("saves/gba/Super Mario Bros. 3.srm", limited, "/data", "/games"));
+    CHECK_FALSE(TargetOf("states/gba/Super Mario Bros. 3.slot2.png", limited, "/data", "/games"));
 }
 
 TEST_CASE("a save goes up, comes down on the other device, and a conflict keeps the loser") {
