@@ -6,6 +6,36 @@ def repo = file("${rootDir}/../..")
 def sdlJava = file("${repo}/.deps/sdl3-src/android-project/app/src/main/java")
 def packedAssets = layout.buildDirectory.dir('packed-assets')
 
+// The release key: EMUDEN_KEYSTORE_FILE and friends (CI), else
+// ~/.emuden-android-signing/signing.properties (the owner's PC); without either, the debug key.
+def releaseSigning = { ->
+    def env = System.getenv()
+    if (env.EMUDEN_KEYSTORE_FILE) {
+        return [storeFile: env.EMUDEN_KEYSTORE_FILE, storePassword: env.EMUDEN_KEYSTORE_PASSWORD,
+                keyAlias: env.EMUDEN_KEY_ALIAS ?: 'emuden', keyPassword: env.EMUDEN_KEY_PASSWORD ?: env.EMUDEN_KEYSTORE_PASSWORD]
+    }
+    def file = new File(System.getProperty('user.home'), '.emuden-android-signing/signing.properties')
+    if (!file.exists()) {
+        return null
+    }
+    def props = new Properties()
+    file.withInputStream { props.load(it) }
+    return [storeFile: props.storeFile, storePassword: props.storePassword, keyAlias: props.keyAlias,
+            keyPassword: props.keyPassword]
+}()
+
+// Versions go up with every commit, so an update always installs over the one before.
+def commitCount = { ->
+    try {
+        def out = providers.exec { commandLine 'git', '-C', repo.path, 'rev-list', '--count', 'HEAD' }
+        return out.standardOutput.asText.get().trim().toInteger()
+    } catch (Exception ignored) {
+        return 1
+    }
+}
+def emudenVersionCode = providers.gradleProperty('emudenVersionCode').map { it.toInteger() }.getOrElse(commitCount())
+def emudenVersionName = providers.gradleProperty('emudenVersion').getOrElse('0.1.0')
+
 android {
     namespace 'io.github.denarmo.emuden'
     compileSdk 36
@@ -16,8 +46,8 @@ android {
         applicationId 'io.github.denarmo.emuden.next'
         minSdk 28
         targetSdk 36
-        versionCode 1
-        versionName '0.1.0'
+        versionCode emudenVersionCode
+        versionName emudenVersionName
         ndk {
             abiFilters 'arm64-v8a'
         }
@@ -39,10 +69,20 @@ android {
         }
     }
 
+    signingConfigs {
+        if (releaseSigning != null) {
+            release {
+                storeFile file(releaseSigning.storeFile)
+                storePassword releaseSigning.storePassword
+                keyAlias releaseSigning.keyAlias
+                keyPassword releaseSigning.keyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // No release key yet: signed with the debug key, so it updates a debug install.
-            signingConfig signingConfigs.debug
+            signingConfig releaseSigning != null ? signingConfigs.release : signingConfigs.debug
             minifyEnabled false
             // -PemudenDebuggable=true: run-as works, for testing on a device with its data.
             debuggable providers.gradleProperty('emudenDebuggable').getOrElse('false') == 'true'

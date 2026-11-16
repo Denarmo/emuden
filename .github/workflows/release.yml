@@ -1,0 +1,142 @@
+# Builds EmuDEN for Windows, Linux and Android and publishes them as a GitHub release.
+# Runs on a pushed tag "v*" (the release takes the tag's name) or by hand from the Actions tab
+# (a draft release named after the commit).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # "1.2.3" for tag v1.2.3, else "0.1.0-<short sha>".
+  VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: .deps
+          key: deps-windows-${{ hashFiles('cmake/deps.cmake') }}
+      - name: Ninja
+        run: pip install ninja
+      - name: Build and package
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tools\package.ps1 -Build -BuildDir build\win -Out dist\EmuDEN-windows-x64 -Zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/EmuDEN-windows-x64.zip
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Packages
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends clang ninja-build cmake pkg-config \
+            libcurl4-openssl-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
+            libxfixes-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev libdecor-0-dev \
+            libegl-dev libgles-dev libgl-dev libdrm-dev libgbm-dev libasound2-dev libpulse-dev \
+            libpipewire-0.3-dev libudev-dev libdbus-1-dev \
+            squashfs-tools librsvg2-bin desktop-file-utils libwebkit2gtk-4.1-0 glib-networking patchelf
+      - uses: actions/cache@v4
+        with:
+          path: .deps
+          key: deps-linux-${{ hashFiles('cmake/deps.cmake') }}
+      - name: Build
+        run: |
+          cmake --preset linux -B build/linux -DDEN_BUILD_TESTS=OFF
+          cmake --build build/linux --parallel --target den_app
+      - name: Package
+        env:
+          EMUDEN_WEBKIT: '1'
+        run: sh tools/linux/package.sh build/linux dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/EmuDEN-x86_64.AppImage
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the version code counts the commits
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/cache@v4
+        with:
+          path: .deps
+          key: deps-android-${{ hashFiles('cmake/deps.cmake') }}
+      - name: Android SDK parts
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;29.0.14206865" "cmake;3.31.5" "platforms;android-36" >/dev/null
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.EMUDEN_KEYSTORE_B64 }}
+        run: |
+          [ -n "$KEYSTORE_B64" ] || { echo "the EMUDEN_KEYSTORE_B64 secret is missing" >&2; exit 1; }
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/emuden-release.jks"
+      - name: Build
+        working-directory: shells/android
+        env:
+          EMUDEN_KEYSTORE_FILE: ${{ runner.temp }}/emuden-release.jks
+          EMUDEN_KEYSTORE_PASSWORD: ${{ secrets.EMUDEN_KEYSTORE_PASSWORD }}
+          EMUDEN_KEY_ALIAS: emuden
+        run: |
+          name="${VERSION#v}"
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease -PemudenBuild=android-release ${name:+-PemudenVersion=$name}
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          cp "$GITHUB_WORKSPACE/build/android-release/gradle/app/outputs/apk/release/app-release.apk" \
+             "$GITHUB_WORKSPACE/dist/EmuDEN-android-arm64.apk"
+          rm -f "$RUNNER_TEMP/emuden-release.jks"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/EmuDEN-android-arm64.apk
+          if-no-files-found: error
+
+  publish:
+    needs: [windows, linux, android]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "$VERSION" ]; then
+            gh release create "$VERSION" dist/* -R "$GITHUB_REPOSITORY" --title "EmuDEN ${VERSION#v}" --generate-notes
+          else
+            tag="build-${GITHUB_SHA::7}"
+            gh release create "$tag" dist/* -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "EmuDEN build ${GITHUB_SHA::7}" --notes "Built by hand from ${GITHUB_SHA}." --draft
+          fi
