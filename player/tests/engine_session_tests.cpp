@@ -181,3 +181,32 @@ TEST_CASE("an engine session resumes from its resume state", "[player][engine]")
     f.session->Close();
     REQUIRE(f.AdvanceUntil([&] { return !f.host->Running(); }));
 }
+
+TEST_CASE("an engine game started again does not hear the last session's app", "[player][engine]") {
+    EngineFixture f;
+    REQUIRE(f.session->Open(f.Request()));
+    REQUIRE(f.Ready());
+    f.fake.SendEvent(JsonObject({{"type", JsonString("menu_request")}}));
+    for (int i = 0; i < 40; ++i) {
+        f.host->Pump();
+        pal::SleepMs(5);
+    }
+    // The player screen left: the app's last words and its exit reach the host, not the session.
+    f.session->Close();
+    const double until = pal::NowSeconds() + 5;
+    while (f.host->Running() && pal::NowSeconds() < until) {
+        f.host->Pump();
+        pal::SleepMs(5);
+    }
+    REQUIRE_FALSE(f.host->Running());
+
+    test::FakeEngine again;
+    player::OpenRequest request = f.Request();
+    request.engine->attach = [&again](int port, const std::string& token) { again.Connect(port, token); };
+    REQUIRE(f.session->Open(request));
+    REQUIRE(f.AdvanceUntil([&] { return f.session->GetSnapshot().can_save_states && again.Got("list_states"); }));
+    CHECK(f.session->GetSnapshot().state == player::State::Running);
+    CHECK_FALSE(f.session->TakeMenuRequest());
+    f.session->Close();
+    REQUIRE(f.AdvanceUntil([&] { return !f.host->Running(); }));
+}

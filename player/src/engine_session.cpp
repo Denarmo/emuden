@@ -41,6 +41,10 @@ public:
 
     Status Open(const OpenRequest& request) override {
         Close();
+        // What the last game's app sent after it was closed (its exit, a menu request) is not
+        // for this one, even when it is the same game.
+        host_.PollEvents();
+        menu_requested_ = false;
         request_ = request;
         error_.clear();
         frames_ = 0;
