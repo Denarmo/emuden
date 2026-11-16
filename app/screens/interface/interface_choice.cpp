@@ -15,6 +15,7 @@
 #include "den/base/log.h"
 #include "../boot/boot.h"
 #include "interfaces.h"
+#include "object_build.h"
 
 namespace den::app {
 
@@ -52,7 +53,7 @@ std::shared_ptr<const InterfaceSpec> Load(const std::string& id) {
         return nullptr;
     }
     const auto text = ReadTextFile(plugin.dir / "plugin.json");
-    Result<InterfaceSpec> spec = text ? ParseInterface(*text, plugin.dir) : Status::Fail("no manifest");
+    Result<InterfaceSpec> spec = text ? ParseInterface(*text, plugin.dir, MouldNames()) : Status::Fail("no manifest");
     if (!spec) {
         log::Warn("interface", "{}: {}", id, spec.error());
         return nullptr;

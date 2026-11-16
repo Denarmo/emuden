@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <algorithm>
-#include <cctype>
 #include <fstream>
 
 #include "den/app/app.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
+#include "core_options.h"
 #include "den/base/json.h"
 #include "game_prefs.h"
 
@@ -42,16 +42,8 @@ bool CoreListsGame(const plugins::GameMatch& games, const library::Entry& game) 
     return std::find(games.codes.begin(), games.codes.end(), code) != games.codes.end();
 }
 
-std::string Plain(const std::string& text) {
-    std::string out;
-    for (const char c : text) {
-        out.push_back(std::isalnum(static_cast<unsigned char>(c)) ? c : '_');
-    }
-    return out;
-}
-
 std::filesystem::path OptionsFile(const std::string& core_id) {
-    return Svc().data_dir / "cache" / "core_options" / (Plain(core_id) + ".json");
+    return Svc().data_dir / "cache" / "core_options" / KnownOptionsFileName(core_id);
 }
 
 std::string TextOf(const JsonValue& value) {
@@ -59,38 +51,18 @@ std::string TextOf(const JsonValue& value) {
 }
 
 void NoteOptions(const std::string& core_id, const std::vector<player::CoreOption>& options) {
-    JsonValue list = JsonArray();
+    // The value in effect is the global one here: per-game values are applied afterwards.
+    std::vector<KnownOption> known;
     for (const player::CoreOption& option : options) {
-        JsonValue values = JsonArray();
-        for (const std::string& value : option.values) {
-            values.items.push_back(JsonString(value));
-        }
-        // The value in effect is the global one here: per-game values are applied afterwards.
-        list.items.push_back(JsonObject({{"key", JsonString(option.key)},
-                                         {"label", JsonString(option.label)},
-                                         {"value", JsonString(option.value)},
-                                         {"values", std::move(values)}}));
+        known.push_back({option.key, option.label, option.value, option.values});
     }
-    const std::string text = WriteJson(list);
+    const std::string text = WriteKnownOptions(known);
     const std::filesystem::path file = OptionsFile(core_id);
     if (ReadTextFile(file).value_or("") != text) {
         std::error_code ec;
         std::filesystem::create_directories(file.parent_path(), ec);
         WriteFileAtomic(file, text);
     }
-}
-
-// The key the player keeps a core option under in the global settings.
-std::string GlobalOptionKey(const std::string& core_name, const std::string& option_key) {
-    std::string name;
-    for (const char c : core_name) {
-        if (std::isalnum(static_cast<unsigned char>(c))) {
-            name.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-        }
-    }
-    std::string safe = option_key;
-    std::replace(safe.begin(), safe.end(), '.', '_');
-    return "core_options." + name + "." + safe;
 }
 
 // Once per session: notes what options the core has, then puts the game's and the console's
@@ -146,10 +118,6 @@ system::Scope ScopeOf(const library::Entry& game) {
     return system::Scope::Game(game.system, game.id);
 }
 
-std::string OptionKey(const std::string& core_id, const std::string& option_key) {
-    return "core_option." + Plain(core_id) + "." + Plain(option_key);
-}
-
 std::optional<plugins::CoreInfo> CoreForGame(const library::Entry& game, const std::string& forced) {
     Services& svc = Svc();
     std::optional<plugins::CoreInfo> core = svc.plugins->CoreFor(game.system);
@@ -203,24 +171,8 @@ bool EngineFullscreenFor(const library::Entry& game, bool app_fullscreen) {
 }
 
 std::vector<KnownOption> KnownOptions(const std::string& core_id) {
-    std::vector<KnownOption> out;
     const auto text = ReadTextFile(OptionsFile(core_id));
-    const auto parsed = text ? ParseJson(*text) : std::nullopt;
-    if (!parsed) {
-        return out;
-    }
-    for (const JsonValue& item : parsed->items) {
-        KnownOption option{item.String("key"), item.String("label"), item.String("value"), {}};
-        if (const JsonValue* values = item.Find("values")) {
-            for (const JsonValue& value : values->items) {
-                option.values.push_back(value.string);
-            }
-        }
-        if (!option.key.empty() && !option.values.empty()) {
-            out.push_back(std::move(option));
-        }
-    }
-    return out;
+    return text ? ParseKnownOptions(*text) : std::vector<KnownOption>{};
 }
 
 DEN_REGISTER_FRAME(ApplyGameOptions);

@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 
+#include "web_rules.h"
+
 namespace den::app::web {
 
 /// A file the user downloaded in the page.
@@ -45,8 +47,6 @@ struct OpenRequest {
     bool browser = false;
 };
 
-/// "Any": a host list or an extension list with this takes everything.
-inline constexpr const char* ANY = "*";
 /// Where the address bar sends what is not an address.
 inline constexpr const char* SEARCH_ADDRESS = "https://duckduckgo.com/?q=";
 /// What the user typed into the address bar as an address: "example.com" ->
@@ -73,25 +73,8 @@ void RegisterOpener(const std::string& name, Opener opener);
 /// The opener registered under `name`, null when there is none.
 const Opener* FindOpener(const std::string& name);
 
-/// Patch and archive formats: bps, ips, ups, xdelta, vcdiff, aps, ppf, zip, 7z.
-const std::vector<std::string>& DefaultExtensions();
-/// The extension of a file name in lower case without the dot.
-std::string ExtensionOf(const std::string& file_name);
-/// Cartridge, disc and card images (gb, gba, nds, iso, chd, ...).
-bool IsRomImage(const std::string& extension);
-enum class Verdict { Take, NotWanted, RomImage };
-Verdict JudgeDownload(const std::string& file_name, const std::vector<std::string>& wanted);
-/// What the user is told about a download that was not taken.
-std::string RefusalText(const std::string& file_name, Verdict verdict);
-/// Whether the user may be asked to follow a link that leaves the page's hosts: an https
-/// address (http on this machine) with a host.
-bool CanLeaveTo(const std::string& url);
-/// "a, B ,c" -> {"a", "b", "c"}.
-std::vector<std::string> SplitList(const std::string& text);
 /// `<data>/inbox/web`: where downloads arrive.
 std::filesystem::path InboxDir();
-/// A file of `dir` that does not exist yet: "hack.bps", then "hack (2).bps", ...
-std::filesystem::path FreeFile(const std::filesystem::path& dir, const std::string& name);
 
 /// What the page is doing, for the automation endpoint. Never anything of the page's content.
 struct PageState {

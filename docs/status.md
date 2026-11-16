@@ -10,7 +10,7 @@ which device, are in `docs/history.md`; add new ones there, newest first.
   is downloaded. Only cores that need no BIOS are offered. A core is a pinned libretro core,
   an engine app spoken to over the Emulator Control Protocol (`docs/engines.md`), or the
   installed Switch 2 emulator (engine level 0, its own window). Other developers' sources can
-  be added (Settings > Plugin sources), limited to their own namespace.
+  be added (Settings > Plugins), limited to their own namespace.
 - **Player.** Software, OpenGL and Vulkan cores (`docs/vulkan.md`); save states, rewind,
   fast-forward, picture presets on a multi-pass chain, per-game and per-console settings,
   button remapping, black frame insertion at whole multiples of the game's rate, two screens (DS layouts, quick settings and the pause menu on the second

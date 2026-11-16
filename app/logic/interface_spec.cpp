@@ -9,7 +9,6 @@
 #include "den/base/files.h"
 #include "den/base/json.h"
 #include "den/plugins/manifest.h"
-#include "object_build.h"
 
 namespace den::app {
 
@@ -101,14 +100,14 @@ void ReadUnitRect(const JsonValue* rect, gfx::Rect& out) {
     }
 }
 
-void ReadObject(const JsonValue* object, ObjectLook& out) {
+void ReadObject(const JsonValue* object, const std::vector<std::string>& moulds, ObjectLook& out) {
     if (object == nullptr || object->kind != JsonValue::Kind::Object) {
         return;
     }
     ReadChoice(object, "shape", {"cartridge", "card", "case", "jewel", "disc"}, out.shape);
     if (const std::string style = object->String("style");
         style == "plain" || style == "pocket" || style == "pocket_wide" ||
-        std::find(MouldNames().begin(), MouldNames().end(), style) != MouldNames().end()) {
+        std::find(moulds.begin(), moulds.end(), style) != moulds.end()) {
         out.style = style;
     }
     ReadChoice(object, "label_edge", {"none", "paper", "foil"}, out.label_edge);
@@ -145,7 +144,8 @@ ConsoleLook InterfaceSpec::LookFor(std::string_view system, std::string_view gro
     return {};
 }
 
-Result<InterfaceSpec> ParseInterface(std::string_view manifest_json, const std::filesystem::path& dir) {
+Result<InterfaceSpec> ParseInterface(std::string_view manifest_json, const std::filesystem::path& dir,
+                                     const std::vector<std::string>& moulds) {
     const std::optional<JsonValue> root = ParseJson(manifest_json);
     const JsonValue* look = root ? root->Find("interface") : nullptr;
     if (look == nullptr || look->kind != JsonValue::Kind::Object) {
@@ -210,7 +210,7 @@ Result<InterfaceSpec> ParseInterface(std::string_view manifest_json, const std::
             ReadColor(&value, "color", console.color);
             console.wallpaper = PackageImage(dir, value.String("wallpaper"));
             console.label = value.String("label").substr(0, 16);
-            ReadObject(value.Find("object"), console.object);
+            ReadObject(value.Find("object"), moulds, console.object);
             spec.consoles[key] = std::move(console);
         }
     }

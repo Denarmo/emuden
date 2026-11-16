@@ -16,6 +16,15 @@ foreach(name ${left_out})
     list(FILTER app_sources EXCLUDE REGEX "/${name}[.]cpp$")
 endforeach()
 
+# What the screens decide without a window (interface looks, core option notes, the browser's
+# rules), with its tests in app/tests.
+file(GLOB app_logic_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/logic/*.cpp")
+add_library(den_app_logic STATIC ${app_logic_sources})
+target_include_directories(den_app_logic PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/logic")
+target_link_libraries(den_app_logic PUBLIC den_plugins den_gfx den_platform den_patching den_base)
+den_warnings(den_app_logic)
+den_tests(app den_app_logic)
+
 if(ANDROID)
     # SDL's activity loads libmain.so and calls SDL_main (shells/android). SDL is linked in,
     # so its JNI_OnLoad must be kept.
@@ -29,7 +38,7 @@ else()
 endif()
 target_include_directories(den_app PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/src")
-target_link_libraries(den_app PRIVATE
+target_link_libraries(den_app PRIVATE den_app_logic
     den_sync den_system den_achievements den_player den_engine den_plugins den_library den_store
     den_ui den_input den_gfx den_platform den_base den_qrcodegen)
 den_warnings(den_app)

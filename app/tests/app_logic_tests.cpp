@@ -1,0 +1,131 @@
+// SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include <filesystem>
+#include <fstream>
+#include <random>
+
+#include <catch2/catch_test_macros.hpp>
+
+#include "core_options.h"
+#include "den/base/files.h"
+#include "interface_spec.h"
+#include "web_rules.h"
+
+using namespace den;
+using namespace den::app;
+namespace fs = std::filesystem;
+
+namespace {
+
+bool Same(gfx::Color a, gfx::Color b) {
+    return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+}
+
+} // namespace
+
+TEST_CASE("an interface plugin's look, with defaults for what is missing or out of range") {
+    const fs::path dir = PathFromUtf8("/plugins/look");
+    auto spec = ParseInterface(R"({
+        "id": "emuden.look", "name": "Look",
+        "interface": {
+            "layout": "shelf3d",
+            "colors": {"background": "#102030", "accent": "#ff000080", "text": "red"},
+            "backdrop": {"art": "console", "tint": 4, "wallpaper": "art/wall.png"},
+            "covers": {"height": 0.1, "spacing": 40},
+            "tabs": {"recent": false},
+            "launch": {"animation": "spin"},
+            "consoles": {
+                "gba": {"color": "#00ff00", "label": "A very long console label", "wallpaper": "../x.png",
+                        "object": {"shape": "cartridge", "style": "snes", "grip": 20, "label": [0, 0, 0.5, 0.5]}},
+                "group:nintendo": {"object": {"shape": "disc", "style": "unknown"}},
+                "*": {"color": "#000000"}
+            }
+        }})",
+                                     dir, {"snes", "n64"});
+    REQUIRE(spec);
+    CHECK(spec->id == "emuden.look");
+    CHECK(spec->layout == "shelf3d");
+    CHECK(Same(spec->background, {0x10, 0x20, 0x30, 255}));
+    CHECK(Same(spec->accent, {255, 0, 0, 0x80}));
+    CHECK(Same(spec->text, {255, 255, 255, 255})); // "red" is not a colour it reads
+    CHECK(spec->backdrop == "console");
+    CHECK(spec->tint == 1.0f);
+    CHECK(spec->wallpaper == PathToUtf8(dir / PathFromUtf8("art/wall.png")));
+    CHECK(spec->cover_height == 0.3f);
+    CHECK(spec->spacing == 40);
+    CHECK_FALSE(spec->tab_recent);
+    CHECK(spec->tab_all);
+    CHECK(spec->launch == "zoom");
+
+    const ConsoleLook gba = spec->LookFor("gba", "nintendo");
+    CHECK(Same(gba.color, {0, 255, 0, 255}));
+    CHECK(gba.label.size() == 16);
+    CHECK(gba.wallpaper.empty()); // outside the package
+    CHECK(gba.object.shape == "cartridge");
+    CHECK(gba.object.style == "snes");
+    CHECK(gba.object.grip == 8);
+    CHECK(gba.object.label.w == 0.5f);
+    const ConsoleLook gb = spec->LookFor("gb", "nintendo");
+    CHECK(gb.object.shape == "disc");
+    CHECK(gb.object.style.empty());
+    CHECK(Same(spec->LookFor("psx", "sony").color, {0, 0, 0, 255}));
+
+    CHECK_FALSE(ParseInterface(R"({"interface": {"layout": "grid"}})", dir, {}));
+    CHECK_FALSE(ParseInterface(R"({"id": "x"})", dir, {}));
+    CHECK(KnownLayout("carousel"));
+}
+
+TEST_CASE("noted core options round-trip and name their settings keys") {
+    const std::vector<KnownOption> options = {
+        {"mgba_skip_bios", "Skip BIOS", "OFF", {"OFF", "ON"}},
+        {"mgba_frameskip", "Frameskip", "0", {"0", "1", "2"}},
+    };
+    const std::vector<KnownOption> again = ParseKnownOptions(WriteKnownOptions(options));
+    REQUIRE(again.size() == 2);
+    CHECK(again[0].key == "mgba_skip_bios");
+    CHECK(again[0].label == "Skip BIOS");
+    CHECK(again[0].fallback == "OFF");
+    CHECK(again[1].values == std::vector<std::string>{"0", "1", "2"});
+    // Options without a key or values are left out; a file that does not parse gives nothing.
+    CHECK(ParseKnownOptions(R"([{"key": "a", "values": []}, {"values": ["x"]}])").empty());
+    CHECK(ParseKnownOptions("not json").empty());
+
+    CHECK(KnownOptionsFileName("emuden.core.mgba") == "emuden_core_mgba.json");
+    CHECK(OptionKey("emuden.core.mgba", "mgba.skip-bios") == "core_option.emuden_core_mgba.mgba_skip_bios");
+    CHECK(GlobalOptionKey("mGBA 0.10", "mgba.skip_bios") == "core_options.mgba010.mgba_skip_bios");
+}
+
+TEST_CASE("the browser takes patches and archives, never ROM images") {
+    using namespace den::app::web;
+    CHECK(ExtensionOf("Hack.V2.BPS") == "bps");
+    CHECK(ExtensionOf("noextension").empty());
+    CHECK(JudgeDownload("hack.bps", {}) == Verdict::Take);
+    CHECK(JudgeDownload("readme.txt", {}) == Verdict::NotWanted);
+    CHECK(JudgeDownload("game.gba", {}) == Verdict::RomImage);
+    CHECK(JudgeDownload("game.gba", {"gba"}) == Verdict::RomImage);
+    CHECK(JudgeDownload("game.gba", {ANY}) == Verdict::Take);
+    CHECK(JudgeDownload("notes.txt", {"txt"}) == Verdict::Take);
+    CHECK(JudgeDownload("hack.bps", {"zip"}) == Verdict::NotWanted);
+    CHECK(RefusalText("game.gba", Verdict::RomImage).find("full game file") != std::string::npos);
+    CHECK(RefusalText("hack.rar", Verdict::NotWanted).find("rar") != std::string::npos);
+
+    CHECK(CanLeaveTo("https://www.romhacking.net/hacks/1"));
+    CHECK_FALSE(CanLeaveTo("http://example.com/"));
+    CHECK_FALSE(CanLeaveTo("javascript:alert(1)"));
+
+    CHECK(SplitList(" bps, ZIP ,,7z") == std::vector<std::string>{"bps", "zip", "7z"});
+    std::vector<std::string> extensions = {" BPS", "", "gba", "zip"};
+    CleanExtensions(extensions);
+    CHECK(extensions == std::vector<std::string>{"bps", "zip"});
+}
+
+TEST_CASE("downloads get a name that is free") {
+    const fs::path dir = fs::temp_directory_path() / ("den_app_logic_" + std::to_string(std::random_device{}()));
+    fs::create_directories(dir);
+    CHECK(web::FreeFile(dir, "hack.bps") == dir / "hack.bps");
+    std::ofstream(dir / "hack.bps") << "1";
+    std::ofstream(dir / "hack (2).bps") << "2";
+    CHECK(web::FreeFile(dir, "hack.bps") == dir / "hack (3).bps");
+    fs::remove_all(dir);
+}

@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "core_options.h"
 #include "den/library/library.h"
 #include "den/plugins/host.h"
 #include "den/system/settings.h"
@@ -35,13 +36,7 @@ bool GameHasOwnCore(const library::Entry& game);
 int ScreenSizeFor(const library::Entry& game);
 bool EngineFullscreenFor(const library::Entry& game, bool app_fullscreen);
 
-/// A core option as the core last described it (noted whenever a game runs).
-struct KnownOption {
-    std::string key, label, fallback;
-    std::vector<std::string> values;
-};
+/// The options noted for this core when a game last ran with it.
 std::vector<KnownOption> KnownOptions(const std::string& core_id);
-/// The settings key of a core option in a game's or console's layer.
-std::string OptionKey(const std::string& core_id, const std::string& option_key);
 
 } // namespace den::app

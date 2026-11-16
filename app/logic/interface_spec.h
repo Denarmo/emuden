@@ -98,8 +98,10 @@ struct InterfaceSpec {
 };
 
 /// Reads the "interface" object of an interface plugin's plugin.json from `dir`. Fails when it
-/// asks for a layout this app does not have.
-Result<InterfaceSpec> ParseInterface(std::string_view manifest_json, const std::filesystem::path& dir);
+/// asks for a layout this app does not have. `moulds`: the cartridge styles the app draws
+/// besides "plain", "pocket" and "pocket_wide" (MouldNames()).
+Result<InterfaceSpec> ParseInterface(std::string_view manifest_json, const std::filesystem::path& dir,
+                                     const std::vector<std::string>& moulds);
 
 /// The layouts this app draws.
 bool KnownLayout(std::string_view layout);
