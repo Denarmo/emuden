@@ -1,6 +1,7 @@
 # Builds EmuDEN for Windows, Linux and Android and publishes them as a GitHub release.
 # Runs on a pushed tag "v*" (the release takes the tag's name) or by hand from the Actions tab
-# (a draft release named after the commit).
+# (a draft release named after the commit). Each build uploads straight to a draft release,
+# which does not count against the artifact storage of a private repository.
 name: Release
 
 on:
@@ -13,14 +14,33 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 env:
-  # "1.2.3" for tag v1.2.3, else "0.1.0-<short sha>".
+  GH_TOKEN: ${{ github.token }}
+  # "v1.2.3" for tag v1.2.3, else empty.
   VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
 
 jobs:
+  draft:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.draft.outputs.tag }}
+    steps:
+      - id: draft
+        run: |
+          if [ -n "$VERSION" ]; then
+            tag="$VERSION"; title="EmuDEN ${VERSION#v}"
+          else
+            tag="build-${GITHUB_SHA::7}"; title="EmuDEN build ${GITHUB_SHA::7}"
+          fi
+          gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+            gh release create "$tag" -R "$GITHUB_REPOSITORY" --draft --target "$GITHUB_SHA" \
+              --title "$title" --notes "Built from ${GITHUB_SHA}."
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
   windows:
+    needs: draft
     runs-on: windows-2022
     timeout-minutes: 90
     steps:
@@ -34,13 +54,12 @@ jobs:
       - name: Build and package
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File tools\package.ps1 -Build -BuildDir build\win -Out dist\EmuDEN-windows-x64 -Zip
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows
-          path: dist/EmuDEN-windows-x64.zip
-          if-no-files-found: error
+      - name: Upload
+        shell: bash
+        run: gh release upload "${{ needs.draft.outputs.tag }}" dist/EmuDEN-windows-x64.zip --clobber -R "$GITHUB_REPOSITORY"
 
   linux:
+    needs: draft
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -66,13 +85,11 @@ jobs:
         env:
           EMUDEN_WEBKIT: '1'
         run: sh tools/linux/package.sh build/linux dist
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux
-          path: dist/EmuDEN-x86_64.AppImage
-          if-no-files-found: error
+      - name: Upload
+        run: gh release upload "${{ needs.draft.outputs.tag }}" dist/EmuDEN-x86_64.AppImage --clobber -R "$GITHUB_REPOSITORY"
 
   android:
+    needs: draft
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -96,7 +113,7 @@ jobs:
           KEYSTORE_B64: ${{ secrets.EMUDEN_KEYSTORE_B64 }}
         run: |
           [ -n "$KEYSTORE_B64" ] || { echo "the EMUDEN_KEYSTORE_B64 secret is missing" >&2; exit 1; }
-          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/emuden-release.jks"
+          printf '%s' "$KEYSTORE_B64" | tr -d '\r\n ' | base64 -d > "$RUNNER_TEMP/emuden-release.jks"
       - name: Build
         working-directory: shells/android
         env:
@@ -110,33 +127,23 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp "$GITHUB_WORKSPACE/build/android-release/gradle/app/outputs/apk/release/app-release.apk" \
              "$GITHUB_WORKSPACE/dist/EmuDEN-android-arm64.apk"
-          rm -f "$RUNNER_TEMP/emuden-release.jks"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android
-          path: dist/EmuDEN-android-arm64.apk
-          if-no-files-found: error
+      - name: Forget the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/emuden-release.jks"
+      - name: Upload
+        run: gh release upload "${{ needs.draft.outputs.tag }}" dist/EmuDEN-android-arm64.apk --clobber -R "$GITHUB_REPOSITORY"
 
   publish:
-    needs: [windows, linux, android]
+    needs: [draft, windows, linux, android]
     runs-on: ubuntu-24.04
-    permissions:
-      contents: write
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
       - name: Checksums
-        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
-      - name: Release
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ -n "$VERSION" ]; then
-            gh release create "$VERSION" dist/* -R "$GITHUB_REPOSITORY" --title "EmuDEN ${VERSION#v}" --generate-notes
-          else
-            tag="build-${GITHUB_SHA::7}"
-            gh release create "$tag" dist/* -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title "EmuDEN build ${GITHUB_SHA::7}" --notes "Built by hand from ${GITHUB_SHA}." --draft
-          fi
+          tag="${{ needs.draft.outputs.tag }}"
+          mkdir dist && cd dist
+          gh release download "$tag" -R "$GITHUB_REPOSITORY" -p 'EmuDEN-*'
+          sha256sum EmuDEN-* > SHA256SUMS.txt && cat SHA256SUMS.txt
+          gh release upload "$tag" SHA256SUMS.txt --clobber -R "$GITHUB_REPOSITORY"
+      - name: Publish a tagged release
+        if: env.VERSION != ''
+        run: gh release edit "$VERSION" -R "$GITHUB_REPOSITORY" --draft=false
