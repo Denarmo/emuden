@@ -15,7 +15,8 @@ namespace den::app {
 
 namespace {
 
-// The usual media of the consoles, for the standard Home: shape and mould (game_moulds.cpp).
+// The usual media of the consoles whose manifest has no presentation.media, for the standard
+// Home: shape and mould (game_moulds.cpp).
 struct Usual {
     std::string_view system, shape, style;
     float aspect;
@@ -53,6 +54,13 @@ GameObject MediaFor(const library::Entry& game) {
     const auto console = Svc().plugins->FindConsole(game.system);
     if (const std::shared_ptr<const InterfaceSpec> spec = ChosenInterface(); spec && spec->layout == "shelf3d") {
         look = spec->LookFor(game.system, console ? console->group : std::string()).object;
+    } else if (console && !console->media.shape.empty()) {
+        const plugins::MediaShape& media = console->media;
+        look.shape = media.shape;
+        look.style = media.style;
+        look.aspect = media.aspect;
+        look.disc = media.disc;
+        look.umd = media.umd;
     } else {
         for (const Usual& usual : USUAL) {
             if (usual.system == game.system) {

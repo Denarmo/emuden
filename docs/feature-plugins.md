@@ -306,8 +306,7 @@ permission.
 - The app only signs in while the plugin is installed (checked every 2 s); removing it signs
   out, and removing its data deletes the token.
 - Games are identified by rcheevos' hash of the file (`achievements::HashFile`), the console
-  by the console plugin's `achievements.rcheevos_console` or the app's table
-  (`achievements::ConsoleFor`). Core memory: the core's `SET_MEMORY_MAPS`, else
+  by the console plugin's `achievements.rcheevos_console` (none without it). Core memory: the core's `SET_MEMORY_MAPS`, else
   `retro_get_memory_data`.
 - During play: unlock cards (top right), the progress indicator (bottom right), challenge
   badges and trackers (bottom left), leaderboard started, failed and submitted cards. The

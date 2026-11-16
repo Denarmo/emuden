@@ -5,6 +5,8 @@
 #include <array>
 #include <cmath>
 #include <format>
+#include <map>
+#include <mutex>
 
 #include "core/core.h"
 #include "den/store/settings.h"
@@ -74,11 +76,41 @@ PadButton PadButtonFromName(std::string_view name) {
                                  : static_cast<PadButton>(it - PAD_NAMES.begin());
 }
 
-bool NintendoLayout(std::string_view system) {
-    static constexpr std::array<std::string_view, 12> SYSTEMS = {
+struct KnownTraits {
+    std::optional<bool> nintendo_layout, digital_only;
+};
+
+std::mutex g_traits_mutex;
+std::map<std::string, KnownTraits, std::less<>> g_traits;
+
+void SetPadTraits(const std::string& system, std::optional<bool> nintendo_layout,
+                  std::optional<bool> digital_only) {
+    std::lock_guard lock(g_traits_mutex);
+    g_traits[system] = {nintendo_layout, digital_only};
+}
+
+PadTraits PadTraitsOf(std::string_view system) {
+    // The consoles a manifest may not describe yet (an older installed one).
+    static constexpr std::array<std::string_view, 12> NINTENDO = {
         "gb", "gbc", "gba", "nds", "3ds", "nes", "snes", "n64", "gamecube", "wii", "virtualboy",
         "pokemini"};
-    return std::find(SYSTEMS.begin(), SYSTEMS.end(), system) != SYSTEMS.end();
+    // PlayStation is among them because its games are given the digital pad (the port device
+    // is always a joypad), which has no sticks at all.
+    static constexpr std::array<std::string_view, 12> DIGITAL = {
+        "gb", "gbc", "gba", "nds", "nes", "snes", "genesis", "sms", "gg", "pico8", "virtualboy", "psx"};
+    PadTraits traits;
+    traits.nintendo_layout = std::find(NINTENDO.begin(), NINTENDO.end(), system) != NINTENDO.end();
+    traits.digital_only = std::find(DIGITAL.begin(), DIGITAL.end(), system) != DIGITAL.end();
+    std::lock_guard lock(g_traits_mutex);
+    if (const auto it = g_traits.find(system); it != g_traits.end()) {
+        traits.nintendo_layout = it->second.nintendo_layout.value_or(traits.nintendo_layout);
+        traits.digital_only = it->second.digital_only.value_or(traits.digital_only);
+    }
+    return traits;
+}
+
+bool NintendoLayout(std::string_view system) {
+    return PadTraitsOf(system).nintendo_layout;
 }
 
 ButtonMap DefaultButtons(std::string_view system, input::PadFamily family, bool by_label) {
@@ -188,12 +220,8 @@ RetroPad MapPad(const input::PadState& pad, std::string_view system, const Butto
             out.buttons |= static_cast<std::uint16_t>(1u << button);
         }
     }
-    // Consoles without a stick: the left stick is the D-pad too. PlayStation is among them
-    // because its games are given the digital pad (the port device is always a joypad), which
-    // has no sticks at all.
-    static constexpr std::array<std::string_view, 12> DIGITAL = {
-        "gb", "gbc", "gba", "nds", "nes", "snes", "genesis", "sms", "gg", "pico8", "virtualboy", "psx"};
-    if (std::find(DIGITAL.begin(), DIGITAL.end(), system) != DIGITAL.end()) {
+    // Consoles without a stick: the left stick is the D-pad too.
+    if (PadTraitsOf(system).digital_only) {
         constexpr float PUSHED = 0.5f;
         out.buttons |= pad.lx < -PUSHED ? RETRO_LEFT : 0;
         out.buttons |= pad.lx > PUSHED ? RETRO_RIGHT : 0;

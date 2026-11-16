@@ -132,6 +132,7 @@ Result<Component> ParseComponent(const JsonValue& value, bool developer) {
         }
     }
     component.cores = json::Strings(value, "cores", false);
+    ParseCoreExtras(value, component);
     if (component.type == TYPE_ENGINE_APP) {
         Result<EngineAppSpec> spec = ParseEngineApp(value);
         if (!spec) {
@@ -165,6 +166,9 @@ void ParseContent(const JsonValue& content, Console& console) {
     scan.folder_only_extensions = json::Strings(content, "folder_only_extensions", true);
     scan.cover_is_rom = json::Bool(content, "cover_is_rom", false);
     scan.scanner = content.String("scanner");
+    // PC games keep their saves with their store; a manifest that does not say is synced
+    // unless it is a PC's.
+    console.sync = json::Bool(content, "sync", console.group != "pc");
     const std::string zip = content.String("zip");
     if (zip == "unpack" || zip == "pass" || zip == "no") {
         scan.zip = zip;
@@ -224,6 +228,7 @@ Result<SystemDef> ParseSystem(const JsonValue& value, const JsonValue& root, con
     console.runner = manifest.engine == "libretro" ? Runner::Core : Runner::Engine;
     console.group = value.String("group");
     console.order = static_cast<int>(json::Number(value, "order", 0));
+    console.sync = console.group != "pc";
     if (const JsonValue* content = value.Find("content")) {
         ParseContent(*content, console);
     }
@@ -237,6 +242,7 @@ Result<SystemDef> ParseSystem(const JsonValue& value, const JsonValue& root, con
                 console.buttons.push_back({button.String("pad"), button.String("label")});
             }
         }
+        ParsePresentation(*presentation, console);
     }
     if (const JsonValue* artwork = value.Find("artwork")) {
         console.thumbnails = artwork->String("libretro_thumbnails");
@@ -253,6 +259,7 @@ Result<SystemDef> ParseSystem(const JsonValue& value, const JsonValue& root, con
     ApplyCapabilities(root.Find("capabilities"), value.Find("capabilities"), console);
     system.cores = json::Strings(value, "cores", false);
     system.platforms = json::Strings(value, "platforms", false);
+    system.default_core = value.String("default_core");
     return system;
 }
 
@@ -363,7 +370,8 @@ const std::vector<std::string>& HostCapabilities() {
         "kind.feature",       "feature.lua.1",  "feature.web.1",
         "core.engine-app.1",  "kind.interface", "interface.1",
         "feature.tune.1",     "feature.achievements.1",
-        "feature.browser.1",
+        "feature.browser.1",  "presentation.screens", "core.netplay",
+        "core.tuning",
     };
     return capabilities;
 }

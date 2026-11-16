@@ -101,7 +101,7 @@ public:
             fact(TrF("details.core", core->installed ? name : TrF("details.core_missing", name)));
         }
         const auto console_of = svc.plugins->FindConsole(game.system);
-        if (sync::Engine* engine = SyncSvc(); engine && console_of && console_of->group != "pc") {
+        if (sync::Engine* engine = SyncSvc(); engine && console_of && console_of->sync) {
             const sync::GameSync saves = engine->GameState(id);
             if (saves.active) {
                 fact(saves.conflict  ? std::string("Saves synced, with a conflict: see Settings, Sync")

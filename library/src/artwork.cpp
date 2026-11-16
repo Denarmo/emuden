@@ -266,6 +266,7 @@ HackQuery Artwork::QueryFor(const Entry& entry, const SystemDef& system, const T
                                                 : std::string();
     query.libretro = &index;
     query.libretro_folder = system.libretro_thumbnails;
+    query.ra_console = system.rcheevos_console;
     return query;
 }
 

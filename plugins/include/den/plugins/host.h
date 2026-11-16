@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "den/base/jobs.h"
+#include "den/base/json.h"
 #include "den/base/result.h"
 
 namespace den::store {
@@ -69,6 +70,30 @@ struct ScanRules {
     std::string scanner; // "switch2": the engine scans, not the extensions
 };
 
+/// One screen of a console inside the core's picture (presentation.screens): its part of the
+/// picture, 0..1 with row 0 at the top, and whether presses on it reach the game.
+struct ScreenPart {
+    float x = 0, y = 0, w = 1, h = 1;
+    bool touch = false;
+};
+
+/// The screens a core's picture holds when its width over height is that of `frame_width`
+/// over `frame_height` (the DS's 256 x 384: the upper screen over the touch screen).
+struct ScreenShape {
+    int frame_width = 0, frame_height = 0;
+    std::vector<ScreenPart> screens;
+};
+
+/// What a game of the console looks like on the standard Home's shelf and boot screen
+/// (presentation.media). An empty shape: the app's own table, then a plain cartridge.
+struct MediaShape {
+    std::string shape; // cartridge, card, case, jewel
+    std::string style; // the mould (game_moulds.cpp: "pocket", "snes", "hucard"); empty: plain
+    float aspect = 0;  // width over height; 0: the shape's own
+    bool disc = false;
+    bool umd = false;
+};
+
 /// A console, from a plugin manifest's systems[].
 struct Console {
     std::string id;         // system id: "gb", "gba", "nds", "psx", "switch2"
@@ -99,6 +124,17 @@ struct Console {
     bool netplay = true;      // capabilities.netplay: its games may be played together
     std::vector<BiosSet> bios;
     bool developer = false;   // its plugin is in the developer folder, not signed
+    /// presentation.screens: the screens of its cores' pictures (a core may have its own).
+    std::vector<ScreenShape> screens;
+    /// presentation.layout: "nintendo" (A on the right, B below it), "other", or empty when
+    /// the manifest does not say (the player then has its own list).
+    std::string pad_layout;
+    /// presentation.digital_only: the console has no stick, so the left stick is the D-pad too.
+    std::optional<bool> digital_only;
+    MediaShape media;
+    /// content.sync: its games' saves and play time are synced (false for PC games, whose
+    /// stores keep their own).
+    bool sync = true;
 };
 
 /// A setting a plugin manifest declares for a console ("settings"). The Consoles screen
@@ -126,6 +162,21 @@ struct GameMatch {
     bool Empty() const {
         return length == 0 || codes.empty();
     }
+};
+
+/// How a core plays a game with another device (a component's netplay).
+struct NetplaySpec {
+    std::string mode;       // "link" (each device its own game, linked) or "lockstep"; empty: none given
+    unsigned subsystem = 0; // non-zero: the game is loaded twice through this libretro subsystem
+    std::string description; // what playing together with it does, for the Together page
+    /// What each side loads differently: the memory its own battery save is kept in (0: the
+    /// usual save RAM; with a subsystem, the other side's is the peer's) and option values
+    /// for the session only.
+    struct Side {
+        unsigned save_memory = 0;
+        std::vector<std::pair<std::string, std::string>> options;
+    };
+    Side host, guest;
 };
 
 /// An engine app that is one of a console's cores (Runner::Engine on CoreInfo).
@@ -158,6 +209,14 @@ struct CoreInfo {
     std::vector<std::pair<std::string, std::string>> widescreen_options;
     bool widescreen_restart = false;
     GameMatch games; // the games this core plays instead of the console's chosen core
+    /// The screens of its picture: the core's own presentation.screens, else the console's.
+    std::vector<ScreenShape> screens;
+    NetplaySpec netplay;
+    /// The name the core reports, whose letters and digits key its stored option values
+    /// ("dolphin-emu"); the component id when the manifest gives none.
+    std::string options_name;
+    /// tuning: core option values by device (den/system/device.h ParseTuning reads it).
+    JsonValue tuning;
     /// BIOS files the core needs and does not find (empty = ready).
     std::vector<std::string> missing_bios;
 

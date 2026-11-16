@@ -88,18 +88,6 @@ bool Has(const std::vector<Event>& events, EventKind kind) {
 
 } // namespace
 
-TEST_CASE("systems map to RetroAchievements consoles") {
-    CHECK(ConsoleFor("gb") == 4);
-    CHECK(ConsoleFor("gbc") == 6);
-    CHECK(ConsoleFor("gba") == 5);
-    CHECK(ConsoleFor("nds") == 18);
-    CHECK(ConsoleFor("psx") == 12);
-    CHECK(ConsoleFor("ps2") == 21);
-    CHECK(ConsoleFor("wsc") == 53);
-    CHECK(ConsoleFor("switch2") == 0);
-    CHECK(ConsoleFor("pico8") == 0);
-}
-
 TEST_CASE("the user agent names the app and rcheevos") {
     const std::string agent = UserAgent("EmuDEN", "0.1.0");
     CHECK(agent.rfind("EmuDEN/0.1.0 rcheevos/", 0) == 0);

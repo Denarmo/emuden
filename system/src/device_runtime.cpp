@@ -22,6 +22,7 @@ struct State {
     DeviceInfo info;
     DeviceProfile profile;
     std::vector<DeviceDefault> defaults;
+    std::vector<TuningRule> tuning;
     std::uint64_t revision = 1;
     bool fake = false;
 };
@@ -59,7 +60,7 @@ DeviceInfo Detect() {
 void Apply() {
     State& state = g_device;
     state.profile = Classify(state.info, TierOverride());
-    state.defaults = DeriveDefaults(state.profile);
+    state.defaults = DeriveDefaults(state.profile, state.tuning);
     if (state.settings) {
         std::vector<std::pair<std::string, JsonValue>> layer;
         for (const DeviceDefault& item : state.defaults) {
@@ -94,6 +95,17 @@ void InitDevice(store::Settings& settings) {
         state.info = Detect();
     }
     Apply();
+}
+
+void SetTuning(std::vector<TuningRule> rules) {
+    g_device.tuning = std::move(rules);
+    if (g_device.settings) {
+        Apply();
+    }
+}
+
+const std::vector<TuningRule>& Tuning() {
+    return g_device.tuning;
 }
 
 void ShutdownDevice() {

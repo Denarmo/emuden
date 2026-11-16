@@ -18,9 +18,6 @@
 
 namespace den::achievements {
 
-/// The RetroAchievements console of an EmuDEN system id ("gba"); 0 when it has none.
-std::uint32_t ConsoleFor(std::string_view system);
-
 /// "EmuDEN/<version> rcheevos/<version>": the User-Agent of every request to the server.
 std::string UserAgent(std::string_view client_name, std::string_view client_version);
 

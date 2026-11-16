@@ -89,6 +89,13 @@ struct Component {
     std::map<std::string, Download, std::less<>> downloads; // by platform key or "any"
     std::vector<std::string> cores; // system files: the cores they are for (empty = all)
     EngineAppSpec engine_app;       // type engine-app
+    /// option_hints: values applied before forced_core_options and the user's own (a layout
+    /// the player's presentation.screens know).
+    std::vector<std::pair<std::string, std::string>> option_hints;
+    std::vector<ScreenShape> screens; // presentation.screens; empty: the system's
+    NetplaySpec netplay;
+    std::string options_name;
+    JsonValue tuning; // an object, or null
 
     const Download* DownloadFor(std::string_view platform_key) const;
     /// It can be installed on the platform: a download (an engine app also needs its
@@ -105,6 +112,7 @@ struct SystemDef {
     Console console;                // installed and available are filled by the host
     std::vector<std::string> cores; // component ids, best first
     std::vector<std::string> platforms; // platform keys it is offered on; empty: all
+    std::string default_core; // the core chosen until the user picks one; empty: the first
 };
 
 struct ManifestSetting {

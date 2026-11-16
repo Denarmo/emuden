@@ -28,6 +28,18 @@ struct MultiFile {
     std::string track_naming; // "redump": "(Track 2)" files belong to track 1's game
 };
 
+/// Bytes at an offset of a file; `mask` (when given, as long as `bytes`) keeps only some bits.
+struct MagicBytes {
+    std::uint64_t offset = 0;
+    std::vector<std::uint8_t> bytes, mask;
+};
+
+/// One way a console's file looks (content.magic): every part must be there.
+struct Magic {
+    std::vector<MagicBytes> parts;
+    std::size_t Weight() const; // the bytes it compares: the more, the surer
+};
+
 /// One entry of a plugin manifest's systems[], as far as the library uses it.
 struct SystemDef {
     std::string id;         // "gba"; also the name of the system's ROM folder
@@ -44,6 +56,8 @@ struct SystemDef {
     bool cover_is_rom = false;
     std::optional<MultiFile> multi_file;
     std::vector<HeaderTitle> header_title;
+    std::vector<Magic> magic;
+    int rcheevos_console = 0; // achievements.rcheevos_console; 0: none
     std::string libretro_thumbnails; // folder in the libretro thumbnail collection
     /// Cover addresses (https) with "{id}" for the game file's own text, a short id such as a
     /// store's app id; tried in order. For consoles whose games are files naming an id.

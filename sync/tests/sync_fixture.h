@@ -16,6 +16,7 @@
 #include "den/base/files.h"
 #include "den/base/jobs.h"
 #include "den/base/json.h"
+#include "den/plugins/host.h"
 #include "den/store/settings.h"
 #include "den/sync/engine.h"
 #include "den/sync/names.h"
@@ -132,6 +133,8 @@ inline library::Entry Game(const std::string& id, const std::string& system, con
 struct Device {
     Scratch scratch;
     std::unique_ptr<store::Settings> settings;
+    Jobs jobs{1};
+    std::unique_ptr<plugins::Host> consoles; // the bundled manifests: which consoles sync
     std::vector<library::Entry> entries;
     std::shared_ptr<Engine> engine;
     std::int64_t clock = 1'800'000'000;
@@ -140,9 +143,11 @@ struct Device {
 
     Device(Cloud& cloud, const std::string& name, std::vector<std::string> categories = {"saves", "states"}) {
         settings = std::make_unique<store::Settings>(scratch.dir / "settings.json");
+        consoles = plugins::CreateHost({scratch.dir, &jobs, settings.get()});
         EngineConfig config;
         config.data_dir = scratch.dir;
         config.settings = settings.get();
+        config.consoles = consoles.get();
         config.device = name;
         config.now = [this] { return clock; };
         config.entries = [this] { return entries; };

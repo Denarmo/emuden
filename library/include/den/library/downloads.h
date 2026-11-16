@@ -41,6 +41,10 @@ bool IsBiosName(const std::string& file_name);
 /// The console a game file's first bytes say it is for, among `candidates` (all when empty);
 /// "" when they say nothing.
 std::string SniffSystem(const std::filesystem::path& file, const std::vector<std::string>& candidates);
+/// The console whose content.magic the file's bytes match, among `candidates` (all when
+/// empty); the one comparing the most bytes when several do. "" when none.
+std::string MagicSystem(const std::filesystem::path& file, const SystemTable& systems,
+                        const std::vector<std::string>& candidates);
 
 /// The name of a hack, from the title of the page it was downloaded from and the file's name:
 /// without its version, the site's name and file-name noise.
@@ -64,8 +68,10 @@ std::string GameName(const NameSources& sources);
 bool TidyFileName(const std::string& file_name);
 /// "POKEMON FIRE" -> "Pokemon Fire"; "" when the header's text says nothing.
 std::string HeaderName(const std::string& header_title);
-/// The text in a game's header (GB, GBC, GBA, NDS, N64); "" for other consoles or none.
-std::string HeaderTitle(const std::filesystem::path& file, const std::string& system);
+/// The text in a game's header: where the console's manifest says (content.header_title),
+/// else where the app knows it (GB, GBC, GBA, NDS, N64); "" for other consoles or none.
+std::string HeaderTitle(const std::filesystem::path& file, const std::string& system,
+                        const SystemDef* def = nullptr);
 /// "1.2.1" from "v1.2.1", "Version 1.2", "_v12"; "" when neither text has one.
 std::string HackVersion(const std::string& page_title, const std::string& file_name);
 /// How well a game's name fits a text (the hack's title and file name): the number of the

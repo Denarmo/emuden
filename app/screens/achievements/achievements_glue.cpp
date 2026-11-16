@@ -260,14 +260,10 @@ void RunOnMain(const std::function<void()>& work) {
 }
 
 std::uint32_t RaConsole(const std::string& system) {
-    if (Svc().plugins) {
-        for (const plugins::Console& console : Svc().plugins->Consoles()) {
-            if (console.id == system && console.rcheevos_console > 0) {
-                return static_cast<std::uint32_t>(console.rcheevos_console);
-            }
-        }
-    }
-    return achievements::ConsoleFor(system);
+    // The console's manifest says (achievements.rcheevos_console; 0 when its capabilities
+    // say no achievements).
+    const auto console = Svc().plugins ? Svc().plugins->FindConsole(system) : std::nullopt;
+    return console && console->rcheevos_console > 0 ? static_cast<std::uint32_t>(console->rcheevos_console) : 0;
 }
 
 std::string ServerHost() {

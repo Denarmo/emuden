@@ -80,9 +80,6 @@ Status PlayerSession::Start(const OpenRequest& request) {
     params.core = request.core;
     params.system_dir = request.system_dir;
     params.save_dir = paths_.save_dir;
-    for (const auto& [key, value] : ScreenOptionHints(request.system)) {
-        params.options[key] = value;
-    }
     for (const auto& [key, value] : request.option_hints) {
         params.options[key] = value;
     }
@@ -97,6 +94,7 @@ Status PlayerSession::Start(const OpenRequest& request) {
     }
     snapshot_.core_name = core_->Info().name;
     system_ = request.system;
+    screen_shapes_ = request.screens.empty() ? BuiltinScreens(request.system) : request.screens;
     game_key_ = request.game_id;
     for (char& c : game_key_) {
         if (!std::isalnum(static_cast<unsigned char>(c))) {

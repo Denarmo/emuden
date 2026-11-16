@@ -26,6 +26,7 @@ struct TogetherPlan {
     std::string core_id; // the core both devices play with
     std::string how;     // what it does, for the page
     unsigned subsystem = 0; // TGB Dual: both Game Boys on each device
+    plugins::NetplaySpec netplay; // the core's, from its manifest
 };
 
 /// How this game is played together: a link-cable or wireless core where the console's

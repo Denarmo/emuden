@@ -27,14 +27,20 @@ struct GameScreen {
     }
 };
 
-/// The screens of a console when the core's picture has the shape they are stacked in
-/// (the upper screen first); empty for every other console and every other shape, where
-/// the picture is one screen.
-std::vector<GameScreen> ScreensOf(const std::string& system, int frame_width, int frame_height);
+/// The screens a core's picture holds when its width over height is that of `frame_width`
+/// over `frame_height`; each screen's size is its part of the picture.
+struct ScreenShape {
+    int frame_width = 0, frame_height = 0;
+    std::vector<GameScreen> screens; // `part` and `touch`; the sizes are filled in by ScreensOf
+};
 
-/// Core options that make a core of the console draw its screens stacked without a gap,
-/// the shape ScreensOf knows. Applied below the user's own values.
-std::vector<std::pair<std::string, std::string>> ScreenOptionHints(const std::string& system);
+/// The screens of the shape the picture has (the upper screen first); empty when it has
+/// none of the shapes, and the picture is one screen.
+std::vector<GameScreen> ScreensOf(const std::vector<ScreenShape>& shapes, int frame_width, int frame_height);
+
+/// The shapes of the consoles the player knows without a plugin manifest saying (DS, 3DS,
+/// the GBA DS core's GBA), for an OpenRequest that brings none.
+const std::vector<ScreenShape>& BuiltinScreens(const std::string& system);
 
 /// Two screens on one display.
 enum class ScreenLayout { Stacked, SideBySide, LargeSmall, One };

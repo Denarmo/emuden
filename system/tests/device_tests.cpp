@@ -1,12 +1,15 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <string>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include "den/base/files.h"
 #include "den/store/settings.h"
 #include "den/system/device.h"
 #include "den/system/settings.h"
@@ -21,6 +24,41 @@ system::DeviceProfile Profile(const char* id) {
     const auto info = system::FakeDevice(id);
     REQUIRE(info);
     return system::Classify(*info);
+}
+
+// The tuned core options of every bundled console manifest, keyed as the app keys them.
+const std::vector<system::TuningRule>& BundledTuning() {
+    static const std::vector<system::TuningRule> rules = [] {
+        std::vector<system::TuningRule> out;
+        for (const auto& dir : std::filesystem::directory_iterator(DEN_BUNDLED_PLUGINS)) {
+            const auto text = ReadTextFile(dir.path() / "plugin.json");
+            const auto root = text ? ParseJson(*text) : std::nullopt;
+            const JsonValue* components = root ? root->Find("components") : nullptr;
+            for (const JsonValue& component : components ? components->items : std::vector<JsonValue>{}) {
+                const JsonValue* tuning = component.Find("tuning");
+                if (tuning == nullptr) {
+                    continue;
+                }
+                std::string name = component.String("options_name");
+                name = name.empty() ? component.String("id") : name;
+                std::string key;
+                for (const char c : name) {
+                    if (std::isalnum(static_cast<unsigned char>(c))) {
+                        key.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+                    }
+                }
+                for (system::TuningRule& rule : system::ParseTuning(*tuning, "core_options." + key + ".")) {
+                    out.push_back(std::move(rule));
+                }
+            }
+        }
+        return out;
+    }();
+    return rules;
+}
+
+std::vector<system::DeviceDefault> Defaults(const system::DeviceProfile& profile) {
+    return system::DeriveDefaults(profile, BundledTuning());
 }
 
 const JsonValue* Find(const std::vector<system::DeviceDefault>& defaults, const std::string& key) {
@@ -56,7 +94,7 @@ TEST_CASE("Retroid Pocket Duo: two screens, medium, a clearly bigger interface")
     CHECK(profile.form == FormFactor::HandheldDual);
     CHECK(profile.tier == Tier::Mid);
 
-    const auto defaults = system::DeriveDefaults(profile);
+    const auto defaults = Defaults(profile);
     CHECK(Number(defaults, "ui.scale") == Catch::Approx(1.55));
     CHECK(Flag(defaults, "window.fullscreen"));
     CHECK(Flag(defaults, "ui.companion.enabled"));
@@ -78,7 +116,7 @@ TEST_CASE("AYN Thor: two screens, high") {
     CHECK(profile.form == FormFactor::HandheldDual);
     CHECK(profile.tier == Tier::High);
 
-    const auto defaults = system::DeriveDefaults(profile);
+    const auto defaults = Defaults(profile);
     CHECK(Number(defaults, "ui.scale") == Catch::Approx(1.45));
     CHECK(Text(defaults, "player.dual_screen.mode") == "auto");
     CHECK(Number(defaults, "player.run_ahead") == 1);
@@ -96,7 +134,7 @@ TEST_CASE("Legion Go S: a handheld PC found by its family name") {
     CHECK(profile.form == FormFactor::HandheldSmall);
     CHECK(profile.tier == Tier::Mid);
 
-    const auto defaults = system::DeriveDefaults(profile);
+    const auto defaults = Defaults(profile);
     CHECK(Number(defaults, "ui.scale") == Catch::Approx(1.0));
     CHECK(Flag(defaults, "window.fullscreen"));
     CHECK(Find(defaults, "ui.companion.enabled") == nullptr);
@@ -117,7 +155,7 @@ TEST_CASE("a desktop PC: windowed, base size, very high by its GPU") {
     CHECK(profile.tier == Tier::VeryHigh);
     CHECK(profile.tier_reason.find("RTX") != std::string::npos);
 
-    const auto defaults = system::DeriveDefaults(profile);
+    const auto defaults = Defaults(profile);
     CHECK(Number(defaults, "ui.scale") == Catch::Approx(1.0));
     CHECK_FALSE(Flag(defaults, "window.fullscreen"));
     CHECK(Number(defaults, "player.refresh_hz") == 144);
@@ -138,7 +176,7 @@ TEST_CASE("other devices fall back on the GPU family and on memory") {
 
     const system::DeviceProfile phone = Profile("phone-low");
     CHECK(phone.tier == Tier::Low);
-    const auto defaults = system::DeriveDefaults(phone);
+    const auto defaults = Defaults(phone);
     CHECK_FALSE(Flag(defaults, "player.rewind"));
     CHECK(Text(defaults, "player.shader_weight") == "light");
     CHECK(Text(defaults, "core_options.ppsspp.ppsspp_internal_resolution") == "480x272");
@@ -153,8 +191,8 @@ TEST_CASE("other devices fall back on the GPU family and on memory") {
     const auto forced = system::Classify(*system::FakeDevice("desktop"), Tier::Low);
     CHECK(forced.tier == Tier::Low);
     CHECK(forced.detected == Tier::VeryHigh);
-    CHECK_FALSE(Flag(system::DeriveDefaults(forced), "player.rewind"));
-    CHECK(system::DescribeDefaults(forced).size() >= 4);
+    CHECK_FALSE(Flag(Defaults(forced), "player.rewind"));
+    CHECK(system::DescribeDefaults(forced, BundledTuning()).size() >= 4);
 }
 
 TEST_CASE("device defaults sit below the user's choices") {
@@ -165,7 +203,7 @@ TEST_CASE("device defaults sit below the user's choices") {
         store::Settings settings(dir / "settings.json");
         system::SettingsStore store(&settings, dir / "settings-overrides.json");
         std::vector<std::pair<std::string, JsonValue>> layer;
-        for (const auto& item : system::DeriveDefaults(Profile("retroid-pocket-duo"))) {
+        for (const auto& item : Defaults(Profile("retroid-pocket-duo"))) {
             layer.emplace_back(item.key, item.value);
         }
         settings.SetDefaults(std::move(layer));
@@ -189,4 +227,24 @@ TEST_CASE("device defaults sit below the user's choices") {
         CHECK(settings.GetNumber("ui.scale", 1.0) == Catch::Approx(1.0));
     }
     std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("tuned core options: the first case the device meets") {
+    const auto parsed = ParseJson(R"({"opt.a": [{"min_tier": "high", "min_screen_height": 1000, "value": "big"},
+                                                {"min_cpu_cores": 8, "value": "many"},
+                                                {"min_tier": "warp", "value": "never"},
+                                                {"value": "small", "describe": "Small"}]})");
+    REQUIRE(parsed);
+    const auto rules = system::ParseTuning(*parsed, "core_options.x.");
+    REQUIRE(rules.size() == 1);
+    CHECK(rules[0].key == "core_options.x.opt_a");
+    CHECK(rules[0].cases.size() == 3); // an unknown tier is left out
+    auto profile = Profile("desktop");
+    CHECK(system::TuneFor(rules[0], profile)->value == "big");
+    profile.info.screens = {system::Screen{1280, 720}};
+    profile.info.cpu_cores = 4;
+    CHECK(system::TuneFor(rules[0], profile)->value == "small");
+    const auto lines = system::DescribeDefaults(profile, rules);
+    CHECK(std::find(lines.begin(), lines.end(), "Small") != lines.end());
+    CHECK(Text(Defaults(Profile("retroid-pocket-duo")), "core_options.dolphinemu.dolphin_efb_scale") == "x1 (640 x 528)");
 }

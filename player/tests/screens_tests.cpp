@@ -11,29 +11,29 @@ using namespace den::player;
 using Catch::Approx;
 
 TEST_CASE("a Nintendo DS picture is two screens only when they are stacked") {
-    const auto screens = ScreensOf("nds", 256, 384);
+    const auto screens = ScreensOf(BuiltinScreens("nds"), 256, 384);
     REQUIRE(screens.size() == 2);
     CHECK(screens[0].part.y == 0);
     CHECK(screens[1].part.y == Approx(0.5f));
     CHECK(screens[1].height == 192);
     CHECK(!screens[0].touch);
     CHECK(screens[1].touch);
-    CHECK(ScreensOf("nds", 512, 768).size() == 2);
-    CHECK(ScreensOf("nds", 512, 192).empty()); // the core laid them side by side
-    CHECK(ScreensOf("gba", 256, 384).empty());
-    const auto gba = ScreensOf("gba", 240, 320); // the GBA DS core: game over second screen
+    CHECK(ScreensOf(BuiltinScreens("nds"), 512, 768).size() == 2);
+    CHECK(ScreensOf(BuiltinScreens("nds"), 512, 192).empty()); // the core laid them side by side
+    CHECK(ScreensOf(BuiltinScreens("gba"), 256, 384).empty());
+    const auto gba = ScreensOf(BuiltinScreens("gba"), 240, 320); // the GBA DS core: game over second screen
     REQUIRE(gba.size() == 2);
     CHECK(gba[1].height == 160);
     CHECK((!gba[0].touch && !gba[1].touch));
-    CHECK(ScreensOf("gba", 240, 160).empty());
-    const auto wide = ScreensOf("3ds", 400, 480);
+    CHECK(ScreensOf(BuiltinScreens("gba"), 240, 160).empty());
+    const auto wide = ScreensOf(BuiltinScreens("3ds"), 400, 480);
     REQUIRE(wide.size() == 2);
     CHECK(wide[1].width == 320);
     CHECK(wide[1].part.x == Approx(0.1f));
 }
 
 TEST_CASE("two screens on one display keep their shape and stay inside the room") {
-    const auto screens = ScreensOf("nds", 256, 384);
+    const auto screens = ScreensOf(BuiltinScreens("nds"), 256, 384);
     const gfx::Rect room{0, 0, 1280, 720};
     for (int layout = 0; layout < SCREEN_LAYOUTS; ++layout) {
         for (const bool swapped : {false, true}) {
@@ -67,7 +67,7 @@ TEST_CASE("two screens on one display keep their shape and stay inside the room"
 }
 
 TEST_CASE("whole multiples of the screen's own pixels") {
-    const auto screens = ScreensOf("nds", 256, 384);
+    const auto screens = ScreensOf(BuiltinScreens("nds"), 256, 384);
     const gfx::Rect fit = FitScreen(screens[1], gfx::Rect{0, 0, 1280, 960}, 1, true);
     CHECK(fit.w == Approx(1280));
     CHECK(fit.h == Approx(960));
@@ -75,4 +75,17 @@ TEST_CASE("whole multiples of the screen's own pixels") {
     CHECK(small.w == Approx(768));
     CHECK(small.h == Approx(576));
     CHECK(small.x == Approx(116));
+}
+
+TEST_CASE("screens from a plugin manifest's shapes, by the picture's proportions") {
+    // A console of two screens side by side, the right one touched.
+    const std::vector<ScreenShape> shapes = {
+        {320, 120, {GameScreen{gfx::Rect{0, 0, 0.5f, 1}}, GameScreen{gfx::Rect{0.5f, 0, 0.5f, 1}, 0, 0, true}}}};
+    const auto screens = ScreensOf(shapes, 640, 240);
+    REQUIRE(screens.size() == 2);
+    CHECK(screens[0].width == 320);
+    CHECK(screens[0].height == 240);
+    CHECK(screens[1].touch);
+    CHECK(ScreensOf(shapes, 640, 480).empty());
+    CHECK(ScreensOf({}, 256, 384).empty());
 }

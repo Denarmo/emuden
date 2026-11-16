@@ -30,6 +30,71 @@ bool Flag(const JsonValue& object, std::string_view key) {
     return value != nullptr && value->kind == JsonValue::Kind::Bool && value->boolean;
 }
 
+std::optional<std::vector<std::uint8_t>> Hex(const std::string& text) {
+    if (text.empty() || text.size() % 2 != 0 || text.size() > 128) {
+        return std::nullopt;
+    }
+    std::vector<std::uint8_t> out;
+    for (std::size_t i = 0; i < text.size(); i += 2) {
+        const auto digit = [](char c) {
+            return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
+        };
+        const int high = digit(text[i]), low = digit(text[i + 1]);
+        if (high < 0 || low < 0) {
+            return std::nullopt;
+        }
+        out.push_back(static_cast<std::uint8_t>(high << 4 | low));
+    }
+    return out;
+}
+
+std::optional<MagicBytes> ParseMagicBytes(const JsonValue& item) {
+    const JsonValue* offset = item.Find("offset");
+    const auto bytes = Hex(item.String("bytes"));
+    if (offset == nullptr || offset->kind != JsonValue::Kind::Number || offset->number < 0 ||
+        offset->number >= (1 << 24) || !bytes) {
+        return std::nullopt;
+    }
+    MagicBytes out{static_cast<std::uint64_t>(offset->number), *bytes, {}};
+    if (const std::string mask = item.String("mask"); !mask.empty()) {
+        const auto bits = Hex(mask);
+        if (!bits || bits->size() != out.bytes.size()) {
+            return std::nullopt;
+        }
+        out.mask = *bits;
+    }
+    return out;
+}
+
+// [{"offset": 4, "bytes": "24FF..", "also": [{"offset": 178, "bytes": "96"}]}, ...]
+std::vector<Magic> ParseMagic(const JsonValue* list) {
+    std::vector<Magic> out;
+    if (list == nullptr || list->kind != JsonValue::Kind::Array) {
+        return out;
+    }
+    for (const JsonValue& item : list->items) {
+        Magic magic;
+        auto first = ParseMagicBytes(item);
+        bool good = first.has_value();
+        if (first) {
+            magic.parts.push_back(std::move(*first));
+        }
+        if (const JsonValue* also = item.Find("also"); also != nullptr && also->kind == JsonValue::Kind::Array) {
+            for (const JsonValue& part : also->items) {
+                auto more = ParseMagicBytes(part);
+                good = good && more.has_value();
+                if (more) {
+                    magic.parts.push_back(std::move(*more));
+                }
+            }
+        }
+        if (good) {
+            out.push_back(std::move(magic));
+        }
+    }
+    return out;
+}
+
 std::optional<SystemDef> ParseSystem(const JsonValue& json) {
     SystemDef def;
     def.id = ToLower(json.String("id"));
@@ -60,6 +125,7 @@ std::optional<SystemDef> ParseSystem(const JsonValue& json) {
             rules.track_naming = multi->String("track_naming");
             def.multi_file = std::move(rules);
         }
+        def.magic = ParseMagic(content->Find("magic"));
         if (const JsonValue* fields = content->Find("header_title");
             fields != nullptr && fields->kind == JsonValue::Kind::Array) {
             for (const JsonValue& field : fields->items) {
@@ -71,6 +137,13 @@ std::optional<SystemDef> ParseSystem(const JsonValue& json) {
                                                 static_cast<std::size_t>(length->number)});
                 }
             }
+        }
+    }
+    if (const JsonValue* achievements = json.Find("achievements"); achievements != nullptr) {
+        const JsonValue* console = achievements->Find("rcheevos_console");
+        if (console != nullptr && console->kind == JsonValue::Kind::Number && console->number > 0 &&
+            console->number < 65536) {
+            def.rcheevos_console = static_cast<int>(console->number);
         }
     }
     if (const JsonValue* artwork = json.Find("artwork"); artwork != nullptr) {
@@ -158,6 +231,14 @@ const std::vector<std::string>& BuiltinRomExtensions() {
     return extensions;
 }
 
+std::size_t Magic::Weight() const {
+    std::size_t weight = 0;
+    for (const MagicBytes& part : parts) {
+        weight += part.bytes.size();
+    }
+    return weight;
+}
+
 SystemTable::SystemTable() : systems_(BuiltinSystems()) {}
 
 void SystemTable::Set(std::vector<SystemDef> systems) {
@@ -191,6 +272,15 @@ void SystemTable::Merge(std::vector<SystemDef> systems) {
         }
         if (def.cover_by_id.empty()) {
             def.cover_by_id = found->cover_by_id;
+        }
+        if (def.header_title.empty()) {
+            def.header_title = found->header_title;
+        }
+        if (def.magic.empty()) {
+            def.magic = found->magic;
+        }
+        if (def.rcheevos_console == 0) {
+            def.rcheevos_console = found->rcheevos_console;
         }
         *found = std::move(def);
     }

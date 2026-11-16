@@ -199,7 +199,7 @@ void SetupWork::SetUpGames(std::vector<GameGroup> groups, const fs::path& base) 
             sources.file_name = PathToUtf8(group.main.filename());
             sources.page_title = groups.size() == 1 ? request.page_title : std::string();
             sources.archive_name = PathKey(base) != PathKey(setup.downloads_) ? record.download : std::string();
-            sources.header_title = HeaderName(HeaderTitle(group.main, group.system));
+            sources.header_title = HeaderName(HeaderTitle(group.main, group.system, systems.Find(group.system)));
             const std::string name = GameName(sources);
             if (auto hack = SetUpPatchedRom(group, name)) {
                 hacks.push_back(std::move(*hack));

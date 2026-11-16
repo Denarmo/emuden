@@ -79,7 +79,7 @@ public:
         switch (step_) {
         case 0:
             text("EmuDEN chose these settings for this device. Settings > Device changes them.");
-            for (const std::string& line : system::DescribeDefaults(system::Device())) {
+            for (const std::string& line : system::DescribeDefaults(system::Device(), system::Tuning())) {
                 list->Emplace<ui::Label>(line);
             }
             break;

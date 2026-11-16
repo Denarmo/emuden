@@ -19,9 +19,6 @@ namespace den::app {
 
 namespace {
 
-constexpr unsigned GAMEBOY_LINK_2P = 0x101;   // RETRO_GAME_TYPE_GAMEBOY_LINK_2P
-constexpr unsigned GAMEBOY_1_SRAM = 0x100;    // RETRO_MEMORY_GAMEBOY_1_SRAM
-constexpr unsigned GAMEBOY_2_SRAM = 0x300;    // TGB Dual: RETRO_MEMORY_GAMEBOY_2_SRAM is (3 << 8) | SAVE_RAM
 constexpr double BROWSE_IDLE_SECONDS = 3.0;   // a browser no page asked for in that long stops
 constexpr std::size_t MAX_SAVE_BYTES = 1u << 20;
 
@@ -76,29 +73,21 @@ TogetherPlan PlanFor(const library::Entry& game) {
         plan.reason = "This console's plugin does not play together.";
         return plan;
     }
-    const auto has_core = [&](const std::string& id) {
-        for (const plugins::CoreInfo& core : Svc().plugins->CoresFor(game.system)) {
-            if (core.id == id) {
-                return true;
-            }
+    // A core that links the way the console's games do (two Game Boys, two GBA, DS wireless)
+    // says so in its manifest; any other is played in lockstep, one console for two players.
+    std::optional<plugins::CoreInfo> linked;
+    for (plugins::CoreInfo& core : Svc().plugins->CoresFor(game.system)) {
+        if (!core.netplay.mode.empty()) {
+            linked = std::move(core);
+            break;
         }
-        return false;
-    };
-    if ((game.system == "gb" || game.system == "gbc") && has_core("tgbdual")) {
-        plan.mode = net::Mode::Lockstep;
-        plan.core_id = "tgbdual";
-        plan.subsystem = GAMEBOY_LINK_2P;
-        plan.how = "A link cable between two Game Boys: each device runs both, linked, and shows its own. "
-                   "Trades and battles work as on the real consoles; each keeps its own save.";
-    } else if (game.system == "gba" && has_core("gpsp")) {
-        plan.mode = net::Mode::Link;
-        plan.core_id = "gpsp";
-        plan.how = "A link cable or wireless adapter between two Game Boy Advance, played with gpSP. "
-                   "Each device plays its own game and save; in Pokemon go to a Pokemon Center's upper floor.";
-    } else if (game.system == "nds" && has_core("melondsds")) {
-        plan.mode = net::Mode::Link;
-        plan.core_id = "melondsds";
-        plan.how = "Local wireless between two DS, played with melonDS DS. Each device plays its own game and save.";
+    }
+    if (linked) {
+        plan.mode = linked->netplay.mode == "link" ? net::Mode::Link : net::Mode::Lockstep;
+        plan.core_id = linked->id;
+        plan.subsystem = linked->netplay.subsystem;
+        plan.how = linked->netplay.description;
+        plan.netplay = linked->netplay;
     } else if (const auto core = CoreForGame(game)) {
         plan.mode = net::Mode::Lockstep;
         plan.core_id = core->id;
@@ -254,14 +243,15 @@ player::TogetherRequest Together::RequestFor(const library::Entry& game) const {
         return request;
     }
     const bool host = request.party->IsHost();
-    if (plan_.subsystem == GAMEBOY_LINK_2P) {
-        // Each device runs both Game Boys: its own with its save, the other's with that one.
+    const plugins::NetplaySpec::Side& own = host ? plan_.netplay.host : plan_.netplay.guest;
+    const plugins::NetplaySpec::Side& other = host ? plan_.netplay.guest : plan_.netplay.host;
+    request.options = own.options;
+    if (plan_.subsystem != 0) {
+        // Each device runs both consoles (TGB Dual's Game Boys): its own with its save, the
+        // other's with that one.
         request.subsystem = plan_.subsystem;
-        request.save_memory = host ? GAMEBOY_1_SRAM : GAMEBOY_2_SRAM;
-        request.peer_save_memory = host ? GAMEBOY_2_SRAM : GAMEBOY_1_SRAM;
-        request.options = {{"tgbdual_gblink_enable", "enabled"},
-                           {"tgbdual_single_screen_mp", host ? "player 1 only" : "player 2 only"},
-                           {"tgbdual_audio_output", host ? "Game Boy #1" : "Game Boy #2"}};
+        request.save_memory = own.save_memory;
+        request.peer_save_memory = other.save_memory;
     } else if (plan_.mode == net::Mode::Lockstep && !host) {
         request.write_saves = false; // the guest plays the host's game
     }

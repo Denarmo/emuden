@@ -197,10 +197,10 @@ fs::path EngineImpl::SyncDir(const std::string& provider) const {
 }
 
 std::set<std::string> EngineImpl::PcSystems() const {
-    std::set<std::string> pc{"steam"};
+    std::set<std::string> pc;
     if (config_.consoles != nullptr) {
         for (const plugins::Console& console : config_.consoles->Consoles()) {
-            if (console.group == "pc") {
+            if (!console.sync) {
                 pc.insert(console.id);
             }
         }

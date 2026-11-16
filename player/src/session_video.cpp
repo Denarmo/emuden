@@ -163,7 +163,7 @@ std::vector<GameScreen> PlayerSession::Screens() const {
         return {};
     }
     const VideoFrame& frame = core_->Frame();
-    return ScreensOf(system_, static_cast<int>(frame.width), static_cast<int>(frame.height));
+    return ScreensOf(screen_shapes_, static_cast<int>(frame.width), static_cast<int>(frame.height));
 }
 
 void PlayerSession::DrawScreen(gfx::Canvas& canvas, int screen, const gfx::Rect& target) {

@@ -13,6 +13,7 @@
 
 #include "den/base/archive.h"
 #include "den/base/files.h"
+#include "den/library/content.h"
 #include "den/library/downloads.h"
 #include "den/library/scan.h"
 #include "den/patching/patch.h"
@@ -226,6 +227,41 @@ std::string SniffSystem(const fs::path& file, const std::vector<std::string>& ca
     return {};
 }
 
+std::string MagicSystem(const fs::path& file, const SystemTable& systems, const std::vector<std::string>& candidates) {
+    std::ifstream in(file, std::ios::binary);
+    if (!in) {
+        return {};
+    }
+    std::string best;
+    std::size_t best_weight = 0;
+    for (const SystemDef& def : systems.All()) {
+        if (!Wanted(candidates, def.id)) {
+            continue;
+        }
+        for (const Magic& magic : def.magic) {
+            const bool match = !magic.parts.empty() && std::all_of(magic.parts.begin(), magic.parts.end(),
+                [&](const MagicBytes& part) {
+                    const Bytes data = ReadAt(in, part.offset, part.bytes.size());
+                    if (data.size() != part.bytes.size()) {
+                        return false;
+                    }
+                    for (std::size_t i = 0; i < data.size(); ++i) {
+                        const std::uint8_t mask = part.mask.empty() ? 0xFF : part.mask[i];
+                        if ((data[i] & mask) != (part.bytes[i] & mask)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                });
+            if (match && magic.Weight() > best_weight) {
+                best = def.id;
+                best_weight = magic.Weight();
+            }
+        }
+    }
+    return best;
+}
+
 bool IsBiosName(const std::string& file_name) {
     const std::string name = ToLower(file_name);
     if (name.find("[bios]") != std::string::npos || name.find("(bios)") != std::string::npos) {
@@ -308,14 +344,18 @@ Identity Identify(const fs::path& file, const SystemTable& systems, const std::v
             }
         }
     }
-    // The bytes: a console's header, or a disc's track under a cartridge's extension (".bin").
-    if (const SystemDef* sniffed = systems.Find(SniffSystem(probe, {}))) {
+    // The bytes: a console's header (its manifest's magic first), or a disc's track under a
+    // cartridge's extension (".bin").
+    std::string by_magic = MagicSystem(probe, systems, {});
+    if (const SystemDef* sniffed = systems.Find(by_magic.empty() ? SniffSystem(probe, {}) : by_magic)) {
         const bool disc = std::find(sniffed->extensions.begin(), sniffed->extensions.end(), "cue") != sniffed->extensions.end();
         if (candidates.empty() || Wanted(candidates, sniffed->id) || (disc && extension != "cue" && extension != "m3u")) {
             return {Kind::Game, sniffed->id, {}};
         }
     }
-    if (std::string sniffed = SniffSystem(probe, candidates); !sniffed.empty() && systems.Find(sniffed) != nullptr) {
+    by_magic = MagicSystem(probe, systems, candidates);
+    if (std::string sniffed = by_magic.empty() ? SniffSystem(probe, candidates) : by_magic;
+        !sniffed.empty() && systems.Find(sniffed) != nullptr) {
         return {Kind::Game, sniffed, {}};
     }
     // The words around the file: a folder named for the console, or its name in the title.
@@ -358,7 +398,10 @@ Identity Identify(const fs::path& file, const SystemTable& systems, const std::v
     return {Kind::Unknown, {}, "it could be a game for " + names + ", and nothing in it says which"};
 }
 
-std::string HeaderTitle(const fs::path& file, const std::string& system) {
+std::string HeaderTitle(const fs::path& file, const std::string& system, const SystemDef* def) {
+    if (def != nullptr && !def->header_title.empty()) {
+        return ReadRomHeaderTitle(*def, file);
+    }
     struct Place {
         std::string_view system;
         std::uint64_t offset;

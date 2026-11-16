@@ -66,6 +66,7 @@ struct HackQuery {
     std::string header; // the title in the ROM's header, if any
     const ThumbnailIndex* libretro = nullptr;
     std::string libretro_folder; // the system's folder in the libretro collection
+    int ra_console = 0;          // the system's RetroAchievements console; 0: none
 };
 
 /// Asks the sources. Blocking: call it from a job. Safe from several threads; requests to

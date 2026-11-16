@@ -25,13 +25,6 @@ constexpr std::string_view THUMBNAIL_HOST = "https://thumbnails.libretro.com/";
 constexpr int MIN_SCORE = 30;
 constexpr std::size_t MAX_CANDIDATES = 12;
 
-// RetroAchievements' console ids by system id.
-constexpr std::pair<std::string_view, int> RA_CONSOLES[] = {
-    {"megadrive", 1}, {"genesis", 1}, {"n64", 2},  {"snes", 3},      {"gb", 4},   {"gba", 5},
-    {"gbc", 6},       {"nes", 7},     {"pce", 8},  {"mastersystem", 11}, {"sms", 11}, {"psx", 12},
-    {"gamegear", 15}, {"gg", 15},     {"nds", 18}, {"psp", 41},
-};
-
 std::int64_t NowMs() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
                std::chrono::steady_clock::now().time_since_epoch())
@@ -179,12 +172,7 @@ void HackSources::FromLibretro(const HackQuery& query, std::vector<CoverCandidat
 // API needs the user's key. The console's list is kept for a month, as its documentation asks.
 void HackSources::FromRetroAchievements(const HackQuery& query, const std::string& key,
                                         std::vector<CoverCandidate>& out, bool& answered) {
-    int console = 0;
-    for (const auto& [system, id] : RA_CONSOLES) {
-        if (system == query.system) {
-            console = id;
-        }
-    }
+    const int console = query.ra_console;
     if (console == 0) {
         return;
     }

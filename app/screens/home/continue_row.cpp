@@ -76,7 +76,7 @@ std::vector<ContinueCard> ContinueCards() {
     request.own_play = svc.library->OwnPlay();
     request.limit = CARDS;
     for (const plugins::Console& console : svc.plugins->Consoles()) {
-        if (console.group == "pc") {
+        if (!console.sync) {
             request.never.insert(console.id);
         }
     }

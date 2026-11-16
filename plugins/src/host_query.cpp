@@ -230,6 +230,11 @@ const Component* RealHost::ChosenCore(const Loaded& loaded, const SystemDef& sys
             }
         }
     }
+    for (const Component* core : cores) {
+        if (core->id == system.default_core) {
+            return core;
+        }
+    }
     return cores.front();
 }
 
@@ -345,8 +350,13 @@ CoreInfo RealHost::Describe(const Loaded& loaded, const SystemDef& system, const
     info.system = system.console.id;
     info.system_dir = bios_dir_;
     info.needs_gl = core.opengl;
-    info.option_hints = core.forced_core_options;
+    info.option_hints = core.option_hints;
+    info.option_hints.insert(info.option_hints.end(), core.forced_core_options.begin(), core.forced_core_options.end());
     AddSettingHints(loaded, system, core, info);
+    info.screens = core.screens.empty() ? system.console.screens : core.screens;
+    info.netplay = core.netplay;
+    info.options_name = core.options_name.empty() ? core.id : core.options_name;
+    info.tuning = core.tuning;
     info.widescreen_options = core.widescreen_options;
     info.widescreen_restart = core.widescreen_restart;
     info.games = core.games;

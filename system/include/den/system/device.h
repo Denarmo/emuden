@@ -79,10 +79,35 @@ std::optional<Tier> TierFromId(std::string_view id);
 
 /// Form factor and tier from the facts; `override_tier` replaces the detected tier.
 DeviceProfile Classify(DeviceInfo info, std::optional<Tier> override_tier = std::nullopt);
-/// The settings that suit the profile.
-std::vector<DeviceDefault> DeriveDefaults(const DeviceProfile& profile);
+/// One value of a tuned setting: it is chosen when the device meets every bound it gives.
+struct TuningCase {
+    std::optional<Tier> min_tier;
+    int min_screen_height = 0; // of the main screen, landscape
+    int min_cpu_cores = 0;
+    std::string value;
+    std::string describe; // a few words for the setup page ("PSP 3x"); empty: not shown
+    bool operator==(const TuningCase&) const = default;
+};
+
+/// A setting chosen by device: a core option a console plugin tunes (its components'
+/// "tuning"). The first case the device meets wins; none: no default.
+struct TuningRule {
+    std::string key; // "core_options.ppsspp.ppsspp_internal_resolution"
+    std::vector<TuningCase> cases;
+    bool operator==(const TuningRule&) const = default;
+};
+
+/// A component's tuning object, {"<option>": [{"min_tier": "mid", "min_screen_height": 605,
+/// "min_cpu_cores": 4, "value": "...", "describe": "..."}, ...]}; each key is `key_prefix`
+/// and the option with dots as underscores. Cases without a value are left out.
+std::vector<TuningRule> ParseTuning(const JsonValue& tuning, const std::string& key_prefix);
+/// The case of the rule the device meets first; null when none.
+const TuningCase* TuneFor(const TuningRule& rule, const DeviceProfile& profile);
+
+/// The settings that suit the profile, with the plugins' tuned core options.
+std::vector<DeviceDefault> DeriveDefaults(const DeviceProfile& profile, const std::vector<TuningRule>& tuning = {});
 /// What was chosen, as short lines for the setup page ("Interface size: 145%").
-std::vector<std::string> DescribeDefaults(const DeviceProfile& profile);
+std::vector<std::string> DescribeDefaults(const DeviceProfile& profile, const std::vector<TuningRule>& tuning = {});
 /// A made-up device by id, for tests and EMUDEN_FAKE_DEVICE.
 std::optional<DeviceInfo> FakeDevice(std::string_view id);
 
@@ -92,6 +117,9 @@ std::optional<DeviceInfo> FakeDevice(std::string_view id);
 /// the app's use of this module). Call once at startup, before settings are read.
 void InitDevice(store::Settings& settings);
 void ShutdownDevice();
+/// The tuned core options of the installed console plugins; the defaults are derived again.
+void SetTuning(std::vector<TuningRule> rules);
+const std::vector<TuningRule>& Tuning();
 /// The graphics context exists: the GPU's name refines the tier and the defaults.
 void NoteGpu(const std::string& renderer, const std::string& version);
 const DeviceProfile& Device();

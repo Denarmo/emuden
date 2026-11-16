@@ -1,9 +1,13 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <cstring>
+#include <tuple>
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "../../patching/tests/encoders.h"
+#include "den/base/files.h"
 #include "den/base/hash.h"
 #include "den/base/jobs.h"
 #include "den/library/downloads.h"
@@ -423,4 +427,56 @@ TEST_CASE("downloads: a ROM patched already becomes a hack of the user's game wi
     // A game with the same code named as that game is a game, not a hack.
     WriteFile(f.downloads / "Monster Quest (Europe).gba", gba("MONSTERQUEST", "AMQE", 33));
     CHECK(f.Run("Monster Quest (Europe).gba").record.outcome == Outcome::Added);
+}
+
+TEST_CASE("downloads: a console's manifest magic decides before the app's own checks") {
+    const fs::path dir = FreshDir("magic");
+    SystemTable systems;
+    systems.Merge(ParseSystems(R"({"id":"duo","name":"Duo","content":{"extensions":["bin"],
+        "magic":[{"offset":2,"bytes":"ABCD","also":[{"offset":5,"bytes":"10","mask":"F0"}]}]}})"));
+    Bytes rom(64, 0);
+    rom[2] = 0xAB, rom[3] = 0xCD, rom[5] = 0x1F;
+    WriteFile(dir / "Game.bin", rom);
+    CHECK(MagicSystem(dir / "Game.bin", systems, {}) == "duo");
+    CHECK(Identify(dir / "Game.bin", systems).system == "duo");
+    rom[5] = 0x2F; // the masked part no longer fits
+    WriteFile(dir / "Other.bin", rom);
+    CHECK(MagicSystem(dir / "Other.bin", systems, {}).empty());
+
+    // The official manifests' magic says what the app's own checks say.
+    SystemTable official;
+    for (const auto& plugin : fs::directory_iterator(DEN_BUNDLED_PLUGINS)) {
+        if (const auto text = ReadTextFile(plugin.path() / "plugin.json")) {
+            official.Merge(ParseSystems(*text));
+        }
+    }
+    Bytes genesis = MakeRom(0x4000, 2);
+    std::memcpy(genesis.data() + 0x100, "SEGA GENESIS    ", 16);
+    Bytes mars = genesis;
+    std::memcpy(mars.data() + 0x100, "SEGA 32X        ", 16);
+    Bytes gba = MakeRom(0x200, 3);
+    const std::uint8_t logo[] = {0x24, 0xFF, 0xAE, 0x51, 0x69, 0x9A, 0xA2, 0x21};
+    std::memcpy(gba.data() + 4, logo, sizeof logo);
+    gba[0xB2] = 0x96;
+    Bytes nds = MakeRom(0x200, 4);
+    std::memcpy(nds.data() + 0xC0, logo, sizeof logo);
+    Bytes gb = MakeRom(0x200, 5);
+    const std::uint8_t gb_logo[] = {0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B};
+    std::memcpy(gb.data() + 0x104, gb_logo, sizeof gb_logo);
+    gb[0x143] = 0x00;
+    Bytes gbc = gb;
+    gbc[0x143] = 0x80;
+    Bytes gg = MakeRom(0x8000, 6);
+    std::memcpy(gg.data() + 0x7FF0, "TMR SEGA", 8);
+    gg[0x7FFF] = 0x6C;
+    Bytes sms = gg;
+    sms[0x7FFF] = 0x4C;
+    for (const auto& [name, bytes, system] : std::vector<std::tuple<std::string, Bytes, std::string>>{
+             {"a.bin", genesis, "genesis"}, {"b.bin", mars, "32x"}, {"c.bin", gba, "gba"}, {"d.bin", nds, "nds"},
+             {"e.bin", gb, "gb"}, {"f.bin", gbc, "gbc"}, {"g.bin", gg, "gg"}, {"h.bin", sms, "sms"}}) {
+        INFO(system);
+        WriteFile(dir / name, bytes);
+        CHECK(MagicSystem(dir / name, official, {}) == system);
+        CHECK(SniffSystem(dir / name, {}) == system);
+    }
 }

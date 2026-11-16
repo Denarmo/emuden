@@ -157,6 +157,7 @@ private:
     std::filesystem::path content_cache_;
     Snapshot snapshot_;
     std::string system_;
+    std::vector<ScreenShape> screen_shapes_;
     AvInfo av_;
 
     // Achievements.

@@ -145,7 +145,9 @@ TEST_CASE("sources with a key are asked only with a key, and choices are downloa
         R"({"success":true,"data":[{"url":"https://cdn2.steamgriddb.com/grid/a.png"}]})";
     web.pages["https://cdn2.steamgriddb.com/grid/a.png"] = PNG;
 
-    const SystemTable systems;
+    // The console's RetroAchievements id comes from its manifest.
+    SystemTable systems;
+    systems.Merge(ParseSystems(R"({"id":"gba","name":"Game Boy Advance","achievements":{"rcheevos_console":5}})"));
     const SystemDef* gba = systems.Find("gba");
     Artwork artwork(dir, web.Plain(), web.Fetcher());
     // No key: neither site is asked.

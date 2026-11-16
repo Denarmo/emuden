@@ -7,6 +7,7 @@
 #pragma once
 
 #include <array>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -29,6 +30,17 @@ int GameButtonFromName(std::string_view name);
 /// "south", "east", ... for settings; PadButton::Count when unknown.
 const char* PadButtonName(input::PadButton button);
 input::PadButton PadButtonFromName(std::string_view name);
+
+/// What a console's own pad is like, from its plugin manifest (presentation.layout and
+/// digital_only); for what a manifest does not say, the player's own lists of consoles.
+struct PadTraits {
+    bool nintendo_layout = false; // A on the right and B below it
+    bool digital_only = false;    // no stick: the left stick is the D-pad too
+};
+/// Called by the app for each console its plugins describe; any thread.
+void SetPadTraits(const std::string& system, std::optional<bool> nintendo_layout,
+                  std::optional<bool> digital_only);
+PadTraits PadTraitsOf(std::string_view system);
 
 /// For each game button, the pad button that presses it (PadButton::Count = none).
 using ButtonMap = std::array<input::PadButton, GAME_BUTTONS>;

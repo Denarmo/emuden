@@ -24,11 +24,6 @@ struct Plan {
     bool rewind = true;
     int run_ahead = 0;
     int audio_latency_ms = 80;
-    int psp_scale = 1;       // times 480x272
-    int height_43 = 480;     // Nintendo 64 and Dreamcast, 4:3
-    bool ps1_enhanced = false;
-    bool nds_threaded = false;
-    int gamecube_scale = 1;
     const char* engine_resolution = "1x";
     bool engine_docked = true;
 };
@@ -96,19 +91,6 @@ Plan MakePlan(const DeviceProfile& profile) {
     // Android's sound path is longer and less even than a desktop's.
     plan.audio_latency_ms = ByTier(tier, 112, 80, 64, 48) + (android ? 16 : 0);
 
-    // Internal resolutions: as sharp as the screen shows, no more than the tier affords.
-    const int psp_wanted = std::max(1, static_cast<int>(std::ceil(screen.height * 0.9 / 272.0)));
-    plan.psp_scale = std::min(psp_wanted, ByTier(tier, 1, 3, 5, 8));
-    const int target = std::min(screen.height, ByTier(tier, 480, 720, 1080, 1440));
-    for (const int height : {480, 720, 960, 1080, 1200, 1440}) {
-        if (height <= target) {
-            plan.height_43 = height;
-        }
-    }
-    plan.ps1_enhanced = tier >= Tier::Mid;
-    plan.nds_threaded = profile.info.cpu_cores >= 4;
-    plan.gamecube_scale = tier == Tier::VeryHigh && screen.height >= 1080 ? 3 : tier >= Tier::High ? 2 : 1;
-
     plan.engine_docked = !handheld || tier >= Tier::High;
     plan.engine_resolution = tier == Tier::Low    ? "0.5x"
                              : tier == Tier::Mid  ? (handheld ? "0.75x" : "1x")
@@ -117,17 +99,13 @@ Plan MakePlan(const DeviceProfile& profile) {
     return plan;
 }
 
-std::string Size43(int height) {
-    return std::format("{}x{}", height * 4 / 3, height);
-}
-
 std::string Percent(float scale) {
     return std::format("{}%", static_cast<int>(scale * 100.0f + 0.5f));
 }
 
 } // namespace
 
-std::vector<DeviceDefault> DeriveDefaults(const DeviceProfile& profile) {
+std::vector<DeviceDefault> DeriveDefaults(const DeviceProfile& profile, const std::vector<TuningRule>& tuning) {
     const Plan plan = MakePlan(profile);
     std::vector<DeviceDefault> out;
     const auto text = [&](std::string key, const std::string& value) {
@@ -151,22 +129,13 @@ std::vector<DeviceDefault> DeriveDefaults(const DeviceProfile& profile) {
     number(RUN_AHEAD_KEY, plan.run_ahead);
     number(AUDIO_LATENCY_KEY, plan.audio_latency_ms);
 
-    // The core that plays each console. Every tier gets the core with a download today; the
-    // table is where a faster or more exact core per tier goes.
-    text("plugins.core.psx", "pcsx_rearmed");
-    text("plugins.core.nds", "melonds");
-    text("plugins.core.n64", "mupen64plus_next");
-    text("plugins.core.snes", "snes9x");
-    text("plugins.core.gba", "mgba");
-
-    text("core_options.ppsspp.ppsspp_internal_resolution",
-         std::format("{}x{}", 480 * plan.psp_scale, 272 * plan.psp_scale));
-    text("core_options.pcsxrearmed.pcsx_rearmed_neon_enhancement_enable", plan.ps1_enhanced ? "enabled" : "disabled");
-    text("core_options.melonds.melonds_threaded_renderer", plan.nds_threaded ? "enabled" : "disabled");
-    text("core_options.mupen64plusnext.mupen64plus-43screensize", Size43(plan.height_43));
-    text("core_options.flycast.flycast_internal_resolution", Size43(plan.height_43));
-    text("core_options.dolphinemu.dolphin_efb_scale",
-         std::format("x{} ({} x {})", plan.gamecube_scale, 640 * plan.gamecube_scale, 528 * plan.gamecube_scale));
+    // The console plugins' tuned core options (internal resolutions and the like); the core
+    // that plays each console is the manifest's default_core.
+    for (const TuningRule& rule : tuning) {
+        if (const TuningCase* chosen = TuneFor(rule, profile)) {
+            text(rule.key, chosen->value);
+        }
+    }
 
     // Passed to the Switch 2 engine once it takes settings (contract level 2); level 0 ignores them.
     text("engine.switch2.settings.resolution", plan.engine_resolution);
@@ -175,7 +144,7 @@ std::vector<DeviceDefault> DeriveDefaults(const DeviceProfile& profile) {
     return out;
 }
 
-std::vector<std::string> DescribeDefaults(const DeviceProfile& profile) {
+std::vector<std::string> DescribeDefaults(const DeviceProfile& profile, const std::vector<TuningRule>& tuning) {
     const Plan plan = MakePlan(profile);
     std::vector<std::string> lines;
     lines.push_back(std::format("{}, {} performance", Label(profile.form),
@@ -186,8 +155,16 @@ std::vector<std::string> DescribeDefaults(const DeviceProfile& profile) {
     if (plan.two_screens) {
         lines.emplace_back("Both screens: two-screen games and details on the second one");
     }
-    lines.push_back(std::format("PSP {}x, PlayStation {}, Nintendo 64 and Dreamcast {}", plan.psp_scale,
-                                plan.ps1_enhanced ? "sharper" : "original", Size43(plan.height_43)));
+    std::string tuned;
+    for (const TuningRule& rule : tuning) {
+        const TuningCase* chosen = TuneFor(rule, profile);
+        if (chosen != nullptr && !chosen->describe.empty()) {
+            tuned += (tuned.empty() ? "" : ", ") + chosen->describe;
+        }
+    }
+    if (!tuned.empty()) {
+        lines.push_back(tuned);
+    }
     lines.push_back(std::format("{} Hz screen, rewind {}, run-ahead {}, sound delay {} ms", plan.refresh_hz,
                                 plan.rewind ? "on" : "off", plan.run_ahead > 0 ? "on" : "off",
                                 plan.audio_latency_ms));

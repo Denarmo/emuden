@@ -20,6 +20,12 @@ Status ParseDepends(const JsonValue& depends, Manifest& manifest);
 void ApplyCapabilities(const JsonValue* manifest_level, const JsonValue* system_level, Console& console);
 /// The "ecp", "executable" and "android" members of an engine-app component.
 Result<EngineAppSpec> ParseEngineApp(const JsonValue& component);
+/// presentation.screens: the shapes a core's picture may have (manifest_presentation.cpp).
+std::vector<ScreenShape> ParseScreens(const JsonValue& shapes);
+/// The members of a system's presentation and content beyond the scan rules.
+void ParsePresentation(const JsonValue& presentation, Console& console);
+/// option_hints, presentation, netplay, options_name and tuning of a core component.
+void ParseCoreExtras(const JsonValue& value, Component& component);
 /// A signing certificate digest as lower-case hex without separators ("AB:CD:.." or "abcd..").
 std::string NormalCertDigest(std::string_view text);
 

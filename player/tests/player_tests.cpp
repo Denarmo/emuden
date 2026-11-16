@@ -166,6 +166,23 @@ TEST_CASE("pads map by position, and by label on Nintendo consoles") {
     REQUIRE(MapPad(stick, "psp", true).lx > 29000);
 }
 
+TEST_CASE("a console's manifest says how its pad is laid out") {
+    using input::PadButton;
+    using input::PadFamily;
+    // A console the player has no list entry for: Nintendo's layout and no stick, as said.
+    REQUIRE(MapPad(Pad({PadButton::South}, PadFamily::Xbox), "newcon", true).buttons == RETRO_B);
+    SetPadTraits("newcon", true, true);
+    CHECK(PadTraitsOf("newcon").nintendo_layout);
+    REQUIRE(MapPad(Pad({PadButton::South}, PadFamily::Xbox), "newcon", true).buttons == RETRO_A);
+    input::PadState stick = Pad({});
+    stick.lx = 0.9f;
+    REQUIRE(MapPad(stick, "newcon", true).buttons == RETRO_RIGHT);
+    // What the manifest leaves out stays as the player's list has it.
+    SetPadTraits("othercon-psx", std::nullopt, false);
+    CHECK_FALSE(PadTraitsOf("othercon-psx").digital_only);
+    CHECK(PadTraitsOf("gba").nintendo_layout);
+}
+
 TEST_CASE("remapped buttons are kept per console") {
     using input::PadButton;
     using input::PadFamily;

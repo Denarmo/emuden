@@ -76,47 +76,6 @@ Result<std::string> Hash(std::uint32_t console, const std::string& path, std::sp
 
 } // namespace
 
-std::uint32_t ConsoleFor(std::string_view system) {
-    static const std::map<std::string_view, std::uint32_t> consoles = {
-        {"32x", RC_CONSOLE_SEGA_32X},
-        {"arcade", RC_CONSOLE_ARCADE},
-        {"atari2600", RC_CONSOLE_ATARI_2600},
-        {"atari5200", RC_CONSOLE_ATARI_5200},
-        {"atari7800", RC_CONSOLE_ATARI_7800},
-        {"dreamcast", RC_CONSOLE_DREAMCAST},
-        {"gamecube", RC_CONSOLE_GAMECUBE},
-        {"gb", RC_CONSOLE_GAMEBOY},
-        {"gba", RC_CONSOLE_GAMEBOY_ADVANCE},
-        {"gbc", RC_CONSOLE_GAMEBOY_COLOR},
-        {"genesis", RC_CONSOLE_MEGA_DRIVE},
-        {"gg", RC_CONSOLE_GAME_GEAR},
-        {"jaguar", RC_CONSOLE_ATARI_JAGUAR},
-        {"lynx", RC_CONSOLE_ATARI_LYNX},
-        {"msx", RC_CONSOLE_MSX},
-        {"n64", RC_CONSOLE_NINTENDO_64},
-        {"nds", RC_CONSOLE_NINTENDO_DS},
-        {"nes", RC_CONSOLE_NINTENDO},
-        {"ngp", RC_CONSOLE_NEOGEO_POCKET},
-        {"ngpc", RC_CONSOLE_NEOGEO_POCKET},
-        {"pce", RC_CONSOLE_PC_ENGINE},
-        {"pokemini", RC_CONSOLE_POKEMON_MINI},
-        {"ps2", RC_CONSOLE_PLAYSTATION_2},
-        {"psp", RC_CONSOLE_PSP},
-        {"psx", RC_CONSOLE_PLAYSTATION},
-        {"saturn", RC_CONSOLE_SATURN},
-        {"sg1000", RC_CONSOLE_SG1000},
-        {"sms", RC_CONSOLE_MASTER_SYSTEM},
-        {"snes", RC_CONSOLE_SUPER_NINTENDO},
-        {"vectrex", RC_CONSOLE_VECTREX},
-        {"virtualboy", RC_CONSOLE_VIRTUAL_BOY},
-        {"wii", RC_CONSOLE_WII},
-        {"wonderswan", RC_CONSOLE_WONDERSWAN},
-        {"wsc", RC_CONSOLE_WONDERSWAN},
-    };
-    const auto found = consoles.find(system);
-    return found == consoles.end() ? 0 : found->second;
-}
-
 std::string UserAgent(std::string_view client_name, std::string_view client_version) {
     return std::string(client_name) + "/" + std::string(client_version) + " rcheevos/" + RCHEEVOS_VERSION_STRING;
 }

@@ -134,6 +134,14 @@ void PlayerScreen::Begin(const std::filesystem::path& content, bool resume) {
     request.game_id = game_.id;
     request.system = game_.system;
     request.option_hints = core_.option_hints;
+    for (const plugins::ScreenShape& shape : core_.screens) {
+        player::ScreenShape& out = request.screens.emplace_back();
+        out.frame_width = shape.frame_width;
+        out.frame_height = shape.frame_height;
+        for (const plugins::ScreenPart& part : shape.screens) {
+            out.screens.push_back(player::GameScreen{gfx::Rect{part.x, part.y, part.w, part.h}, 0, 0, part.touch});
+        }
+    }
     request.resume = resume && Param("resume") != "0";
     request.title = game_.name;
     request.hardcore = AchievementsHardcore(game_);

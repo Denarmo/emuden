@@ -63,6 +63,9 @@ struct OpenRequest {
     std::string system;               // system id
     /// Option values from the plugin manifest, applied before the user's own.
     std::vector<std::pair<std::string, std::string>> option_hints;
+    /// The screens of the core's picture (the manifest's presentation.screens); empty: those
+    /// the player knows for the system (BuiltinScreens).
+    std::vector<ScreenShape> screens;
     /// Continue from where the game was left (the state written by Close), when there is one
     /// and the "player.resume" setting allows it.
     bool resume = true;
