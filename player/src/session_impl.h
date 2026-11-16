@@ -129,6 +129,8 @@ private:
     void CaptureRewind();
     void SetupRewind();
     void LoadBatterySave();
+    /// Runs a few more frames, unseen, until another GBA core could take over the state.
+    void SettleForOtherCores();
     Status WriteStateFile(const std::filesystem::path& file);
     Status ReadStateFile(const std::filesystem::path& file);
     void WriteThumbnail(const std::filesystem::path& file);

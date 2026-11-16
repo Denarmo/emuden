@@ -432,6 +432,9 @@ void PlayerScreen::Update(ui::Context& ctx) {
     if (!resume_told_ && snapshot.resumed) {
         resume_told_ = true;
         svc.stage->Toast("Resumed where you left off");
+    } else if (!resume_told_ && !snapshot.resume_problem.empty()) {
+        resume_told_ = true;
+        svc.stage->Toast(snapshot.resume_problem, 5.0f);
     }
     // A pad that went away mid-game (unplugged, battery, out of range) pauses the game.
     const int pads = svc.input->PadCount();

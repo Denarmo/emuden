@@ -41,6 +41,9 @@ std::vector<std::uint8_t> WrapState(const std::string& core_name,
 /// The core's bytes inside `file`.
 Result<std::span<const std::uint8_t>> UnwrapState(const std::string& core_name,
                                                   std::span<const std::uint8_t> file);
+/// The name of the core that made `file`, and its bytes; empty when it is not a state.
+std::string StateCoreName(std::span<const std::uint8_t> file);
+std::span<const std::uint8_t> StatePayload(std::span<const std::uint8_t> file);
 
 /// The game inside a zip, for a core that does not open zips itself: the first file with one
 /// of `extensions` (lower case, no dot), extracted under `cache_dir` (emptied first).

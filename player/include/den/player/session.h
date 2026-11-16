@@ -132,6 +132,7 @@ struct Snapshot {
     bool can_rewind = false;
     bool hardware_rendered = false; // the core draws with the GPU
     bool resumed = false;           // this session continued from the state Close wrote
+    std::string resume_problem;     // why the state Close wrote (another core's) did not load
     double audio_queued_ms = 0.0;   // sound waiting to be played
     int audio_underruns = 0;        // times the sound ran dry (audible gaps) since Open
     std::string picture;            // the picture preset in use ("plain", "crt", ...), never "auto"

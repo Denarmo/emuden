@@ -16,6 +16,7 @@
 #include "den/app/pages.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
+#include "den/states/gba.h"
 #include "den/sync/continue.h"
 #include "glyphs.h"
 #include "player_screen.h"
@@ -39,6 +40,24 @@ std::string When(std::int64_t unix_time) {
         text += std::format(", {:02}:{:02}", local->tm_hour, local->tm_min);
     }
     return text;
+}
+
+// Whether the running core takes over another GBA core's resume state by converting it
+// (docs/gba-states.md): then the game keeps its own core.
+bool ResumeConverts(const std::filesystem::path& file, const std::string& wrote, const std::string& own) {
+    if (!states::CanConvertGbaState(wrote, own)) {
+        return false;
+    }
+    const auto data = ReadBinaryFile(file);
+    const std::size_t header = 9 + wrote.size();
+    if (!data || data->size() <= header) {
+        return false;
+    }
+    const std::string why = states::GbaStateNotPortable(wrote, std::span(*data).subspan(header));
+    if (!why.empty()) {
+        log::Info("player", "the {} resume state does not convert: {}", wrote, why);
+    }
+    return why.empty();
 }
 
 } // namespace
@@ -145,7 +164,12 @@ void PlayerScreen::MatchResumeCore() {
     }
     sync::ResumeCoreInput input;
     input.own = core_.name;
-    input.wrote = sync::StateCore(sync::ResumeState(Svc().data_dir, game_.system, game_.id));
+    const std::filesystem::path resume = sync::ResumeState(Svc().data_dir, game_.system, game_.id);
+    input.wrote = sync::StateCore(resume);
+    if (!input.wrote.empty() && !EqualsNoCase(input.wrote, core_.name) && ResumeConverts(resume, input.wrote, core_.name)) {
+        log::Info("player", "the resume state of {} is {}'s: {} converts it", game_.name, input.wrote, core_.name);
+        return;
+    }
     std::optional<plugins::CoreInfo> other;
     if (!input.wrote.empty() && !EqualsNoCase(input.wrote, core_.name)) {
         input.own_for_game = GameHasOwnCore(game_);

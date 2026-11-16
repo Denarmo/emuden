@@ -318,6 +318,7 @@ int PlayerSession::MicrophoneButton() const {
 
 void PlayerSession::SaveResumeState() {
     if (core_ && resume_enabled_ && snapshot_.can_save_states && snapshot_.frames > 0) {
+        SettleForOtherCores();
         if (const Status status = WriteStateFile(paths_.Resume()); !status) {
             log::Warn("player", "no resume state: {}", status.error);
         } else {
@@ -493,7 +494,16 @@ void PlayerSession::RunForward(int frames, bool sound_on_all) {
         if (pending_resume_) {
             // Some cores only take a state once they have run a frame.
             pending_resume_ = false;
-            snapshot_.resumed = static_cast<bool>(ReadStateFile(paths_.Resume()));
+            const Status resumed = ReadStateFile(paths_.Resume());
+            snapshot_.resumed = resumed.ok;
+            if (!resumed) {
+                // Another GBA core's, which did not convert: the game starts from its save.
+                const std::string wrote = StateCoreName(ReadBinaryFile(paths_.Resume()).value_or(std::vector<std::uint8_t>()));
+                if (!wrote.empty() && wrote != core_->Info().name) {
+                    snapshot_.resume_problem = "Where you left off was saved with " + wrote + ", which " +
+                                               core_->Info().name + " cannot load: starting from the game's save";
+                }
+            }
             Notify(FrameEvent::StateLoaded);
         }
         const std::chrono::duration<double> spent = std::chrono::steady_clock::now() - start;

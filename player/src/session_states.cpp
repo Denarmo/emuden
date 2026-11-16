@@ -9,6 +9,7 @@
 #include "den/base/files.h"
 #include "den/base/log.h"
 #include "den/gfx/device.h"
+#include "den/states/gba.h"
 #include "session_impl.h"
 
 namespace den::player {
@@ -21,13 +22,27 @@ std::string_view Bytes(std::span<const std::uint8_t> data) {
     return std::string_view(reinterpret_cast<const char*>(data.data()), data.size());
 }
 
+// GBA battery saves are kept in the layout every GBA core reads (docs/gba-states.md), so a
+// save made with one core plays with another.
+bool IsGbaGame(const fs::path& content) {
+    return EqualsNoCase(PathToUtf8(content.extension()), ".gba");
+}
+
 } // namespace
 
 void PlayerSession::LoadBatterySave() {
     const std::span<std::uint8_t> ram = core_->SaveRam();
     if (!ram.empty()) {
         if (const auto data = ReadBinaryFile(paths_.BatterySave())) {
-            std::memcpy(ram.data(), data->data(), std::min(ram.size(), data->size()));
+            if (IsGbaGame(content_path_)) {
+                // Only VBA Next needs to know whether a large save belongs to an EEPROM.
+                const bool eeprom = EqualsNoCase(core_->Info().name, "VBA Next") &&
+                                    states::RomUsesEeprom(ReadBinaryFile(content_path_).value_or(
+                                        std::vector<std::uint8_t>()));
+                states::LoadGbaSave(core_->Info().name, *data, eeprom, ram);
+            } else {
+                std::memcpy(ram.data(), data->data(), std::min(ram.size(), data->size()));
+            }
         }
     }
     saved_ram_.assign(ram.begin(), ram.end());
@@ -42,7 +57,9 @@ void PlayerSession::FlushSaves() {
                         std::equal(ram.begin(), ram.end(), saved_ram_.begin()))) {
         return;
     }
-    if (!WriteFileAtomic(paths_.BatterySave(), Bytes(ram))) {
+    const std::vector<std::uint8_t> portable =
+        IsGbaGame(content_path_) ? states::PortableGbaSave(ram) : std::vector<std::uint8_t>(ram.begin(), ram.end());
+    if (!WriteFileAtomic(paths_.BatterySave(), Bytes(portable))) {
         log::Error("player", "the save could not be written: {}",
                    PathToUtf8(paths_.BatterySave()));
         return;
@@ -76,13 +93,34 @@ Status PlayerSession::ReadStateFile(const fs::path& file) {
     if (!data) {
         return Status::Fail("There is no save state in this slot.");
     }
-    const auto unwrapped = UnwrapState(core_->Info().name, *data);
-    if (!unwrapped) {
-        return unwrapped.status();
+    const std::string& own = core_->Info().name;
+    const auto unwrapped = UnwrapState(own, *data);
+    std::span<const std::uint8_t> payload;
+    std::vector<std::uint8_t> converted;
+    if (unwrapped) {
+        payload = unwrapped.value();
+    } else {
+        // Another GBA core's state is rewritten for this one, from a state of this one.
+        const std::string wrote = StateCoreName(*data);
+        if (!states::CanConvertGbaState(wrote, own)) {
+            return unwrapped.status();
+        }
+        std::vector<std::uint8_t> current(core_->StateSize());
+        if (current.empty() || !core_->SaveState(current)) {
+            return Status::Fail("This game cannot save a state right now.");
+        }
+        auto result = states::ConvertGbaState(wrote, StatePayload(*data), own, current);
+        if (!result) {
+            log::Warn("player", "the {} state could not be converted for {}: {}", wrote, own, result.error());
+            return Status::Fail("The save state was made with " + wrote + " and could not be converted for " + own +
+                                ".");
+        }
+        log::Info("player", "converted a {} state for {}", wrote, own);
+        converted = result.take();
+        payload = converted;
     }
     // Cores read as many bytes as their state has now: a state from another version of the
     // core may be shorter.
-    std::span<const std::uint8_t> payload = unwrapped.value();
     const std::size_t size = core_->StateSize();
     if (payload.size() < size) {
         state_scratch_.assign(size, 0);
@@ -97,6 +135,38 @@ Status PlayerSession::ReadStateFile(const fs::path& file) {
     }
     audio_.Clear();
     return {};
+}
+
+void PlayerSession::SettleForOtherCores() {
+    // A state is taken at the end of a frame, where a game often waits in the BIOS: a wait
+    // converts, but a DMA or a save chip command midway, or other BIOS calls, do not (and
+    // another device may play the game with another core). A few frames on, they are done.
+    constexpr int MOST_FRAMES = 30;
+    const std::string& name = core_->Info().name;
+    if (!IsGbaGame(content_path_) || together_.party || !states::CanConvertGbaState(name, name == "gpSP" ? "mGBA" : "gpSP")) {
+        return;
+    }
+    std::vector<std::uint8_t> state(core_->StateSize());
+    int ran = 0;
+    for (; ran < MOST_FRAMES; ++ran) {
+        state.resize(core_->StateSize());
+        if (state.empty() || !core_->SaveState(state)) {
+            break;
+        }
+        const std::string why = states::GbaStateNotPortable(name, state);
+        if (why.empty()) {
+            break;
+        }
+        if (ran == 0) {
+            log::Info("player", "the resume state would not convert ({}): running on a little", why);
+        }
+        core_->SetAudioMuted(true);
+        core_->RunFrame();
+    }
+    core_->SetAudioMuted(false);
+    if (ran > 0) {
+        FlushSaves();
+    }
 }
 
 void PlayerSession::WriteThumbnail(const fs::path& file) {

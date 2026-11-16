@@ -106,6 +106,25 @@ Result<std::span<const std::uint8_t>> UnwrapState(const std::string& core_name,
     return file.subspan(header);
 }
 
+std::string StateCoreName(std::span<const std::uint8_t> file) {
+    if (file.size() <= sizeof(STATE_MAGIC) + 1 || std::memcmp(file.data(), STATE_MAGIC, sizeof(STATE_MAGIC)) != 0) {
+        return {};
+    }
+    const std::size_t name_size = file[sizeof(STATE_MAGIC)];
+    if (file.size() <= sizeof(STATE_MAGIC) + 1 + name_size) {
+        return {};
+    }
+    return std::string(reinterpret_cast<const char*>(file.data()) + sizeof(STATE_MAGIC) + 1, name_size);
+}
+
+std::span<const std::uint8_t> StatePayload(std::span<const std::uint8_t> file) {
+    const std::string name = StateCoreName(file);
+    if (name.empty()) {
+        return {};
+    }
+    return file.subspan(sizeof(STATE_MAGIC) + 1 + name.size());
+}
+
 Result<fs::path> ResolveContent(const fs::path& content,
                                 const std::vector<std::string>& extensions,
                                 const fs::path& cache_dir) {
