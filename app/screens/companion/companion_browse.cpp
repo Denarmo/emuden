@@ -112,7 +112,9 @@ public:
         if (std::unique_ptr<ui::Node> model = MakeShelfPreview(game, MODEL_W, COVER_H)) {
             top->Add(std::move(model));
         } else {
-            top->Emplace<CoverView>(game.name, game.cover, COVER_W, COVER_H)->overlay_title = game.placeholder_cover;
+            auto* view = top->Emplace<CoverView>(game.name, game.cover, COVER_W, COVER_H);
+            view->overlay_title = game.placeholder_cover;
+            view->hack = IsHackGame(game);
         }
         ui::Node* side = top->Add(ui::MakeBox(ui::Axis::Column, 4));
         side->grow = 1;

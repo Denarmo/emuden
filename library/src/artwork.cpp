@@ -12,6 +12,7 @@
 #include "den/library/content.h"
 #include "den/library/launchbox_covers.h"
 #include "den/library/names.h"
+#include "den/library/rom_codes.h"
 #include "artwork_cache.h"
 
 namespace den::library {
@@ -312,7 +313,7 @@ bool Artwork::ResolveHack(const Entry& entry, const SystemDef& system, const Thu
     fs::path raw = FindCached(raw_stem);
     const fs::path no_base = WithSuffix(stem, ".nobase");
     if (raw.empty() && fetcher_ && !stopped() && !IsFresh(no_base, MISS_LIFETIME)) {
-        const std::string name = MatchBaseGame(index, original, query.header);
+        const std::string name = FindBaseGame(index, system.id, original, HeaderOf(entry, query.header));
         bool answered = name.empty();
         if (!name.empty()) {
             Download(std::string(THUMBNAIL_HOST) + UrlEncodeSegment(system.libretro_thumbnails) +
@@ -370,7 +371,7 @@ std::vector<CoverChoice> Artwork::Choices(const Entry& entry, const SystemDef* s
     std::string base = MatchThumbnail(index, original);
     const bool is_hack = base.empty();
     if (is_hack) {
-        base = MatchBaseGame(index, original, query.header);
+        base = FindBaseGame(index, system->id, original, HeaderOf(entry, QueryFor(entry, *system, index, original).header));
     }
     if (!base.empty() && !stopped()) {
         const fs::path raw = fetch(std::string(THUMBNAIL_HOST) + UrlEncodeSegment(system->libretro_thumbnails) +
@@ -382,6 +383,20 @@ std::vector<CoverChoice> Artwork::Choices(const Entry& entry, const SystemDef* s
         }
     }
     return out;
+}
+
+void Artwork::ForgetMisses(const Entry& entry, const SystemDef* system) {
+    if (system == nullptr) {
+        return;
+    }
+    const std::string original = entry.original_name.empty() ? entry.name : entry.original_name;
+    for (const char* kind : {"roms", "hacks"}) {
+        const fs::path stem = cache_dir_ / kind / PathFromUtf8(system->id) / PathFromUtf8(CacheFileName(original));
+        for (const char* suffix : {".miss", ".miss2", ".nobase"}) {
+            std::error_code ec;
+            fs::remove(WithSuffix(stem, suffix), ec);
+        }
+    }
 }
 
 ArtworkResult Artwork::Resolve(const Entry& entry, const SystemDef* system,

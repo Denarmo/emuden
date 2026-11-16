@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include "../boot/boot.h"
+#include "../home/game_widgets.h"
 #include "den/gfx/canvas.h"
 
 namespace den::app {
@@ -202,6 +203,9 @@ void CoverCarousel::DrawOne(ui::Context& ctx, const library::Entry& game, const 
     } else {
         canvas.DrawImage(r, texture, Shade(gfx::Color{255, 255, 255, 255}, light), radius,
                          gfx::CoverUv(texture.width, texture.height, r));
+        if (IsHackGame(game)) {
+            DrawHackSticker(ctx, r, texture, true);
+        }
     }
     if (!texture || game.placeholder_cover) {
         gfx::Text& text = ctx.Text();

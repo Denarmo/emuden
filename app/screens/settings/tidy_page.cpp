@@ -112,7 +112,14 @@ public:
                                                          : junk)++;
         }
         if (plan_.changes.empty()) {
-            list->Emplace<ui::Label>(std::format("All {} games have clean names already. Nothing to do.", plan_.games));
+            if (!retried_) {
+                retried_ = true; // nothing to rename: box art is still looked up again
+                Svc().library->RetryCovers();
+                Svc().library->Scan();
+            }
+            list->Emplace<ui::Label>(std::format("All {} games have clean names already. Games without box art "
+                                                 "look for it again.",
+                                                 plan_.games));
             rows.push_back(ActionRow("tidy.close", "Close", [this] { GetStage().Pop(); }));
             AddRows(list, std::move(rows));
             return;
@@ -121,8 +128,9 @@ public:
                                              Count(renames, "file gets", "files get"),
                                              Count(names, "game gets", "games get"),
                                              Count(junk, "leftover file or empty folder", "leftover files and empty folders")));
-        list->Emplace<ui::Label>("Saves, states, play time and game settings go with the new names. Box art is "
-                                 "looked up again for renamed games.")
+        list->Emplace<ui::Label>("Saves, states, play time and game settings go with the new names. Games without "
+                                 "box art look for it again; a hack finds the box of the game it was made from by "
+                                 "its header and gets the HACK sticker.")
             ->tone = ui::Tone::Dim;
         rows.push_back(ActionRow("tidy.go", "Tidy up", [this] { Apply(); }));
         rows.push_back(ActionRow("tidy.cancel", "Cancel", [this] { GetStage().Pop(); }));
@@ -220,7 +228,7 @@ private:
     std::atomic<float> progress_{0};
     Step shown_ = Step::Looking;
     float shown_progress_ = 0;
-    bool started_ = false, undo_ = false;
+    bool started_ = false, undo_ = false, retried_ = false;
     tidy::Plan plan_;
     tidy::Done done_;
     std::vector<tidy::Moved> moved_;

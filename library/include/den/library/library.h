@@ -215,6 +215,9 @@ public:
         (void)old_id;
         (void)new_id;
     }
+    /// Games shown with a drawn placeholder ask for their box again with the next scan (a
+    /// hack's base game may be found now), instead of waiting out the week a miss is kept.
+    virtual void RetryCovers() {}
 };
 
 /// An answer to a GET: status 0 when the request never got one.

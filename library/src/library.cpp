@@ -504,6 +504,15 @@ private:
         RecordChanged(id);
     }
 
+    void RetryCovers() override {
+        const SystemTable systems = SystemsCopy();
+        for (const Entry& entry : Entries()) {
+            if (entry.placeholder_cover || entry.cover.empty()) {
+                artwork_.ForgetMisses(entry, systems.Find(entry.system));
+            }
+        }
+    }
+
     void MoveRecord(const std::string& old_id, const std::string& new_id) override {
         std::lock_guard lock(mutex_);
         if (const auto found = saved_.records.find(old_id); found != saved_.records.end()) {

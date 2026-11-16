@@ -49,8 +49,9 @@ public:
 
         ui::Node* cover = root.Add(ui::MakeBox(ui::Axis::Column, 0));
         cover->justify = ui::Align::Center;
-        cover->Emplace<CoverView>(game.name, game.cover, COVER_SIDE_W, COVER_SIDE_H)->overlay_title =
-            game.placeholder_cover;
+        auto* view = cover->Emplace<CoverView>(game.name, game.cover, COVER_SIDE_W, COVER_SIDE_H);
+        view->overlay_title = game.placeholder_cover;
+        view->hack = IsHackGame(game);
 
         ui::Node* side = root.Add(ui::MakeBox(ui::Axis::Column, 6));
         if (compact_) {

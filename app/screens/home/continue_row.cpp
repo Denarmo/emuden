@@ -205,6 +205,7 @@ ContinueTile::ContinueTile(const ContinueCard& card)
     image_path = screenshot ? PathToUtf8(card.item.screenshot) : card.game.cover;
     cover = screenshot ? card.game.cover : std::string();
     badge = SystemShortName(card.game.system);
+    hack = IsHackGame(card.game);
     label = title + ", " + line;
 }
 
@@ -214,6 +215,9 @@ void ContinueTile::DrawContent(ui::Context& ctx) {
     const gfx::Texture texture = image_path.empty() ? gfx::Texture{} : ctx.textures->Get(image_path, 1024);
     if (texture) {
         DrawCover(ctx, image, texture, false);
+        if (hack && !screenshot) {
+            DrawHackSticker(ctx, image, texture, false);
+        }
     } else {
         ctx.canvas->FillRect(image, theme.panel, theme.radius);
         const std::string shown = ctx.Text().Elide(title, theme.text_heading, image.w - 32, gfx::FONT_BOLD);
@@ -230,6 +234,9 @@ void ContinueTile::DrawContent(ui::Context& ctx) {
             ctx.canvas->FillRect(corner.Inset(-2), theme.dialog, theme.radius_small + 2);
             ctx.canvas->DrawImage(corner, box, gfx::Color{255, 255, 255, 255}, theme.radius_small,
                                   gfx::CoverUv(box.width, box.height, corner));
+            if (hack) {
+                DrawHackSticker(ctx, corner, box, true);
+            }
         }
     }
     if (!badge.empty()) {

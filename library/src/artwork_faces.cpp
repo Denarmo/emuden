@@ -12,6 +12,7 @@
 #include "den/library/artwork.h"
 #include "den/library/launchbox_covers.h"
 #include "den/library/names.h"
+#include "den/library/rom_codes.h"
 #include "artwork_cache.h"
 
 namespace den::library {
@@ -64,7 +65,8 @@ GameFaces Artwork::Faces(const Entry& entry, const SystemDef* system, const std:
         if (base.empty() && !system->libretro_thumbnails.empty()) {
             const ThumbnailIndex& index = IndexFor(*system);
             if (!index.names.empty() && MatchThumbnail(index, original).empty()) {
-                base = MatchBaseGame(index, original, QueryFor(entry, *system, index, original).header);
+                base = FindBaseGame(index, system->id, original,
+                                    HeaderOf(entry, QueryFor(entry, *system, index, original).header));
             }
         }
         auto from_base = base.empty() ? std::nullopt

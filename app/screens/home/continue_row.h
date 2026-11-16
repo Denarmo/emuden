@@ -52,6 +52,7 @@ public:
     std::string line;
     bool screenshot = false; // the picture is the game's, not a box: it fills the card
     std::string cover;       // drawn small in the corner over a screenshot
+    bool hack = false;       // a ROM hack: its box gets the HACK sticker
 
 protected:
     void DrawContent(ui::Context& ctx) override;

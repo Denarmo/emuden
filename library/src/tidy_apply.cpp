@@ -150,6 +150,7 @@ Done Apply(Library& library, const Plan& plan, const fs::path& data_dir, const M
             progress(static_cast<float>(i + 1) / static_cast<float>(plan.changes.size()));
         }
     }
+    library.RetryCovers(); // hacks without a box find their base game's with the next scan
     const auto now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch());
     std::error_code ec;
     fs::create_directories(LogFile(data_dir).parent_path(), ec);

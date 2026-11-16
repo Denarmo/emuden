@@ -8,6 +8,7 @@
 #include "den/app/app.h"
 #include "den/base/files.h"
 #include "den/library/artwork.h"
+#include "den/platform/pal.h"
 #include "game_widgets.h"
 #include "games.h"
 
@@ -158,6 +159,32 @@ void DrawCover(ui::Context& ctx, const gfx::Rect& rect, const gfx::Texture& text
 
 float DrawChip(ui::Context& ctx, const gfx::Rect& image, const std::string& text, bool right, float room);
 
+bool IsHackGame(const library::Entry& game) {
+    return !game.hack_of.empty() || library::IsHackBox(game.cover);
+}
+
+void DrawHackSticker(ui::Context& ctx, const gfx::Rect& rect, const gfx::Texture& texture, bool fill) {
+    static const std::string path = PathToUtf8(pal::AssetsDir() / "branding" / "hack-sticker.png");
+    const gfx::Texture sticker = ctx.textures ? ctx.textures->Get(path, 256) : gfx::Texture{};
+    // On the picture DrawCover shows: the whole rectangle, or the fitted picture in it.
+    gfx::Rect picture = rect;
+    if (texture && !fill) {
+        const gfx::Rect fit = gfx::FitRect(texture.width, texture.height, rect);
+        if (fit.w < rect.w * (1 - FILL_TOLERANCE) || fit.h < rect.h * (1 - FILL_TOLERANCE)) {
+            picture = fit;
+        }
+    }
+    if (!sticker) {
+        DrawChip(ctx, picture, "HACK", true, picture.w - 16);
+        return;
+    }
+    const float w = std::clamp(picture.w * 0.36f, 30.0f, 120.0f);
+    const float h = w * static_cast<float>(sticker.height) / static_cast<float>(std::max(1, sticker.width));
+    const float inset = std::max(4.0f, picture.w * 0.04f);
+    ctx.canvas->DrawImage(gfx::Rect{picture.Right() - inset - w, picture.y + inset, w, h}, sticker,
+                          gfx::Color{255, 255, 255, 255}, 0);
+}
+
 CoverView::CoverView(std::string title, std::string image_path, float w, float h)
     : title_(std::move(title)), image_path_(std::move(image_path)) {
     width = w;
@@ -172,8 +199,8 @@ void CoverView::DrawContent(ui::Context& ctx) {
         if (overlay_title) {
             DrawCentered(ctx, rect.Inset(16), title_, theme.text_heading, gfx::FONT_BOLD, theme.page);
         }
-        if (library::IsHackBox(image_path_)) {
-            DrawChip(ctx, rect, "HACK", true, rect.w - 16);
+        if (hack || library::IsHackBox(image_path_)) {
+            DrawHackSticker(ctx, rect, texture, overlay_title);
         }
     } else {
         ctx.canvas->FillRect(rect, theme.panel, theme.radius);
@@ -220,8 +247,7 @@ float DrawChip(ui::Context& ctx, const gfx::Rect& image, const std::string& text
 void GameTile::DrawContent(ui::Context& ctx) {
     const ui::Theme& theme = *ctx.theme;
     const gfx::Rect image = FocusRect();
-    constexpr float HACK_CHIP = 58; // kept free for the "HACK" chip beside a long badge
-    float hack_room = image.w - 16 - (hack && !badge.empty() ? HACK_CHIP : 0);
+    const float hack_room = image.w - 16 - (hack ? image.w * 0.4f : 0); // the sticker's corner stays free
     const gfx::Texture texture =
         ctx.textures && !image_path.empty() ? ctx.textures->Get(image_path) : gfx::Texture{};
     if (texture) {
@@ -237,7 +263,7 @@ void GameTile::DrawContent(ui::Context& ctx) {
         DrawChip(ctx, image, badge, false, hack_room);
     }
     if (hack) {
-        DrawChip(ctx, image, "HACK", true, image.w - 16);
+        DrawHackSticker(ctx, image, texture, overlay_title || !texture);
     }
     const gfx::Rect caption{rect.x, image.Bottom() + 6, image_width, 24};
     DrawLine(ctx, caption, title, theme.text_small + 1, focused ? gfx::FONT_BOLD : gfx::FONT_REGULAR,
@@ -247,7 +273,7 @@ void GameTile::DrawContent(ui::Context& ctx) {
 ui::Tile* AddGameTile(ui::Node* parent, const library::Entry& game, const GameTileOptions& options) {
     auto* tile = parent->Emplace<GameTile>(game.name, game.cover, options.w, options.h);
     tile->overlay_title = game.placeholder_cover;
-    tile->hack = library::IsHackBox(game.cover);
+    tile->hack = IsHackGame(game);
     tile->id = options.id_prefix + "." + game.id;
     if (options.show_badge) {
         tile->badge = options.badge.empty() ? SystemShortName(game.system) : options.badge;

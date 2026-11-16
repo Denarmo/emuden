@@ -119,6 +119,9 @@ public:
     /// given, is fetched instead (an https picture of the console from elsewhere).
     std::string Device(const SystemDef* system, const std::string& url = {},
                        const std::function<bool()>& stopping = {});
+    /// Forgets that the game's box (and its base game's, for a hack) was not found, so the
+    /// next Resolve asks again.
+    void ForgetMisses(const Entry& entry, const SystemDef* system);
 
 private:
     const ThumbnailIndex& IndexFor(const SystemDef& system);

@@ -35,11 +35,20 @@ private:
 /// `fill` crops it to the rectangle instead (drawn placeholders).
 void DrawCover(ui::Context& ctx, const gfx::Rect& rect, const gfx::Texture& texture, bool fill);
 
+/// A ROM hack: made by EmuDEN from a game (hack_of), or shown with the box of the game it was
+/// made from (artwork.h IsHackBox).
+bool IsHackGame(const library::Entry& game);
+/// The foil HACK sticker the shelf puts on a hack's cartridge (assets/branding/hack-sticker.png),
+/// drawn over the top right corner of the cover's picture inside `rect` (`texture`: the cover,
+/// to find where its picture is; none = the whole rectangle). The cover file itself stays whole.
+void DrawHackSticker(ui::Context& ctx, const gfx::Rect& rect, const gfx::Texture& texture, bool fill);
+
 /// A cover that is not focusable: the image, or the game's name on a tinted card.
 class CoverView final : public ui::Node {
 public:
     CoverView(std::string title, std::string image_path, float w, float h);
     bool overlay_title = false; // the image is a drawn placeholder: print the name over it
+    bool hack = false;          // a ROM hack: the HACK sticker goes on it (IsHackGame)
 
 protected:
     void DrawContent(ui::Context& ctx) override;
@@ -73,7 +82,7 @@ class GameTile final : public ui::Tile {
 public:
     using ui::Tile::Tile;
     bool overlay_title = false;
-    bool hack = false; // the cover is the original game's box: a "HACK" chip is drawn on it
+    bool hack = false; // a ROM hack (IsHackGame): the HACK sticker is drawn on its cover
 
 protected:
     void DrawContent(ui::Context& ctx) override;

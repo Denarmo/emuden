@@ -48,6 +48,15 @@ console's folder. Not done: hacks a site ships already patched are not filed und
 
 The browser's second screen: Bookmarks and Downloads tabs (docs/in-app-browser.md).
 
+A hack the cover sources do not know finds the game it was made from in its own header
+(`library/rom_codes.h`): the game code first (GBA 0xAC, GB/GBC 0x13F, NDS 0x0C, N64 0x3B),
+which hacks keep when they rename the title, against a list of the games hacks are made from
+most; then a known header title (SNES 0x7FC0/0xFFC0 and Game Boy titles); then the title by
+words (MatchBaseGame). Its cover is that game's box with the foil HACK sticker drawn over it
+in lists, the game page, Continue cards, the carousel and the second screen (the cover file
+stays whole). The tidy-up makes games without box art look again. Not done: PlayStation and
+PS2 boot serials (no list of serials to match them against).
+
 ## RetroAchievements (2026-11-15)
 
 The `emuden.retroachievements` plugin (`docs/feature-plugins.md` 4.3) and the runtime in

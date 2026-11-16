@@ -177,6 +177,7 @@ private:
         auto* cover = card->Emplace<CoverView>(game ? game->name : std::string("Game"),
                                                game ? game->cover : std::string(), COVER_W, COVER_H);
         cover->overlay_title = game && game->placeholder_cover;
+        cover->hack = game && IsHackGame(*game);
         ui::Node* info = card->Add(ui::MakeBox(ui::Axis::Column, 6));
         info->grow = 1;
         info->justify = ui::Align::Center;
