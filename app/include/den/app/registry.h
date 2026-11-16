@@ -47,6 +47,9 @@ public:
     void AddQuitHold(std::function<bool()> hook);
     /// Drawn over the screens every frame, after them (the canvas is begun).
     void AddOverlay(std::function<void(ui::Context&)> draw);
+    /// Called once a frame is drawn, before it is shown: its size in pixels (the back buffer
+    /// can be read).
+    void AddAfterDraw(std::function<void(int width, int height)> hook);
     /// Sees every input event first: true keeps it from the screens.
     void AddEventFilter(std::function<bool(const input::Event&)> filter);
     /// Runs once as the app closes, after the screens are gone and while the GL context still
@@ -71,6 +74,9 @@ public:
     const std::vector<std::function<void(ui::Context&)>>& Overlays() const {
         return overlays_;
     }
+    const std::vector<std::function<void(int, int)>>& AfterDraw() const {
+        return after_draw_;
+    }
     const std::vector<std::function<bool(const input::Event&)>>& EventFilters() const {
         return event_filters_;
     }
@@ -85,6 +91,7 @@ private:
     std::vector<std::function<void()>> startup_, frame_, shutdown_;
     std::vector<std::function<bool()>> quit_holds_;
     std::vector<std::function<void(ui::Context&)>> overlays_;
+    std::vector<std::function<void(int, int)>> after_draw_;
     std::vector<std::function<bool(const input::Event&)>> event_filters_;
 };
 
@@ -120,6 +127,7 @@ struct Registrar {
     DEN_REGISTRAR([](::den::app::Registry& r) { r.AddQuitHold(__VA_ARGS__); })
 #define DEN_REGISTER_OVERLAY(...)                                                                 \
     DEN_REGISTRAR([](::den::app::Registry& r) { r.AddOverlay(__VA_ARGS__); })
+#define DEN_REGISTER_AFTER_DRAW(...)                                                                  DEN_REGISTRAR([](::den::app::Registry& r) { r.AddAfterDraw(__VA_ARGS__); })
 #define DEN_REGISTER_EVENT_FILTER(...)                                                            \
     DEN_REGISTRAR([](::den::app::Registry& r) { r.AddEventFilter(__VA_ARGS__); })
 #define DEN_REGISTER_SHUTDOWN(...)                                                                \

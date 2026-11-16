@@ -163,6 +163,7 @@ void PlayerScreen::Begin(const std::filesystem::path& content, bool resume) {
         request.engine = EngineInstallFor(core_);
         request.engine_setup = EngineSetupFor(core_);
         request.fullscreen = EngineFullscreenFor(game_, svc.window->Fullscreen());
+        request.cover = BootCover();
     }
     log::Info("player", "open {} with {}", game_.name, core_.id);
     if (const Status opened = svc.player->Open(request); !opened) {

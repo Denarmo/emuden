@@ -408,9 +408,9 @@ public class EmuDenActivity extends SDLActivity {
     }
 
     public static String enginePlay(String pkg, String cert, String path, int port, String token, String session,
-                                    boolean fullscreen, int display) {
+                                    boolean fullscreen, int display, String cover) {
         EmuDenActivity activity = self;
-        return activity != null ? EngineApps.play(activity, pkg, cert, path, port, token, session, fullscreen, display)
+        return activity != null ? EngineApps.play(activity, pkg, cert, path, port, token, session, fullscreen, display, cover)
                 : "error:The app is closing";
     }
 

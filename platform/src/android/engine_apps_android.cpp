@@ -89,7 +89,7 @@ Status Play(const PlayRequest& request) {
     const jni::ActivityCall call;
     const jmethodID method =
         call.Method("enginePlay", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;"
-                                  "Ljava/lang/String;ZI)Ljava/lang/String;");
+                                  "Ljava/lang/String;ZILjava/lang/String;)Ljava/lang/String;");
     if (!method) {
         return Status::Fail("This build cannot start engine apps.");
     }
@@ -99,10 +99,12 @@ Status Play(const PlayRequest& request) {
     jstring content = env->NewStringUTF(PathToUtf8(request.content).c_str());
     jstring token = env->NewStringUTF(request.token.c_str());
     jstring session = env->NewStringUTF(request.session.c_str());
+    jstring cover = env->NewStringUTF(PathToUtf8(request.cover).c_str());
     jobject answer = env->CallStaticObjectMethod(call.activity_class, method, package, cert, content,
                                                  static_cast<jint>(request.port), token, session,
-                                                 request.fullscreen ? JNI_TRUE : JNI_FALSE, Where(request.display));
-    for (jstring text : {package, cert, content, token, session}) {
+                                                 request.fullscreen ? JNI_TRUE : JNI_FALSE, Where(request.display),
+                                                 cover);
+    for (jstring text : {package, cert, content, token, session, cover}) {
         env->DeleteLocalRef(text);
     }
     return Answer(call, answer);

@@ -68,6 +68,9 @@ struct PlayerHooks {
     /// The core the game is played with, when this feature chooses it (Together's link core);
     /// nullopt leaves it to the game's own choice.
     std::function<std::optional<plugins::CoreInfo>(const PlayerStart&)> core;
+    /// The game was asked for and the boot screen begins: what can start before the player
+    /// screen opens (sync's check for newer saves). `params`: the player's route parameters.
+    std::function<void(const library::Entry&, const plugins::CoreInfo&, const ui::Params&)> asked;
     /// Before the game starts, once its core is known: a gate that holds it, or null.
     std::function<std::unique_ptr<PlayerGate>(const PlayerStart&, const plugins::CoreInfo&)> gate;
     /// The game is about to open: the feature sets its part of the request.

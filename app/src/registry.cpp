@@ -44,6 +44,10 @@ void Registry::AddOverlay(std::function<void(ui::Context&)> draw) {
     overlays_.push_back(std::move(draw));
 }
 
+void Registry::AddAfterDraw(std::function<void(int, int)> hook) {
+    after_draw_.push_back(std::move(hook));
+}
+
 void Registry::AddEventFilter(std::function<bool(const input::Event&)> filter) {
     event_filters_.push_back(std::move(filter));
 }

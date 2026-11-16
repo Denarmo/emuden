@@ -45,6 +45,7 @@ struct PlayRequest {
     std::string token;
     std::string session;
     bool fullscreen = true;
+    std::filesystem::path cover; // a PNG shown until the game's first frame (ECP, Android)
     apps::Display display = apps::Display::Main;
 };
 /// Starts the engine's PLAY activity for a game (the game goes to it as a content URI it

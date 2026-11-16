@@ -13,7 +13,9 @@
 #include "boot_draw.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
+#include "den/base/files.h"
 #include "den/base/log.h"
+#include "den/gfx/device.h"
 #include "den/player/boot_sound.h"
 
 namespace den::app {
@@ -41,7 +43,15 @@ struct Boot {
     std::uint32_t pad_buttons = ~0u; // held when it began: only new presses skip
     std::optional<gfx::Rect> from;
     double from_time = -10;
+    BootWait wait;      // this frame's, from what the game waits for
+    BootWait last_wait; // the last frame's, for the input events before this frame's update
+    // PlayerApp: the picture handed to the engine app, read after the frame that shows it.
+    enum class Cover { None, Wanted, Written, Failed } cover = Cover::None;
 };
+
+std::filesystem::path CoverFile() {
+    return Svc().data_dir / "cache" / "boot-cover.png";
+}
 
 Boot& Get() {
     static Boot boot;
@@ -63,12 +73,16 @@ void Finish() {
     b.draw = BootDraw{};
 }
 
-void Skip() {
+void Skip(const BootWait& wait) {
     Boot& b = Get();
     if (b.end != Boot::End::None) {
         return;
     }
     const BootTimes& times = b.draw.Times();
+    if (b.draw.t >= times.logo_end && wait.skip) {
+        wait.skip(); // the game starts with what it has
+        return;
+    }
     if (b.draw.t < times.plain) {
         b.draw.t = times.plain;
         b.sounded = true; // straight to the logo, without its sound
@@ -91,9 +105,8 @@ void Watch(float dt) {
         return;
     }
     const ui::Page* top = svc.stage->Top();
-    const GamePlayer* player = CurrentPlayer();
     const bool gone = b.since_start > 0.5f && (!top || top->Route() != "player");
-    if (gone || svc.stage->DialogOpen() || (player != nullptr && player->InStartCheck())) {
+    if (gone || svc.stage->DialogOpen()) {
         b.end = Boot::End::Back; // a question to answer first, or it failed
         return;
     }
@@ -136,18 +149,24 @@ void Tick(ui::Context& ctx) {
         buttons |= Svc().input->Pad(port).buttons;
     }
     if (buttons & ~b.pad_buttons) {
-        Skip();
+        Skip(b.wait);
     }
     b.pad_buttons = buttons;
 
     const BootTimes& times = b.draw.Times();
+    if (b.runner == BootRunner::PlayerApp && !b.started && b.draw.t >= times.start) {
+        b.draw.t = times.start; // still, while its picture is read
+    }
     if (!b.sounded && b.draw.animate && b.draw.t >= times.sound) {
         b.sounded = true;
         if (Svc().settings->GetBool(LAUNCH_SOUND_KEY, true)) {
             player::PlayBootSound(static_cast<float>(b.volume) * 0.8f);
         }
     }
-    if (!b.started && b.draw.t >= times.start) {
+    if (!b.started && b.draw.t >= times.start && b.runner == BootRunner::PlayerApp && b.cover != Boot::Cover::Written &&
+        b.cover != Boot::Cover::Failed) {
+        b.cover = Boot::Cover::Wanted; // the app starts once the frame is read
+    } else if (!b.started && b.draw.t >= times.start) {
         b.started = true;
         if (auto start = std::move(b.start)) {
             start(); // the screens are covered: the game's own start is not seen
@@ -175,8 +194,26 @@ void Overlay(ui::Context& ctx) {
     }
     Tick(ctx);
     if (b.active) {
-        b.draw.Main(ctx, b.out);
+        b.draw.Main(ctx, b.out, b.wait.text, b.wait.fraction);
     }
+    b.last_wait = std::move(b.wait);
+    b.wait = BootWait{}; // set again by the next frame's update while it lasts
+}
+
+void AfterDraw(int width, int height) {
+    Boot& b = Get();
+    if (!b.active || b.cover != Boot::Cover::Wanted) {
+        return;
+    }
+    const std::vector<std::uint8_t> pixels = Svc().device->ReadPixels(width, height);
+    const std::filesystem::path file = CoverFile();
+    std::error_code ec;
+    std::filesystem::create_directories(file.parent_path(), ec);
+    const Status saved = gfx::SavePng(file, width, height, pixels.data());
+    if (!saved) {
+        log::Warn("boot", "no cover for the engine app: {}", saved.error);
+    }
+    b.cover = saved ? Boot::Cover::Written : Boot::Cover::Failed;
 }
 
 bool Filter(const input::Event& event) {
@@ -188,16 +225,16 @@ bool Filter(const input::Event& event) {
     switch (event.type) {
     case Type::Nav:
         if (!event.repeat && event.nav != input::Nav::None) {
-            Skip();
+            Skip(b.last_wait);
         }
         return true;
     case Type::Key:
         if (event.down && !event.repeat) {
-            Skip();
+            Skip(b.last_wait);
         }
         return true;
     case Type::PointerDown:
-        Skip();
+        Skip(b.last_wait);
         return true;
     case Type::PointerMove:
     case Type::PointerUp:
@@ -221,11 +258,11 @@ void NoteLaunchFrom(const gfx::Rect& where) {
     b.from_time = pal::NowSeconds();
 }
 
-void BootGame(const library::Entry& game, BootRunner runner, std::function<void()> start) {
+bool BootGame(const library::Entry& game, BootRunner runner, std::function<void()> start) {
     Boot& b = Get();
     if (b.active) {
         log::Info("boot", "{} not started: {} is starting", game.name, b.draw.game.name);
-        return;
+        return false;
     }
     Services& svc = Svc();
     std::optional<gfx::Rect> from;
@@ -241,8 +278,9 @@ void BootGame(const library::Entry& game, BootRunner runner, std::function<void(
     b.runner = runner;
     b.start = std::move(start);
     b.volume = std::clamp(svc.settings->GetNumber("player.volume", 1.0), 0.0, 1.0);
-    b.draw.Begin(game, LaunchAnimationOn(), from, window_h);
+    b.draw.Begin(game, LaunchAnimationOn(), from, window_h, runner == BootRunner::PlayerApp);
     log::Info("boot", "start {} ({})", game.name, b.draw.animate ? "animated" : "plain");
+    return true;
 }
 
 bool BootCarries(const std::string& game_id) {
@@ -259,6 +297,26 @@ bool BootShowing() {
     return Get().active;
 }
 
+void SetBootWait(BootWait wait) {
+    Boot& b = Get();
+    if (b.active) {
+        b.wait = std::move(wait);
+    }
+}
+
+void BootStepAside() {
+    Boot& b = Get();
+    if (b.active && b.end == Boot::End::None) {
+        log::Info("boot", "{}: a question first", b.draw.game.name);
+        b.end = Boot::End::Back;
+    }
+}
+
+std::filesystem::path BootCover() {
+    const Boot& b = Get();
+    return b.active && b.cover == Boot::Cover::Written ? CoverFile() : std::filesystem::path();
+}
+
 void DrawBootSecond(ui::Context& ctx) {
     const Boot& b = Get();
     if (b.active) {
@@ -268,5 +326,6 @@ void DrawBootSecond(ui::Context& ctx) {
 
 DEN_REGISTER_OVERLAY(Overlay);
 DEN_REGISTER_EVENT_FILTER(Filter);
+DEN_REGISTER_AFTER_DRAW(AfterDraw);
 
 } // namespace den::app

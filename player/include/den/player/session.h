@@ -75,6 +75,9 @@ struct OpenRequest {
     std::optional<engine::EngineSetup> engine_setup;
     std::string title;
     bool fullscreen = true; // the engine's own window
+    /// An engine app (Android): what it shows until its game's first frame, the boot screen
+    /// as it was (a PNG; empty for none).
+    std::filesystem::path cover;
     /// RetroAchievements hardcore: no state is loaded (the resume state neither) and no rewind.
     bool hardcore = false;
     TogetherRequest together;

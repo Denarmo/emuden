@@ -45,9 +45,13 @@ float EaseOutBack(float s) {
 
 } // namespace
 
-void BootDraw::Begin(const library::Entry& entry, bool animated, std::optional<gfx::Rect> from, float) {
+void BootDraw::Begin(const library::Entry& entry, bool animated, std::optional<gfx::Rect> from, float, bool late) {
     game = entry;
     animate = animated;
+    times_ = animate ? ANIMATED : PLAIN;
+    if (late) {
+        times_.start = times_.logo_end;
+    }
     t = 0;
     from_ = from;
     media_ = MediaFor(game);
@@ -56,7 +60,7 @@ void BootDraw::Begin(const library::Entry& entry, bool animated, std::optional<g
 }
 
 const BootTimes& BootDraw::Times() const {
-    return animate ? ANIMATED : PLAIN;
+    return times_;
 }
 
 float BootDraw::Cover() const {
@@ -70,7 +74,7 @@ float BootDraw::Cover() const {
     return Lerp(0.8f, 1.0f, Ease(t, times.closed, times.plain));
 }
 
-void BootDraw::Main(ui::Context& ctx, float out) {
+void BootDraw::Main(ui::Context& ctx, float out, const std::string& wait_text, float fraction) {
     gfx::Canvas& canvas = *ctx.canvas;
     const float shown = 1 - Ease(out, 0, 1);
     canvas.FillRect(gfx::Rect{0, 0, canvas.Width(), canvas.Height()}, BACKGROUND.WithAlpha(Cover() * shown));
@@ -81,13 +85,23 @@ void BootDraw::Main(ui::Context& ctx, float out) {
     if (animate) {
         DrawLogo(ctx, shown);
     }
-    // A start that takes long says what it is waiting for.
-    if (const float wait = Ease(t, times.logo_end + 3.5f, times.logo_end + 4.0f) * shown; wait > 0) {
-        const std::string text = "Starting " + game.name + "\xE2\x80\xA6";
+    // A start that takes long says what it is waiting for: what the game waits for soon after
+    // the logo is down, else that it starts.
+    const bool told = !wait_text.empty();
+    const float from = times.logo_end + (told ? 0.3f : 3.5f);
+    if (const float wait = Ease(t, from, from + 0.4f) * shown; wait > 0) {
+        const std::string text = told ? wait_text : "Starting " + game.name + "\xE2\x80\xA6";
         const float size = ctx.theme->text_body;
         const float w = ctx.Text().Measure(text, size);
-        canvas.DrawText(text, canvas.Width() * 0.5f - w * 0.5f, canvas.Height() * 0.82f, size,
-                        ctx.theme->text_dim.WithAlpha(wait));
+        const float y = canvas.Height() * 0.8f;
+        canvas.DrawText(text, canvas.Width() * 0.5f - w * 0.5f, y, size, ctx.theme->text_dim.WithAlpha(wait));
+        if (told && fraction >= 0) {
+            const float bar_w = std::min(canvas.Width() * 0.4f, 360.0f);
+            const gfx::Rect bar{canvas.Width() * 0.5f - bar_w * 0.5f, y + size * 1.9f, bar_w, 4};
+            canvas.FillRect(bar, WHITE.WithAlpha(0.12f * wait), 2);
+            canvas.FillRect(gfx::Rect{bar.x, bar.y, bar.w * std::clamp(fraction, 0.0f, 1.0f), bar.h},
+                            WHITE.WithAlpha(0.7f * wait), 2);
+        }
     }
 }
 

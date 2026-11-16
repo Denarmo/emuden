@@ -34,10 +34,12 @@ struct BootDraw {
     bool animate = true;
     float t = 0;
 
-    void Begin(const library::Entry& game, bool animate, std::optional<gfx::Rect> from, float window_h);
+    /// `late`: the game starts once the logo is still (an engine app is handed that picture).
+    void Begin(const library::Entry& game, bool animate, std::optional<gfx::Rect> from, float window_h, bool late);
     const BootTimes& Times() const;
-    /// `out`: 0..1 through the fade at the end (into the game, or back to the page).
-    void Main(ui::Context& ctx, float out);
+    /// `out`: 0..1 through the fade at the end (into the game, or back to the page). `wait`:
+    /// what the game waits for, with its progress (0..1, or < 0).
+    void Main(ui::Context& ctx, float out, const std::string& wait, float fraction);
     void Second(ui::Context& ctx, float out) const;
 
 private:
@@ -45,6 +47,7 @@ private:
     void DrawDrop(ui::Context& ctx);
     void DrawLogo(ui::Context& ctx, float alpha);
 
+    BootTimes times_;
     GameObject media_;
     std::unique_ptr<FaceLoader> faces_;
     std::optional<gfx::Rect> from_;

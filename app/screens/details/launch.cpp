@@ -7,8 +7,10 @@
 #include "den/app/app.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
+#include "den/app/engine_setup.h"
 #include "den/app/game_prefs.h"
 #include "den/app/launch.h"
+#include "den/app/player_hooks.h"
 
 namespace den::app {
 
@@ -43,7 +45,7 @@ void StartInEngine(const library::Entry& game) {
 }
 
 // ROMs: the player screen opens the session for the entry.
-void StartInPlayer(const library::Entry& game, bool restart, const ui::Params& extra) {
+void StartInPlayer(const library::Entry& game, const plugins::CoreInfo& core, bool restart, const ui::Params& extra) {
     Services& svc = Svc();
     if (!svc.stage->HasRoute("player")) {
         svc.stage->Toast(Tr("launch.no_player"));
@@ -55,7 +57,16 @@ void StartInPlayer(const library::Entry& game, bool restart, const ui::Params& e
     if (restart) {
         params["resume"] = "0";
     }
-    BootGame(game, BootRunner::Player, [params] { Svc().stage->Push("player", params); });
+    // An engine app that takes the display is handed the boot screen's picture.
+    const bool app = core.runner == plugins::Runner::Engine && !EngineInstallFor(core).package.empty();
+    if (BootGame(game, app ? BootRunner::PlayerApp : BootRunner::Player,
+                 [params] { Svc().stage->Push("player", params); })) {
+        for (const PlayerHooks& hooks : AllPlayerHooks()) {
+            if (hooks.asked) {
+                hooks.asked(game, core, params);
+            }
+        }
+    }
 }
 
 void StartRom(const library::Entry& game, bool restart, const ui::Params& extra) {
@@ -84,10 +95,11 @@ void StartRom(const library::Entry& game, bool restart, const ui::Params& extra)
         }
         svc.stage->Confirm(Tr("bios.missing_title"),
                            TrF("bios.missing_message", console, files, PathToUtf8(core->system_dir)),
-                           Tr("bios.start_anyway"), [game, restart, extra] { StartInPlayer(game, restart, extra); });
+                           Tr("bios.start_anyway"),
+                           [game, core = *core, restart, extra] { StartInPlayer(game, core, restart, extra); });
         return;
     }
-    StartInPlayer(game, restart, extra);
+    StartInPlayer(game, *core, restart, extra);
 }
 
 } // namespace

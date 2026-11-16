@@ -4,13 +4,15 @@
 // Before a game starts, its saves are checked against the sync provider (docs/sync.md,
 // section 3.3): a newer online save comes down without a question, a save changed on both
 // devices asks which one to keep. Offline, slow or skipped, the game starts as it is. A gate
-// of the player (den/app/player_hooks.h).
+// of the player (den/app/player_hooks.h). The check begins with the boot screen, as the game is
+// asked for, and says there what it waits for; only a question shows its own panel.
 
 #include <algorithm>
 #include <ctime>
 #include <format>
 
 #include "den/app/app.h"
+#include "den/app/boot.h"
 #include "den/app/game_widgets.h"
 #include "den/app/games.h"
 #include "den/app/glyphs.h"
@@ -27,6 +29,10 @@ constexpr double CHECK_SECONDS = 3.0;
 // From Home's Continue the moment it was left on another device is what the user asked for:
 // it may take a while to come down (Skip starts the game as it is here).
 constexpr double CONTINUE_SECONDS = 30.0;
+// A newer save that is coming down is waited for, with its progress.
+constexpr double DOWNLOAD_SECONDS = 15.0;
+// A check begun with the boot screen is the player's when it opens within this time.
+constexpr double EARLY_SECONDS = 5.0;
 constexpr float ROW_HEIGHT = 52;
 
 // "Today, 14:05": the day as the library shows it, and the time within the last month.
@@ -47,6 +53,37 @@ struct Check {
     Status resolved;
 };
 
+JobPtr RunCheck(sync::Engine& engine, const std::shared_ptr<Check>& check, const std::string& id, double seconds) {
+    const double asked = pal::NowSeconds();
+    return Svc().jobs->Run("check saves", [engine = &engine, check, id, seconds, asked](Job&) {
+        check->result = engine->CheckGame(id, check->gate, seconds);
+        log::Info("sync", "save check of {}: {:.2f} s{}", id, pal::NowSeconds() - asked,
+                  check->gate.Abandoned() ? " (given up)" : "");
+        return Status();
+    });
+}
+
+// The check begun as the game was asked for, before the player screen opened.
+struct Early {
+    std::string game_id;
+    std::shared_ptr<Check> check;
+    JobPtr job;
+    double started = 0;
+};
+
+Early& Pending() {
+    static Early early;
+    return early;
+}
+
+void DropEarly() {
+    Early& early = Pending();
+    if (early.check) {
+        early.check->gate.Abandon();
+    }
+    early = Early{};
+}
+
 class SaveCheck final : public PlayerGate {
 public:
     SaveCheck(sync::Engine& engine, const library::Entry& game, const PlayerStart& start)
@@ -54,11 +91,16 @@ public:
           from_(start.Param("from")) {
         started_ = pal::NowSeconds();
         seconds_ = from_continue_ ? CONTINUE_SECONDS : CHECK_SECONDS;
-        job_ = Svc().jobs->Run("check saves", [engine = &engine_, check = check_, id = game_.id,
-                                               seconds = seconds_](Job&) {
-            check->result = engine->CheckGame(id, check->gate, seconds);
-            return Status();
-        });
+        Early& early = Pending();
+        if (early.job && early.game_id == game_.id && started_ - early.started < EARLY_SECONDS) {
+            check_ = early.check;
+            job_ = early.job;
+            started_ = early.started; // the time it is given counts from the press
+            early = Early{};
+        } else {
+            DropEarly();
+            job_ = RunCheck(engine_, check_, game_.id, from_continue_ ? CONTINUE_SECONDS : DOWNLOAD_SECONDS);
+        }
     }
 
     Step Tick() override {
@@ -79,8 +121,11 @@ public:
             return Took();
         }
         if (!finished) {
-            ShowProgress();
-            if (pal::NowSeconds() - started_ >= seconds_) {
+            const sync::GameTransfer transfer = engine_.GameProgress(true);
+            const bool coming = transfer.game_id == game_.id && transfer.total > 0;
+            ShowProgress(transfer);
+            TellBoot(transfer, coming);
+            if (pal::NowSeconds() - started_ >= (coming && !from_continue_ ? DOWNLOAD_SECONDS : seconds_)) {
                 check_->gate.Abandon(); // offline or slow: the game starts with what it has
                 log::Info("player", "save check for {} took too long; starting", game_.name);
                 return Step::Done;
@@ -92,6 +137,7 @@ public:
             log::Info("player", "save check for {}: {}", game_.name, result.error);
         }
         if (!result.conflicts.empty()) {
+            BootStepAside(); // the question is the user's: its panel is shown
             choosing_ = true;
             focus_ = "sync.online";
             return Step::Rebuild;
@@ -198,11 +244,30 @@ private:
         rebuild_ = true;
     }
 
-    void ShowProgress() {
+    // Under the boot screen: what is waited for, there.
+    void TellBoot(const sync::GameTransfer& transfer, bool coming) {
+        if (!BootCovers()) {
+            return;
+        }
+        BootWait wait;
+        if (from_continue_) {
+            wait.text = "Getting where you left off" + (from_.empty() ? std::string() : " on " + from_) + "\xE2\x80\xA6";
+        } else {
+            wait.text = coming ? "Getting your newer save\xE2\x80\xA6" : "Checking for newer saves\xE2\x80\xA6";
+        }
+        if (coming) {
+            const float part = transfer.fraction >= 0 ? transfer.fraction : 0.0f;
+            wait.fraction = std::clamp(
+                (static_cast<float>(transfer.done) + part) / static_cast<float>(transfer.total), 0.0f, 1.0f);
+        }
+        wait.skip = [this] { Skip(); };
+        SetBootWait(std::move(wait));
+    }
+
+    void ShowProgress(const sync::GameTransfer& transfer) {
         if (progress_ == nullptr || bar_ == nullptr) {
             return;
         }
-        const sync::GameTransfer transfer = engine_.GameProgress(true);
         if (transfer.game_id != game_.id || transfer.total == 0) {
             progress_->text = "Looking online\xE2\x80\xA6";
             bar_->fraction = -1;
@@ -238,6 +303,20 @@ PlayerHooks SyncHooks() {
             return nullptr;
         }
         return std::make_unique<SaveCheck>(*engine, start.game, start);
+    };
+    hooks.asked = [](const library::Entry& game, const plugins::CoreInfo& core, const ui::Params& params) {
+        sync::Engine* engine = SyncSvc();
+        if (engine == nullptr || core.runner == plugins::Runner::Engine || !engine->SyncsSaves()) {
+            return;
+        }
+        DropEarly();
+        const auto from_continue = params.find("continue");
+        const bool picking_up = from_continue != params.end() && from_continue->second == "1";
+        Early& early = Pending();
+        early.game_id = game.id;
+        early.check = std::make_shared<Check>();
+        early.started = pal::NowSeconds();
+        early.job = RunCheck(*engine, early.check, game.id, picking_up ? CONTINUE_SECONDS : DOWNLOAD_SECONDS);
     };
     return hooks;
 }

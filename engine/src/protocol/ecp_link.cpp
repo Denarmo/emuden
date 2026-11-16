@@ -216,6 +216,7 @@ Result<std::unique_ptr<Link>> OpenEcpLink(const Install& install, const LaunchRe
         play.token = opening.token;
         play.session = request.game_id;
         play.fullscreen = request.fullscreen;
+        play.cover = request.cover;
         // The game takes this app's display; on a device with two the companion panel stays
         // on the other one.
         play.display = pal::apps::Display::Main;

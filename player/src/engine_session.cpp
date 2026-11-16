@@ -61,6 +61,7 @@ public:
         launch.title = request.title;
         launch.content = request.content;
         launch.fullscreen = request.fullscreen;
+        launch.cover = request.cover;
         launch.install = request.engine;
         launch.controlled = true;
         launch.setup = request.engine_setup;

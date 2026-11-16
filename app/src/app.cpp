@@ -303,6 +303,9 @@ int Run(int argc, char** argv) {
             canvas.Begin(width, height, bar_scale);
             title_bar.Draw(ctx, *svc.window, width, bar);
             canvas.End();
+            for (const auto& hook : registry.AfterDraw()) {
+                hook(width, height);
+            }
             automation.AfterDraw(width, height);
             if (!hidden) {
                 svc.window->Swap();

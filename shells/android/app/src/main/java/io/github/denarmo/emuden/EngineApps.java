@@ -7,6 +7,7 @@ import android.app.Activity;
 import android.app.ActivityOptions;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
+import android.content.ClipData;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -40,6 +41,8 @@ final class EngineApps {
     static final String ACTION_PLAY = "io.github.ecp.action.PLAY";
     static final String ACTION_CONFIGURE = "io.github.ecp.action.CONFIGURE";
     private static final String EXTRA = "io.github.ecp.extra.";
+    /** The boot screen's background (app/screens/boot/boot_draw.cpp), behind the cover. */
+    private static final int COVER_COLOR = 0xFF0B0D14;
     private static final String ACTION_INSTALLED = "io.github.denarmo.emuden.ENGINE_INSTALLED";
     private static final int DISPLAY_MAIN = 1, DISPLAY_SECOND = 2;
 
@@ -192,7 +195,7 @@ final class EngineApps {
 
     /** Starts a game in the engine: section 3 of the protocol. */
     static String play(Activity activity, String pkg, String cert, String path, int port, String token,
-                       String session, boolean fullscreen, int display) {
+                       String session, boolean fullscreen, int display, String cover) {
         String installed = query(activity, pkg);
         if (installed.isEmpty()) {
             return "error:The engine app is not installed";
@@ -219,7 +222,15 @@ final class EngineApps {
                 .putExtra(EXTRA + "SESSION", session)
                 .putExtra(EXTRA + "MENU_INTENT", menuIntent)
                 .putExtra(EXTRA + "FULLSCREEN", fullscreen);
-        return start(activity, intent, display);
+        // The boot screen as it was: the engine shows it until its game's first frame, so the
+        // change of app is not seen (ECP SPEC, section 3).
+        if (cover != null && !cover.isEmpty() && new File(cover).isFile()) {
+            Uri picture = GameProvider.uriFor(activity, new File(cover));
+            intent.setClipData(ClipData.newRawUri("cover", picture));
+            intent.putExtra(EXTRA + "COVER", picture)
+                    .putExtra(EXTRA + "COVER_COLOR", COVER_COLOR);
+        }
+        return start(activity, intent, display, true);
     }
 
     /**
@@ -249,7 +260,7 @@ final class EngineApps {
                 .setComponent(target)
                 .setDataAndType(GameProvider.uriFor(activity, new File(path)), "application/octet-stream")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        return start(activity, intent, display);
+        return start(activity, intent, display, false);
     }
 
     /** After the menu: the engine's activity comes back to the front (section 6.2). */
@@ -261,7 +272,7 @@ final class EngineApps {
         Intent intent = new Intent(ACTION_PLAY)
                 .setComponent(target)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-        return start(activity, intent, display);
+        return start(activity, intent, display, true);
     }
 
     /** A file or folder the engine may keep reading (ECP configure): its URI, or "error:...". */
@@ -297,13 +308,20 @@ final class EngineApps {
         }
     }
 
-    private static String start(Activity activity, Intent intent, int display) {
+    /** `still`: no window animation, the engine's screen simply replaces this one. */
+    private static String start(Activity activity, Intent intent, int display, boolean still) {
         int target = display == DISPLAY_SECOND ? SecondScreen.otherDisplayId(activity)
                 : display == DISPLAY_MAIN ? SecondScreen.ownDisplayId(activity) : -1;
         try {
-            if (target >= 0) {
-                ActivityOptions options = ActivityOptions.makeBasic();
+            if (still) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+            }
+            ActivityOptions options = still ? ActivityOptions.makeCustomAnimation(activity, 0, 0)
+                    : target >= 0 ? ActivityOptions.makeBasic() : null;
+            if (options != null && target >= 0) {
                 options.setLaunchDisplayId(target);
+            }
+            if (options != null) {
                 activity.startActivity(intent, options.toBundle());
             } else {
                 activity.startActivity(intent);

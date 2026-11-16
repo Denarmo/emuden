@@ -59,6 +59,8 @@ struct LaunchRequest {
     std::string title;
     std::filesystem::path content; // the game file
     bool fullscreen = true;
+    /// Engine apps (Android): a PNG it shows over its screen until its first frame.
+    std::filesystem::path cover;
     /// The engine to use; empty: the one Find gives for the system.
     std::optional<Install> install;
     /// Level 2: setting values by key (as text), sent with the launch.
