@@ -28,6 +28,14 @@ struct Waiting {
     std::optional<Values> result;
 };
 
+// A call's progress reaches the caller only while it waits: a call given up (cancelled, or
+// past its limit) goes on in the plugin, and its caller may be gone by its next report.
+struct ProgressGuard {
+    std::mutex mutex;
+    Progress progress;
+    bool live = true;
+};
+
 class PluginProvider final : public Provider {
 public:
     PluginProvider(plugins::FeatureHost* host, std::string id, std::set<std::string> pc,
@@ -123,6 +131,15 @@ private:
 
     Values Call(const char* function, std::vector<JsonValue> args, Progress progress = {}) {
         auto waiting = std::make_shared<Waiting>();
+        auto guard = std::make_shared<ProgressGuard>();
+        guard->progress = std::move(progress);
+        struct Closed {
+            ProgressGuard& guard;
+            ~Closed() {
+                std::lock_guard lock(guard.mutex);
+                guard.live = false;
+            }
+        } closed{*guard};
         host_->Invoke(
             id_, {"provider", function}, std::move(args),
             [waiting](Values values) {
@@ -130,7 +147,12 @@ private:
                 waiting->result = std::move(values);
                 waiting->done.notify_all();
             },
-            std::move(progress));
+            [guard](double done, double total) {
+                std::lock_guard lock(guard->mutex);
+                if (guard->live && guard->progress) {
+                    guard->progress(done, total);
+                }
+            });
         std::unique_lock lock(waiting->mutex);
         const auto until = std::chrono::steady_clock::now() + CALL_LIMIT;
         while (!waiting->result) {
