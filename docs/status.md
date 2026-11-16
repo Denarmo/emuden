@@ -8,6 +8,37 @@ listened.
 
 SteamOS (Legion Go S) feature by feature, with the Linux fixes it needed: `docs/steamos.md`.
 
+## Black frame insertion (2026-11-16)
+
+- **What it does:** at a display rate that is a whole multiple of the game's, each game frame
+  is shown for one refresh and the next ones are black, locked to vsync (60 fps at 120 Hz:
+  game, black; 240 Hz: game and three black, or two with "Half of them"). For every core
+  EmuDEN runs itself; engine apps (PSX2 ECP, Switch 2) show it as not available. The cadence
+  is `den/player/bfi.h` with unit tests; rates that would judder are refused with the reason
+  ("Needs a 120 Hz display", "This game runs at 50 fps; needs 100 or 150 Hz").
+- **Where:** a toggle in the pause menu and the second screen's quick settings, a row on the
+  console page and in the game settings (per console and game), on/strength in Settings,
+  Player. `player.bfi*` is device-only for sync. A toast warns about flicker once.
+- **Kept working:** no black frames while fast-forwarding, rewinding, playing together, with
+  a menu or the launch fade over the game, or with the main window covered; the second
+  display keeps its screen; screenshots, state pictures and resume pictures come from the
+  core's picture, and the automation screenshot skips black frames.
+- **Display rate:** asked for while it is on and given back after (the window's preferred
+  display mode on Android, an exclusive full screen mode on the desktop).
+- **Measured on the Retroid Pocket Duo** (120 Hz, release APK, debuggable): Mario Golf (GBC,
+  59.73 fps): `drive.py bfi` traces `GBGB...` with no break over 240 frames, the middle pixel
+  read back 0 on black refreshes; SurfaceFlinger presented 126 buffers 8.34 ms apart with
+  none missed; game 59.9 fps, no sound gaps. Fast-forward traces all game frames, rewind no
+  black ones, and black frames start again after. Pokemon Mystery Dungeon (DS, two screens):
+  the second screen stayed lit in every capture; in a heavy scene the game misses about 8 of
+  125 refreshes with or without black frames, and each missed one shows two game frames in a
+  row (the toggle then says the refreshes are uneven). With the launch animation the first
+  black frame came after the fade.
+- **Not verified:** switching a display from 60 to 120 Hz (the Retroid runs at 120 already;
+  the desktop switch needs full screen and was not tried on the owner's monitors), a 240 Hz
+  display, a camera or high-speed capture of the panel itself (the checks read back what was
+  drawn and what SurfaceFlinger presented).
+
 ## Browser plugin (2026-11-15)
 
 The `emuden.browser` plugin (`docs/feature-plugins.md` 4.4, `docs/in-app-browser.md`) and the

@@ -30,6 +30,7 @@ constexpr const char* WARNED_KEY = "player.bfi_warned";
 constexpr const char* WARNING =
     "Black frame insertion flickers on purpose. If flicker bothers you, turn it off.";
 constexpr double RATES_EVERY = 1.0; // seconds between asking the display while it matters
+constexpr double MISSES_BELOW = 0.97; // of the display's rate drawn: refreshes are being missed
 
 player::BfiStrength Strength() {
     return Svc().settings->GetString(BFI_STRENGTH_KEY.name(), BFI_STRENGTH_KEY.fallback()) == "half"
@@ -151,6 +152,11 @@ std::string BlackFrames::Status(const player::Snapshot& snapshot) const {
     }
     if (!snapshot.bfi_steady && snapshot.bfi_display_hz > 0) {
         return std::format("The display shows only {} frames a second", player::RateText(snapshot.bfi_display_hz));
+    }
+    if (snapshot.bfi_display_hz > 0 && snapshot.bfi_display_hz < plan.refresh_hz * MISSES_BELOW) {
+        // The game is too heavy to draw every refresh: a missed one shows no black frame.
+        return std::format("Uneven: {} of {} refreshes a second are drawn", player::RateText(snapshot.bfi_display_hz),
+                           player::RateText(plan.refresh_hz));
     }
     return std::format("At {} Hz: {} black frame{} after each of the game's", player::RateText(plan.refresh_hz),
                        plan.black, plan.black == 1 ? "" : "s");
