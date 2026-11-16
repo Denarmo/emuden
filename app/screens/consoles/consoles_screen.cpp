@@ -10,6 +10,7 @@
 #include "den/app/frame.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
+#include "den/app/strings.h"
 
 namespace den::app {
 
@@ -73,6 +74,8 @@ public:
             });
         refresh.description = "Fetches the list of consoles and cores again";
         rows.push_back(std::move(refresh));
+        rows.push_back(ActionRow("consoles.install_file", Tr("install_file.row"), InstallConsoleFromFile,
+                                 Tr("install_file.row_help")));
         AddRows(list, std::move(rows));
     }
 
@@ -108,7 +111,8 @@ std::vector<ui::RowSpec> ConsolesRows() {
         [] { return std::format("{} of {} ready", ReadyCount(), Svc().plugins->Consoles().size()); },
         [] { Svc().stage->Push("consoles"); });
     row.description = "Install, repair or remove what plays each console's games";
-    return {row};
+    return {row, ActionRow("settings.install_file", Tr("install_file.row"), InstallConsoleFromFile,
+                           Tr("install_file.row_help"))};
 }
 
 } // namespace

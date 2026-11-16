@@ -42,7 +42,11 @@ struct Loaded {
     bool from_index = false; // its package came from a signed index, not from the app
     std::string origin;      // the address of its source (the official one for the developer folder)
     bool developer = false;  // from <data>/plugins-dev, unsigned
+    bool local = false;      // installed from a file, unsigned (<data>/plugins-local)
 };
+
+/// The origin of a core installed for an unsigned plugin installed from a file.
+inline constexpr const char* LOCAL_ORIGIN = "local";
 
 inline std::string FileNameOf(const Download& download) {
     const std::string& path = download.archive == "zip" ? download.entry : download.url;
@@ -111,6 +115,12 @@ public:
     Status SetSourceEnabled(const std::string& address, bool enabled) override;
     JobPtr RemoveSource(const std::string& address) override;
 
+    // host_local.cpp
+    Result<PackageProbe> ProbePackage(const fs::path& path) const override;
+    Status InstallPackage(const PackageProbe& probe) override;
+    std::vector<CarryOver> CarryOvers() const override;
+    JobPtr SettleCarryOver(const std::string& plugin_id, bool keep) override;
+
 private:
     struct Found {
         const Loaded* loaded = nullptr;
@@ -152,7 +162,8 @@ private:
     Console Describe(const Loaded& loaded, const SystemDef& system) const;
     void AddSettingHints(const Loaded& loaded, const SystemDef& system, const Component& core, CoreInfo& info) const;
     CoreInfo Describe(const Loaded& loaded, const SystemDef& system, const Component& core) const;
-    void AddManifest(Manifest manifest, bool from_index, const std::string& origin, bool developer = false);
+    void AddManifest(Manifest manifest, bool from_index, const std::string& origin, bool developer = false,
+                     bool local = false);
     /// Every other console plugin it depends on is there, in a version of its range.
     bool DependsMet(const Manifest& manifest) const;
     /// The console plugins of the developer folder, when developer mode is on.
@@ -161,6 +172,15 @@ private:
     bool Allowed(const Manifest& manifest, std::size_t origin);
     void LoadManifests();
     void LoadState();
+
+    // host_local.cpp
+    /// The unsigned console plugins installed from files.
+    void LoadLocalManifests();
+    /// On the first start, the cached official list names the console plugins the app had
+    /// before: those it has no manifest of now were built in and are carried over.
+    void FindCarryOvers();
+    void SaveCarryOvers() const;
+    Status KeepCarryOver(Job& job, const std::string& plugin_id);
     void SaveState() const;
 
     // host_sources.cpp
@@ -217,6 +237,7 @@ private:
     HostDeps deps_;
     fs::path plugins_dir_;
     fs::path dev_dir_; // <data>/plugins-dev/<id>/plugin.json, shared with the feature host
+    fs::path local_dir_; // <data>/plugins-local/<id>/plugin.json
     fs::path bios_dir_;
 
     mutable std::mutex mutex_;
@@ -226,6 +247,7 @@ private:
     std::vector<SourceState> states_;
     std::map<std::string, std::string, std::less<>> system_files_; // plugin/component -> sha256
     mutable std::map<std::string, Checked, std::less<>> checked_;
+    std::vector<CarryOver> carry_overs_;
     mutable bool engines_loaded_ = false;
     mutable std::map<std::string, EngineRecord, std::less<>> engines_;
     mutable std::map<std::string, std::pair<std::uint64_t, pal::engine_apps::Installed>, std::less<>> apps_;

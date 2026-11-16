@@ -75,17 +75,18 @@ bool KnownSystem(const std::string& system) {
 
 std::optional<Install> Locate(const std::string& system, const std::filesystem::path& data_dir,
                               const store::Settings* settings) {
+    // The program the user chose on this device comes first, for any console.
     const KnownEngine* engine = FindKnown(system);
-    if (!engine) {
-        return std::nullopt;
-    }
     const std::string chosen = settings ? Trim(settings->GetString(PathKey(system))) : std::string();
     if (!chosen.empty()) {
         const std::filesystem::path path = PathFromUtf8(chosen);
         if (IsRegularFile(path)) {
             return Install{path, "setting", 0};
         }
-        return InFolder(*engine, path, "setting");
+        return engine ? InFolder(*engine, path, "setting") : std::nullopt;
+    }
+    if (!engine) {
+        return std::nullopt;
     }
     for (const char* folder : {"engines", "emulators"}) {
         if (auto found = InFolder(*engine, data_dir / folder / system, "plugin")) {

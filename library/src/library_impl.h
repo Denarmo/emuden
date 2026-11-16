@@ -50,6 +50,7 @@ public:
     void SetFavourite(const std::string& id, bool favourite) override;
     void RecordPlay(const std::string& id, std::int64_t started_unix, std::int64_t seconds) override;
     std::map<std::string, PlayTotals> OwnPlay() const override;
+    std::set<std::string> SystemsWithRecords() const override;
     void SetOtherPlay(const std::map<std::string, PlayTotals>& others) override;
     std::vector<CoverChoice> CoverChoices(const std::string& id,
                                           const std::function<bool()>& stopping) override;

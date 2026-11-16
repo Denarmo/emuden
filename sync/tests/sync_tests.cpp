@@ -154,6 +154,7 @@ TEST_CASE("settings sync without what belongs to the device") {
     a.settings->SetString("core_options.flycast.emuden_renderer", "Vulkan");
     a.settings->SetBool("player.bfi", true); // black frames depend on this device's display
     a.settings->SetString("player.bfi_strength", "half");
+    a.settings->SetString("engine.switch2.path", "C:/Engines/Switch2/engine.exe"); // chosen on this device
     REQUIRE(a.Sync().ok);
     const std::string uploaded = cloud.files.at("config/settings.json").data;
     CHECK(uploaded.find("player.bfi") == std::string::npos);
@@ -161,6 +162,7 @@ TEST_CASE("settings sync without what belongs to the device") {
     CHECK(uploaded.find("ui.scale") == std::string::npos);
     CHECK(uploaded.find("emuden_renderer") == std::string::npos);
     CHECK(uploaded.find("sync.") == std::string::npos);
+    CHECK(uploaded.find("engine.switch2") == std::string::npos);
     CHECK(uploaded.find("steam") == std::string::npos);
     b.settings->SetNumber("ui.scale", 2.0);
     REQUIRE(b.Sync().ok);

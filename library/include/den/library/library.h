@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <set>
 #include <memory>
 #include <optional>
 #include <string>
@@ -146,6 +147,11 @@ public:
     /// holds for another game inside this session (a game opened over this one) is left out.
     virtual void RecordPlay(const std::string& id, std::int64_t started_unix, std::int64_t seconds) = 0;
     /// What this device played, per entry id: without the other devices' time.
+    /// The systems of every game the library keeps a record of, by the system part of its id:
+    /// games that are gone, or hidden because their console's plugin is not there, included.
+    virtual std::set<std::string> SystemsWithRecords() const {
+        return {};
+    }
     virtual std::map<std::string, PlayTotals> OwnPlay() const {
         return {};
     }

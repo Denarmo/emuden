@@ -52,4 +52,9 @@ void Pick(PickOptions options, std::function<void(const std::string&)> on_pick);
 /// the engine host's path setting.
 void ChooseEnginePath(const std::string& system);
 
+/// Lets the user pick a console plugin (an .emuplugin package, or a folder's plugin.json),
+/// shows what it is and whether EmuDEN signed it, and installs it; a console that runs in an
+/// engine program not found on this device asks for that program next.
+void InstallConsoleFromFile();
+
 } // namespace den::app

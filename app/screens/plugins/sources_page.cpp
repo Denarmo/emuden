@@ -183,6 +183,8 @@ std::vector<ui::RowSpec> SourceRows() {
         "sources.check", Tr("sources.check"), [] { return JobText(g_check, ""); }, CheckAll);
     check.description = Tr("sources.check_help");
     rows.push_back(std::move(check));
+    rows.push_back(ActionRow("sources.install_file", Tr("install_file.row"), InstallConsoleFromFile,
+                             Tr("install_file.row_help")));
     int index = 0;
     for (const SourceInfo& info : Svc().plugins->Sources()) {
         ui::RowSpec row = ValueRow(

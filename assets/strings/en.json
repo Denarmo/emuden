@@ -208,6 +208,18 @@
   "source.install": "Install",
   "source.install_title": "Install {}?",
 
+  "install_file.row": "Install a console from a file",
+  "install_file.row_help": "An .emuplugin package, or the plugin.json of a plugin folder, for a console EmuDEN does not offer",
+  "install_file.pick": "Choose a console plugin",
+  "install_file.title": "Install {}?",
+  "install_file.what": "{} {} by {}: {}.",
+  "install_file.replaces": "It replaces version {} on this device.",
+  "install_file.signed": "It is signed by EmuDEN.",
+  "install_file.unsigned": "It is not signed by EmuDEN, and nobody checked it: the cores it names are programs that run on this device. Install it only if you trust where the file came from.",
+  "install_file.engine": "Its games run in an engine program you install yourself; EmuDEN asks where it is if it does not find it.",
+  "install_file.install": "Install",
+  "install_file.done": "{} was installed",
+
   "sources.title": "Plugin sources",
   "developer.mode": "Developer mode",
   "developer.mode_help": "Uses the plugins of the developer folder, unsigned, beside the installed ones",

@@ -314,6 +314,15 @@ private:
         note.description = "Until the engine plugin exists, EmuDEN starts the emulator installed on this device, "
                            "and saves and settings stay in that emulator";
         rows.push_back(std::move(note));
+        rows.push_back(ActionRow("console.remove", "Remove", [console] {
+            Svc().stage->Confirm("Remove " + console.name + "?",
+                                 "Its plugin is removed; install it from a file to have it again. Games, saves "
+                                 "and the engine program stay.",
+                                 "Remove", [console] {
+                                     TrackConsoleJob(console.id, console.name, "removed",
+                                                     Svc().plugins->Remove(console.id));
+                                 });
+        }));
     }
 
     std::uint64_t revision_ = 0;

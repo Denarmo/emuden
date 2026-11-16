@@ -11,6 +11,7 @@
 #include "den/library/content.h"
 #include "den/library/names.h"
 #include "den/library/scan.h"
+#include "switch2_system.h"
 #include "seven_zip_writer.h"
 
 using namespace den;
@@ -311,6 +312,11 @@ TEST_CASE("Switch 2 games") {
 
     ScanOptions options = Options(root);
     options.icons_dir = root / "icons";
+    // Without its plugin nothing of it is found: the folder is no console's.
+    CHECK(ScanFolders(options).empty());
+    SystemTable systems;
+    systems.Set(ParseSystems(SWITCH2_SYSTEM));
+    options.systems = &systems;
     const std::vector<Entry> entries = ScanFolders(options);
     REQUIRE(entries.size() == 4);
     const Entry* zelda = ByName(entries, "The Legend of Zelda: Ocarina of Time");

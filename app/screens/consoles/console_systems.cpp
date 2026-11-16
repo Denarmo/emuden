@@ -4,6 +4,7 @@
 // The library learns the consoles of the installed plugins: whenever the plugins change, the
 // consoles that are ready (their core or engine app is installed) are handed to it. A console
 // it did not have has its games searched for at once; one whose plugin is gone is dropped.
+// After an update, a console plugin the app no longer brings is kept if it was in use.
 
 #include <algorithm>
 #include <set>
@@ -56,11 +57,37 @@ library::SystemDef ToSystemDef(const plugins::Console& console) {
     return def;
 }
 
+// A console plugin an update no longer brings stays where the library has games of it, and
+// goes where it has none. One at a time; one that cannot be fetched now is tried next start.
+void SettleCarryOvers(Services& svc) {
+    static std::set<std::string> tried;
+    static JobPtr job;
+    if (job && !job->Finished()) {
+        return;
+    }
+    if (job && job->State() == JobState::Failed) {
+        log::Warn("plugins", "a console plugin could not be kept: {}", job->Error());
+    }
+    job.reset();
+    const std::set<std::string> seen = svc.library->SystemsWithRecords();
+    for (const plugins::CarryOver& carry : svc.plugins->CarryOvers()) {
+        if (!tried.insert(carry.plugin_id).second) {
+            continue;
+        }
+        const bool keep = std::any_of(carry.systems.begin(), carry.systems.end(),
+                                      [&](const std::string& system) { return seen.contains(system); });
+        log::Info("plugins", "{}: {} after the update", carry.plugin_id, keep ? "kept" : "no longer offered");
+        job = svc.plugins->SettleCarryOver(carry.plugin_id, keep);
+        return;
+    }
+}
+
 void Frame() {
     Services& svc = Svc();
     if (svc.plugins == nullptr || svc.library == nullptr) {
         return;
     }
+    SettleCarryOvers(svc);
     State& state = Get();
     const std::uint64_t revision = svc.plugins->Revision();
     if (revision == state.revision) {

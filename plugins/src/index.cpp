@@ -155,6 +155,12 @@ Result<Index> ParseIndex(std::string_view text) {
                 // Not "systems": in an entry that field lists console objects, and readers
                 // older than feature plugins expect it to.
                 plugin.systems = json::Strings(value, "feature_systems", false);
+            } else if (const JsonValue* systems = value.Find("systems")) {
+                for (const JsonValue& system : systems->items) {
+                    if (const std::string id = system.String("id"); !id.empty()) {
+                        plugin.systems.push_back(id);
+                    }
+                }
             }
             index.plugins.push_back(std::move(plugin));
         }

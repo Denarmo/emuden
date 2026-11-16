@@ -307,11 +307,12 @@ Status RealHost::InstallCore(Job& job, const Loaded& loaded, const Component& co
         const std::size_t source = OriginOf(loaded);
         key = LedgerKey(loaded, core);
         origin = loaded.developer ? DEVELOPER_ORIGIN
+                 : loaded.local      ? LOCAL_ORIGIN
                  : source > 0        ? loaded.origin
                                      : (loaded.from_index ? "official" : "bundled");
         // Core files share one folder: an added source's core never takes another's file.
         for (const auto& [other_key, record] : ledger_.Records()) {
-            if (other_key != key && EqualsNoCase(record.file, file_name) && (source > 0 || loaded.developer)) {
+            if (other_key != key && EqualsNoCase(record.file, file_name) && (source > 0 || loaded.developer || loaded.local)) {
                 return Status::Fail(core.name + " would replace the core file " + file_name + " of another plugin.");
             }
         }
@@ -392,7 +393,7 @@ void RealHost::InstallSystemFiles(Job& job, const Loaded& loaded, const std::str
             std::lock_guard lock(mutex_);
             if (const auto reason = BlockedFor(views_, origin, download.sha256)) {
                 status = Status::Fail("it must not be used: " + *reason);
-            } else if ((origin > 0 || loaded.developer) && !system_files_.contains(SystemFilesKey(manifest, files)) &&
+            } else if ((origin > 0 || loaded.developer || loaded.local) && !system_files_.contains(SystemFilesKey(manifest, files)) &&
                        BiosPresent(bios_dir_, {download.entry, false})) {
                 status = Status::Fail("it would replace files already in the BIOS folder");
             }
@@ -424,7 +425,22 @@ Status RealHost::DoRemove(const std::string& system) {
         return Status::Fail("EmuDEN does not know the console \"" + system + "\".");
     }
     if (found.system->console.runner == Runner::Engine) {
-        return Status::Fail(found.system->console.name + " is part of EmuDEN.");
+        // Nothing of it but its plugin is on the device: removing the console removes that.
+        const Loaded& loaded = *found.loaded;
+        const fs::path dir = (loaded.local ? local_dir_ : plugins_dir_) / PathFromUtf8(loaded.manifest.id);
+        std::error_code ec;
+        if (loaded.developer || !fs::is_directory(dir, ec)) {
+            return Status::Fail(found.system->console.name + " is part of EmuDEN.");
+        }
+        fs::remove_all(dir, ec);
+        if (ec) {
+            return Status::Fail("The plugin could not be removed.");
+        }
+        manifests_.clear(); // a built-in copy of it, if any, is used again
+        LoadManifests();
+        checked_.clear();
+        ++revision_;
+        return {};
     }
     const Component* core = ChosenCore(*found.loaded, *found.system);
     if (core == nullptr) {

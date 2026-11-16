@@ -8,9 +8,16 @@ which device, are in `docs/history.md`; add new ones there, newest first.
 - **Consoles as plugins.** Every console is an official plugin from `Denarmo/emuden-plugins`
   (signed index), with copies bundled in `assets/plugins` so consoles show before anything
   is downloaded. Only cores that need no BIOS are offered. A core is a pinned libretro core,
-  an engine app spoken to over the Emulator Control Protocol (`docs/engines.md`), or the
-  installed Switch 2 emulator (engine level 0, its own window). Other developers' sources can
-  be added (Settings > Plugins), limited to their own namespace.
+  an engine app spoken to over the Emulator Control Protocol (`docs/engines.md`), or an
+  engine program the player brings (Switch 2, engine level 0, its own window). Other
+  developers' sources can be added (Settings > Plugins), limited to their own namespace.
+- **Install a console from a file** (Settings > Plugins, Settings > Consoles): an
+  `.emuplugin` or a folder's `plugin.json`, shown with its trust (signed by EmuDEN, or a third
+  party's, unchecked) before it is installed; an engine console then asks for its engine
+  program when it is not found, and keeps that path on the device (`engine.<system>.path`, not
+  synced). This is the only way to get **Switch 2**: it is not built in, in no plugin list,
+  and no release carries or downloads its engine. Until its plugin is installed it shows
+  nowhere and a `SWITCH 2` folder is no console's (`docs/engines.md`).
 - **Player.** Software, OpenGL and Vulkan cores (`docs/vulkan.md`); save states, rewind,
   fast-forward, picture presets on a multi-pass chain, per-game and per-console settings,
   button remapping, black frame insertion at whole multiples of the game's rate, two screens (DS layouts, quick settings and the pause menu on the second

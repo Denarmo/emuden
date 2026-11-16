@@ -21,6 +21,23 @@ std::uint64_t RealLibrary::Revision() const {
     return revision_.load();
 }
 
+std::set<std::string> RealLibrary::SystemsWithRecords() const {
+    std::lock_guard lock(mutex_);
+    std::set<std::string> out;
+    const auto add = [&out](const std::string& id) {
+        if (const std::size_t colon = id.find(':'); colon != std::string::npos && colon > 0) {
+            out.insert(id.substr(0, colon));
+        }
+    };
+    for (const auto& [id, record] : saved_.records) {
+        add(id);
+    }
+    for (const Entry& entry : entries_) {
+        add(entry.id);
+    }
+    return out;
+}
+
 std::vector<Entry> RealLibrary::Entries() const {
     std::lock_guard lock(mutex_);
     std::vector<Entry> out;

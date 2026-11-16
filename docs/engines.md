@@ -9,6 +9,23 @@ driven from EmuDEN's own pause menu, quick settings and companion panel, like a 
 console's `cores` beside its libretro cores; it is chosen per console or per game the same way
 (`Host::CoresFor`, `SelectCore`, the game's core setting).
 
+## Switch 2: an engine the player brings
+
+Switch 2 is not shipped: no release (Windows zip, AppImage, APK) holds its plugin or an engine,
+and no list offers it. The player installs the signed package
+`manual/emuden.switch2.emuplugin` of `Denarmo/emuden-plugins` with **Settings > Plugins >
+Install a console from a file** (`Host::ProbePackage`, `InstallPackage`); EmuDEN then asks for
+the engine program if `engine::Locate` does not find it. The chosen path
+(`engine.switch2.path`) is device-only and the first place `Locate` looks, for any console.
+Its console, content rules and folder names (`SWITCH 2`, `nx2`, ...) come from that manifest;
+the library has no built-in Switch 2 entry, only its `switch2` scanner.
+
+A device that had Switch 2 while it was built in keeps it: on the first start of a version
+without it, the host notes the official console plugins its cached list named and it has no
+manifest of (`Host::CarryOvers`, `<data>/plugins/carry-over.json`); the app keeps those the
+library has records of (`Library::SystemsWithRecords`) by fetching the signed `manual/`
+package, and lets the others go. A new install has no cached list and never gets it.
+
 ## Declaring an engine core
 
 A component of type `engine-app`:

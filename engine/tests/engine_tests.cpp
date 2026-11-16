@@ -103,6 +103,28 @@ TEST_CASE("an engine folder is found by its executable") {
     CHECK(install->level == 0);
 }
 
+TEST_CASE("the engine program chosen on this device is looked at first") {
+    Fixture f;
+    const auto found = f.dir / "engines" / "switch2";
+    std::filesystem::create_directories(found);
+    std::ofstream(found / "lichii.exe") << "x";
+    REQUIRE(f.host->Find("switch2"));
+    CHECK(f.host->Find("switch2")->source == "plugin");
+
+    const auto chosen = f.dir / "Chosen" / "engine-program";
+    std::filesystem::create_directories(chosen.parent_path());
+    std::ofstream(chosen) << "x";
+    f.settings->SetString(engine::PathKey("switch2"), PathToUtf8(chosen));
+    REQUIRE(f.host->Find("switch2"));
+    CHECK(f.host->Find("switch2")->executable == chosen);
+    CHECK(f.host->Find("switch2")->source == "setting");
+    // Any console's: a program is a program, whatever its name.
+    f.settings->SetString(engine::PathKey("otherengine"), PathToUtf8(chosen));
+    REQUIRE(f.host->Find("otherengine"));
+    CHECK(f.host->Find("otherengine")->executable == chosen);
+    CHECK_FALSE(f.host->Find("nochoice"));
+}
+
 TEST_CASE("level 0 reports the exit and books the play time") {
     Fixture f;
     f.UseShell("ping -n 3 127.0.0.1 >nul & exit 3", "sleep 2; exit 3");

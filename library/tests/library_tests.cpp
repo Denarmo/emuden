@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <set>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -13,6 +14,7 @@
 #include "den/library/artwork.h"
 #include "den/library/library.h"
 #include "den/library/systems.h"
+#include "switch2_system.h"
 
 using namespace den;
 using namespace den::library;
@@ -166,6 +168,44 @@ TEST_CASE("the library scans, keeps records and remembers them") {
         const auto tetris = library->Find(tetris_id);
         REQUIRE(tetris);
         CHECK(tetris->favourite);
+        CHECK(library->Entries().size() == 2);
+    }
+}
+
+TEST_CASE("Switch 2 games show only while its plugin is installed, and are remembered") {
+    const fs::path dir = FreshDir("switch2-plugin");
+    const fs::path roms = dir / "roms";
+    Put(roms / "SWITCH 2" / "Mario Kart World [0400C3F00006E000].nsp");
+    Put(roms / "gb" / "Tetris (World).gb");
+    Jobs jobs(2);
+    Config config;
+    config.data_dir = dir / "user";
+    config.jobs = &jobs;
+    config.offline = true;
+    {
+        auto library = CreateLibrary(config);
+        REQUIRE(library->AddFolder(PathToUtf8(roms)));
+        jobs.Wait(library->Scan());
+        // Not installed: the "SWITCH 2" folder is no console's, and nothing of it shows.
+        REQUIRE(library->Entries().size() == 1);
+        CHECK(library->Consoles().Find("switch2") == nullptr);
+        CHECK(library->SystemsWithRecords() == std::set<std::string>{"gb"});
+
+        library->SetSystems(ParseSystems(SWITCH2_SYSTEM));
+        jobs.Wait(library->Scan());
+        REQUIRE(library->Entries().size() == 2);
+        CHECK(library->Find("switch2:0400C3F00006E000"));
+        CHECK(library->SystemsWithRecords().contains("switch2"));
+    }
+    {
+        // An update without the plugin: its games are hidden, and stay known by their records.
+        auto library = CreateLibrary(config);
+        CHECK(library->Entries().size() == 1);
+        jobs.Wait(library->Scan());
+        CHECK(library->Entries().size() == 1);
+        CHECK(library->SystemsWithRecords().contains("switch2"));
+        library->SetSystems(ParseSystems(SWITCH2_SYSTEM));
+        jobs.Wait(library->Scan());
         CHECK(library->Entries().size() == 2);
     }
 }

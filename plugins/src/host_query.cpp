@@ -58,7 +58,7 @@ bool WriteOrigin(const fs::path& plugin_dir, const std::string& address) {
 
 RealHost::RealHost(const Config& config, HostDeps deps)
     : config_(config), deps_(std::move(deps)), plugins_dir_(config.data_dir / "plugins"),
-      dev_dir_(config.data_dir / "plugins-dev"), bios_dir_(config.data_dir / "bios"), ledger_(config.data_dir / "cores") {
+      dev_dir_(config.data_dir / "plugins-dev"), local_dir_(config.data_dir / "plugins-local"), bios_dir_(config.data_dir / "bios"), ledger_(config.data_dir / "cores") {
     if (!deps_.http) {
         deps_.http = &pal::HttpGet;
     }
@@ -90,6 +90,7 @@ RealHost::RealHost(const Config& config, HostDeps deps)
     }
     UpdateRevokedKeys();
     LoadManifests();
+    FindCarryOvers();
 }
 
 std::vector<Console> RealHost::Consoles() const {
@@ -173,7 +174,7 @@ Status RealHost::VerifyCore(const fs::path& library) const {
     const CoreRecord* record = ledger_.FindByFile(PathToUtf8(library.filename()));
     std::size_t origin = 0;
     if (record != nullptr && !record->origin.empty() && record->origin != "official" && record->origin != "bundled" &&
-        record->origin != DEVELOPER_ORIGIN) {
+        record->origin != DEVELOPER_ORIGIN && record->origin != LOCAL_ORIGIN) {
         origin = FindView(views_, record->origin);
         if (origin == views_.size()) {
             return Status::Fail("This core's source was removed.");
@@ -239,8 +240,8 @@ const Component* RealHost::ChosenCore(const Loaded& loaded, const SystemDef& sys
 }
 
 std::string RealHost::LedgerKey(const Loaded& loaded, const Component& core) const {
-    if (loaded.developer) {
-        return std::string(DEVELOPER_ORIGIN) + "/" + loaded.manifest.id + "/" + core.id;
+    if (loaded.developer || loaded.local) {
+        return std::string(loaded.local ? LOCAL_ORIGIN : DEVELOPER_ORIGIN) + "/" + loaded.manifest.id + "/" + core.id;
     }
     return OriginOf(loaded) == 0 ? core.id : loaded.manifest.id + "/" + core.id;
 }
@@ -290,6 +291,8 @@ Console RealHost::Describe(const Loaded& loaded, const SystemDef& system) const 
     const std::size_t origin = OriginOf(loaded);
     if (origin > 0) {
         console.source = views_[origin].label;
+    } else if (loaded.local) {
+        console.source = "a file";
     }
     if (console.runner == Runner::Engine) {
         console.installed = true;
@@ -370,17 +373,22 @@ CoreInfo RealHost::Describe(const Loaded& loaded, const SystemDef& system, const
 
 // Manifests stay in the order of their sources, so the official source's console wins a
 // system id over an added source's, and the source added first over a later one.
-void RealHost::AddManifest(Manifest manifest, bool from_index, const std::string& origin, bool developer) {
+void RealHost::AddManifest(Manifest manifest, bool from_index, const std::string& origin, bool developer,
+                           bool local) {
     const auto it = std::find_if(manifests_.begin(), manifests_.end(),
                                  [&](const Loaded& l) { return l.manifest.id == manifest.id; });
     if (it == manifests_.end()) {
-        manifests_.push_back({std::move(manifest), from_index, origin, developer});
+        manifests_.push_back({std::move(manifest), from_index, origin, developer, local});
+    } else if (local != it->local && !developer) {
+        // An unsigned file never stands in for a signed plugin, nor the other way round.
+        log::Warn("plugins", "{} installed from a file is not used: another copy came first", manifest.id);
+        return;
     } else if (it->origin != origin) {
         log::Warn("plugins", "{} from {} is not used: it came from {} first", manifest.id, origin, it->origin);
         return;
     } else if (developer || (!it->developer && manifest.version >= it->manifest.version)) {
         // The developer folder's copy is the one used, whatever its version.
-        *it = {std::move(manifest), from_index, origin, developer};
+        *it = {std::move(manifest), from_index, origin, developer, local};
     }
     std::stable_sort(manifests_.begin(), manifests_.end(), [this](const Loaded& a, const Loaded& b) {
         return OriginOf(a) < OriginOf(b);
@@ -438,6 +446,7 @@ void RealHost::LoadManifests() {
                       manifest ? "the folder is not named after the plugin" : manifest.error());
         }
     }
+    LoadLocalManifests();
     LoadDeveloperManifests();
 }
 

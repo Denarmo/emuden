@@ -1,12 +1,15 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <algorithm>
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "den/library/artwork.h"
 #include "den/library/names.h"
 #include "den/library/scan.h"
 #include "den/library/systems.h"
+#include "switch2_system.h"
 
 using namespace den::library;
 
@@ -73,12 +76,10 @@ TEST_CASE("the built-in consoles") {
     CHECK(table.FromFolderName("PSX") == table.Find("psx"));
     CHECK(table.FromFolderName("ps1") == table.Find("psx"));
     CHECK(table.FromFolderName("Game Boy Advance") == table.Find("gba"));
-    CHECK(table.FromFolderName("SWITCH 2") == table.Find("switch2"));
     CHECK(table.FromFolderName("documents") == nullptr);
     CHECK(table.FromUniqueExtension("gba") == table.Find("gba"));
     CHECK(table.FromUniqueExtension("iso") == nullptr); // several consoles
     CHECK(table.FromUniqueExtension("md") == nullptr);  // only inside its folder
-    CHECK(table.FromUniqueExtension("nup") == table.Find("switch2"));
     CHECK(table.RomExtension("celeste.p8.png") == "p8.png");
     CHECK(table.RomExtension("tetris (world).gb") == "gb");
 }
@@ -87,13 +88,32 @@ TEST_CASE("plugin manifests extend the consoles") {
     SystemTable table;
     table.Merge(ParseSystems(R"({"id":"x.lynx","systems":[
         {"id":"lynx","name":"Atari Lynx","order":50,"content":{"extensions":["LNX"],"folder_aliases":["atarilynx"]}},
-        {"id":"switch2","name":"Nintendo Switch 2","content":{"extensions":[],"scanner":"switch2"}}]})"));
+        {"id":"gba","name":"Game Boy Advance","short_name":"AGB","content":{"extensions":[]}}]})"));
     REQUIRE(table.Find("lynx") != nullptr);
     CHECK(table.FromUniqueExtension("lnx") == table.Find("lynx"));
     CHECK(table.FromFolderName("AtariLynx") == table.Find("lynx"));
     // A manifest without extensions keeps the built-in ones.
-    CHECK(table.FromUniqueExtension("nup") == table.Find("switch2"));
+    CHECK(table.FromUniqueExtension("gba") == table.Find("gba"));
+    CHECK(table.Find("gba")->short_name == "AGB");
+}
+
+TEST_CASE("Switch 2 is hidden until its plugin is installed") {
+    SystemTable table;
+    CHECK(table.Find("switch2") == nullptr);
+    CHECK(table.FromFolderName("SWITCH 2") == nullptr);
+    CHECK(table.FromFolderName("nx2") == nullptr);
+    CHECK(table.FromUniqueExtension("nup") == nullptr);
+    CHECK(std::find(BuiltinRomExtensions().begin(), BuiltinRomExtensions().end(), "nup") ==
+          BuiltinRomExtensions().end());
+    table.Set(ParseSystems(SWITCH2_SYSTEM));
+    REQUIRE(table.Find("switch2") != nullptr);
+    CHECK(table.Find("switch2")->scanner == "switch2");
     CHECK(table.Find("switch2")->short_name == "Switch 2");
+    CHECK(table.FromFolderName("SWITCH 2") == table.Find("switch2"));
+    CHECK(table.FromUniqueExtension("nup") == table.Find("switch2"));
+    table.Set({}); // its plugin was removed
+    CHECK(table.Find("switch2") == nullptr);
+    CHECK(table.FromFolderName("SWITCH 2") == nullptr);
 }
 
 TEST_CASE("a console whose plugin is removed leaves the table") {

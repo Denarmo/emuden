@@ -17,7 +17,8 @@ The games on this device. Screens use `den/library/library.h` only; the player a
 - **Consoles.** `src/systems_data.cpp` holds the `systems[]` of the official plugin manifests,
   so the library works with no plugin installed. The plugin host (or the app) hands the
   installed manifests' systems to `Library::SetSystems`; they replace or extend the table.
-  The library does not include `plugins/`.
+  The library does not include `plugins/`. Switch 2 is not in the built-in table: it comes
+  only from its plugin, installed by hand, and its scanner (`switch2`) runs only then.
 - **Folders.** A folder holds console folders (`gba`, `PSX`, `Game Boy Advance`, `SWITCH 2`:
   id, alias or name) and ROM files whose extension names one console. A folder named like a
   console, or added with a system, is that console's folder. No folder is added by default.

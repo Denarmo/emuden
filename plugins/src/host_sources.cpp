@@ -106,7 +106,7 @@ void RealHost::RemoveOrphans() {
     }
     std::vector<std::string> cores;
     for (const auto& [key, record] : ledger_.Records()) {
-        if (record.origin != "official" && record.origin != "bundled" && record.origin != DEVELOPER_ORIGIN &&
+        if (record.origin != "official" && record.origin != "bundled" && record.origin != DEVELOPER_ORIGIN && record.origin != LOCAL_ORIGIN &&
             !record.origin.empty() &&
             FindView(views_, record.origin) == views_.size()) {
             cores.push_back(key);

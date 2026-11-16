@@ -113,7 +113,7 @@ TEST_CASE("every bundled manifest is read") {
     std::size_t count = 0;
     const BundledManifest* bundled = BundledManifests(count);
     REQUIRE(count >= 19);
-    bool saw_gb = false, saw_psx = false, saw_switch2 = false;
+    bool saw_gb = false, saw_psx = false;
     for (std::size_t i = 0; i < count; ++i) {
         Result<Manifest> manifest = ParseManifest(
             std::string_view(reinterpret_cast<const char*>(bundled[i].data), bundled[i].size));
@@ -166,14 +166,12 @@ TEST_CASE("every bundled manifest is read") {
             // blueMSX runs on the free C-BIOS, which comes as system files.
             CHECK(console.bios.empty());
             CHECK(manifest->SystemFilesFor("bluemsx", "android-arm64").size() == 2);
-        } else if (manifest->id == "emuden.switch2") {
-            saw_switch2 = true;
-            CHECK(console.runner == Runner::Engine);
-            CHECK(console.short_name == "Switch 2");
-            CHECK(console.scan.scanner == "switch2");
         }
+        // Switch 2 is installed by hand from a file, never built in.
+        CHECK(manifest->id != "emuden.switch2");
+        CHECK(console.runner == Runner::Core);
     }
-    CHECK((saw_gb && saw_psx && saw_switch2));
+    CHECK((saw_gb && saw_psx));
 }
 
 TEST_CASE("a manifest that is not pinned is refused") {

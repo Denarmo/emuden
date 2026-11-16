@@ -251,6 +251,30 @@ struct SourceProbe {
     std::size_t plugins = 0;
 };
 
+/// A console plugin read from a file (an .emuplugin package, or a folder or file holding
+/// plugin.json) before the user agrees to install it.
+struct PackageProbe {
+    std::filesystem::path path;
+    std::string id, name, version, publisher, summary;
+    std::vector<std::string> systems;  // its consoles' ids
+    std::vector<std::string> consoles; // and names
+    /// Signed with EmuDEN's key (plugin.json.sig): installed as one of EmuDEN's own plugins.
+    /// Otherwise it is a third party's, unchecked by anyone, and held to their rules.
+    bool official = false;
+    bool engine = false;     // its games run in an engine program the user may have to point at
+    std::string replaces;    // the version of it on this device, if any
+    std::string manifest;    // the plugin.json read
+    std::string signature;   // and its plugin.json.sig, if any
+};
+
+/// A console plugin an earlier EmuDEN had built in or offered that this one neither brings nor
+/// offers: it stays on the devices that have games of it.
+struct CarryOver {
+    std::string plugin_id;
+    std::string name;
+    std::vector<std::string> systems;
+};
+
 class Host {
 public:
     virtual ~Host() = default;
@@ -318,7 +342,29 @@ public:
     virtual JobPtr RemoveSource(const std::string& /*address*/) {
         return nullptr;
     }
+
+    /// Reads a console plugin from a file or folder; fails (user-facing) when it is broken or
+    /// may not be installed.
+    virtual Result<PackageProbe> ProbePackage(const std::filesystem::path& /*path*/) const {
+        return Status::Fail("This version cannot install plugins from a file.");
+    }
+    /// Installs a probed plugin. A console that runs in an engine may need its program next.
+    virtual Status InstallPackage(const PackageProbe& /*probe*/) {
+        return Status::Fail("This version cannot install plugins from a file.");
+    }
+    /// The console plugins this device had before an update that the app no longer brings.
+    virtual std::vector<CarryOver> CarryOvers() const {
+        return {};
+    }
+    /// Keeps one (its signed package is fetched from beside the official list) or lets it go.
+    virtual JobPtr SettleCarryOver(const std::string& /*plugin_id*/, bool /*keep*/) {
+        return nullptr;
+    }
 };
+
+/// Where a console plugin no longer offered is kept beside the official list, signed:
+/// manual/<id>.emuplugin.
+std::string ManualPackagePath(const std::string& plugin_id);
 
 /// The setting that turns developer mode on: the developer folder's plugins are used, unsigned.
 inline constexpr const char* DEVELOPER_KEY = "plugins.developer";
