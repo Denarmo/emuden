@@ -144,16 +144,17 @@ TEST_CASE("every bundled manifest is read") {
             CHECK(console.scan.loose_members);
             CHECK(console.bios.empty()); // only cores that need no BIOS are offered
         } else if (manifest->id == "emuden.ps2") {
-            // Play! needs no BIOS and is the default everywhere; PSX2 ECP is an optional
-            // Android engine app that needs the player's BIOS.
+            // DenSX2 (based on Play!) needs no BIOS and is the default everywhere; PSX2 ECP is
+            // an optional Android engine app that needs the player's BIOS, the only BIOS set.
             const auto android = manifest->CoresFor(manifest->systems.front(), "android-arm64");
             REQUIRE(android.size() == 2);
-            CHECK(android[0]->id == "play");
+            CHECK(android[0]->id == "densx2");
             CHECK(android[1]->type == "engine-app");
             const auto cores = manifest->CoresFor(manifest->systems.front(), "windows-x86_64");
             REQUIRE(cores.size() == 1);
-            CHECK(cores[0]->id == "play");
-            CHECK(console.bios.empty());
+            CHECK(cores[0]->id == "densx2");
+            REQUIRE(console.bios.size() == 1);
+            CHECK(console.bios[0].cores == std::vector<std::string>{"psx2-ecp"});
         } else if (manifest->id == "emuden.gba") {
             // GBA DS is chosen by ROM code for the games it has a second screen for.
             const Component* gbads = manifest->FindComponent("gbads");
