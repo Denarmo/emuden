@@ -8,12 +8,12 @@
 #include <cstdio>
 #include <random>
 #include <system_error>
-#include <tuple>
 
 #include "den/base/files.h"
 #include "den/base/log.h"
 #include "den/platform/pal.h"
 #include "den/plugins/feature_host.h"
+#include "den/plugins/feature_manifest.h"
 #include "den/plugins/host.h"
 #include "den/store/settings.h"
 #include "engine_impl.h"
@@ -215,22 +215,28 @@ GameIndex EngineImpl::Games() const {
     return config_.library ? GameIndex(config_.library->Entries(), PcSystems()) : GameIndex({}, PcSystems());
 }
 
-bool EngineImpl::ListsFolders(const std::string& id) const {
-    if (config_.provider_factory || !Folder(id).empty()) {
-        return true;
-    }
-    if (id != GDRIVE_PROVIDER || config_.features == nullptr) {
-        return false;
-    }
-    // Google Drive lists one folder by itself from 1.0.4; before, every call lists everything.
-    for (const plugins::FeaturePlugin& plugin : config_.features->Plugins()) {
-        if (plugin.id == id && plugin.installed) {
-            int major = 0, minor = 0, patch = 0;
-            std::sscanf(plugin.version.c_str(), "%d.%d.%d", &major, &minor, &patch);
-            return std::make_tuple(major, minor, patch) >= std::make_tuple(1, 0, 4);
+// feature.sync.listing of the installed provider plugin; "category" when it says nothing.
+std::string EngineImpl::Listing(const std::string& id) const {
+    if (config_.features != nullptr) {
+        for (const plugins::FeaturePlugin& plugin : config_.features->Plugins()) {
+            if (plugin.id == id && plugin.installed && !plugin.sync_listing.empty()) {
+                return plugin.sync_listing;
+            }
         }
     }
-    return false;
+    return plugins::SYNC_LISTING_CATEGORY;
+}
+
+bool EngineImpl::ListsFolders(const std::string& id) const {
+    return config_.provider_factory || !Folder(id).empty() || Listing(id) == plugins::SYNC_LISTING_PER_FOLDER;
+}
+
+bool EngineImpl::ListsOnce(const std::string& id) const {
+    if (config_.provider_factory || !Folder(id).empty()) {
+        return false;
+    }
+    const std::string listing = Listing(id);
+    return listing == plugins::SYNC_LISTING_ALL || listing == plugins::SYNC_LISTING_PER_FOLDER;
 }
 
 std::unique_ptr<Provider> EngineImpl::MakeProvider(const std::string& id, const std::atomic<bool>* cancel) const {

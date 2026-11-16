@@ -25,9 +25,6 @@ inline constexpr const char* CONFIG = "config";
 inline constexpr const char* GAMES = "games";
 inline constexpr const char* BIOS = "bios";
 
-/// The Google Drive provider: it never receives anything of a PC console, in any form.
-inline constexpr const char* GDRIVE_PROVIDER = "emuden.sync.gdrive";
-
 /// A game of the library as sync sees it.
 struct GameRef {
     std::string id, system;

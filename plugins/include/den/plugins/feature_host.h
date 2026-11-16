@@ -49,6 +49,7 @@ struct FeaturePlugin {
     bool needs_consent = false; // install or update asks for permissions not yet granted
     std::vector<PermissionLine> permissions, new_permissions;
     std::vector<std::string> sync_categories; // a sync provider: what it can keep in step
+    std::string sync_listing;                 // and how it lists (feature.sync.listing)
     std::uint64_t data_bytes = 0;
     std::string error; // last script failure, user-facing
 };
@@ -65,6 +66,8 @@ public:
     virtual Status Open(const std::string& id) = 0;
     virtual void Close(const std::string& id) = 0;  // the page left the stage
     virtual void Reload(const std::string& id) = 0; // developer plugins
+    /// Reads the plugins on the device again: those of the developer folder come and go.
+    virtual void Rescan() {}
     /// The plugin's page stack, top last; `revision` moves on every change.
     virtual std::vector<PageModel> Pages(const std::string& id, std::uint64_t& revision) const = 0;
     virtual void Send(const std::string& id, UiEvent event) = 0; // never blocks

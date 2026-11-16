@@ -86,8 +86,7 @@ public:
     Result<std::string> Put(const std::string& path, const fs::path& local, const std::string& rev,
                             std::int64_t modified, const Progress& progress) override {
         if (Refused(path)) {
-            return Status::Fail(id_ == GDRIVE_PROVIDER ? "Google Drive never receives anything of a PC console"
-                                                       : "PC consoles never sync");
+            return Status::Fail("PC consoles never sync");
         }
         const std::string token = host_->LendFile(id_, local);
         Values values = Call("put", {JsonString(path), JsonString(token), rev.empty() ? JsonValue() : JsonString(rev),

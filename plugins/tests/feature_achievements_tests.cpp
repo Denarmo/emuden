@@ -139,7 +139,7 @@ bool Logged(const ScriptRunner& runner, const std::string& line) {
 
 TEST_CASE("den.achievements needs its permission") {
     Stage stage;
-    auto runner = stage.Run(R"(["device.info"])");
+    auto runner = stage.Run(R"(["files.import"])");
     runner->Call({"actions", "sign_in"}, {JsonValue(), JsonString("right")});
     runner->Settle();
     CHECK(Logged(*runner, "sign_in nil the plugin has no permission for achievements"));

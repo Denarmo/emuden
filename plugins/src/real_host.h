@@ -34,10 +34,14 @@ inline constexpr std::int64_t POLL_INTERVAL_SECONDS = 6 * 3600;
 inline constexpr std::size_t MAX_SYSTEM_FILES = 8192;
 inline constexpr std::uint64_t MAX_SYSTEM_FILES_BYTES = 512ull << 20;
 
+/// The origin of a core installed for a plugin of the developer folder.
+inline constexpr const char* DEVELOPER_ORIGIN = "developer";
+
 struct Loaded {
     Manifest manifest;
     bool from_index = false; // its package came from a signed index, not from the app
-    std::string origin;      // the address of its source
+    std::string origin;      // the address of its source (the official one for the developer folder)
+    bool developer = false;  // from <data>/plugins-dev, unsigned
 };
 
 inline std::string FileNameOf(const Download& download) {
@@ -95,6 +99,11 @@ public:
         return revision_.load();
     }
 
+    void ReloadDeveloper() override;
+    std::filesystem::path DeveloperDir() const override {
+        return dev_dir_;
+    }
+
     // host_sources.cpp
     std::vector<SourceInfo> Sources() const override;
     JobPtr ProbeSource(const std::string& text, std::shared_ptr<SourceProbe> out) override;
@@ -141,8 +150,13 @@ private:
     }
     bool SystemFilesGood(const Manifest& manifest, const Component& files) const;
     Console Describe(const Loaded& loaded, const SystemDef& system) const;
+    void AddSettingHints(const Loaded& loaded, const SystemDef& system, const Component& core, CoreInfo& info) const;
     CoreInfo Describe(const Loaded& loaded, const SystemDef& system, const Component& core) const;
-    void AddManifest(Manifest manifest, bool from_index, const std::string& origin);
+    void AddManifest(Manifest manifest, bool from_index, const std::string& origin, bool developer = false);
+    /// Every other console plugin it depends on is there, in a version of its range.
+    bool DependsMet(const Manifest& manifest) const;
+    /// The console plugins of the developer folder, when developer mode is on.
+    void LoadDeveloperManifests();
     /// The rules of the manifest's source; a note on that source when it breaks one.
     bool Allowed(const Manifest& manifest, std::size_t origin);
     void LoadManifests();
@@ -202,6 +216,7 @@ private:
     Config config_;
     HostDeps deps_;
     fs::path plugins_dir_;
+    fs::path dev_dir_; // <data>/plugins-dev/<id>/plugin.json, shared with the feature host
     fs::path bios_dir_;
 
     mutable std::mutex mutex_;

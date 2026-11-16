@@ -43,6 +43,9 @@ struct Download {
     std::uint64_t size = 0;
     std::string archive; // "zip" or "none"
     std::string entry;   // the member to unpack from a zip; "Name/" is a whole folder of it
+    /// Developer folder only: a file on this device in place of `url` (checksum and size
+    /// optional), so nothing has to be hosted while a plugin is made.
+    std::string file;
 };
 
 /// Component types this app reads; others are left out of the manifest.
@@ -101,12 +104,32 @@ bool IsAndroidKey(std::string_view platform_key);
 struct SystemDef {
     Console console;                // installed and available are filled by the host
     std::vector<std::string> cores; // component ids, best first
+    std::vector<std::string> platforms; // platform keys it is offered on; empty: all
 };
 
 struct ManifestSetting {
     SettingSpec spec;
-    std::vector<std::string> systems; // empty: every system of the plugin
+    std::vector<std::string> systems;   // empty: every system of the plugin
+    std::vector<std::string> platforms; // empty: every platform
+    std::string when_core;              // shown only while this core plays the console
+    /// apply.core_option: the core option the value is given to, through `map` when the
+    /// value is one of its keys. Empty: the app does not apply this setting itself.
+    std::string core_option;
+    std::vector<std::pair<std::string, std::string>> option_map;
+
+    bool Applies(std::string_view system, std::string_view platform_key, std::string_view core_id) const;
+    /// The core option value for the setting's stored value (`value`).
+    std::string OptionValue(const std::string& value) const;
 };
+
+/// depends[]: another console plugin that must be there, in a version range.
+struct Dependency {
+    std::string id;
+    std::string range = "*";
+};
+
+/// The platform keys a manifest lists: empty or "any" is every platform.
+bool ListsPlatform(const std::vector<std::string>& platforms, std::string_view platform_key);
 
 struct Manifest {
     std::string id;
@@ -121,6 +144,8 @@ struct Manifest {
     std::vector<SystemDef> systems;
     std::vector<Component> components;
     std::vector<ManifestSetting> settings; // those with a label of their own
+    std::vector<std::string> platforms;    // empty: every platform
+    std::vector<Dependency> depends;
 
     const Component* FindComponent(std::string_view component_id) const;
     /// The cores of the system with a download for the platform, best first.
@@ -132,8 +157,9 @@ struct Manifest {
 };
 
 /// Reads plugin.json. Fails with the reason for anything this app cannot use: a bad id or
-/// version, a newer format, an unmet need, a download that is not pinned.
-Result<Manifest> ParseManifest(std::string_view json);
+/// version, a newer format, an unmet need, a download that is not pinned. `developer`: a
+/// manifest of the developer folder, whose downloads may name a local file.
+Result<Manifest> ParseManifest(std::string_view json, bool developer = false);
 
 /// The capability strings a manifest's `needs` may name.
 const std::vector<std::string>& HostCapabilities();

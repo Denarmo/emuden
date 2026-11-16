@@ -163,7 +163,7 @@ public:
         rows.clear();
         ui::RowSpec sources = ValueRow(
             "plugins.sources", "Plugin sources", [] { return std::format("{}", Svc().plugins->Sources().size()); },
-            [] { Svc().stage->Push("settings", {{"section", "Plugin sources"}}); });
+            [] { Svc().stage->Push("settings", {{"section", "Plugins"}}); });
         sources.description = "Where plugins come from: EmuDEN's own source and the ones you added";
         rows.push_back(std::move(sources));
         AddRows(list, std::move(rows));

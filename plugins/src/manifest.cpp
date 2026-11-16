@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <algorithm>
-#include <cmath>
 
 #include "den/base/files.h"
 #include "den/base/json.h"
@@ -12,14 +11,15 @@
 
 namespace den::plugins {
 
-Result<Download> ParseDownload(const JsonValue& value) {
+Result<Download> ParseDownload(const JsonValue& value, bool local) {
     static const char* const KNOWN[] = {"url",  "sha256",           "size",   "archive",
                                         "entry", "strip_components", "rename", "executable_bit"};
     if (value.kind != JsonValue::Kind::Object) {
         return Status::Fail("a download is not an object");
     }
     for (const auto& member : value.members) {
-        if (std::none_of(std::begin(KNOWN), std::end(KNOWN),
+        if (!(local && member.first == "file") &&
+            std::none_of(std::begin(KNOWN), std::end(KNOWN),
                          [&](const char* key) { return member.first == key; })) {
             return Status::Fail("a download has the unknown field \"" + member.first + "\"");
         }
@@ -30,10 +30,16 @@ Result<Download> ParseDownload(const JsonValue& value) {
     download.size = static_cast<std::uint64_t>(json::Number(value, "size", 0));
     download.archive = value.String("archive");
     download.entry = value.String("entry");
-    if (!download.url.starts_with("https://") || download.url.find('@') != std::string::npos) {
+    download.file = local ? value.String("file") : std::string();
+    if (!download.file.empty()) {
+        // A file the developer has: checked when given, else hashed when it is installed.
+        if (!download.url.empty() || (!download.sha256.empty() && !IsSha256Hex(download.sha256))) {
+            return Status::Fail("a local download has a url or a bad checksum");
+        }
+    } else if (!download.url.starts_with("https://") || download.url.find('@') != std::string::npos) {
         return Status::Fail("a download is not a plain https address");
     }
-    if (!IsSha256Hex(download.sha256) || download.size == 0) {
+    if (download.file.empty() && (!IsSha256Hex(download.sha256) || download.size == 0)) {
         return Status::Fail("a download has no checksum or size");
     }
     if (download.archive != "zip" && download.archive != "none") {
@@ -78,7 +84,7 @@ bool IsComponentId(std::string_view id) {
     });
 }
 
-Result<Component> ParseComponent(const JsonValue& value) {
+Result<Component> ParseComponent(const JsonValue& value, bool developer) {
     Component component;
     component.id = value.String("id");
     component.type = value.String("type");
@@ -135,7 +141,7 @@ Result<Component> ParseComponent(const JsonValue& value) {
     }
     if (const JsonValue* downloads = value.Find("downloads")) {
         for (const auto& [platform, entry] : downloads->members) {
-            Result<Download> download = ParseDownload(entry);
+            Result<Download> download = ParseDownload(entry, developer);
             // System files are a folder of a zip; a download that is not is left out, and
             // the console still plays.
             if (component.type == TYPE_SYSTEM_FILES &&
@@ -202,7 +208,7 @@ void ParseBios(const JsonValue& sets, Console& console) {
     }
 }
 
-Result<SystemDef> ParseSystem(const JsonValue& value, const Manifest& manifest) {
+Result<SystemDef> ParseSystem(const JsonValue& value, const JsonValue& root, const Manifest& manifest) {
     SystemDef system;
     Console& console = system.console;
     console.id = value.String("id");
@@ -244,55 +250,10 @@ Result<SystemDef> ParseSystem(const JsonValue& value, const Manifest& manifest) 
     if (const JsonValue* bios = value.Find("bios")) {
         ParseBios(*bios, console);
     }
+    ApplyCapabilities(root.Find("capabilities"), value.Find("capabilities"), console);
     system.cores = json::Strings(value, "cores", false);
+    system.platforms = json::Strings(value, "platforms", false);
     return system;
-}
-
-std::string ScalarText(const JsonValue& value) {
-    switch (value.kind) {
-    case JsonValue::Kind::String:
-        return value.string;
-    case JsonValue::Kind::Bool:
-        return value.boolean ? "true" : "false";
-    case JsonValue::Kind::Number: {
-        if (value.number == std::floor(value.number)) {
-            return std::to_string(static_cast<long long>(value.number));
-        }
-        return std::to_string(value.number);
-    }
-    default:
-        return {};
-    }
-}
-
-void ParseSettings(const JsonValue& settings, Manifest& manifest) {
-    for (const JsonValue& value : settings.items) {
-        ManifestSetting setting;
-        SettingSpec& spec = setting.spec;
-        spec.key = value.String("key");
-        spec.label = value.String("label");
-        spec.type = value.String("type");
-        if (spec.key.empty() || spec.label.empty() || spec.type.empty()) {
-            continue; // a setting bound to the engine's own has no label here
-        }
-        spec.help = value.String("help");
-        spec.suffix = value.String("suffix");
-        spec.min = json::Number(value, "min", 0);
-        spec.max = json::Number(value, "max", 0);
-        spec.step = json::Number(value, "step", 1);
-        if (const JsonValue* fallback = value.Find("default")) {
-            spec.default_value = ScalarText(*fallback);
-        }
-        if (const JsonValue* choices = value.Find("choices")) {
-            for (const JsonValue& choice : choices->items) {
-                const JsonValue* choice_value = choice.Find("value");
-                spec.choices.emplace_back(choice_value ? ScalarText(*choice_value) : std::string(),
-                                          choice.String("label"));
-            }
-        }
-        setting.systems = json::Strings(value, "systems", false);
-        manifest.settings.push_back(std::move(setting));
-    }
 }
 
 } // namespace
@@ -424,6 +385,9 @@ const Component* Manifest::FindComponent(std::string_view component_id) const {
 std::vector<const Component*> Manifest::CoresFor(const SystemDef& system,
                                                  std::string_view platform_key) const {
     std::vector<const Component*> out;
+    if (!ListsPlatform(platforms, platform_key) || !ListsPlatform(system.platforms, platform_key)) {
+        return out;
+    }
     for (const std::string& core : system.cores) {
         const Component* component = FindComponent(core);
         if (component != nullptr && (component->type == TYPE_CORE || component->type == TYPE_ENGINE_APP) &&
@@ -448,7 +412,7 @@ std::vector<const Component*> Manifest::SystemFilesFor(std::string_view core_id,
     return out;
 }
 
-Result<Manifest> ParseManifest(std::string_view text) {
+Result<Manifest> ParseManifest(std::string_view text, bool developer) {
     if (text.size() > MAX_MANIFEST_SIZE) {
         return Status::Fail("the manifest is too large");
     }
@@ -492,7 +456,7 @@ Result<Manifest> ParseManifest(std::string_view text) {
             if (type != TYPE_CORE && type != TYPE_ENGINE && type != TYPE_SYSTEM_FILES && type != TYPE_ENGINE_APP) {
                 continue;
             }
-            Result<Component> component = ParseComponent(value);
+            Result<Component> component = ParseComponent(value, developer);
             if (!component) {
                 return Status::Fail(manifest.id + ": " + component.error());
             }
@@ -501,7 +465,7 @@ Result<Manifest> ParseManifest(std::string_view text) {
     }
     if (const JsonValue* systems = root->Find("systems")) {
         for (const JsonValue& value : systems->items) {
-            Result<SystemDef> system = ParseSystem(value, manifest);
+            Result<SystemDef> system = ParseSystem(value, *root, manifest);
             if (!system) {
                 return Status::Fail(manifest.id + ": " + system.error());
             }
@@ -513,6 +477,12 @@ Result<Manifest> ParseManifest(std::string_view text) {
     }
     if (const JsonValue* settings = root->Find("settings")) {
         ParseSettings(*settings, manifest);
+    }
+    manifest.platforms = json::Strings(*root, "platforms", false);
+    if (const JsonValue* depends = root->Find("depends")) {
+        if (Status status = ParseDepends(*depends, manifest); !status.ok) {
+            return Status::Fail(manifest.id + ": " + status.error);
+        }
     }
     return manifest;
 }

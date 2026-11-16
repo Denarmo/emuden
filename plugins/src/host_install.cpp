@@ -272,7 +272,8 @@ Status RealHost::DoInstall(Job& job, const std::string& system, const std::strin
         }
         const std::string key = LedgerKey(loaded, core);
         const CoreRecord* record = ledger_.Find(key);
-        if (record != nullptr && record->download_sha256 == download.sha256 && CoreGood(loaded, core)) {
+        if (record != nullptr && download.file.empty() && record->download_sha256 == download.sha256 &&
+            CoreGood(loaded, core)) {
             ledger_.AddOwner(key, manifest.id);
             ledger_.Save();
             ++revision_;
@@ -305,18 +306,21 @@ Status RealHost::InstallCore(Job& job, const Loaded& loaded, const Component& co
         std::lock_guard lock(mutex_);
         const std::size_t source = OriginOf(loaded);
         key = LedgerKey(loaded, core);
-        origin = source > 0 ? loaded.origin : (loaded.from_index ? "official" : "bundled");
+        origin = loaded.developer ? DEVELOPER_ORIGIN
+                 : source > 0        ? loaded.origin
+                                     : (loaded.from_index ? "official" : "bundled");
         // Core files share one folder: an added source's core never takes another's file.
         for (const auto& [other_key, record] : ledger_.Records()) {
-            if (other_key != key && EqualsNoCase(record.file, file_name) && source > 0) {
+            if (other_key != key && EqualsNoCase(record.file, file_name) && (source > 0 || loaded.developer)) {
                 return Status::Fail(core.name + " would replace the core file " + file_name + " of another plugin.");
             }
         }
     }
     job.SetMessage("Downloading " + core.name);
     const fs::path temp = ledger_.Directory() / "tmp" / PathFromUtf8(core.id + "-" + download.sha256.substr(0, 12));
-    Status status = DownloadPinned(deps_.http, download.url, download.sha256, download.size, temp, &job,
-                                   [&job](float f) { job.SetProgress(f * 0.9f); });
+    std::string download_sha256;
+    Status status = FetchDownload(deps_.http, download, temp, &job, [&job](float f) { job.SetProgress(f * 0.9f); },
+                                  &download_sha256);
     if (!status.ok) {
         return status;
     }
@@ -344,8 +348,8 @@ Status RealHost::InstallCore(Job& job, const Loaded& loaded, const Component& co
     }
     CoreRecord record;
     record.file = file_name;
-    record.download_sha256 = download.sha256;
-    record.url = download.url;
+    record.download_sha256 = download_sha256;
+    record.url = download.file.empty() ? download.url : download.file;
     record.version = core.version;
     record.origin = origin;
     record.owners = {loaded.manifest.id};
@@ -388,13 +392,13 @@ void RealHost::InstallSystemFiles(Job& job, const Loaded& loaded, const std::str
             std::lock_guard lock(mutex_);
             if (const auto reason = BlockedFor(views_, origin, download.sha256)) {
                 status = Status::Fail("it must not be used: " + *reason);
-            } else if (origin > 0 && !system_files_.contains(SystemFilesKey(manifest, files)) &&
+            } else if ((origin > 0 || loaded.developer) && !system_files_.contains(SystemFilesKey(manifest, files)) &&
                        BiosPresent(bios_dir_, {download.entry, false})) {
                 status = Status::Fail("it would replace files already in the BIOS folder");
             }
         }
         if (status.ok) {
-            status = DownloadPinned(deps_.http, download.url, download.sha256, download.size, temp, &job);
+            status = FetchDownload(deps_.http, download, temp, &job);
         }
         if (status.ok) {
             job.SetMessage("Installing " + files.name);

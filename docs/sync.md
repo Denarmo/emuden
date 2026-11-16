@@ -123,8 +123,9 @@ Before a game of the player starts (with `saves` or `states` on), its saves and 
 are checked against the remote (`Engine::CheckGame`); the screen shows "Checking for newer
 saves…" with Skip, and after 3 s, offline or skipped, the game starts as it is and the check
 writes nothing more (`CheckGate`). Only the game's system folders are listed
-(`list("saves/<system>/")`) where the provider does that quickly: the folder store, and
-Google Drive from 1.0.4; else its categories.
+(`list("saves/<system>/")`) where the provider does that quickly: the folder store, and a
+provider whose manifest says `"listing": "per_folder"` (Google Drive from 1.0.7); else its
+categories.
 
 - Changed only online since the last sync: downloaded, no question.
 - Changed only here: the game starts; it goes up when the game ends.
@@ -226,7 +227,11 @@ with `", "`.
 A feature plugin with `sync` in `permissions` and `"sync": {"categories": [...]}` in its
 `feature` object is a provider. `categories` is required with `sync`, may list only
 `saves`, `states`, `config`, `games` and `bios`, and none twice; `feature.sync` without the
-`sync` permission refuses the manifest. The install page shows "Keep these in step between
+`sync` permission refuses the manifest. `listing` (optional) says how `list(prefix)` behaves:
+`category` (the default: a run lists each category), `all` (any listing returns everything, so a
+run lists once with prefix nil) or `per_folder` (as `all`, and a system folder such as
+`saves/gba/` is listed quickly, so a game's own sync lists only its folders); the engine reads it
+(`EngineImpl::ListsOnce`, `ListsFolders`) instead of knowing providers by id. The install page shows "Keep these in step between
 your devices: saves, save states, settings, games, BIOS files" for what it lists. The
 plugin returns, beside the usual entry points:
 
@@ -310,8 +315,8 @@ Host settings, all kept on the device: `sync.active` (provider id), `sync.catego
 `sync.folder.<id>`, `sync.upload_games`, `sync.games_folder` (default `<data>/games`),
 `sync.interval_minutes` (15; 0 = only at start, game end and Sync now).
 
-For trying a provider: put it in `<data>/plugins-dev/<id>/` (plugin.json, main.lua), set
-`"plugins.developer": true` in `<data>/settings.json` and start the app; it is listed under
+For trying a provider: put it in `<data>/plugins-dev/<id>/` (plugin.json, main.lua), turn on
+Settings > Plugins > Developer mode (`plugins.developer`) and choose Reload developer plugins; it is listed under
 Plugins as "Developer" and asks for its permissions before it first runs. `<data>` is the
 `user` folder next to the program when it exists (portable), else `%APPDATA%\EmuDEN`, the
 XDG data folder or the app's files on Android.

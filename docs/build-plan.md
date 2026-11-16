@@ -29,7 +29,7 @@ player/    libretro host, session, rewind, shaders, pacing, netplay, menu model
 system/    backup, storage, updates, diagnostics, child mode, power, upkeep
 app/       main, router, screens/<feature>/, pages/ (rows as data)
 shells/    android/ windows/ linux/
-contracts/ engine protocol, manifest, index and add-on schemas (toolkit-free)
+contracts/ engine protocol and the capability list (the schemas live in emuden-plugins/schema)
 engine-sdk/ C library an engine links; includes the null engine
 assets/ tests/ tools/ (relay, importer, signer, shader converter)
 ```

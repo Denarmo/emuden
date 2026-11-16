@@ -95,8 +95,10 @@ struct Console {
     std::string rdb;        // the libretro database name, or empty
     std::string launchbox;  // the LaunchBox Games Database platform, or empty
     std::vector<std::string> cover_by_id; // cover addresses with "{id}" (library::SystemDef)
-    int rcheevos_console = 0;
+    int rcheevos_console = 0; // 0 also when the manifest's capabilities say no achievements
+    bool netplay = true;      // capabilities.netplay: its games may be played together
     std::vector<BiosSet> bios;
+    bool developer = false;   // its plugin is in the developer folder, not signed
 };
 
 /// A setting a plugin manifest declares for a console ("settings"). The Consoles screen
@@ -112,6 +114,7 @@ struct SettingSpec {
     double min = 0, max = 0, step = 1;
     std::string suffix;
     std::string default_value;
+    std::string section; // the heading it is shown under; empty: "Settings"
 };
 
 /// The games a core is chosen for without asking: those whose ROM holds one of `codes` at
@@ -225,6 +228,12 @@ public:
     virtual JobPtr Remove(const std::string& system) = 0;
     /// Fetches the signed index of every source again.
     virtual JobPtr Refresh() = 0;
+    /// Reads the console plugins of the developer folder again (setting "plugins.developer").
+    virtual void ReloadDeveloper() {}
+    /// <data>/plugins-dev: one folder per plugin, console and feature plugins alike.
+    virtual std::filesystem::path DeveloperDir() const {
+        return {};
+    }
     /// Grows whenever consoles or their installed state changed.
     virtual std::uint64_t Revision() const = 0;
 
@@ -251,6 +260,9 @@ public:
         return nullptr;
     }
 };
+
+/// The setting that turns developer mode on: the developer folder's plugins are used, unsigned.
+inline constexpr const char* DEVELOPER_KEY = "plugins.developer";
 
 struct Config {
     std::filesystem::path data_dir; // plugins live under data_dir / "plugins", cores under "cores"

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "den/plugins/feature_manifest.h"
 #include "real_host.h"
 
 namespace den::plugins {
@@ -57,7 +58,7 @@ bool WriteOrigin(const fs::path& plugin_dir, const std::string& address) {
 
 RealHost::RealHost(const Config& config, HostDeps deps)
     : config_(config), deps_(std::move(deps)), plugins_dir_(config.data_dir / "plugins"),
-      bios_dir_(config.data_dir / "bios"), ledger_(config.data_dir / "cores") {
+      dev_dir_(config.data_dir / "plugins-dev"), bios_dir_(config.data_dir / "bios"), ledger_(config.data_dir / "cores") {
     if (!deps_.http) {
         deps_.http = &pal::HttpGet;
     }
@@ -144,9 +145,9 @@ std::vector<SettingSpec> RealHost::SettingsFor(const std::string& system) const 
     std::lock_guard lock(mutex_);
     std::vector<SettingSpec> out;
     if (const Found found = Find(system); found.system != nullptr) {
+        const Component* core = ChosenCore(*found.loaded, *found.system);
         for (const ManifestSetting& setting : found.loaded->manifest.settings) {
-            if (setting.systems.empty() ||
-                std::find(setting.systems.begin(), setting.systems.end(), system) != setting.systems.end()) {
+            if (setting.Applies(system, deps_.platform_key, core != nullptr ? core->id : std::string())) {
                 out.push_back(setting.spec);
             }
         }
@@ -171,7 +172,8 @@ Status RealHost::VerifyCore(const fs::path& library) const {
     std::lock_guard lock(mutex_);
     const CoreRecord* record = ledger_.FindByFile(PathToUtf8(library.filename()));
     std::size_t origin = 0;
-    if (record != nullptr && !record->origin.empty() && record->origin != "official" && record->origin != "bundled") {
+    if (record != nullptr && !record->origin.empty() && record->origin != "official" && record->origin != "bundled" &&
+        record->origin != DEVELOPER_ORIGIN) {
         origin = FindView(views_, record->origin);
         if (origin == views_.size()) {
             return Status::Fail("This core's source was removed.");
@@ -184,10 +186,21 @@ Status RealHost::VerifyCore(const fs::path& library) const {
     return ledger_.VerifyForLoad(library, Blocked(origin));
 }
 
-// A manifest of a source that was removed, or whose key EmuDEN withdrew, is not used.
+// A manifest of a source that was removed, or whose key EmuDEN withdrew, is not used, nor
+// one whose dependencies are missing.
 bool RealHost::Usable(const Loaded& loaded) const {
     const std::size_t origin = OriginOf(loaded);
-    return origin < views_.size() && views_[origin].revoked.empty();
+    return origin < views_.size() && views_[origin].revoked.empty() && DependsMet(loaded.manifest);
+}
+
+bool RealHost::DependsMet(const Manifest& manifest) const {
+    return std::all_of(manifest.depends.begin(), manifest.depends.end(), [&](const Dependency& dependency) {
+        return std::any_of(manifests_.begin(), manifests_.end(), [&](const Loaded& other) {
+            const std::size_t origin = OriginOf(other);
+            return other.manifest.id == dependency.id && origin < views_.size() && views_[origin].revoked.empty() &&
+                   VersionInRange(other.manifest.version, dependency.range);
+        });
+    });
 }
 
 RealHost::Found RealHost::Find(const std::string& system) const {
@@ -221,6 +234,9 @@ const Component* RealHost::ChosenCore(const Loaded& loaded, const SystemDef& sys
 }
 
 std::string RealHost::LedgerKey(const Loaded& loaded, const Component& core) const {
+    if (loaded.developer) {
+        return std::string(DEVELOPER_ORIGIN) + "/" + loaded.manifest.id + "/" + core.id;
+    }
     return OriginOf(loaded) == 0 ? core.id : loaded.manifest.id + "/" + core.id;
 }
 
@@ -265,6 +281,7 @@ bool RealHost::SystemFilesGood(const Manifest& manifest, const Component& files)
 
 Console RealHost::Describe(const Loaded& loaded, const SystemDef& system) const {
     Console console = system.console;
+    console.developer = loaded.developer;
     const std::size_t origin = OriginOf(loaded);
     if (origin > 0) {
         console.source = views_[origin].label;
@@ -280,8 +297,8 @@ Console RealHost::Describe(const Loaded& loaded, const SystemDef& system) const 
         } else if (console.installed) {
             const CoreRecord* record = ledger_.Find(LedgerKey(loaded, *core));
             const Download* download = core->DownloadFor(deps_.platform_key);
-            console.update_available =
-                record != nullptr && download != nullptr && record->download_sha256 != download->sha256;
+            console.update_available = record != nullptr && download != nullptr && download->file.empty() &&
+                                       record->download_sha256 != download->sha256;
             for (const Component* files : loaded.manifest.SystemFilesFor(core->id, deps_.platform_key)) {
                 console.update_available = console.update_available || !SystemFilesGood(loaded.manifest, *files);
             }
@@ -304,6 +321,20 @@ Console RealHost::Describe(const Loaded& loaded, const SystemDef& system) const 
     return console;
 }
 
+// The manifest's settings that set a core option (or an engine app's setting), after the forced ones.
+void RealHost::AddSettingHints(const Loaded& loaded, const SystemDef& system, const Component& core,
+                               CoreInfo& info) const {
+    for (const ManifestSetting& setting : loaded.manifest.settings) {
+        if (!setting.core_option.empty() && setting.Applies(system.console.id, deps_.platform_key, core.id)) {
+            const std::string key = "console." + system.console.id + "." + setting.spec.key;
+            const std::string value = config_.settings != nullptr
+                                          ? config_.settings->GetString(key, setting.spec.default_value)
+                                          : setting.spec.default_value;
+            info.option_hints.emplace_back(setting.core_option, setting.OptionValue(value));
+        }
+    }
+}
+
 CoreInfo RealHost::Describe(const Loaded& loaded, const SystemDef& system, const Component& core) const {
     if (core.type == TYPE_ENGINE_APP) {
         return DescribeEngineApp(loaded, system, core);
@@ -315,6 +346,7 @@ CoreInfo RealHost::Describe(const Loaded& loaded, const SystemDef& system, const
     info.system_dir = bios_dir_;
     info.needs_gl = core.opengl;
     info.option_hints = core.forced_core_options;
+    AddSettingHints(loaded, system, core, info);
     info.widescreen_options = core.widescreen_options;
     info.widescreen_restart = core.widescreen_restart;
     info.games = core.games;
@@ -328,16 +360,17 @@ CoreInfo RealHost::Describe(const Loaded& loaded, const SystemDef& system, const
 
 // Manifests stay in the order of their sources, so the official source's console wins a
 // system id over an added source's, and the source added first over a later one.
-void RealHost::AddManifest(Manifest manifest, bool from_index, const std::string& origin) {
+void RealHost::AddManifest(Manifest manifest, bool from_index, const std::string& origin, bool developer) {
     const auto it = std::find_if(manifests_.begin(), manifests_.end(),
                                  [&](const Loaded& l) { return l.manifest.id == manifest.id; });
     if (it == manifests_.end()) {
-        manifests_.push_back({std::move(manifest), from_index, origin});
+        manifests_.push_back({std::move(manifest), from_index, origin, developer});
     } else if (it->origin != origin) {
         log::Warn("plugins", "{} from {} is not used: it came from {} first", manifest.id, origin, it->origin);
         return;
-    } else if (manifest.version >= it->manifest.version) {
-        *it = {std::move(manifest), from_index, origin};
+    } else if (developer || (!it->developer && manifest.version >= it->manifest.version)) {
+        // The developer folder's copy is the one used, whatever its version.
+        *it = {std::move(manifest), from_index, origin, developer};
     }
     std::stable_sort(manifests_.begin(), manifests_.end(), [this](const Loaded& a, const Loaded& b) {
         return OriginOf(a) < OriginOf(b);
@@ -395,6 +428,38 @@ void RealHost::LoadManifests() {
                       manifest ? "the folder is not named after the plugin" : manifest.error());
         }
     }
+    LoadDeveloperManifests();
+}
+
+void RealHost::LoadDeveloperManifests() {
+    if (config_.settings == nullptr || !config_.settings->GetBool(DEVELOPER_KEY, false)) {
+        return;
+    }
+    for (const fs::path& dir : ListDirectory(dev_dir_)) {
+        const auto text = ReadTextFile(dir / "plugin.json");
+        if (!text || IsFeatureManifest(*text)) {
+            continue; // a feature or interface plugin is the feature host's
+        }
+        Result<Manifest> manifest = ParseManifest(*text, true);
+        Status status = manifest ? CheckDeveloperManifest(*manifest) : manifest.status();
+        if (status.ok && manifest->id != PathToUtf8(dir.filename())) {
+            status = Status::Fail("the folder is not named after the plugin");
+        }
+        if (!status.ok) {
+            log::Warn("plugins", "developer folder, {}: {}", PathToUtf8(dir.filename()), status.error);
+            continue;
+        }
+        AddManifest(manifest.take(), false, views_[0].address, true);
+    }
+}
+
+void RealHost::ReloadDeveloper() {
+    std::lock_guard lock(mutex_);
+    // Read again from the start: a developer copy may have replaced the official one of its id.
+    manifests_.clear();
+    LoadManifests();
+    checked_.clear();
+    ++revision_;
 }
 
 void RealHost::LoadState() {

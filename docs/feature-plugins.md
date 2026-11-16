@@ -400,8 +400,13 @@ Data folder `<data>/plugin-data/<id>/`: `storage.json`, `grant.json`, `downloads
 | Source | Installing | Limits |
 |---|---|---|
 | Bundled / official (`Denarmo/emuden-plugins`, the app's key) | One press; the permissions are on the plugin's page | `emuden.` ids, `systems: ["*"]` allowed |
-| Third-party source (the user added `github:owner/repo`, its own key) | A permission page first: publisher, source, every permission sentence, hosts by name; default focus on "Cancel" | Id must start with the source owner's namespace; no `["*"]`; `downloads.watch` refused |
-| Developer folder (`<data>/plugins-dev/<id>/`, setting `plugins.developer`) | Loaded unsigned, marked "Developer"; same permission page; `den.log` also shown in a console row | For writing plugins; "Reload" restarts the script |
+| Third-party source (the user added `github:owner/repo`, its own key) | A permission page first: publisher, source, every permission sentence, hosts by name; default focus on "Cancel" | Id must start with the source owner's namespace; no `["*"]`; the official-only permissions (`downloads.watch`, `browse.any`, `downloads.setup`, `achievements`) refused |
+| Developer folder (`<data>/plugins-dev/<id>/`, Settings > Plugins > Developer mode, setting `plugins.developer`) | Loaded unsigned, marked "Developer"; same permission page; `den.log` also shown in a console row | For writing plugins; "Reload" restarts the script, Reload developer plugins reads the folder again; the third-party limits without the namespace |
+
+Every permission also needs its capability in `needs` (`PermissionCapability`: `browse` needs
+`feature.web.1`, the tune permissions `feature.tune.1`, `achievements` `feature.achievements.1`,
+`browse.any` and `downloads.setup` `feature.browser.1`); `contracts/capabilities.json` lists them
+and the official-only ones, and plugins_tests checks it against the code.
 
 No plugin of any source gets: other hosts than declared, the file system outside its
 folder, other plugins' data, ROM contents, save files, settings, processes or native code.

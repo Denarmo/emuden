@@ -121,7 +121,8 @@ bool RealHost::EngineAppUpdate(const Loaded& loaded, const Component& core) cons
     LoadEngines();
     const auto it = engines_.find(LedgerKey(loaded, core));
     const Download* download = core.DownloadFor(deps_.platform_key);
-    return it != engines_.end() && download != nullptr && it->second.download_sha256 != download->sha256;
+    return it != engines_.end() && download != nullptr && download->file.empty() &&
+           it->second.download_sha256 != download->sha256;
 }
 
 CoreInfo RealHost::DescribeEngineApp(const Loaded& loaded, const SystemDef& system, const Component& core) const {
@@ -148,6 +149,7 @@ CoreInfo RealHost::DescribeEngineApp(const Loaded& loaded, const SystemDef& syst
     }
     // The widescreen row works through the engine's standard setting.
     info.widescreen_options = {{"video.widescreen_patches", "true"}};
+    AddSettingHints(loaded, system, core, info);
     return info;
 }
 
@@ -174,8 +176,9 @@ Status RealHost::InstallEngineApp(Job& job, const Loaded& loaded, const Componen
     const fs::path dir = EngineDir(key);
     std::error_code ec;
     fs::create_directories(temp.parent_path(), ec);
-    Status status = DownloadPinned(deps_.http, download.url, download.sha256, download.size, temp, &job,
-                                   [&job](float f) { job.SetProgress(f * 0.8f); });
+    std::string download_sha256;
+    Status status = FetchDownload(deps_.http, download, temp, &job, [&job](float f) { job.SetProgress(f * 0.8f); },
+                                  &download_sha256);
     if (!status.ok) {
         return status;
     }
@@ -208,7 +211,7 @@ Status RealHost::InstallEngineApp(Job& job, const Loaded& loaded, const Componen
     }
     std::lock_guard lock(mutex_);
     LoadEngines();
-    engines_[key] = {executable, *sha, download.sha256, core.version, loaded.origin};
+    engines_[key] = {executable, *sha, download_sha256, core.version, loaded.origin};
     if (!SaveEngines()) {
         return Status::Fail("The list of installed engines could not be saved.");
     }

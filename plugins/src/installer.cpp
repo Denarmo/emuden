@@ -75,6 +75,35 @@ Status DownloadPinned(const HttpGetter& http, const std::string& url, std::strin
     return {};
 }
 
+Status FetchDownload(const HttpGetter& http, const Download& download, const fs::path& destination, Job* job,
+                     const std::function<void(float)>& progress, std::string* sha256) {
+    if (download.file.empty()) {
+        Status status = DownloadPinned(http, download.url, download.sha256, download.size, destination, job, progress);
+        if (status.ok && sha256 != nullptr) {
+            *sha256 = download.sha256;
+        }
+        return status;
+    }
+    std::error_code ec;
+    fs::create_directories(destination.parent_path(), ec);
+    fs::remove(destination, ec);
+    if (!fs::copy_file(PathFromUtf8(download.file), destination, ec) || ec) {
+        return Status::Fail("The file " + download.file + " could not be read.");
+    }
+    const auto hash = Sha256File(destination);
+    if (!hash || (!download.sha256.empty() && *hash != download.sha256)) {
+        fs::remove(destination, ec);
+        return Status::Fail("The file " + download.file + " does not match its checksum.");
+    }
+    if (progress) {
+        progress(1.0f);
+    }
+    if (sha256 != nullptr) {
+        *sha256 = *hash;
+    }
+    return {};
+}
+
 Status UnpackEntry(const fs::path& archive, std::string_view entry, const fs::path& destination,
                    std::uint64_t max_size, Job* job) {
     const auto entries = ListZip(archive);

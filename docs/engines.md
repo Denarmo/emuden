@@ -69,8 +69,10 @@ and the system's `"cores": ["example-ps2", "pcsx2"]`, best first.
 - The plugin may `need` `core.engine-app.1`; versions of EmuDEN without engine apps skip the
   component and offer the console's other cores.
 
-The plugin schema (`emuden-plugins/schema/plugin.schema.json`) needs `engine-app` in the
-component `type` enum and the `ecp`, `executable` and `android` objects above.
+The plugin schema is `emuden-plugins/schema/plugin.schema.json` (the only copy); the guide for
+outside developers, with the namespace rule for engine apps of an added source, is
+`emuden-plugins/docs/engines.md`. In the developer folder a download may name a local `file`
+in place of `url`.
 
 ## How a session runs
 

@@ -31,6 +31,14 @@ Status DownloadPinned(const HttpGetter& http, const std::string& url, std::strin
                       std::uint64_t size, const std::filesystem::path& destination,
                       Job* job = nullptr, const std::function<void(float)>& progress = {});
 
+struct Download;
+
+/// DownloadPinned for a manifest's download, or a copy of the local file of a developer
+/// plugin's download (checked when it names a checksum). `sha256` gets the file's checksum.
+Status FetchDownload(const HttpGetter& http, const Download& download, const std::filesystem::path& destination,
+                     Job* job = nullptr, const std::function<void(float)>& progress = {},
+                     std::string* sha256 = nullptr);
+
 /// Unpacks the one member `entry` of a zip to `destination`. Links and encrypted members are
 /// refused, and a member larger than `max_size` (0 = any).
 Status UnpackEntry(const std::filesystem::path& archive, std::string_view entry,

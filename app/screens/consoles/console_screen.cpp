@@ -114,8 +114,13 @@ public:
         }));
         if (!console->source.empty()) {
             rows.push_back(ValueRow("console.source", Tr("source.label"), [source = console->source] { return source; },
-                                    [] { Svc().stage->Push("settings", {{"section", "Plugin sources"}}); }));
+                                    [] { Svc().stage->Push("settings", {{"section", "Plugins"}}); }));
             rows.back().description = TrF("source.from_added", console->source);
+        }
+        if (console->developer) {
+            rows.push_back(ValueRow("console.source", Tr("source.label"), [] { return std::string("Developer folder"); },
+                                    [] { Svc().stage->Push("settings", {{"section", "Plugins"}}); }));
+            rows.back().description = "Developer, unsigned";
         }
         if (console->runner == plugins::Runner::Engine) {
             EngineRows(*console, rows);
@@ -125,14 +130,23 @@ public:
         AddRows(list, std::move(rows));
 
         const std::vector<plugins::SettingSpec> settings = svc.plugins->SettingsFor(system);
-        if (!settings.empty()) {
-            auto heading = ui::MakeHeading("Settings");
+        // One heading per section, in the order the manifest first names them.
+        std::vector<std::string> sections;
+        for (const plugins::SettingSpec& spec : settings) {
+            if (std::find(sections.begin(), sections.end(), spec.section) == sections.end()) {
+                sections.push_back(spec.section);
+            }
+        }
+        for (const std::string& section : sections) {
+            auto heading = ui::MakeHeading(section.empty() ? "Settings" : section);
             heading->pad_top = 14;
             heading->pad_bottom = 4;
             list->Add(std::move(heading));
             std::vector<ui::RowSpec> setting_rows;
             for (const plugins::SettingSpec& spec : settings) {
-                setting_rows.push_back(SettingRow(system, spec));
+                if (spec.section == section) {
+                    setting_rows.push_back(SettingRow(system, spec));
+                }
             }
             AddRows(list, std::move(setting_rows));
         }

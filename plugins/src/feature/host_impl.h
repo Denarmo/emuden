@@ -58,6 +58,9 @@ public:
     Status Open(const std::string& id) override;
     void Close(const std::string& id) override;
     void Reload(const std::string& id) override;
+    void Rescan() override {
+        Scan();
+    }
     std::vector<PageModel> Pages(const std::string& id, std::uint64_t& revision) const override;
     void Send(const std::string& id, UiEvent event) override;
     void Back(const std::string& id) override;

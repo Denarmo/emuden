@@ -212,7 +212,7 @@ void RealFeatureHost::Scan() {
             }
         }
     }
-    if (config_.settings != nullptr && config_.settings->GetBool("plugins.developer", false)) {
+    if (config_.settings != nullptr && config_.settings->GetBool(DEVELOPER_KEY, false)) {
         for (const fs::path& dir : ListDirectory(dev_dir_)) {
             take(ReadPackage(dir, FeaturePlugin::Trust::Developer, {}), dir);
         }
@@ -247,6 +247,7 @@ std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
         plugin.installed = true;
         plugin.permissions = PermissionLines(manifest.access, manifest.sync_categories);
         plugin.sync_categories = manifest.sync_categories;
+        plugin.sync_listing = manifest.sync_listing;
         plugin.data_bytes = package.data_bytes;
         std::error_code ec;
         if (!manifest.icon.empty() && fs::is_regular_file(package.dir / PathFromUtf8(manifest.icon), ec)) {

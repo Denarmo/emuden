@@ -105,6 +105,8 @@ std::filesystem::path DownloadsDir();
 /// Opens an http or https address in the user's browser (the Windows shell, xdg-open, an
 /// Android intent). Only for something the user just pressed: the app opens no page by itself.
 Status OpenUrl(const std::string& url);
+/// Shows a folder in the system's file manager, for something the user just pressed.
+Status OpenFolder(const std::filesystem::path& folder);
 
 double NowSeconds();
 void SleepMs(int ms);

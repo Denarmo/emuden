@@ -48,6 +48,22 @@ inline constexpr const char* PERMISSION_DOWNLOADS_SETUP = "downloads.setup";
 /// The categories a sync provider may offer, in the order the sync page shows them.
 inline constexpr const char* SYNC_CATEGORIES[] = {"saves", "states", "config", "games", "bios"};
 
+/// feature.sync.listing: how a provider's list(prefix) behaves. "category" (default): the
+/// engine lists each category. "all": any listing returns everything, so a run lists once.
+/// "per_folder": as "all", and a system folder ("saves/gba/") is listed quickly, so syncing
+/// one game lists only its folders.
+inline constexpr const char* SYNC_LISTING_CATEGORY = "category";
+inline constexpr const char* SYNC_LISTING_ALL = "all";
+inline constexpr const char* SYNC_LISTING_PER_FOLDER = "per_folder";
+
+/// The capability `needs` must list for a permission beyond feature.lua.1 (browse needs
+/// feature.web.1); nullptr when none.
+const char* PermissionCapability(std::string_view permission);
+/// Only EmuDEN's own plugins may hold it (CheckTrust).
+bool OfficialOnlyPermission(std::string_view permission);
+/// Every permission a manifest may name.
+std::vector<std::string> KnownPermissions();
+
 /// What a plugin may reach: the part of a manifest (or of an index entry) the user agrees to.
 struct FeatureAccess {
     std::vector<std::string> permissions;
@@ -73,6 +89,7 @@ struct FeatureManifest {
     FeatureAccess access;
     std::vector<std::string> file_types; // lower case, without the dot
     std::vector<std::string> sync_categories; // feature.sync.categories, with PERMISSION_SYNC
+    std::string sync_listing = SYNC_LISTING_CATEGORY; // feature.sync.listing
     int min_interval_ms = 500;
     int memory_mb = 32;
     int storage_mb = 512;
@@ -86,8 +103,8 @@ Result<FeatureManifest> ParseFeatureManifest(std::string_view json);
 /// Whether the text is a manifest of a package kind at all (console manifests are not ours).
 bool IsFeatureManifest(std::string_view json);
 
-/// The rules of a plugin's source: only the official one may see every system; a third-party
-/// plugin's id starts with its source owner's name and it cannot watch the Downloads folder.
+/// The rules of a plugin's source: only the official one may see every system or hold an
+/// OfficialOnlyPermission; a third-party plugin's id starts with its source owner's name.
 Status CheckTrust(const FeatureManifest& manifest, FeaturePlugin::Trust trust,
                   std::string_view source_owner);
 

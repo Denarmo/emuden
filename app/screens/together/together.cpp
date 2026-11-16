@@ -72,6 +72,10 @@ TogetherPlan PlanFor(const library::Entry& game) {
         plan.reason = "Games of this console cannot be played together yet.";
         return plan;
     }
+    if (!console->netplay) {
+        plan.reason = "This console's plugin does not play together.";
+        return plan;
+    }
     const auto has_core = [&](const std::string& id) {
         for (const plugins::CoreInfo& core : Svc().plugins->CoresFor(game.system)) {
             if (core.id == id) {

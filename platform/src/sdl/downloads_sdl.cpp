@@ -27,6 +27,30 @@ Status OpenUrl(const std::string& url) {
     return {};
 }
 
+Status OpenFolder(const std::filesystem::path& folder) {
+    std::error_code ec;
+    if (!std::filesystem::is_directory(folder, ec)) {
+        return Status::Fail("the folder is not there");
+    }
+    std::string path = PathToUtf8(std::filesystem::absolute(folder, ec));
+    std::replace(path.begin(), path.end(), '\\', '/');
+    std::string url = path.starts_with("/") ? "file://" : "file:///";
+    static constexpr char HEX[] = "0123456789ABCDEF";
+    for (const unsigned char c : path) {
+        if (c <= ' ' || c == '%' || c == '#' || c == '?' || c >= 0x80) {
+            url += '%';
+            url += HEX[c >> 4];
+            url += HEX[c & 15];
+        } else {
+            url += static_cast<char>(c);
+        }
+    }
+    if (!SDL_OpenURL(url.c_str())) {
+        return Status::Fail(std::string("the folder could not be opened: ") + SDL_GetError());
+    }
+    return {};
+}
+
 std::vector<std::filesystem::path> DownloadFolders() {
     std::vector<std::filesystem::path> folders;
     const auto add = [&](const std::string& text) {

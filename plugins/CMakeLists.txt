@@ -29,7 +29,8 @@ target_sources(den_plugins PRIVATE "${generated}")
 
 if(TARGET den_plugins_tests)
     target_compile_definitions(den_plugins_tests PRIVATE
-        DEN_PLUGINS_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+        DEN_PLUGINS_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures"
+        DEN_CONTRACTS_DIR="${CMAKE_SOURCE_DIR}/contracts")
     # The feature tests drive the script runner directly.
     target_include_directories(den_plugins_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
     target_link_libraries(den_plugins_tests PRIVATE den_lua)

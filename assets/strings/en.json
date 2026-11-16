@@ -209,6 +209,13 @@
   "source.install_title": "Install {}?",
 
   "sources.title": "Plugin sources",
+  "developer.mode": "Developer mode",
+  "developer.mode_help": "Uses the plugins of the developer folder, unsigned, beside the installed ones",
+  "developer.folder": "Open developer folder",
+  "developer.folder_help": "One folder per plugin, named after its id, with its plugin.json",
+  "developer.reload": "Reload developer plugins",
+  "developer.reload_help": "Reads the developer folder again after you changed a plugin",
+  "developer.reloaded": "Developer plugins reloaded",
   "sources.help": "Where consoles, cores and plugins come from: EmuDEN's own source and the ones you added",
   "sources.add": "Add a source",
   "sources.add_help": "A GitHub owner/repository or an https address; owner/repository#fingerprint adds it only with that key",

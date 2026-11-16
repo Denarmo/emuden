@@ -62,9 +62,11 @@ std::optional<SourceEntry> ParseSourceEntry(std::string_view line);
 /// A plugin id a third-party source may publish: it starts with "<ns>." and is not EmuDEN's.
 Status CheckSourceNamespace(std::string_view plugin_id, std::string_view ns);
 /// The rules for a console plugin from a third-party source: its namespace, the libretro
-/// engine only (switch2 and pcstore are EmuDEN's), no scanner of its own, no file that an
-/// engine answers.
+/// engine only (switch2 is EmuDEN's), no scanner of its own, no file that an engine answers,
+/// and engine apps of its own namespace.
 Status CheckThirdPartyManifest(const Manifest& manifest, std::string_view ns);
+/// The same rules without the namespace, for a console plugin of the developer folder.
+Status CheckDeveloperManifest(const Manifest& manifest);
 
 /// One source as the hosts see it: the official one first, then the added ones in the order
 /// they were added.

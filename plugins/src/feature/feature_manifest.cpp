@@ -103,6 +103,33 @@ std::vector<std::string> Beyond(const std::vector<std::string>& wanted,
 
 } // namespace
 
+const char* PermissionCapability(std::string_view permission) {
+    if (permission == PERMISSION_BROWSE) {
+        return "feature.web.1";
+    }
+    if (permission == PERMISSION_DEVICE_INFO || permission == PERMISSION_GAME_SETTINGS ||
+        permission == PERMISSION_STEAM) {
+        return "feature.tune.1";
+    }
+    if (permission == PERMISSION_ACHIEVEMENTS) {
+        return "feature.achievements.1";
+    }
+    if (permission == PERMISSION_BROWSE_ANY || permission == PERMISSION_DOWNLOADS_SETUP) {
+        return "feature.browser.1";
+    }
+    return nullptr;
+}
+
+bool OfficialOnlyPermission(std::string_view permission) {
+    // The achievements runtime signs in only with emuden.retroachievements' token.
+    return permission == PERMISSION_DOWNLOADS_WATCH || permission == PERMISSION_BROWSE_ANY ||
+           permission == PERMISSION_DOWNLOADS_SETUP || permission == PERMISSION_ACHIEVEMENTS;
+}
+
+std::vector<std::string> KnownPermissions() {
+    return {std::begin(PERMISSIONS), std::end(PERMISSIONS)};
+}
+
 bool FeatureAccess::Has(std::string_view permission) const {
     return Contains(permissions, permission);
 }
@@ -195,6 +222,9 @@ Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
     if (feature == nullptr || feature->kind != JsonValue::Kind::Object) {
         return Status::Fail(manifest.id + " has no feature object");
     }
+    if (!Contains(needs, "feature.lua.1")) {
+        return Status::Fail(manifest.id + " does not ask for feature.lua.1");
+    }
     manifest.entry = feature->String("entry");
     if (!IsSafeRelativePath(manifest.entry) || !manifest.entry.ends_with(".lua")) {
         return Status::Fail("the entry is not a script of the package");
@@ -217,6 +247,11 @@ Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
                         [&](const char* name) { return item.string == name; });
         if (!known) {
             return Status::Fail("the permission \"" + item.string + "\" is not known");
+        }
+        // An older EmuDEN refuses a capability it lacks, so the permission is tied to it.
+        if (const char* capability = PermissionCapability(item.string);
+            capability != nullptr && !Contains(needs, capability)) {
+            return Status::Fail("the permission \"" + item.string + "\" needs " + capability + " in needs");
         }
         if (!access.Has(item.string)) {
             access.permissions.push_back(item.string);
@@ -306,6 +341,13 @@ Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
             }
             manifest.sync_categories.push_back(item.string);
         }
+        if (const JsonValue* listing = sync->Find("listing")) {
+            const std::string value = listing->kind == JsonValue::Kind::String ? listing->string : std::string();
+            if (value != SYNC_LISTING_CATEGORY && value != SYNC_LISTING_ALL && value != SYNC_LISTING_PER_FOLDER) {
+                return Status::Fail("feature.sync.listing is category, all or per_folder");
+            }
+            manifest.sync_listing = value;
+        }
     } else if (sync != nullptr) {
         return Status::Fail("feature.sync needs the sync permission");
     }
@@ -335,17 +377,16 @@ Status CheckTrust(const FeatureManifest& manifest, FeaturePlugin::Trust trust,
     if (Contains(manifest.access.systems, "*")) {
         return Status::Fail("Only an official plugin may see every console.");
     }
+    for (const std::string& permission : manifest.access.permissions) {
+        if (OfficialOnlyPermission(permission)) {
+            return Status::Fail("Only an official plugin may have the permission \"" + permission + "\".");
+        }
+    }
     if (trust == FeaturePlugin::Trust::ThirdParty) {
         const std::string prefix = ToLower(source_owner) + ".";
         if (prefix.size() < 2 || !manifest.id.starts_with(prefix) ||
             manifest.id.starts_with("emuden.")) {
             return Status::Fail("The plugin's id does not belong to its source.");
-        }
-        if (manifest.access.Has(PERMISSION_DOWNLOADS_WATCH)) {
-            return Status::Fail("A plugin of this source may not watch the Downloads folder.");
-        }
-        if (manifest.access.Has(PERMISSION_BROWSE_ANY) || manifest.access.Has(PERMISSION_DOWNLOADS_SETUP)) {
-            return Status::Fail("Only an official plugin may show any website or set up downloads.");
         }
     }
     return {};

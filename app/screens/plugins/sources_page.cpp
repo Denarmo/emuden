@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Plugin sources: the settings section that lists them, adds one (its key's fingerprint is
-// confirmed unless the user pinned it) and checks them, and the page of one source (route
+// Settings, Plugins: the plugin sources (adds one, its key's fingerprint confirmed unless the
+// user pinned it, and checks them), developer mode, and the page of one source (route
 // "plugin.source", param address) that switches it off or removes it.
 
 #include <chrono>
@@ -14,6 +14,8 @@
 #include "den/app/frame.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
+#include "den/base/files.h"
+#include "feature_api.h"
 #include "model_widgets.h"
 
 namespace den::app {
@@ -130,6 +132,47 @@ void EveryFrame() {
     }
 }
 
+// The developer folder's plugins, console and feature alike, are read again.
+void ReloadDeveloperPlugins() {
+    Svc().plugins->ReloadDeveloper();
+    if (plugins::FeatureHost* host = FeatureHostSvc()) {
+        host->Rescan();
+    }
+    RebuildTop();
+}
+
+void AddDeveloperRows(std::vector<ui::RowSpec>& rows) {
+    rows.push_back(ToggleRow(
+        "plugins.developer", Tr("developer.mode"), [] { return Svc().settings->GetBool(plugins::DEVELOPER_KEY, false); },
+        [](bool on) {
+            Svc().settings->SetBool(plugins::DEVELOPER_KEY, on);
+            ReloadDeveloperPlugins();
+        }));
+    rows.back().description = Tr("developer.mode_help");
+    if (!Svc().settings->GetBool(plugins::DEVELOPER_KEY, false)) {
+        return;
+    }
+    const std::filesystem::path dir = Svc().plugins->DeveloperDir();
+    ui::RowSpec folder = ValueRow(
+        "plugins.developer_folder", Tr("developer.folder"), [dir] { return PathToUtf8(dir); },
+        [dir] {
+            std::error_code ec;
+            std::filesystem::create_directories(dir, ec);
+            if (const Status opened = pal::OpenFolder(dir); !opened.ok) {
+                Svc().stage->Toast(opened.error, 4.0f);
+            }
+        });
+    folder.description = Tr("developer.folder_help");
+    rows.push_back(std::move(folder));
+    rows.push_back(ActionRow(
+        "plugins.developer_reload", Tr("developer.reload"),
+        [] {
+            ReloadDeveloperPlugins();
+            Svc().stage->Toast(Tr("developer.reloaded"));
+        },
+        Tr("developer.reload_help")));
+}
+
 std::vector<ui::RowSpec> SourceRows() {
     std::vector<ui::RowSpec> rows;
     ui::RowSpec add = ValueRow(
@@ -149,6 +192,7 @@ std::vector<ui::RowSpec> SourceRows() {
                                          : TrF("sources.key", info.fingerprint) + "  ·  " + CheckedText(info.checked);
         rows.push_back(std::move(row));
     }
+    AddDeveloperRows(rows);
     return rows;
 }
 
@@ -254,7 +298,7 @@ private:
 } // namespace
 
 DEN_REGISTER_SCREEN("plugin.source", SourceScreen);
-DEN_REGISTER_SETTINGS(52, "Plugin sources", SourceRows);
+DEN_REGISTER_SETTINGS(52, "Plugins", SourceRows);
 DEN_REGISTER_FRAME(EveryFrame);
 
 } // namespace den::app

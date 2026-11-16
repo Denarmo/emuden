@@ -222,12 +222,31 @@ Status CheckSourceNamespace(std::string_view plugin_id, std::string_view ns) {
     return {};
 }
 
+Status CheckDeveloperManifest(const Manifest& manifest) {
+    if (manifest.engine != "libretro") {
+        return Status::Fail(manifest.id + ": the " + manifest.engine + " engine is only for EmuDEN's own plugins");
+    }
+    for (const SystemDef& system : manifest.systems) {
+        if (!system.console.scan.scanner.empty()) {
+            return Status::Fail(manifest.id + ": only EmuDEN's own plugins scan with an engine");
+        }
+        for (const BiosSet& set : system.console.bios) {
+            for (const BiosFile& file : set.files) {
+                if (file.path.starts_with("@")) {
+                    return Status::Fail(manifest.id + ": only an engine answers " + file.path);
+                }
+            }
+        }
+    }
+    return {};
+}
+
 Status CheckThirdPartyManifest(const Manifest& manifest, std::string_view ns) {
     if (Status status = CheckSourceNamespace(manifest.id, ns); !status.ok) {
         return status;
     }
-    if (manifest.engine != "libretro") {
-        return Status::Fail(manifest.id + ": the " + manifest.engine + " engine is only for EmuDEN's own plugins");
+    if (Status status = CheckDeveloperManifest(manifest); !status.ok) {
+        return status;
     }
     // An engine app is started outside EmuDEN: an added source offers only its own, named
     // "<ns>.", "io.github.<ns>." or the reversed host ("org.example." for example.org).
@@ -255,18 +274,6 @@ Status CheckThirdPartyManifest(const Manifest& manifest, std::string_view ns) {
         if (!own(spec.ecp_id) || (!spec.package.empty() && !own(spec.package))) {
             return Status::Fail(manifest.id + ": the engine app " + component.id + " is not in this source's " +
                                 std::string(ns) + " namespace");
-        }
-    }
-    for (const SystemDef& system : manifest.systems) {
-        if (!system.console.scan.scanner.empty()) {
-            return Status::Fail(manifest.id + ": only EmuDEN's own plugins scan with an engine");
-        }
-        for (const BiosSet& set : system.console.bios) {
-            for (const BiosFile& file : set.files) {
-                if (file.path.starts_with("@")) {
-                    return Status::Fail(manifest.id + ": only an engine answers " + file.path);
-                }
-            }
         }
     }
     return {};

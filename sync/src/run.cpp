@@ -47,9 +47,9 @@ void Run::Setup() {
 bool Run::List(std::set<std::string>& categories, std::map<std::string, RemoteFile>& remote) {
     const std::set<std::string> pc = engine_.PcSystems();
     bool listed = false;
-    // Google Drive lists everything for every call: once is enough there.
+    // A provider whose every listing returns everything is listed once.
     std::optional<Result<std::vector<RemoteFile>>> all;
-    if (provider_.Id() == GDRIVE_PROVIDER) {
+    if (engine_.ListsOnce(provider_.Id())) {
         Change([](SyncState& s) { s.current = "Looking for changes"; });
         all = provider_.List("");
     }
