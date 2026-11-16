@@ -29,9 +29,9 @@ struct FakeTune final : TuneServices {
         if (id != "gt4" && id != "snes1") {
             return std::nullopt;
         }
-        TuneGame game{id, id == "gt4" ? "Gran Turismo 4" : "Mario", id == "gt4" ? "ps2" : "snes", "play", "Play!", true, {}};
-        const auto value = own.find("play_res_multi");
-        game.options.push_back({"play_res_multi", "Resolution", value != own.end() ? value->second : "1x",
+        TuneGame game{id, id == "gt4" ? "Gran Turismo 4" : "Mario", id == "gt4" ? "ps2" : "snes", "densx2", "DenSX2", true, {}};
+        const auto value = own.find("densx2_res_multi");
+        game.options.push_back({"densx2_res_multi", "Resolution", value != own.end() ? value->second : "1x",
                                 {"1x", "2x", "4x"}, value != own.end()});
         return game;
     }
@@ -72,7 +72,7 @@ const char* const SCRIPT = R"(
     function plugin.open()
       local info, why = den.device.info()
       den.log("info " .. tostring(info and info.name) .. " " .. tostring(why))
-      local set, why2 = den.game.set("gt4", { play_res_multi = "2x" })
+      local set, why2 = den.game.set("gt4", { densx2_res_multi = "2x" })
       den.log("open set " .. tostring(set) .. " " .. tostring(why2))
     end
     function plugin.actions.look(id)
@@ -81,9 +81,9 @@ const char* const SCRIPT = R"(
       den.log("look " .. game.core .. " " .. game.options[1].key .. "=" .. game.options[1].value)
     end
     function plugin.actions.apply(value)
-      local before, why = den.game.set("gt4", { play_res_multi = value })
+      local before, why = den.game.set("gt4", { densx2_res_multi = value })
       if not before then return den.log("apply " .. why) end
-      den.log("apply before=" .. tostring(before.play_res_multi == den.json.null and "null" or before.play_res_multi))
+      den.log("apply before=" .. tostring(before.densx2_res_multi == den.json.null and "null" or before.densx2_res_multi))
     end
     function plugin.actions.steam(launch)
       local status = den.steam.status()
@@ -158,7 +158,7 @@ TEST_CASE("den.device.info and den.game need their permissions and systems") {
     CHECK(Logged(*runner, "open set nil settings are changed only when the user asks for it"));
     runner->Call({"actions", "look"}, {JsonString("gt4")});
     runner->Settle();
-    CHECK(Logged(*runner, "look play play_res_multi=1x"));
+    CHECK(Logged(*runner, "look densx2 densx2_res_multi=1x"));
     runner->Call({"actions", "look"}, {JsonString("snes1")});
     runner->Settle();
     CHECK(Logged(*runner, "look the plugin did not declare the console snes"));
@@ -181,7 +181,7 @@ TEST_CASE("den.game.set changes a game only after the app's question is accepted
     runner->Call({"actions", "apply"}, {JsonString("2x")});
     AnswerAll(*runner, true);
     CHECK(Logged(*runner, "apply before=null"));
-    CHECK(stage.tune->own["play_res_multi"] == "2x");
+    CHECK(stage.tune->own["densx2_res_multi"] == "2x");
 }
 
 TEST_CASE("den.steam lists apps and sets only safe launch options after the question") {

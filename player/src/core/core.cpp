@@ -94,7 +94,7 @@ std::unique_ptr<LibretroCore> LibretroCore::Load(const LoadParams& params, std::
     }
     load(c.retro_load_game_special, "retro_load_game_special");
     // A core built to be loaded by Java finds the Java VM through JNI_OnLoad, which only
-    // System.loadLibrary calls; Play! asks for it with its own setter.
+    // System.loadLibrary calls; DenSX2 (Play!) asks for it with its own setter.
     if (void* vm = pal::JavaVm()) {
         auto* object = static_cast<SDL_SharedObject*>(c.library);
         if (auto on_load = reinterpret_cast<int (*)(void*, void*)>(SDL_LoadFunction(object, "JNI_OnLoad"))) {
