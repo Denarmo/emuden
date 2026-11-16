@@ -94,3 +94,8 @@ libretro `.srm`.
   Aria of Sorrow and Golden Sun (flash 64K): after 120 to 180 frames of the same input, the
   converted run's EWRAM matched the source core's own run (Aria of Sorrow: up to 10 bytes of
   RNG drift) for mGBA→gpSP, gpSP→mGBA, gpSP→GBA DS, GBA DS→gpSP and mGBA↔GBA DS.
+- In the app (debug APK from main, Retroid Pocket Duo, 2026-11-16), Aria of Sorrow through the
+  player route's `core=`: an mGBA resume state opened in GBA DS (both screens), left at the
+  Select Data screen; `core=mgba` resumed there ("converted a GBA DS state for mGBA"), and
+  GBA DS again resumed there with its second screen. That GBA DS resume state and its picture,
+  copied by hand into a portable Windows profile, resumed in mGBA at the same screen.
