@@ -78,38 +78,12 @@ const char* FormId(system::FormFactor form) {
     }
 }
 
-// PRETTY_NAME and whether ID is steamos, from /etc/os-release where there is one.
-std::pair<std::string, bool> OsRelease() {
-    const auto text = ReadTextFile("/etc/os-release");
-    std::string name;
-    bool steamos = false;
-    std::size_t start = 0;
-    while (text && start < text->size()) {
-        std::size_t end = text->find('\n', start);
-        end = end == std::string::npos ? text->size() : end;
-        std::string line = text->substr(start, end - start);
-        start = end + 1;
-        const std::size_t equals = line.find('=');
-        if (equals == std::string::npos) {
-            continue;
-        }
-        std::string value = line.substr(equals + 1);
-        if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
-            value = value.substr(1, value.size() - 2);
-        }
-        if (line.starts_with("PRETTY_NAME=")) {
-            name = value;
-        } else if (line.starts_with("ID=")) {
-            steamos = ToLower(value) == "steamos";
-        }
-    }
-    return {name, steamos};
-}
-
 JsonValue Facts() {
     const system::DeviceProfile& device = system::Device();
     const system::DeviceInfo& info = device.info;
-    const auto [os_name, steamos] = info.os == "linux" ? OsRelease() : std::pair<std::string, bool>{};
+    const pal::OsReleaseInfo release = info.os == "linux" ? pal::OsRelease() : pal::OsReleaseInfo{};
+    const std::string& os_name = release.pretty_name;
+    const bool steamos = release.id == "steamos";
     JsonValue screen = JsonObject();
     if (!info.screens.empty()) {
         screen = JsonObject({{"width", JsonNumber(info.screens.front().width)},

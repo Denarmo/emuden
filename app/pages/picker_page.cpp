@@ -29,34 +29,6 @@ bool Hidden(const std::string& name) {
     return name.empty() || name[0] == '.' || name[0] == '$';
 }
 
-std::vector<fs::path> Places() {
-    std::vector<fs::path> places;
-    std::error_code ec;
-    for (const char* variable : {"USERPROFILE", "HOME"}) {
-        const std::string home = GetEnv(variable);
-        if (!home.empty() && fs::is_directory(PathFromUtf8(home), ec)) {
-            places.push_back(PathFromUtf8(home));
-            break;
-        }
-    }
-    if (pal::GetCaps().os == "windows") {
-        for (char letter = 'A'; letter <= 'Z'; ++letter) {
-            const fs::path root = PathFromUtf8(std::string(1, letter) + ":\\");
-            if (fs::exists(root, ec)) {
-                places.push_back(root);
-            }
-        }
-    } else {
-        places.emplace_back("/");
-        for (const char* mount : {"/run/media", "/media", "/mnt", "/storage"}) {
-            if (fs::is_directory(mount, ec)) {
-                places.emplace_back(mount);
-            }
-        }
-    }
-    return places;
-}
-
 class PickerPage final : public ui::Page {
 public:
     PickerPage() : request_(g_request) {
@@ -75,7 +47,7 @@ public:
         list->pad_bottom = 24;
 
         if (current_.empty()) {
-            for (const fs::path& place : Places()) {
+            for (const fs::path& place : pal::StorageRoots()) {
                 AddFolder(list, place, PathToUtf8(place));
             }
             return;

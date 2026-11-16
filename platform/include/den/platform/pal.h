@@ -101,6 +101,16 @@ bool IsPortable();
 std::filesystem::path AssetsDir();
 /// The user's Downloads folder; empty when the device has none the app can list.
 std::filesystem::path DownloadsDir();
+/// Where a folder picker starts: the user's home folder, then the drives (Windows) or the
+/// file system's root and the folders removable media are mounted under.
+std::vector<std::filesystem::path> StorageRoots();
+
+/// The Linux distribution from /etc/os-release; empty elsewhere.
+struct OsReleaseInfo {
+    std::string pretty_name; // "SteamOS Holo"
+    std::string id;          // "steamos", lower case
+};
+OsReleaseInfo OsRelease();
 
 /// Opens an http or https address in the user's browser (the Windows shell, xdg-open, an
 /// Android intent). Only for something the user just pressed: the app opens no page by itself.

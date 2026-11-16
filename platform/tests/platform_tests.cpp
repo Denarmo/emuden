@@ -46,3 +46,17 @@ TEST_CASE("http get follows redirects and streams to a file", "[.network]") {
     request.url = "https://github.com/Denarmo/emuden-plugins/raw/main/no-such-file";
     CHECK(pal::HttpGet(request).status == 404);
 }
+
+TEST_CASE("the folder picker's places and the distribution", "[platform]") {
+    const auto roots = den::pal::StorageRoots();
+    REQUIRE_FALSE(roots.empty());
+    for (const auto& root : roots) {
+        CHECK(std::filesystem::is_directory(root));
+    }
+    const den::pal::OsReleaseInfo release = den::pal::OsRelease();
+    if (den::pal::GetCaps().os == "linux") {
+        CHECK_FALSE(release.id.empty());
+    } else {
+        CHECK(release.id.empty());
+    }
+}
