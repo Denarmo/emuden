@@ -9,6 +9,7 @@
 #include <format>
 #include <map>
 
+#include "den/app/registry.h"
 #include "den/gfx/mesh_shapes.h"
 #include "object_build.h"
 
@@ -310,15 +311,44 @@ std::unique_ptr<gfx::Mesh3D> Upload(const std::vector<gfx::MeshVertex>& vertices
 
 struct Meshes {
     std::unique_ptr<gfx::Mesh3D> solid, clear;
+    std::uint64_t used = 0; // the frame it was last asked for
 };
 
+// Built meshes by look. Trimmed between frames to those asked for lately, so a mesh handed out
+// stays valid for the rest of its frame; all are freed while the GL context still exists.
+constexpr std::size_t MESH_CACHE_SIZE = 128;
+std::map<std::string, Meshes> g_meshes;
+std::unique_ptr<gfx::Mesh3D> g_disc_meshes[2];
+Meshes g_umd;
+std::uint64_t g_frame = 0;
+
+void TrimMeshes() {
+    ++g_frame;
+    while (g_meshes.size() > MESH_CACHE_SIZE) {
+        const auto oldest = std::min_element(g_meshes.begin(), g_meshes.end(),
+                                             [](const auto& a, const auto& b) { return a.second.used < b.second.used; });
+        if (oldest->second.used + 1 >= g_frame) {
+            break; // all drawn last frame: keep them
+        }
+        g_meshes.erase(oldest);
+    }
+}
+
+DEN_REGISTER_FRAME(TrimMeshes);
+DEN_REGISTER_SHUTDOWN([] {
+    g_meshes.clear();
+    g_disc_meshes[0].reset();
+    g_disc_meshes[1].reset();
+    g_umd = {};
+});
+
 const Meshes& MeshesFor(const GameObject& o) {
-    static std::map<std::string, Meshes> cache;
     const std::string key =
         std::format("{} {} {} {} {} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {} {}", o.shape, o.style,
                     o.label_edge, o.smoke, o.photo, o.aspect, o.depth, o.label.x, o.label.y, o.label.w, o.label.h, o.radius,
                     o.notch, o.grip, o.hack);
-    Meshes& meshes = cache[key];
+    Meshes& meshes = g_meshes[key];
+    meshes.used = g_frame;
     if (!meshes.solid) {
         Built b;
         if (o.photo) {
@@ -443,8 +473,7 @@ const gfx::Mesh3D* GameObject::DiscMesh() const {
     if (!disc) {
         return nullptr;
     }
-    static std::unique_ptr<gfx::Mesh3D> meshes[2];
-    std::unique_ptr<gfx::Mesh3D>& mesh = meshes[hack ? 1 : 0];
+    std::unique_ptr<gfx::Mesh3D>& mesh = g_disc_meshes[hack ? 1 : 0];
     if (!mesh) {
         std::vector<gfx::MeshVertex> vertices;
         BuildDisc(vertices, 0.012f, hack);
@@ -456,14 +485,13 @@ const gfx::Mesh3D* GameObject::DiscMesh() const {
 namespace {
 
 const Meshes& Umd() {
-    static Meshes meshes;
-    if (!meshes.solid) {
+    if (!g_umd.solid) {
         std::vector<gfx::MeshVertex> solid, clear;
         BuildUmdShell(solid, clear);
-        meshes.solid = Upload(solid);
-        meshes.clear = Upload(clear);
+        g_umd.solid = Upload(solid);
+        g_umd.clear = Upload(clear);
     }
-    return meshes;
+    return g_umd;
 }
 
 } // namespace

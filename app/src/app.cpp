@@ -321,6 +321,9 @@ int Run(int argc, char** argv) {
         }
         // Screens go before the services they use.
         svc.stage = nullptr;
+        for (const auto& hook : registry.Shutdown()) {
+            hook();
+        }
     }
     svc = Services{};
     system::ShutdownDevice();

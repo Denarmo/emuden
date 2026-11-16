@@ -48,6 +48,10 @@ void Registry::AddEventFilter(std::function<bool(const input::Event&)> filter) {
     event_filters_.push_back(std::move(filter));
 }
 
+void Registry::AddShutdown(std::function<void()> hook) {
+    shutdown_.push_back(std::move(hook));
+}
+
 std::vector<RailEntry> Registry::Rail() const {
     std::vector<RailEntry> out = rail_;
     std::stable_sort(out.begin(), out.end(),

@@ -49,6 +49,9 @@ public:
     void AddOverlay(std::function<void(ui::Context&)> draw);
     /// Sees every input event first: true keeps it from the screens.
     void AddEventFilter(std::function<bool(const input::Event&)> filter);
+    /// Runs once as the app closes, after the screens are gone and while the GL context still
+    /// exists: GL objects kept in statics are freed here.
+    void AddShutdown(std::function<void()> hook);
 
     const std::vector<std::pair<std::string, ui::Stage::Factory>>& Screens() const {
         return screens_;
@@ -71,12 +74,15 @@ public:
     const std::vector<std::function<bool(const input::Event&)>>& EventFilters() const {
         return event_filters_;
     }
+    const std::vector<std::function<void()>>& Shutdown() const {
+        return shutdown_;
+    }
 
 private:
     std::vector<std::pair<std::string, ui::Stage::Factory>> screens_;
     std::vector<RailEntry> rail_;
     std::vector<SettingsSection> settings_;
-    std::vector<std::function<void()>> startup_, frame_;
+    std::vector<std::function<void()>> startup_, frame_, shutdown_;
     std::vector<std::function<bool()>> quit_holds_;
     std::vector<std::function<void(ui::Context&)>> overlays_;
     std::vector<std::function<bool(const input::Event&)>> event_filters_;
@@ -116,3 +122,5 @@ struct Registrar {
     DEN_REGISTRAR([](::den::app::Registry& r) { r.AddOverlay(__VA_ARGS__); })
 #define DEN_REGISTER_EVENT_FILTER(...)                                                            \
     DEN_REGISTRAR([](::den::app::Registry& r) { r.AddEventFilter(__VA_ARGS__); })
+#define DEN_REGISTER_SHUTDOWN(...)                                                                \
+    DEN_REGISTRAR([](::den::app::Registry& r) { r.AddShutdown(__VA_ARGS__); })
