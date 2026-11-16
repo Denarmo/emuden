@@ -23,7 +23,7 @@ namespace fs = std::filesystem;
 constexpr const char* DEVICE_ONLY[] = {
     "sync.",           "app.",           "window.",        "display.",      "paths.",         "input.",
     "plugins.",        "engine.",        "setup.",        "settings.",      "apps.",
-    "beside.",         "automation.",    "library.folders", "ui.scale",     "ui.text_scale",
+    "beside.",         "automation.",    "ui.scale",       "ui.text_scale",
     "ui.companion.",   "ui.keyboard",    "player.dual_screen.", "player.swap_displays",
     "player.overlay_on_second_screen",   "player.refresh_hz",   "player.audio_latency_ms",
     "player.screen_size", "player.volume",  "player.bfi",

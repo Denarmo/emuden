@@ -2,8 +2,8 @@
 
 What each module offers the others. Headers are in `<module>/include/den/<module>/`; include
 them as `"den/<module>/<file>.h"`. A directory never includes one listed after it in the
-root `CMakeLists.txt` (base, platform, gfx, input, ui, store, library, plugins, online,
-engine, player, system, sync, app).
+root `CMakeLists.txt` (base, platform, net, patching, gfx, input, ui, store, library,
+plugins, engine, player, achievements, system, sync, app).
 
 ## Building one target
 
@@ -11,10 +11,10 @@ engine, player, system, sync, app).
 powershell -ExecutionPolicy Bypass -File tools\build.ps1 -Preset win -Target <target> -BuildDir <your dir>
 ```
 
-Targets: `den_base`, `den_platform`, `den_gfx`, `den_input`, `den_ui`, `den_store`,
-`den_library`, `den_plugins`, `den_engine`, `den_player`, `den_system`, `den_sync`, `den_app` (the
-executable `bin/emuden.exe`), and `den_<module>_tests` for every module that has files in
-`<module>/tests`. Several targets: `-Target den_ui,den_ui_tests`. `-Test` runs ctest.
+Targets: `den_base`, `den_platform`, `den_net`, `den_patching`, `den_gfx`, `den_input`, `den_ui`,
+`den_store`, `den_library`, `den_plugins`, `den_engine`, `den_player`, `den_achievements`,
+`den_system`, `den_sync`, `den_app` (the executable `bin/emuden.exe`), and `den_<module>_tests`
+for every module that has files in `<module>/tests`. Several targets: `-Target den_ui,den_ui_tests`. `-Test` runs ctest.
 
 A module's `CMakeLists.txt` is one line, `den_module(<name> DEPS ... PRIVATE_DEPS ...)`.
 Sources in `<module>/src` (recursively) and tests in `<module>/tests` are globbed: adding a
@@ -49,7 +49,7 @@ sources live once in `.deps/`.
 | `den/store/settings.h` | `Settings`: dotted keys in `settings.json` |
 | `den/platform/child.h` | `StartChild`: a child that never outlives the app (job object, parent-death signal), working directory, `RequestClose`, `Kill` |
 | `den/system/settings.h` | layered settings: `Key<T> K{"a.b", default, {meta}}` declared next to the feature registers itself; `system::Store().Get(K, Scope::Game(system, id))` resolves game, console, global (`settings.json`), default; overrides in `settings-overrides.json` (versioned); `Keys()`, `KeysIn(section)` for pages |
-| `den/system/first_run.h` | `NoteStart` (called by the app), `ThisStart()` (`first_run`, `upgraded`), `SetupDone`, `MarkSetupDone` (`setup.done`) |
+| `den/system/first_run.h` | `NoteStart` (called by the app; `first_run`, `upgraded`), `SetupDone`, `MarkSetupDone` (`setup.done`) |
 
 No OS `#ifdef` outside `platform/`. What differs between devices is asked from
 `pal::GetCaps()` (`gles`, `touch`, `windowed`, `child_processes`, `handheld`, `platform_key`).
@@ -348,3 +348,13 @@ wanted files that then appear in the Downloads folder (`den/platform/downloads.h
 `web::Open(OpenRequest)`, `web::RegisterOpener`) lets the user browse the hosts an opener
 allows and hands the opener the files the user downloads there (`<data>/inbox/web`; patch and
 archive formats, never a ROM image). Its test endpoint is on the automation port + 3.
+
+## Hidden settings
+
+Keys the app reads that no page shows; set them in `settings.json` by hand.
+
+| Key | Default | What |
+|---|---|---|
+| `player.integer_scale` | `false` | The game picture only in whole multiples of the core's size, whatever the preset (`player/src/session.cpp`, `app/screens/player/player_displays.cpp`) |
+| `plugins.refresh_on_start` | `true` | Fetch the signed plugin list once per start (`app/screens/consoles/startup_refresh.cpp`); `false` keeps the bundled manifests and the last list |
+| `plugins.downloads_folder` | the platform's Downloads folder | Where feature plugins look for files the user's browser saved (`plugins/src/feature/feature_catalog.cpp`) |
