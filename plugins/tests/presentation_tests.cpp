@@ -169,7 +169,7 @@ TEST_CASE("the host chooses the default core and hands out the core's presentati
 TEST_CASE("the official manifests say what the app's tables said") {
     const std::vector<Manifest> all = Bundled();
     // The consoles whose pads have Nintendo's layout, and those without a stick.
-    const std::set<std::string> nintendo = {"gb",  "gbc", "gba",      "nds", "nes",        "snes",
+    const std::set<std::string> nintendo = {"gb",  "gbc", "gba",      "nds", "3ds", "nes",        "snes",
                                             "n64", "gamecube", "wii", "virtualboy", "pokemini"};
     const std::set<std::string> digital = {"gb", "gbc", "gba", "nds", "nes", "snes", "genesis", "sms",
                                            "gg", "pico8", "virtualboy", "psx"};
@@ -217,4 +217,7 @@ TEST_CASE("the official manifests say what the app's tables said") {
     CHECK(CoreOf(all, "emuden.gba", "gpsp").netplay.mode == "link");
     CHECK(CoreOf(all, "emuden.nds", "melondsds").netplay.mode == "link");
     CHECK(CoreOf(all, "emuden.gamecube", "dolphin").options_name == "dolphin-emu");
+    const Component& azahar = CoreOf(all, "emuden.n3ds", "azahar");
+    CHECK(azahar.options_name == "Azahar");
+    CHECK(azahar.option_hints.front().first == "citra_layout_option");
 }
