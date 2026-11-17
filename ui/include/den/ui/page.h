@@ -64,6 +64,10 @@ public:
         return focus_;
     }
     void SetFocus(Node* node, bool scroll_to = true);
+    /// Scrolls whatever holds `node` until it is in view, without moving the focus.
+    void ScrollIntoView(Node* node) {
+        EnsureVisible(node);
+    }
     /// Rebuilds the tree before the next frame; focus returns to the node with the same id
     /// and every scrolling node that has an id stays where it was. `keep_scroll` false is
     /// for a rebuild that shows other content under the same ids.

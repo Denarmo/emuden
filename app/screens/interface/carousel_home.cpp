@@ -405,6 +405,10 @@ private:
         for (std::size_t i = 0; i < tab_nodes_.size(); ++i) {
             tab_nodes_[i]->chosen = i == index;
         }
+        // L1/R1 choose a tab without focusing it: its strip still scrolls to show it.
+        if (!first && index < tab_nodes_.size()) {
+            ScrollIntoView(tab_nodes_[index]);
+        }
         Remembered().tab = tab.key;
         if (const library::Entry* game = carousel_->Selected()) {
             ShowGame(*game);
