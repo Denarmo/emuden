@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// The "carousel" and "shelf3d" layouts of interface plugins: consoles as coloured tabs along the top (the
-// shoulder buttons step through them), one gliding row of covers, and the selected game's
-// name and records under it, over a backdrop in the console's colour. The plugin's spec sets
+// The page of every interface plugin layout: consoles as coloured tabs along the top (the
+// shoulder buttons step through them), the games ("carousel": one gliding row of covers with
+// the selected game's name and records under it; "shelf3d" the same in 3D; "grid", "list",
+// "wheel" and "hero" in game_views.h), and the other screens' buttons, over a backdrop in the
+// console's colour. The plugin's spec sets
 // the colours, art and motion; the page is drawn with a copy of the app's theme in them.
 
 #include <algorithm>
@@ -15,6 +17,7 @@
 #include "den/app/games.h"
 #include "den/app/strings.h"
 #include "cover_carousel.h"
+#include "game_views.h"
 #include "object_shelf.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
@@ -101,6 +104,9 @@ public:
 
     void Build() override {
         revision_ = GamesRevision();
+        carousel_ = nullptr;
+        view_ = nullptr;
+        below_ = nullptr;
         BuildTabs();
         ui::Node& root = Root();
         root.axis = ui::Axis::Column;
@@ -135,7 +141,11 @@ public:
             AddScreens(root);
             return;
         }
-        if (spec_->layout == "shelf3d") {
+        if (std::unique_ptr<GameView> view = MakeGameView(spec_)) {
+            view_ = view.get();
+            carousel_ = view_;
+            root.Add(std::move(view));
+        } else if (spec_->layout == "shelf3d") {
             carousel_ = root.Emplace<ObjectShelf>(spec_);
         } else {
             carousel_ = root.Emplace<CoverCarousel>(spec_);
@@ -161,6 +171,7 @@ public:
         ui::Node* info = below_->Add(ui::MakeBox(ui::Axis::Column, 4));
         info->align = ui::Align::Center;
         info->pad_bottom = 8;
+        info->visible = view_ == nullptr; // those layouts show the game themselves
         moment_ = info->Emplace<MomentPicture>(224, 126);
         moment_->visible = false;
         name_ = info->Emplace<ui::Label>(" ", theme_.text_title, gfx::FONT_BOLD);
@@ -202,6 +213,7 @@ public:
             }
             if (const ContinueCard* card = SelectedCard()) {
                 records_->text = ContinueLine(*card); // "5 min ago" moves on
+                GiveNotes();
             }
         }
         if (clock_) {
@@ -248,6 +260,13 @@ public:
                 FocusCarousel();
             }
             return true;
+        case input::Nav::Up:
+            // Out of the games, up to the chosen console's tab (not the one nearest above).
+            if (view_ != nullptr && OnCarousel() && tab_ < tab_nodes_.size()) {
+                SetFocus(tab_nodes_[tab_], false);
+                return true;
+            }
+            return false;
         case input::Nav::Option:
             if (game && Svc().library->Find(game->id)) {
                 stage.Push("details", {{"id", game->id}});
@@ -382,6 +401,7 @@ private:
             at = tab.games[i].id == Remembered().game ? i : at;
         }
         carousel_->SetGames(tab.games, at, tab.aspect, tab.color);
+        GiveNotes();
         for (std::size_t i = 0; i < tab_nodes_.size(); ++i) {
             tab_nodes_[i]->chosen = i == index;
         }
@@ -389,6 +409,19 @@ private:
         if (const library::Entry* game = carousel_->Selected()) {
             ShowGame(*game);
         }
+    }
+
+    // The Continue cards' lines and pictures, for the layouts that show them in place.
+    void GiveNotes() {
+        if (view_ == nullptr || tab_ >= tabs_.size() || tabs_[tab_].cards.empty()) {
+            return;
+        }
+        std::vector<std::string> lines, moments;
+        for (const ContinueCard& card : tabs_[tab_].cards) {
+            lines.push_back(ContinueLine(card));
+            moments.push_back(PathToUtf8(card.item.screenshot));
+        }
+        view_->SetNotes(std::move(lines), std::move(moments));
     }
 
     void ShowGame(const library::Entry& game) {
@@ -461,6 +494,7 @@ private:
     std::vector<Tab*> tab_nodes_;
     std::size_t tab_ = 0;
     CoverCarousel* carousel_ = nullptr;
+    GameView* view_ = nullptr; // carousel_ when the layout is one of game_views.h
     ui::Node* below_ = nullptr; // the game's name and the buttons under the carousel
     float below_height_ = 0;
     ui::Label* name_ = nullptr;

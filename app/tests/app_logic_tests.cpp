@@ -73,7 +73,7 @@ TEST_CASE("an interface plugin's look, with defaults for what is missing or out 
     CHECK(gb.object.style.empty());
     CHECK(Same(spec->LookFor("psx", "sony").color, {0, 0, 0, 255}));
 
-    CHECK_FALSE(ParseInterface(R"({"interface": {"layout": "grid"}})", dir, {}));
+    CHECK_FALSE(ParseInterface(R"({"interface": {"layout": "coverflow"}})", dir, {}));
     CHECK_FALSE(ParseInterface(R"({"id": "x"})", dir, {}));
     CHECK(KnownLayout("carousel"));
 }
