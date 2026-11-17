@@ -31,6 +31,7 @@
 #include "den/platform/lifecycle.h"
 #include "den/platform/second_display.h"
 #include "den/app/second_screen.h"
+#include "companion_rest.h"
 
 namespace den::app {
 
@@ -44,6 +45,7 @@ struct Controller {
     SecondScreenClient client;
     SecondScreenClient overlay; // drawn instead of the pages or the claim
     bool overlaid = false;
+    CompanionRest rest;
     bool claimed = false;
     bool ready_logged = false;
     std::string base; // the page the stage rests on: browsing or quick settings
@@ -276,6 +278,10 @@ void Frame() {
     // not come): they are drawn over everything else and take the presses.
     ui::TextEntry* typing = svc.stage->Entry();
     const bool keys = typing && typing->KeysApart();
+    // The quick settings of a game on the main screen alone rest when untouched.
+    const bool can_rest = !c.claimed && !c.overlaid && !keys && c.base == "companion.play" &&
+                          svc.player->GetSnapshot().state == player::State::Running;
+    c.rest.Update(pal::NowSeconds(), can_rest, c.pointer);
     for (const pal::SecondPointer& p : c.pointer) {
         const input::Event event = PointerEvent(p);
         if (keys) {
@@ -312,7 +318,10 @@ void Frame() {
             c.overlay.draw(ctx, gfx::Rect{0, 0, svc.canvas->Width(), svc.canvas->Height()});
         }
     } else if (!c.claimed) {
-        c.stage->Frame(ctx);
+        if (!c.rest.Resting()) {
+            c.stage->Frame(ctx);
+        }
+        c.rest.Draw(ctx);
     } else if (c.client.draw) {
         c.client.draw(ctx, gfx::Rect{0, 0, svc.canvas->Width(), svc.canvas->Height()});
     }
@@ -328,7 +337,7 @@ std::vector<ui::RowSpec> Rows() {
         [](int index) { Svc().settings->SetString(ENABLED_KEY, MODES[std::clamp(index, 0, 2)]); });
     row.description = "Game details while browsing and quick settings while playing, on the "
                       "second screen. Automatic: on when the device has two screens";
-    return {row};
+    return {row, CompanionRestRow()};
 }
 
 } // namespace
