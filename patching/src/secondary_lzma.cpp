@@ -5,8 +5,6 @@
 // window's section is the next piece of it, cut where the encoder flushed, so the decoder
 // lives as long as the patch is applied. Decoded by XZ Embedded.
 
-#include <mutex>
-
 #include <xz.h>
 
 #include "secondary.h"
@@ -26,8 +24,7 @@ public:
 
     bool Decode(Cursor& in, std::uint8_t* out, std::size_t size) override {
         if (state_ == nullptr) {
-            static std::once_flag tables;
-            std::call_once(tables, [] { xz_crc32_init(); });
+            PrepareXz();
             state_ = xz_dec_init(XZ_DYNALLOC, MAX_DICTIONARY);
             if (state_ == nullptr) {
                 return false;

@@ -102,15 +102,18 @@ if(WIN32)
         advapi32 ole32 oleaut32 shell32 shlwapi user32 gdi32 version)
 endif()
 
-# XZ Embedded (0BSD) decodes the LZMA sections of xdelta patches (patching/src). It is a
-# decoder only; the three files below are all of it that is built.
+# XZ Embedded (0BSD) decodes the LZMA sections of xdelta patches and .xz files (patching/src).
+# It is a decoder only; the files below are all of it that is built. CRC32 and CRC64 checks
+# are verified, a stream with another check (SHA-256) is decoded unchecked.
 den_fetch(xzembedded https://github.com/tukaani-project/xz-embedded.git v2024-12-30 GIT_SHALLOW ON)
 add_library(den_xz STATIC
     "${xzembedded_SOURCE_DIR}/linux/lib/xz/xz_crc32.c"
+    "${xzembedded_SOURCE_DIR}/linux/lib/xz/xz_crc64.c"
     "${xzembedded_SOURCE_DIR}/linux/lib/xz/xz_dec_lzma2.c"
     "${xzembedded_SOURCE_DIR}/linux/lib/xz/xz_dec_stream.c")
 target_include_directories(den_xz SYSTEM PUBLIC "${xzembedded_SOURCE_DIR}/linux/include/linux"
     PRIVATE "${xzembedded_SOURCE_DIR}/userspace")
+target_compile_definitions(den_xz PUBLIC XZ_USE_CRC64 XZ_DEC_ANY_CHECK)
 set_target_properties(den_xz PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(MSVC)
     target_compile_options(den_xz PRIVATE /w)

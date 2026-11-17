@@ -31,6 +31,9 @@ std::unique_ptr<Secondary> MakeDjwDecoder();
 std::unique_ptr<Secondary> MakeFgkDecoder();
 std::unique_ptr<Secondary> MakeLzmaDecoder();
 
+/// Fills XZ Embedded's checksum tables once; before any other call of it (xz_file.cpp).
+void PrepareXz();
+
 /// The bits of a section, as xdelta3 packs them: the low bit of a byte first.
 struct BitReader {
     Cursor& in;
