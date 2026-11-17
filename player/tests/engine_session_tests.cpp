@@ -182,7 +182,7 @@ TEST_CASE("an engine that fails to launch fails the session", "[player][engine]"
     f.fake.launch_error = "keys_missing";
     REQUIRE(f.session->Open(f.Request()));
     REQUIRE(f.AdvanceUntil([&] { return f.session->GetSnapshot().state == player::State::Failed; }));
-    CHECK(f.session->GetSnapshot().error == "The engine needs keys that are not installed.");
+    CHECK(f.session->GetSnapshot().error.starts_with("This game is encrypted and EmuDEN has no keys for it."));
 }
 
 TEST_CASE("an engine session resumes from its resume state", "[player][engine]") {

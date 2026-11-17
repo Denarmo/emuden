@@ -359,7 +359,8 @@ std::string ErrorText(const JsonValue& result) {
         } else if (code == "firmware_missing") {
             message = "The engine needs firmware that is not installed.";
         } else if (code == "keys_missing") {
-            message = "The engine needs keys that are not installed.";
+            message = "This game is encrypted and EmuDEN has no keys for it. Install your "
+                      "console's prod.keys, or dump the game again with decryption turned on.";
         } else if (code == "content_missing" || code == "content_invalid") {
             message = "The engine cannot read this game.";
         } else if (code == "slot_empty") {
