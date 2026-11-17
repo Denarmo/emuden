@@ -42,6 +42,7 @@ struct Package {
     FeatureAccess granted;      // grant.json
     std::uint64_t data_bytes = 0;
     std::string origin; // the address of the source it came from
+    int applied_mods = 0; // records of den.mods
 };
 
 class RealFeatureHost final : public FeatureHost {
@@ -54,7 +55,7 @@ public:
         return revision_.load();
     }
     JobPtr Install(const std::string& id, bool consent) override;
-    JobPtr Remove(const std::string& id, bool delete_data, bool delete_hacks) override;
+    JobPtr Remove(const std::string& id, bool delete_data, bool delete_hacks, bool undo_mods) override;
     Status Open(const std::string& id) override;
     void Close(const std::string& id) override;
     void Reload(const std::string& id) override;
@@ -98,11 +99,15 @@ private:
     fs::path DataDir(const std::string& id) const {
         return data_root_ / PathOf(id);
     }
+    /// <data>/mods/<id>: the records of den.mods, kept apart from the plugin's own data.
+    fs::path ModsDir(const std::string& id) const {
+        return config_.data_dir / "mods" / PathOf(id);
+    }
     static fs::path PathOf(const std::string& id);
 
     // feature_install.cpp
     Status DoInstall(Job& job, const std::string& id, bool consent);
-    Status DoRemove(const std::string& id, bool delete_data, bool delete_hacks);
+    Status DoRemove(const std::string& id, bool delete_data, bool delete_hacks, bool undo_mods);
 
     // feature_host.cpp
     std::shared_ptr<Runner> RunnerOf(const std::string& id) const;

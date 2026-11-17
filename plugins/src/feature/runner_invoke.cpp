@@ -69,4 +69,33 @@ int Runner::ProgressThunk(lua_State* L) {
     return 0;
 }
 
+void Runner::StartPending(Coroutine& co) {
+    AsyncOp op = std::move(co.pending);
+    co.pending = nullptr;
+    {
+        std::lock_guard lock(mutex_);
+        ++helpers_;
+    }
+    std::thread([this, id = co.id, op = std::move(op)] {
+        Outcome outcome;
+        try {
+            outcome = op();
+        } catch (const std::exception& e) {
+            outcome = [message = std::string(e.what())](lua_State* L) { return Refuse(L, message); };
+        }
+        Post([this, id, outcome = std::move(outcome)] { ResumeWith(id, outcome); });
+        std::lock_guard lock(mutex_);
+        --helpers_;
+        idle_.notify_all();
+    }).detach();
+}
+
+int Runner::ContinueWith(lua_State* T, AsyncOp op) {
+    if (Coroutine* co = Current(T)) {
+        co->pending = std::move(op);
+        return ASK_CONTINUES;
+    }
+    return Refuse(T, "the call is no longer waiting");
+}
+
 } // namespace den::plugins::feature

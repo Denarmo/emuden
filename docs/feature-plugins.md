@@ -107,6 +107,7 @@ Permissions (the sentence is what the install page shows):
 | `achievements` | `den.achievements.*` (needs `feature.achievements.1`) | "Sign in to RetroAchievements and track achievements while you play" |
 | `browse.any` | `den.web.open{any = true}`, `den.web.bookmarks()`: the in-app browser on any site; every file the user downloads there is kept in EmuDEN's Downloads folder. Official plugins only (needs `feature.browser.1`) | "Show any website inside EmuDEN and keep what you download there in EmuDEN's Downloads folder" |
 | `downloads.setup` | `den.downloads.*`: the files of EmuDEN's Downloads folder set up as games and hacks, the list of setups and undo. Official plugins only (needs `feature.browser.1`) | "Add the games and patches you download to your library" |
+| `game.files` | `den.mods.*`: files of Steam games added and replaced, Vulkan layers set up, each after the app's question. Official plugins only (needs `feature.mods.1`) | "Add and replace files of your Steam games and set up Vulkan layers, each time after asking you" |
 
 `den.http.request` (any method, bodies, multipart, answer headers) needs `http`,
 `http.user_host` or `http.local`; see `docs/sync.md`, section 4.
@@ -143,7 +144,7 @@ Paths are relative to the plugin's data folder; `..` and absolute paths are erro
 | `den.json.decode(text)` / `den.json.encode(value)` | value / text; arrays are tables 1..n, JSON null is `den.json.null` |
 | `den.storage.get(key)` / `set(key, value)` / `remove(key)` / `keys()` | JSON values, 1 MiB in total, written atomically |
 | `den.http.get{url, headers?, cache_seconds?}` (wait) | `{status, body, headers, cached}`; body at most 8 MiB |
-| `den.download{url, name, sha256?, on_progress?}` (wait) | `"downloads/<name>"`; at most 256 MiB; checked against `sha256` when given |
+| `den.download{url, name, sha256?, on_progress?}` (wait) | `"downloads/<name>"`; at most 256 MiB (512 MiB for a plugin with `game.files`); checked against `sha256` when given |
 | `den.open_url(url)` | opens the user's browser (`pal::OpenUrl`). Only inside `plugin.actions.*`, that is after something the user pressed; elsewhere it returns `nil, message` |
 | `den.web.available()` | `true, "in-app"` when the device shows web pages inside the app, else `false, "browser"`. `den.web.open` works either way |
 | `den.web.open{url, hosts?, title?, extensions?}` (wait) | shows the page in the in-app browser and returns the next file the user downloads there: `{path = "inbox/<name>", name, source_host}`. The page stays open; calling it again waits for the next file. `nil, "closed"` once the user closed the page. Section 4.1 |
@@ -173,6 +174,12 @@ Paths are relative to the plugin's data folder; `..` and absolute paths are erro
 | `den.steam.status()` (wait) | `{installed, can_change, note, apps = { {appid, name, shortcut} }, tools = { {name, display} }}` |
 | `den.steam.config(appid)` (wait) | `{launch_options, compat_tool, compat_tool_display, compat_tool_chosen}`; `compat_tool_chosen` is false when Steam picked the tool itself, and `compat_tool = ""` in `set` gives the choice back to Steam |
 | `den.steam.set{appid, name?, launch_options?, compat_tool?}` (wait) | true, after the app asked the user |
+| `den.mods.find{appid, names}` (wait) | `{ {path, size, sha256} }`: files of a Steam game's folder by name. Section 4.5 |
+| `den.mods.unpack{file, entries}` (wait) | `{ [entry] = "cache/mods/<archive stem>/<entry>" }` from a zip, 7z or tar.xz under `downloads/` |
+| `den.mods.apply{appid, name, files = { {from, to, keep_as?} }}` (wait) | true, after the app asked the user; copies the files into the game's folder and keeps the originals |
+| `den.mods.state(appid)` (wait) / `den.mods.remove(appid)` (wait) | `{name, time, complete, files = { {to, intact} }}` or nil / `true, left` after the app asked |
+| `den.mods.layer{name, layers = { {manifest, library} }}` (wait) | true, after the app asked the user; Linux only |
+| `den.mods.layer_state(name)` (wait) / `den.mods.remove_layer(name)` (wait) | `{time, manifests, intact}` or nil / true after the app asked |
 
 `cover` is a path in the plugin's folder, an https URL of an allowed host, or nil (the base
 game's cover with a "Hack" label). The HTTP client sends `User-Agent: EmuDEN/<app version>
@@ -284,7 +291,7 @@ plugin lists `feature.tune.1` in `needs`.
 - Launch options must pass `library::steam::CheckLaunchOptions`, because Steam runs them
   through a shell: words of `A-Z a-z 0-9 _ - . , = : / + @`, `%command%` at most once, and
   before it only environment variables of known prefixes (`PROTON_`, `DXVK_`, `VKD3D_`,
-  `WINE...`, `RADV_`, `MESA_`, `MANGOHUD`, ...) and the wrappers `gamemoderun`, `mangohud`,
+  `WINE...`, `RADV_`, `MESA_`, `MANGOHUD`, `LSFGVK_`, ...) and the wrappers `gamemoderun`, `mangohud`,
   `gamescope`, `obs-gamecapture`, `prime-run` with flags that hold no path. `LD_PRELOAD`, a
   script path or any shell syntax is refused before the user is asked.
 
@@ -350,6 +357,18 @@ while true do
 end
 ```
 
+### 4.5 Mods for PC games: `den.mods`
+
+For plugins that set up a mod for a Steam game (`docs/game-mods-api.md` has every call and the
+rules the app keeps). Needs `feature.mods.1` and the `game.files` permission, official plugins
+only. The plugin downloads a release (`den.download`), unpacks the entries it needs
+(`den.mods.unpack`) and asks the app to copy them into the game's folder (`den.mods.apply`)
+or to set up a Vulkan layer (`den.mods.layer`, Linux). `apply`, `remove`, `layer` and
+`remove_layer` work only inside `plugin.actions.*` and show the app's own question, which
+lists every file; a no is `nil, "cancelled"`. The app keeps the originals and a record in
+`<data>/mods/<plugin id>/`, so it can undo an apply without the plugin; removing the plugin
+offers that.
+
 ## 5. UI model
 
 A page is a table (C++: `PageModel`). The app's renderer draws it with the UI kit and owns
@@ -399,12 +418,13 @@ Data folder `<data>/plugin-data/<id>/`: `storage.json`, `grant.json`, `downloads
 | Source | Installing | Limits |
 |---|---|---|
 | Bundled / official (`Denarmo/emuden-plugins`, the app's key) | One press; the permissions are on the plugin's page | `emuden.` ids, `systems: ["*"]` allowed |
-| Third-party source (the user added `github:owner/repo`, its own key) | A permission page first: publisher, source, every permission sentence, hosts by name; default focus on "Cancel" | Id must start with the source owner's namespace; no `["*"]`; the official-only permissions (`downloads.watch`, `browse.any`, `downloads.setup`, `achievements`) refused |
+| Third-party source (the user added `github:owner/repo`, its own key) | A permission page first: publisher, source, every permission sentence, hosts by name; default focus on "Cancel" | Id must start with the source owner's namespace; no `["*"]`; the official-only permissions (`downloads.watch`, `browse.any`, `downloads.setup`, `achievements`, `game.files`) refused |
 | Developer folder (`<data>/plugins-dev/<id>/`, Settings > Plugins > Developer mode, setting `plugins.developer`) | Loaded unsigned, marked "Developer"; same permission page; `den.log` also shown in a console row | For writing plugins; "Reload" restarts the script, Reload developer plugins reads the folder again; the third-party limits without the namespace |
 
 Every permission also needs its capability in `needs` (`PermissionCapability`: `browse` needs
 `feature.web.1`, the tune permissions `feature.tune.1`, `achievements` `feature.achievements.1`,
-`browse.any` and `downloads.setup` `feature.browser.1`); `contracts/capabilities.json` lists them
+`browse.any` and `downloads.setup` `feature.browser.1`, `game.files` `feature.mods.1`);
+`contracts/capabilities.json` lists them
 and the official-only ones, and plugins_tests checks it against the code.
 
 No plugin of any source gets: other hosts than declared, the file system outside its

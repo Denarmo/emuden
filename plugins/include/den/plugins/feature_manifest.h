@@ -37,6 +37,9 @@ inline constexpr const char* PERMISSION_DEVICE_INFO = "device.info";
 inline constexpr const char* PERMISSION_GAME_SETTINGS = "game.settings";
 /// den.steam: the Steam games of this computer, their launch options and Proton version.
 inline constexpr const char* PERMISSION_STEAM = "steam";
+/// den.mods: files added to and replaced in the folders of Steam games, and Vulkan layers,
+/// each after the app's own question (official plugins only). den.download takes 512 MiB.
+inline constexpr const char* PERMISSION_GAME_FILES = "game.files";
 /// den.achievements: sign in to RetroAchievements and the achievements of the user's games.
 inline constexpr const char* PERMISSION_ACHIEVEMENTS = "achievements";
 /// den.web.open{any = true}: any https site in the in-app browser, every file downloaded there

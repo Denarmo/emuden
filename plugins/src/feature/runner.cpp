@@ -190,6 +190,7 @@ void Runner::Boot() {
     RegisterSecrets(L, *this);
     RegisterTune(L, *this);
     RegisterAchievements(L, *this);
+    RegisterMods(L, *this);
     if (config_.manifest.access.Has(PERMISSION_SYNC)) {
         RegisterSync(L, *this);
     }
@@ -374,26 +375,7 @@ void Runner::Resume(std::uint64_t id, int arguments) {
     }
     lua_pop(co.thread, results);
     if (co.pending) {
-        AsyncOp op = std::move(co.pending);
-        co.pending = nullptr;
-        {
-            std::lock_guard lock(mutex_);
-            ++helpers_;
-        }
-        std::thread([this, id, op = std::move(op)] {
-            Outcome outcome;
-            try {
-                outcome = op();
-            } catch (const std::exception& e) {
-                outcome = [message = std::string(e.what())](lua_State* L) {
-                    return Refuse(L, message);
-                };
-            }
-            Post([this, id, outcome = std::move(outcome)] { ResumeWith(id, outcome); });
-            std::lock_guard lock(mutex_);
-            --helpers_;
-            idle_.notify_all();
-        }).detach();
+        StartPending(co);
     } else if (!co.waits_for_ask) {
         Failed(co.name, "The script paused outside a den call.");
         Answer(co, 0, "The script paused outside a den call.");
@@ -512,7 +494,11 @@ bool Runner::Answer(std::uint64_t ask_id, bool accepted, const std::string& valu
         }
         found->second.waits_for_ask = false;
         const int pushed = answer(found->second.thread, accepted, value);
-        Resume(id, pushed);
+        if (pushed == ASK_CONTINUES && found->second.pending) {
+            StartPending(found->second);
+        } else {
+            Resume(id, std::max(pushed, 0));
+        }
     });
     return true;
 }

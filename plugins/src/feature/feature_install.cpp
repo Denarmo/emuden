@@ -11,6 +11,7 @@
 #include "den/base/zip.h"
 #include "feature/host_impl.h"
 #include "feature/index_source.h"
+#include "feature/mods.h"
 
 namespace den::plugins::feature {
 
@@ -84,9 +85,9 @@ JobPtr RealFeatureHost::Install(const std::string& id, bool consent) {
     });
 }
 
-JobPtr RealFeatureHost::Remove(const std::string& id, bool delete_data, bool delete_hacks) {
-    return config_.jobs->Run("Remove " + id, [this, id, delete_data, delete_hacks](Job&) {
-        const Status status = DoRemove(id, delete_data, delete_hacks);
+JobPtr RealFeatureHost::Remove(const std::string& id, bool delete_data, bool delete_hacks, bool undo_mods) {
+    return config_.jobs->Run("Remove " + id, [this, id, delete_data, delete_hacks, undo_mods](Job&) {
+        const Status status = DoRemove(id, delete_data, delete_hacks, undo_mods);
         Scan();
         return status;
     });
@@ -232,7 +233,7 @@ Status RealFeatureHost::DoInstall(Job& job, const std::string& id, bool consent)
     return {};
 }
 
-Status RealFeatureHost::DoRemove(const std::string& id, bool delete_data, bool delete_hacks) {
+Status RealFeatureHost::DoRemove(const std::string& id, bool delete_data, bool delete_hacks, bool undo_mods) {
     std::optional<Package> present;
     {
         std::lock_guard lock(mutex_);
@@ -254,6 +255,10 @@ Status RealFeatureHost::DoRemove(const std::string& id, bool delete_data, bool d
                 result.notes.push_back(hack.name + ": " + removed.error);
             }
         }
+    }
+    if (undo_mods) {
+        const Status undone = mods::Store(ModsDir(id)).RemoveAll();
+        result.notes.insert(result.notes.end(), undone.notes.begin(), undone.notes.end());
     }
     std::error_code ec;
     fs::remove_all(plugins_dir_ / PathOf(id), ec);

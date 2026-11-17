@@ -226,18 +226,27 @@ public:
                                  [this] { return delete_data_; }, [this](bool on) { delete_data_ = on; }));
         rows.push_back(ToggleRow("manage.delete_hacks", "When removing, also remove the hacks it installed",
                                  [this] { return delete_hacks_; }, [this](bool on) { delete_hacks_ = on; }));
+        const bool mods = plugin.applied_mods > 0;
+        if (mods) {
+            rows.push_back(ToggleRow("manage.undo_mods", "When removing, also undo what it set up in your games",
+                                     [this] { return undo_mods_; }, [this](bool on) { undo_mods_ = on; }));
+        }
         rows.push_back(ValueRow(
             "manage.remove", "Remove", [id] { return JobText(FeaturePluginJob(id), ""); },
-            [this, id, name = plugin.name] {
+            [this, id, mods, name = plugin.name] {
                 if (FeaturePluginJob(id)) {
                     return;
                 }
                 std::string message = delete_data_ ? "The plugin and its data are deleted." : "Its data is kept.";
                 message += delete_hacks_ ? " The hacks it installed are removed from the library."
                                          : " The hacks it installed stay in your library.";
-                GetStage().Confirm(std::format("Remove {}?", name), message, "Remove", [this, id, name] {
+                if (mods) {
+                    message += undo_mods_ ? " What it set up in your games is undone."
+                                          : " What it set up in your games stays; installing it again can undo it.";
+                }
+                GetStage().Confirm(std::format("Remove {}?", name), message, "Remove", [this, id, mods, name] {
                     TrackFeaturePluginJob(id, name, "was removed",
-                                          FeatureHostSvc()->Remove(id, delete_data_, delete_hacks_));
+                                          FeatureHostSvc()->Remove(id, delete_data_, delete_hacks_, mods && undo_mods_));
                     GetStage().Pop();
                 });
             }));
@@ -266,7 +275,7 @@ public:
     }
 
 private:
-    bool delete_data_ = false, delete_hacks_ = false;
+    bool delete_data_ = false, delete_hacks_ = false, undo_mods_ = true;
     std::uint64_t revision_ = 0;
 };
 

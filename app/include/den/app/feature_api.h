@@ -11,6 +11,7 @@
 
 #include "den/base/jobs.h"
 #include "den/plugins/feature_host.h"
+#include "den/plugins/feature_mods.h"
 #include "den/plugins/feature_tune.h"
 #include "den/plugins/feature_ui.h"
 
@@ -26,6 +27,8 @@ void InstallFeaturePlugin(const std::string& id, bool consent);
 JobPtr FeaturePluginJob(const std::string& id);
 /// What den.device.info, den.game and den.steam of feature plugins reach (plugin_tune.cpp).
 std::shared_ptr<plugins::TuneServices> CreateTuneServices();
+/// What den.mods of feature plugins reaches (plugin_mods.cpp).
+std::shared_ptr<plugins::ModServices> CreateModServices();
 void TrackFeaturePluginJob(const std::string& id, const std::string& name, const std::string& done,
                            JobPtr job);
 

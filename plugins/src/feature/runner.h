@@ -25,6 +25,7 @@
 #include "den/plugins/feature_manifest.h"
 #include "den/plugins/feature_services.h"
 #include "den/plugins/feature_achievements.h"
+#include "den/plugins/feature_mods.h"
 #include "den/plugins/feature_tune.h"
 #include "den/plugins/feature_ui.h"
 #include "den/plugins/sync_link.h"
@@ -51,6 +52,8 @@ struct RunnerConfig {
     std::shared_ptr<FeatureServices> services; // may be null
     std::shared_ptr<TuneServices> tune;         // den.device.info, den.game, den.steam; may be null
     std::shared_ptr<AchievementServices> achievements; // den.achievements; may be null
+    std::shared_ptr<ModServices> mods;    // den.mods; may be null
+    std::filesystem::path mods_dir;       // <data>/mods/<id>: what den.mods applied
     std::function<std::int64_t()> now;
     long long instruction_limit = 200'000'000;
     pal::Secrets* secrets = nullptr;      // den.secrets; null: pal::GetSecrets()
@@ -69,6 +72,8 @@ using InvokeProgress = std::function<void(double, double)>;
 using Outcome = std::function<int(lua_State*)>;
 /// The waited-for work, on a helper thread. It may not touch Lua.
 using AsyncOp = std::function<Outcome()>;
+/// What an AnswerFn returns after Runner::ContinueWith.
+inline constexpr int ASK_CONTINUES = -1;
 /// The screen's answer to an ask, on the worker thread.
 using AnswerFn = std::function<int(lua_State*, bool accepted, const std::string& value)>;
 /// One of the answers to an ask that is answered many times, on the worker thread.
@@ -141,6 +146,9 @@ public:
     int Suspend(lua_State* L, AsyncOp op);
     /// Suspends the calling coroutine until the screen answered `ask`.
     int SuspendForAsk(lua_State* L, Ask ask, AnswerFn answer);
+    /// For an AnswerFn to return: the coroutine goes on waiting, now for `op` on a helper
+    /// thread (work that follows a yes and takes long).
+    int ContinueWith(lua_State* T, AsyncOp op);
     void PostAsk(Ask ask);
     /// Posts an ask the screen answers every time something happens ("accepted") and once
     /// more when it is over ("not accepted").
@@ -211,6 +219,8 @@ private:
     void Answer(Coroutine& co, int results, const std::string& failure);
     static int ProgressThunk(lua_State* L);
     void Resume(std::uint64_t id, int arguments);
+    /// Runs the coroutine's pending work on a helper thread, then resumes it.
+    void StartPending(Coroutine& co);
     void ResumeWith(std::uint64_t id, const Outcome& outcome);
     void Drop(std::uint64_t id);
     void Failed(const std::string& name, const std::string& message);
@@ -277,6 +287,7 @@ void RegisterSecrets(lua_State* L, Runner& runner); // secrets
 void RegisterSync(lua_State* L, Runner& runner);    // sync, for the sync permission
 void RegisterTune(lua_State* L, Runner& runner);    // device.info, game, steam (after RegisterCore)
 void RegisterAchievements(lua_State* L, Runner& runner); // achievements
+void RegisterMods(lua_State* L, Runner& runner);    // mods
 
 /// The credential store's name of a plugin's secret.
 std::string SecretName(const std::string& plugin, const std::string& key);

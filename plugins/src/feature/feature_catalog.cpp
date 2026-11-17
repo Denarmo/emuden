@@ -15,6 +15,7 @@
 #include "den/store/settings.h"
 #include "feature/host_impl.h"
 #include "feature/index_source.h"
+#include "feature/mods.h"
 
 namespace den::plugins::feature {
 
@@ -220,6 +221,7 @@ void RealFeatureHost::Scan() {
     for (auto& [id, package] : found) {
         package.granted = ReadGrant(id);
         package.data_bytes = FolderBytes(DataDir(id));
+        package.applied_mods = static_cast<int>(mods::Store(ModsDir(id)).Count());
     }
     std::lock_guard lock(mutex_);
     installed_ = std::move(found);
@@ -249,6 +251,7 @@ std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
         plugin.sync_categories = manifest.sync_categories;
         plugin.sync_listing = manifest.sync_listing;
         plugin.data_bytes = package.data_bytes;
+        plugin.applied_mods = package.applied_mods;
         std::error_code ec;
         if (!manifest.icon.empty() && fs::is_regular_file(package.dir / PathFromUtf8(manifest.icon), ec)) {
             plugin.icon = package.dir / PathFromUtf8(manifest.icon);

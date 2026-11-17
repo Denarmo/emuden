@@ -18,7 +18,7 @@ const char* const PERMISSIONS[] = {
     PERMISSION_LIBRARY_READ, PERMISSION_PATCH,           PERMISSION_LIBRARY_WRITE,
     PERMISSION_SYNC,         PERMISSION_HTTP_USER_HOST,  PERMISSION_HTTP_LOCAL,
     PERMISSION_DEVICE_INFO,  PERMISSION_GAME_SETTINGS,   PERMISSION_STEAM,
-    PERMISSION_ACHIEVEMENTS,
+    PERMISSION_ACHIEVEMENTS, PERMISSION_GAME_FILES,
     PERMISSION_BROWSE_ANY,   PERMISSION_DOWNLOADS_SETUP,
 };
 
@@ -114,6 +114,9 @@ const char* PermissionCapability(std::string_view permission) {
     if (permission == PERMISSION_ACHIEVEMENTS) {
         return "feature.achievements.1";
     }
+    if (permission == PERMISSION_GAME_FILES) {
+        return "feature.mods.1";
+    }
     if (permission == PERMISSION_BROWSE_ANY || permission == PERMISSION_DOWNLOADS_SETUP) {
         return "feature.browser.1";
     }
@@ -123,7 +126,8 @@ const char* PermissionCapability(std::string_view permission) {
 bool OfficialOnlyPermission(std::string_view permission) {
     // The achievements runtime signs in only with emuden.retroachievements' token.
     return permission == PERMISSION_DOWNLOADS_WATCH || permission == PERMISSION_BROWSE_ANY ||
-           permission == PERMISSION_DOWNLOADS_SETUP || permission == PERMISSION_ACHIEVEMENTS;
+           permission == PERMISSION_DOWNLOADS_SETUP || permission == PERMISSION_ACHIEVEMENTS ||
+           permission == PERMISSION_GAME_FILES;
 }
 
 std::vector<std::string> KnownPermissions() {
@@ -444,6 +448,8 @@ std::vector<PermissionLine> PermissionLines(const FeatureAccess& access,
             text = "See your Steam games and change their launch options and Proton version";
         } else if (name == PERMISSION_ACHIEVEMENTS) {
             text = "Sign in to RetroAchievements and track achievements while you play";
+        } else if (name == PERMISSION_GAME_FILES) {
+            text = "Add and replace files of your Steam games and set up Vulkan layers, each time after asking you";
         } else {
             text = "Change the hacks it installed";
         }

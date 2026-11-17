@@ -29,6 +29,7 @@ namespace den::plugins {
 class AchievementServices;
 class SyncLink;
 class TuneServices;
+class ModServices;
 
 /// Package kinds the feature host installs: "feature" (a script) and "interface" (data only:
 /// a look for the Home screen, docs/interface-plugins.md in emuden-plugins).
@@ -51,6 +52,7 @@ struct FeaturePlugin {
     std::vector<std::string> sync_categories; // a sync provider: what it can keep in step
     std::string sync_listing;                 // and how it lists (feature.sync.listing)
     std::uint64_t data_bytes = 0;
+    int applied_mods = 0; // games and Vulkan layers den.mods changed for it
     std::string error; // last script failure, user-facing
 };
 
@@ -61,7 +63,9 @@ public:
     virtual std::uint64_t Revision() const = 0;             // list changed
     /// Fails without consent when the plugin needs it.
     virtual JobPtr Install(const std::string& id, bool consent) = 0;
-    virtual JobPtr Remove(const std::string& id, bool delete_data, bool delete_hacks) = 0;
+    /// `undo_mods`: what the plugin applied to games and the Vulkan layers it set up
+    /// (den.mods) are undone too; otherwise their records stay.
+    virtual JobPtr Remove(const std::string& id, bool delete_data, bool delete_hacks, bool undo_mods = false) = 0;
     /// Starts the script, runs plugin.open. Fails for an interface, which has none.
     virtual Status Open(const std::string& id) = 0;
     virtual void Close(const std::string& id) = 0;  // the page left the stage
@@ -120,6 +124,8 @@ struct FeatureConfig {
     std::string app_version;
     /// What den.device.info, den.game and den.steam reach; null: those calls fail.
     std::shared_ptr<TuneServices> tune;
+    /// What den.mods reaches; null: those calls fail.
+    std::shared_ptr<ModServices> mods;
     /// What den.achievements reaches; null: those calls fail.
     std::shared_ptr<AchievementServices> achievements;
 };

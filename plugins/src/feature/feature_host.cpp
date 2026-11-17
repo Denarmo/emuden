@@ -104,6 +104,10 @@ Result<std::shared_ptr<Runner>> RealFeatureHost::Start(const std::string& id) {
     config.services = deps_.services;
     config.tune = deps_.tune ? deps_.tune : config_.tune;
     config.achievements = deps_.achievements ? deps_.achievements : config_.achievements;
+    if (package.manifest.access.Has(PERMISSION_GAME_FILES)) {
+        config.mods = deps_.mods ? deps_.mods : config_.mods;
+        config.mods_dir = ModsDir(id);
+    }
     config.now = deps_.now;
     config.instruction_limit = deps_.instruction_limit;
     if (package.manifest.access.Has(PERMISSION_SYNC)) {

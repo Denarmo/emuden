@@ -26,6 +26,8 @@ namespace den::plugins::feature {
 
 inline constexpr std::uint64_t MAX_HTTP_BODY = 8ull << 20;
 inline constexpr std::uint64_t MAX_DOWNLOAD = 256ull << 20;
+/// For a plugin with game.files (den.mods): the releases it sets up are larger.
+inline constexpr std::uint64_t MAX_MOD_DOWNLOAD = 512ull << 20;
 inline constexpr int BLOCKED_AFTER_429_SECONDS = 15 * 60;
 
 struct UrlParts {

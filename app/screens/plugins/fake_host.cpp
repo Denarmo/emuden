@@ -131,7 +131,7 @@ public:
             });
     }
 
-    JobPtr Remove(const std::string& id, bool, bool) override {
+    JobPtr Remove(const std::string& id, bool, bool, bool) override {
         return Svc().jobs->Run(
             "remove plugin",
             [](Job&) {

@@ -376,7 +376,7 @@ const std::vector<std::string>& HostCapabilities() {
         "core.engine-app.1",  "kind.interface", "interface.1",
         "feature.tune.1",     "feature.achievements.1",
         "feature.browser.1",  "presentation.screens", "core.netplay",
-        "core.tuning",
+        "core.tuning",        "feature.mods.1",
     };
     return capabilities;
 }

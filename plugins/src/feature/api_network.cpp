@@ -89,7 +89,9 @@ int Download(lua_State* L) {
     if (!sha256.empty() && !IsSha256Hex(sha256)) {
         return Refuse(L, "sha256 is not a SHA-256 checksum");
     }
-    const std::uint64_t room = std::min<std::uint64_t>(MAX_DOWNLOAD, runner.StorageLeft());
+    const std::uint64_t most =
+        runner.Config().manifest.access.Has(PERMISSION_GAME_FILES) ? MAX_MOD_DOWNLOAD : MAX_DOWNLOAD;
+    const std::uint64_t room = std::min<std::uint64_t>(most, runner.StorageLeft());
     if (room == 0) {
         return Refuse(L, "the plugin's folder is full");
     }

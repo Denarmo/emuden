@@ -53,6 +53,7 @@ void CreateHost() {
     config.library = svc.library;
     config.app_version = system::Version();
     config.tune = CreateTuneServices();
+    config.mods = CreateModServices();
     config.achievements = AchievementServicesSvc();
     HostSlot() = plugins::CreateFeatureHost(config);
 }
