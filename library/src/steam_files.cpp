@@ -245,7 +245,8 @@ bool EnvAllowed(std::string_view name) {
                                            "AMD_", "__GL_", "MANGOHUD", "GALLIUM_", "SDL_", "LFX",
                                            "ENABLE_VKBASALT", "WINEDLLOVERRIDES", "WINEDEBUG",
                                            "WINEESYNC", "WINEFSYNC", "DRI_PRIME", "mesa_glthread",
-                                           "STAGING_", "SteamDeck", "LSFG_", "ENABLE_GAMESCOPE_WSI",
+                                           "STAGING_", "SteamDeck", "LSFG_", "LSFGVK_", "DISABLE_LSFGVK",
+                                           "ENABLE_GAMESCOPE_WSI",
                                            "PULSE_LATENCY_MSEC", "OBS_VKCAPTURE"};
     return std::any_of(std::begin(PREFIXES), std::end(PREFIXES),
                        [&](const char* prefix) { return name.starts_with(prefix); });
@@ -462,6 +463,30 @@ std::vector<Tool> Install::Tools() const {
         }
     }
     return out;
+}
+
+std::optional<GameFolder> Install::FolderOf(const std::string& appid) const {
+    if (appid.empty() || appid.size() > 10 ||
+        !std::all_of(appid.begin(), appid.end(), [](char c) { return c >= '0' && c <= '9'; })) {
+        return std::nullopt;
+    }
+    for (const fs::path& folder : LibraryFolders(root_)) {
+        const auto vdf = ReadVdf(folder / "steamapps" / ("appmanifest_" + appid + ".acf"));
+        const Vdf* state = vdf ? vdf->Find("AppState") : nullptr;
+        if (state == nullptr || state->Value("appid") != appid) {
+            continue;
+        }
+        const std::string name = state->Value("installdir");
+        if (name.empty() || name == "." || name == ".." || name.find_first_of("/\\:") != std::string::npos) {
+            continue;
+        }
+        const fs::path dir = folder / "steamapps" / "common" / PathFromUtf8(name);
+        std::error_code ec;
+        if (fs::is_directory(fs::symlink_status(dir, ec))) {
+            return GameFolder{state->Value("name"), dir};
+        }
+    }
+    return std::nullopt;
 }
 
 AppConfig Install::ConfigFromFiles(const std::string& appid) const {

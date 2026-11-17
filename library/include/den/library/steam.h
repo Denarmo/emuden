@@ -56,6 +56,11 @@ struct Tool {
     bool installed = false;
 };
 
+struct GameFolder {
+    std::string name;
+    std::filesystem::path dir;
+};
+
 /// The Steam folder: EMUDEN_STEAM_DIR, else the usual places of the platform's Steam.
 std::optional<std::filesystem::path> FindRoot();
 
@@ -81,6 +86,10 @@ public:
     std::vector<Tool> Tools() const;
     /// From localconfig.vdf and config.vdf (or shortcuts.vdf): as Steam last wrote them.
     AppConfig ConfigFromFiles(const std::string& appid) const;
+    /// Where an installed game's files are: steamapps/common/<installdir> of the library
+    /// folder whose appmanifest_<appid>.acf names it. Nothing for a shortcut, a game that is
+    /// not installed, or an installdir that is not one plain folder name.
+    std::optional<GameFolder> FolderOf(const std::string& appid) const;
 
 private:
     std::filesystem::path root_;

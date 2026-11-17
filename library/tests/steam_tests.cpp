@@ -122,6 +122,40 @@ TEST_CASE("an installation lists its games, shortcuts, tools and their settings"
     CHECK(install.ConfigFromFiles("4105511571").launch_options == "EMUDEN_AUTOMATION=5577 %command%");
 }
 
+TEST_CASE("a game's folder is its installdir in the library folder that holds it") {
+    const fs::path root = FreshDir("folders");
+    const fs::path other = FreshDir("folders-other");
+    Put(root / "steamapps" / "libraryfolders.vdf",
+        "\"libraryfolders\" { \"0\" { \"path\" \"" + VdfPath(root) + "\" } \"1\" { \"path\" \"" +
+            VdfPath(other) + "\" } }");
+    const auto manifest = [](const std::string& appid, const std::string& name, const std::string& dir) {
+        return "\"AppState\" { \"appid\" \"" + appid + "\" \"name\" \"" + name + "\" \"installdir\" \"" + dir +
+               "\" }";
+    };
+    Put(root / "steamapps" / "appmanifest_1145350.acf", manifest("1145350", "Hades II", "Hades II"));
+    Put(other / "steamapps" / "appmanifest_389140.acf", manifest("389140", "Horizon Chase Turbo", "HorizonChase"));
+    Put(other / "steamapps" / "appmanifest_10.acf", manifest("10", "Gone", "Gone"));
+    Put(other / "steamapps" / "appmanifest_20.acf", manifest("20", "Sly", ".."));
+    Put(other / "steamapps" / "appmanifest_30.acf", manifest("30", "Deep", "a/b"));
+    fs::create_directories(root / "steamapps" / "common" / "Hades II");
+    fs::create_directories(other / "steamapps" / "common" / "HorizonChase");
+    fs::create_directories(other / "steamapps" / "common" / "a" / "b");
+
+    const Install install(root);
+    const auto hades = install.FolderOf("1145350");
+    REQUIRE(hades);
+    CHECK(hades->name == "Hades II");
+    CHECK(hades->dir == root / "steamapps" / "common" / "Hades II");
+    const auto chase = install.FolderOf("389140");
+    REQUIRE(chase);
+    CHECK(chase->dir == other / "steamapps" / "common" / "HorizonChase");
+    CHECK_FALSE(install.FolderOf("10"));  // its folder is gone
+    CHECK_FALSE(install.FolderOf("20"));  // not a folder name
+    CHECK_FALSE(install.FolderOf("30"));
+    CHECK_FALSE(install.FolderOf("999")); // not installed
+    CHECK_FALSE(install.FolderOf("../1145350"));
+}
+
 TEST_CASE("official Proton names map to Steam's tool names") {
     CHECK(ProtonToolName("Proton 9.0") == "proton_9");
     CHECK(ProtonToolName("Proton 9.0-4") == "proton_9");
@@ -137,6 +171,11 @@ TEST_CASE("only launch options without shell syntax are allowed") {
     CHECK(CheckLaunchOptions("PROTON_USE_WINED3D=1 DXVK_ASYNC=1 %command%").ok);
     CHECK(CheckLaunchOptions("gamescope -w 1280 -h 800 -f -- %command% -windowed").ok);
     CHECK(CheckLaunchOptions("WINEDLLOVERRIDES=dinput8=n,b mangohud %command%").ok);
+    CHECK(CheckLaunchOptions("LSFGVK_ENV=1 LSFGVK_MULTIPLIER=2 LSFGVK_FLOW_SCALE=0.8 LSFGVK_PERFORMANCE_MODE=1 "
+                             "LSFGVK_PROFILE=deck ENABLE_GAMESCOPE_WSI=1 %command%")
+              .ok);
+    CHECK(CheckLaunchOptions("DISABLE_LSFGVK=1 %command%").ok);
+    CHECK_FALSE(CheckLaunchOptions("LSFGVKX=1 %command%").ok);
     CHECK_FALSE(CheckLaunchOptions("rm -rf ~; %command%").ok);
     CHECK_FALSE(CheckLaunchOptions("$(curl evil) %command%").ok);
     CHECK_FALSE(CheckLaunchOptions("LD_PRELOAD=/tmp/x.so %command%").ok);
