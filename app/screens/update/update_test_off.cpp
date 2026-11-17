@@ -7,7 +7,7 @@
 
 namespace den::app {
 
-UpdateTestOverrides TestOverrides() {
+update::TestOverrides RawTestOverrides() {
     return {};
 }
 

@@ -9,7 +9,7 @@
 
 namespace den::app {
 
-UpdateTestOverrides TestOverrides() {
+update::TestOverrides RawTestOverrides() {
     return {pal::GetEnv("EMUDEN_TEST_UPDATE_VERSION"), pal::GetEnv("EMUDEN_TEST_UPDATE_URL")};
 }
 

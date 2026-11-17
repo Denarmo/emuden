@@ -173,3 +173,22 @@ TEST_CASE("automatic checks happen once a day") {
     CHECK(CheckDue(now + 3600, now));
     CHECK(CheckDue(now - 10, now, 5));
 }
+
+TEST_CASE("the update source is the build's repository") {
+    // The test build is configured with the default.
+    CHECK(UpdateRepo() == DEFAULT_REPO);
+    CHECK(LatestUrl("Denarmo/emuden") == "https://api.github.com/repos/Denarmo/emuden/releases/latest");
+    CHECK(ListUrl("Denarmo/emuden") == "https://api.github.com/repos/Denarmo/emuden/releases?per_page=10");
+    CHECK(ReleasesPage("Denarmo/emuden") == "https://github.com/Denarmo/emuden/releases");
+    CHECK(LatestUrl("someone/emuden-releases") ==
+          "https://api.github.com/repos/someone/emuden-releases/releases/latest");
+    CHECK(IsRepoName("Denarmo/emuden"));
+    CHECK(IsRepoName("some_one/emu.den-releases"));
+    CHECK_FALSE(IsRepoName("emuden"));
+    CHECK_FALSE(IsRepoName("/emuden"));
+    CHECK_FALSE(IsRepoName("Denarmo/"));
+    CHECK_FALSE(IsRepoName("a/b/c"));
+    CHECK_FALSE(IsRepoName("../emuden"));
+    CHECK_FALSE(IsRepoName("a/b?x=1"));
+    CHECK_FALSE(IsRepoName("a b/c"));
+}

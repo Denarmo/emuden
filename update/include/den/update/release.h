@@ -17,11 +17,7 @@
 
 namespace den::update {
 
-/// Asked without a token: GitHub allows 60 such requests an hour per address.
-inline constexpr const char* LATEST_URL = "https://api.github.com/repos/Denarmo/emuden/releases/latest";
-/// The newest releases, pre-releases included (Beta updates).
-inline constexpr const char* LIST_URL = "https://api.github.com/repos/Denarmo/emuden/releases?per_page=10";
-inline constexpr const char* RELEASES_PAGE = "https://github.com/Denarmo/emuden/releases";
+inline constexpr const char* DEFAULT_REPO = "Denarmo/emuden";
 inline constexpr const char* SUMS_NAME = "SHA256SUMS.txt";
 inline constexpr std::int64_t CHECK_INTERVAL = 24 * 60 * 60;
 
@@ -48,7 +44,20 @@ struct Release {
 
 /// One release object of the API. nullopt without a tag that is a semantic version.
 std::optional<Release> ParseRelease(const JsonValue& json);
-/// The answer of LATEST_URL (an object) or LIST_URL (an array): the newest release that may be
+/// The GitHub repository ("owner/name") the build takes its updates from (EMUDEN_UPDATE_REPO),
+/// DEFAULT_REPO unless the build named another.
+std::string UpdateRepo();
+/// Whether the text is an "owner/name" GitHub may have.
+bool IsRepoName(std::string_view repo);
+/// The repository's newest release, asked without a token (GitHub allows 60 such requests an
+/// hour per address).
+std::string LatestUrl(std::string_view repo);
+/// The repository's newest releases, pre-releases included (Beta updates).
+std::string ListUrl(std::string_view repo);
+/// The repository's releases page, for the user's browser.
+std::string ReleasesPage(std::string_view repo);
+
+/// The answer of LatestUrl (an object) or ListUrl (an array): the newest release that may be
 /// offered. Drafts never are, pre-releases only with `beta`.
 std::optional<Release> PickRelease(std::string_view json_text, bool beta);
 

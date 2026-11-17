@@ -27,15 +27,66 @@ std::string HttpError(const pal::HttpResponse& response, const std::string& what
 }
 
 bool UrlAllowed(const Source& source, const std::string& url) {
-    return url.starts_with("https://") ||
-           (source.allow_loopback && url.starts_with("http://") && pal::IsLoopbackUrl(url));
+    return url.starts_with("https://") || (source.allow_loopback && IsLoopbackUrl(url));
 }
 
 } // namespace
 
+bool IsLoopbackUrl(std::string_view url) {
+    std::string_view rest;
+    if (url.starts_with("http://")) {
+        rest = url.substr(7);
+    } else if (url.starts_with("https://")) {
+        rest = url.substr(8);
+    } else {
+        return false;
+    }
+    std::string_view authority = rest.substr(0, rest.find_first_of("/?#"));
+    if (authority.find('@') != std::string_view::npos || authority.find('\\') != std::string_view::npos) {
+        return false; // user info could hide the real host
+    }
+    std::string_view host;
+    if (authority.starts_with("[")) {
+        const std::size_t close = authority.find(']');
+        if (close == std::string_view::npos) {
+            return false;
+        }
+        host = authority.substr(0, close + 1);
+        authority.remove_prefix(close + 1);
+        if (!authority.empty() && authority.front() != ':') {
+            return false;
+        }
+    } else {
+        const std::size_t colon = authority.find(':');
+        host = authority.substr(0, colon);
+        authority = colon == std::string_view::npos ? std::string_view() : authority.substr(colon);
+    }
+    if (!authority.empty()) { // ":port", digits only
+        const std::string_view port = authority.substr(1);
+        if (port.empty() || port.find_first_not_of("0123456789") != std::string_view::npos) {
+            return false;
+        }
+    }
+    const std::string name = ToLower(host);
+    return name == "127.0.0.1" || name == "localhost" || name == "[::1]";
+}
+
+TestOverrides AllowedTestOverrides(std::string_view release_version, std::string version, std::string url) {
+    if (!release_version.empty()) {
+        return {};
+    }
+    TestOverrides out;
+    out.version = std::move(version);
+    if (IsLoopbackUrl(url)) {
+        out.url = std::move(url);
+    }
+    return out;
+}
+
 Result<CheckResult> FetchLatest(const Source& source, bool beta) {
     pal::HttpRequest request;
-    request.url = !source.url.empty() ? source.url : beta ? LIST_URL : LATEST_URL;
+    const std::string repo = !source.repo.empty() ? source.repo : UpdateRepo();
+    request.url = !source.url.empty() ? source.url : beta ? ListUrl(repo) : LatestUrl(repo);
     request.headers.emplace_back("Accept", "application/vnd.github+json");
     request.headers.emplace_back("X-GitHub-Api-Version", "2022-11-28");
     request.max_body = 4u << 20;

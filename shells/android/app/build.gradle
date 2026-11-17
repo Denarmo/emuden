@@ -37,6 +37,8 @@ def emudenVersionCode = providers.gradleProperty('emudenVersionCode').map { it.t
 def emudenVersionName = providers.gradleProperty('emudenVersion').getOrElse('0.1.0')
 // Only a build given -PemudenVersion is a release, which offers updates (EMUDEN_VERSION).
 def emudenReleaseVersion = providers.gradleProperty('emudenVersion').getOrElse('')
+// -PemudenUpdateRepo=owner/name: where the app looks for updates (EMUDEN_UPDATE_REPO).
+def emudenUpdateRepo = providers.gradleProperty('emudenUpdateRepo').getOrElse('Denarmo/emuden')
 
 android {
     namespace 'io.github.denarmo.emuden'
@@ -57,7 +59,8 @@ android {
             cmake {
                 // The same variables as the "android" CMake preset.
                 arguments '-DANDROID_STL=c++_shared', '-DDEN_BUILD_TESTS=OFF',
-                        '-DCMAKE_BUILD_TYPE=RelWithDebInfo', "-DEMUDEN_VERSION=${emudenReleaseVersion}"
+                        '-DCMAKE_BUILD_TYPE=RelWithDebInfo', "-DEMUDEN_VERSION=${emudenReleaseVersion}",
+                        "-DEMUDEN_UPDATE_REPO=${emudenUpdateRepo}"
                 targets 'den_app'
             }
         }

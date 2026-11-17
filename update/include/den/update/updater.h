@@ -23,7 +23,10 @@ using HttpGetter = std::function<pal::HttpResponse(const pal::HttpRequest&)>;
 
 struct Source {
     HttpGetter http; // default: pal::HttpGet
-    /// The releases API address; empty: LATEST_URL, or LIST_URL for beta updates.
+    /// The repository asked; empty: UpdateRepo().
+    std::string repo;
+    /// A releases API address instead of the repository's (tests only); empty: LatestUrl, or
+    /// ListUrl for beta updates.
     std::string url;
     /// Downloads may come from http://127.0.0.1 (a test's server); otherwise https only.
     bool allow_loopback = false;
@@ -33,6 +36,18 @@ struct CheckResult {
     std::string body;               // the API's answer, kept to show the notes after a restart
     std::optional<Release> release; // the newest release that may be offered, newer or not
 };
+
+/// Whether the address is http or https to this device: 127.0.0.1, [::1] or localhost.
+bool IsLoopbackUrl(std::string_view url);
+
+/// The test-only overrides a test may set (EMUDEN_TEST_UPDATE_VERSION, EMUDEN_TEST_UPDATE_URL).
+struct TestOverrides {
+    std::string version;
+    std::string url;
+};
+/// The overrides that apply: none in a release build (`release_version` set), and the address
+/// only when it is a loopback one, so they can never redirect a release's updates.
+TestOverrides AllowedTestOverrides(std::string_view release_version, std::string version, std::string url);
 
 /// Asks the releases API once.
 Result<CheckResult> FetchLatest(const Source& source, bool beta);

@@ -262,9 +262,12 @@ TEST_CASE("the check asks GitHub once and reads its answer") {
     REQUIRE(result);
     REQUIRE(result->release);
     CHECK(result->release->version == "0.2.0");
-    CHECK(asked == std::vector<std::string>{LATEST_URL});
+    CHECK(asked == std::vector<std::string>{LatestUrl(UpdateRepo())});
     REQUIRE(FetchLatest(source, true));
-    CHECK(asked.back() == LIST_URL);
+    CHECK(asked.back() == ListUrl(UpdateRepo()));
+    source.repo = "someone/emuden-releases";
+    REQUIRE(FetchLatest(source, false));
+    CHECK(asked.back() == "https://api.github.com/repos/someone/emuden-releases/releases/latest");
 
     source.http = [](const pal::HttpRequest&) {
         pal::HttpResponse response;
@@ -283,4 +286,53 @@ TEST_CASE("an AppImage is replaced by a rename beside it") {
     CHECK_FALSE(fs::exists(dir / ".EmuDEN-x86_64.AppImage.new"));
     Write(dir / "sub" / "x", "new");
     CHECK_FALSE(ReplaceAppImage(dir / "sub" / "x", dir / "EmuDEN-x86_64.AppImage").ok);
+}
+
+TEST_CASE("test overrides apply only to development builds and this device") {
+    // A release build ignores both, so they can never redirect its updates.
+    const TestOverrides release = AllowedTestOverrides("0.2.0", "0.0.9", "http://127.0.0.1:8765/latest.json");
+    CHECK(release.version.empty());
+    CHECK(release.url.empty());
+
+    const TestOverrides dev = AllowedTestOverrides("", "0.0.9", "http://127.0.0.1:8765/latest.json");
+    CHECK(dev.version == "0.0.9");
+    CHECK(dev.url == "http://127.0.0.1:8765/latest.json");
+    CHECK(AllowedTestOverrides("", "", "https://localhost/x").url == "https://localhost/x");
+    CHECK(AllowedTestOverrides("", "", "http://[::1]:80/x").url == "http://[::1]:80/x");
+    CHECK(AllowedTestOverrides("", "", "https://evil.example/latest.json").url.empty());
+    CHECK(AllowedTestOverrides("", "", "https://api.github.com/repos/x/y/releases/latest").url.empty());
+}
+
+TEST_CASE("loopback addresses are told from look-alikes") {
+    CHECK(IsLoopbackUrl("http://127.0.0.1/latest.json"));
+    CHECK(IsLoopbackUrl("http://127.0.0.1:8765"));
+    CHECK(IsLoopbackUrl("https://LOCALHOST:443/a?b#c"));
+    CHECK(IsLoopbackUrl("http://[::1]:8765/a"));
+    CHECK(IsLoopbackUrl("http://[::1]/a"));
+    CHECK_FALSE(IsLoopbackUrl("http://127.0.0.1@evil.example/"));
+    CHECK_FALSE(IsLoopbackUrl("http://localhost.evil.example/"));
+    CHECK_FALSE(IsLoopbackUrl("http://127.0.0.1.evil.example/"));
+    CHECK_FALSE(IsLoopbackUrl("http://evil.example/?127.0.0.1"));
+    CHECK_FALSE(IsLoopbackUrl("http://127.0.0.1:80x/"));
+    CHECK_FALSE(IsLoopbackUrl("http://[::1]x/"));
+    CHECK_FALSE(IsLoopbackUrl("http://127.0.0.1\\@evil.example/"));
+    CHECK_FALSE(IsLoopbackUrl("ftp://127.0.0.1/"));
+    CHECK_FALSE(IsLoopbackUrl("file:///etc/passwd"));
+    CHECK_FALSE(IsLoopbackUrl(""));
+}
+
+TEST_CASE("loopback downloads only with the test allowance") {
+    const std::string data = "zip";
+    Release release = ReleaseWith(data);
+    release.assets[0].url = "http://127.0.0.1:8765/EmuDEN-x86_64.AppImage";
+    release.assets[1].url = "http://127.0.0.1:8765/SHA256SUMS.txt";
+    FakeServer server;
+    server.files[release.assets[0].url] = data;
+    server.files[release.assets[1].url] = Hex(data) + "  EmuDEN-x86_64.AppImage\n";
+    Source source;
+    source.http = [&](const pal::HttpRequest& request) { return server(request); };
+    const fs::path dir = FreshDir("loopback");
+    CHECK_FALSE(DownloadAsset(source, release, "EmuDEN-x86_64.AppImage", dir / "a").ok);
+    source.allow_loopback = true;
+    CHECK(DownloadAsset(source, release, "EmuDEN-x86_64.AppImage", dir / "a").ok);
 }

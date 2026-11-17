@@ -16,6 +16,7 @@
 #include "den/system/settings.h"
 #include "den/ui/widgets.h"
 #include "den/update/release.h"
+#include "den/update/updater.h"
 
 namespace den::app {
 
@@ -52,13 +53,9 @@ std::string LastCheckText();
 /// The newer release's install row (update_rows.cpp), for the notes page.
 std::vector<ui::RowSpec> UpdateInstallRows();
 
-/// Test-only overrides (update_test.cpp; EMUDEN_DEV_TOOLS builds): a running version
-/// (EMUDEN_TEST_UPDATE_VERSION) and a releases API address (EMUDEN_TEST_UPDATE_URL) whose
-/// downloads may come from 127.0.0.1. Empty when unset.
-struct UpdateTestOverrides {
-    std::string version;
-    std::string url;
-};
-UpdateTestOverrides TestOverrides();
+/// The test-only overrides as set (update_test.cpp; EMUDEN_DEV_TOOLS builds): a running version
+/// (EMUDEN_TEST_UPDATE_VERSION) and a releases API address (EMUDEN_TEST_UPDATE_URL). Empty when
+/// unset. update::AllowedTestOverrides decides which apply.
+update::TestOverrides RawTestOverrides();
 
 } // namespace den::app

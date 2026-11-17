@@ -53,6 +53,12 @@ fs::path CacheFile() {
     return WorkDir() / "latest.json";
 }
 
+// Only a development build honours them, and the address only on this device.
+update::TestOverrides TestOverrides() {
+    const update::TestOverrides raw = RawTestOverrides();
+    return update::AllowedTestOverrides(system::ReleaseVersion(), raw.version, raw.url);
+}
+
 update::Source MakeSource() {
     update::Source source;
     source.url = TestOverrides().url;
@@ -96,6 +102,10 @@ void Startup() {
     state.running = !test_version.empty() ? test_version : system::ReleaseVersion();
     if (!test_version.empty()) {
         log::Info("update", "Test only: running as version {}", test_version);
+    }
+    const update::TestOverrides raw = RawTestOverrides();
+    if ((!raw.version.empty() && test_version.empty()) || (!raw.url.empty() && TestOverrides().url.empty())) {
+        log::Info("update", "Test overrides ignored: a release build, or an address not on this device");
     }
     state.target = pal::self_update::Detect();
     state.asset = update::AssetNameFor(pal::GetCaps().platform_key);
@@ -303,7 +313,7 @@ void DownloadAndInstall() {
     }
     if (state.target.method == Method::ReleasePage || state.asset.empty() || !state.release->Find(state.asset)) {
         if (const Status opened = pal::OpenUrl(!state.release->page.empty() ? state.release->page
-                                                                            : update::RELEASES_PAGE);
+                                                                            : update::ReleasesPage(update::UpdateRepo()));
             !opened) {
             Svc().stage->Toast(opened.error, 5.0f);
         }

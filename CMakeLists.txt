@@ -18,6 +18,12 @@ option(EMUDEN_DEV_TOOLS "Build the developer and test tools into the app" ON)
 # The release this build is ("0.2.0"), set by the packaging scripts. Empty is a development
 # build, which never offers an update.
 set(EMUDEN_VERSION "" CACHE STRING "Release version built into the app; empty for a development build")
+# The GitHub repository ("owner/name") whose releases the app updater offers, for a public
+# releases repository beside a private source one.
+set(EMUDEN_UPDATE_REPO "Denarmo/emuden" CACHE STRING "GitHub owner/name the app takes its updates from")
+if(NOT EMUDEN_UPDATE_REPO MATCHES "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+    message(FATAL_ERROR "EMUDEN_UPDATE_REPO must be owner/name, not \"${EMUDEN_UPDATE_REPO}\"")
+endif()
 
 include(cmake/deps.cmake)
 include(cmake/module.cmake)

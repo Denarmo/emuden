@@ -60,6 +60,37 @@ const Asset* Release::Find(std::string_view asset_name) const {
     return nullptr;
 }
 
+std::string UpdateRepo() {
+    const std::string repo = DEN_UPDATE_REPO;
+    return IsRepoName(repo) ? repo : DEFAULT_REPO;
+}
+
+bool IsRepoName(std::string_view repo) {
+    const std::size_t slash = repo.find('/');
+    if (slash == std::string_view::npos || slash == 0 || slash + 1 == repo.size() ||
+        repo.find('/', slash + 1) != std::string_view::npos) {
+        return false;
+    }
+    const auto part_ok = [](std::string_view part) {
+        return part != "." && part != ".." && std::all_of(part.begin(), part.end(), [](char c) {
+                   return std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_' || c == '.';
+               });
+    };
+    return part_ok(repo.substr(0, slash)) && part_ok(repo.substr(slash + 1));
+}
+
+std::string LatestUrl(std::string_view repo) {
+    return "https://api.github.com/repos/" + std::string(repo) + "/releases/latest";
+}
+
+std::string ListUrl(std::string_view repo) {
+    return "https://api.github.com/repos/" + std::string(repo) + "/releases?per_page=10";
+}
+
+std::string ReleasesPage(std::string_view repo) {
+    return "https://github.com/" + std::string(repo) + "/releases";
+}
+
 std::optional<Release> ParseRelease(const JsonValue& json) {
     if (json.kind != JsonValue::Kind::Object) {
         return std::nullopt;
