@@ -258,7 +258,9 @@ void BuildCarton(std::vector<gfx::MeshVertex>& out, const GameObject& o) {
     parts.front = Part::Print;
     parts.back = Part::Back;
     parts.spine = Part::Spine;
-    gfx::AddSlab(out, RoundedOutline(o.aspect, 1, 0.006f, 0.006f), o.depth, 0.004f, parts, 0, 0, 0, 2);
+    const float r = o.radius > 0 ? o.radius : 0.006f;
+    gfx::AddSlab(out, RoundedOutline(o.aspect, 1, r, r), o.depth, std::min(0.004f + r * 0.3f, o.depth * 0.3f), parts, 0,
+                 0, 0, r > 0.01f ? 4 : 2);
 }
 
 void BuildCase(std::vector<gfx::MeshVertex>& out, const GameObject& o) {
@@ -429,6 +431,17 @@ GameObject GameObject::Carton(float cover_aspect) const {
     o.shape = "carton";
     o.aspect = std::round(std::clamp(cover_aspect > 0 ? cover_aspect : box_aspect, 0.4f, 2.0f) * 100.0f) / 100.0f;
     o.depth = 0.2f;
+    // Plastic cases (DS, 3DS, Game Boy Advance) are thinner, with rounded corners; cardboard
+    // boxes are square-cornered.
+    if (style == "nds" || style == "n3ds") {
+        o.depth = 0.085f;
+        o.radius = 0.03f;
+    } else if (style == "pocket_wide") {
+        o.depth = 0.1f;
+        o.radius = 0.02f;
+    } else if (style == "pocket") {
+        o.depth = 0.16f;
+    }
     o.shell = gfx::Color{236, 234, 228, 255};
     return o;
 }

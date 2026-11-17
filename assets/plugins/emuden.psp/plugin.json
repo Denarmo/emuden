@@ -44,7 +44,7 @@
         "digital_only": false,
         "media": {
           "shape": "case",
-          "aspect": 0.58,
+          "aspect": 0.6,
           "disc": true,
           "umd": true
         }

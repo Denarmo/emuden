@@ -24,8 +24,8 @@ struct Usual {
 };
 constexpr Usual USUAL[] = {
     {"gb", "cartridge", "pocket", 0, false, false},       {"gbc", "cartridge", "pocket", 0, false, false},
-    {"gba", "cartridge", "pocket_wide", 0, false, false}, {"nds", "card", "", 1.05f, false, false},
-    {"3ds", "card", "", 1.05f, false, false},             {"nes", "cartridge", "nes", 0, false, false},
+    {"gba", "cartridge", "pocket_wide", 0, false, false}, {"nds", "cartridge", "nds", 0, false, false},
+    {"3ds", "cartridge", "n3ds", 0, false, false},             {"nes", "cartridge", "nes", 0, false, false},
     {"snes", "cartridge", "snes", 0, false, false},       {"n64", "cartridge", "n64", 0, false, false},
     {"switch", "card", "", 0.68f, false, false},          {"switch2", "card", "", 0.68f, false, false},
     {"genesis", "cartridge", "megadrive", 0, false, false}, {"sms", "cartridge", "mastersystem", 0, false, false},
@@ -41,7 +41,7 @@ constexpr Usual USUAL[] = {
     {"intellivision", "cartridge", "intellivision", 0, false, false},
     {"gamecube", "case", "", 0.72f, true, false},         {"wii", "case", "", 0.7f, true, false},
     {"wiiu", "case", "", 0.7f, true, false},              {"psx", "jewel", "", 0, true, false},
-    {"ps2", "case", "", 0.7f, true, false},               {"psp", "case", "", 0.58f, true, true},
+    {"ps2", "case", "", 0.7f, true, false},               {"psp", "case", "", 0.6f, true, true},
     {"saturn", "jewel", "", 0, true, false},              {"dreamcast", "jewel", "", 0, true, false},
     {"segacd", "jewel", "", 0, true, false},              {"3do", "jewel", "", 0, true, false},
 };

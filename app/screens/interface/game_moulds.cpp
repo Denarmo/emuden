@@ -27,6 +27,8 @@ enum class Outline {
     Wings,      // the top corners cut away at a slant (Nintendo 64)
     Chamfer,    // both top corners cut off at 45 degrees
     Advance,    // the top corners cut at a slant and the bottom a little narrower (Game Boy Advance)
+    Card,       // Nintendo DS card: the bottom narrower, the top right corner notched
+    Card3ds,    // the same with the 3DS's tab standing out of the right side
 };
 
 struct Mould {
@@ -55,6 +57,11 @@ struct Mould {
 constexpr Mould MOULDS[] = {
     {"pocket_wide", "cartridge", 1.63f, 0.23f, {52, 53, 58, 255}, {0.14f, 0.23f, 0.72f, 0.64f}, "none",
      Outline::Advance, 0.02f, 0.03f, 0.045f, 0.14f, 0, 0, 0, false, false, true, 0, 0, false, false, 0.12f},
+    // 33 x 35 x 3.8 mm: the bottom 7 mm (the end with the contacts) is 1 mm narrower each side.
+    {"nds", "cartridge", 0.943f, 0.109f, {222, 224, 228, 255}, {0.09f, 0.05f, 0.82f, 0.62f}, "none", Outline::Card,
+     0.035f, 0.03f, 0.03f, 0.2f, 0, 0, 3},
+    {"n3ds", "cartridge", 0.943f, 0.109f, {212, 214, 220, 255}, {0.09f, 0.05f, 0.82f, 0.62f}, "none",
+     Outline::Card3ds, 0.035f, 0.03f, 0.03f, 0.2f, 0, 0, 3},
     {"nes", "cartridge", 0.89f, 0.15f, {128, 129, 135, 255}, {0.23f, 0.035f, 0.54f, 0.5f}, "none",
      Outline::StepBottom, 0.02f, 0.02f, 0.035f, 0.1f, 8, 0, 0, false, false, true},
     {"snes", "cartridge", 1.36f, 0.19f, {163, 164, 170, 255}, {0.08f, 0.05f, 0.84f, 0.42f}, "none",
@@ -176,6 +183,25 @@ std::vector<Vec2> OutlineOf(const Mould& m, float a) {
                         {-x, 0.5f - m.cut_h, 0.012f},
                         {-x, sy + sx, 0.006f},
                         {-x + sx, sy, 0}});
+    }
+    case Outline::Card:
+    case Outline::Card3ds: {
+        const float sx = m.cut_w, sy = -0.5f + m.cut_h, notch = 0.1f;
+        std::vector<Corner> c{{-x + sx, -0.5f, rb}, {x - sx, -0.5f, rb}, {x - sx, sy, 0}, {x, sy + sx, 0.008f}};
+        if (m.outline == Outline::Card3ds) {
+            // A tab on the right side that keeps it out of a DS.
+            const float tab = 0.035f;
+            c.push_back({x, 0.0f, 0.004f});
+            c.push_back({x + tab, 0.02f, 0.006f});
+            c.push_back({x + tab, 0.2f, 0.006f});
+            c.push_back({x, 0.22f, 0.004f});
+        }
+        c.push_back({x, 0.5f - notch, 0.012f});
+        c.push_back({x - notch, 0.5f, 0.012f});
+        c.push_back({-x, 0.5f, rt});
+        c.push_back({-x, sy + sx, 0.008f});
+        c.push_back({-x + sx, sy, 0});
+        return Rounded(c);
     }
     case Outline::Rect:
         break;
