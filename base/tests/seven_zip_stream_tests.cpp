@@ -61,7 +61,7 @@ std::string LzmaSevenZip(const Files& files, std::uint32_t dictionary, bool bcj 
     LzmaEncProps_Init(&props);
     props.level = 1;
     props.dictSize = dictionary;
-    test::SevenZipCoder coder{"\x03\x01\x01", std::string(LZMA_PROPS_SIZE, '\0'), {}};
+    test::SevenZipCoder coder{"\x03\x01\x01", std::string(LZMA_PROPS_SIZE, '\0'), {}, {}};
     coder.packed.resize(data.size() + data.size() / 3 + (1u << 16));
     SizeT packed_size = coder.packed.size();
     SizeT props_size = LZMA_PROPS_SIZE;
@@ -72,7 +72,7 @@ std::string LzmaSevenZip(const Files& files, std::uint32_t dictionary, bool bcj 
     REQUIRE(code == SZ_OK);
     coder.packed.resize(packed_size);
     if (bcj) {
-        coder.filter = "";
+        coder.filter = "\x03\x03\x01\x03";
     }
     return test::SevenZipOf(files, coder);
 }
@@ -81,7 +81,7 @@ std::string LzmaSevenZip(const Files& files, std::uint32_t dictionary, bool bcj 
 // its window), with a dictionary of 1 MiB.
 std::string Lzma2SevenZip(const Files& files) {
     const std::string data = Joined(files);
-    test::SevenZipCoder coder{"\x21", "\x10", {}};
+    test::SevenZipCoder coder{"\x21", "\x10", {}, {}};
     for (std::size_t at = 0; at < data.size(); at += 1u << 16) {
         const std::size_t size = std::min<std::size_t>(1u << 16, data.size() - at);
         coder.packed += at == 0 ? '\x01' : '\x02'; // the first resets the dictionary

@@ -138,7 +138,7 @@ inline std::string SevenZipOf(const std::vector<std::pair<std::string, std::stri
 
 /// Every file stored.
 inline std::string StoredSevenZip(const std::vector<std::pair<std::string, std::string>>& files) {
-    SevenZipCoder copy{std::string(1, '\0'), {}, {}};
+    SevenZipCoder copy{std::string(1, '\0'), {}, {}, {}};
     for (const auto& file : files) {
         copy.packed += file.second;
     }
