@@ -35,6 +35,10 @@ struct ZipEntry {
     bool unsupported = false;
     /// The unpacked size of the solid block the file is part of.
     std::uint64_t block_size = 0;
+    /// The block can be decoded front to back (LZMA, LZMA2 or copy, one filter at most),
+    /// holding only `window` bytes (its dictionary) in memory.
+    bool streams = false;
+    std::uint64_t window = 0;
 };
 
 /// The files of a zip archive (folders left out), from its central directory. Zip64 archives

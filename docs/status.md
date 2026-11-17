@@ -49,8 +49,9 @@ which device, are in `docs/history.md`; add new ones there, newest first.
 - A button remap is per console, not per pad or port.
 - Two apps started on the same automation port: the second runs without automation and
   commands go to the first. Use a port of your own for every test.
-- rar is not read; 7z with a password, PPMd or a solid block over 1 GiB is refused with a
-  sentence. An archive with several patches gives its first.
+- rar is not read; 7z with a password, PPMd, a dictionary over 256 MiB in a block over
+  256 MiB, or a BCJ2 block over 1 GiB is refused with a sentence, which the library scan
+  logs for an archive it skips. An archive with several patches gives its first.
 - Linux without WebKitGTK 4.1 (SteamOS) has no page inside the app: the browser plugins use
   the fallback page and the Downloads folder.
 - Not built: manuals, video capture, an accessibility tree, languages other than English

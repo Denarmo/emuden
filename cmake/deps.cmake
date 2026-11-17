@@ -152,6 +152,18 @@ if(MSVC)
 else()
     target_compile_options(den_lzma PRIVATE -w)
 endif()
+# The SDK's LZMA encoder, single-threaded, for tests that write 7z archives (base/tests).
+if(DEN_BUILD_TESTS)
+    add_library(den_lzma_encoder STATIC "${lzma_sdk_src}/C/LzmaEnc.c" "${lzma_sdk_src}/C/LzFind.c"
+        "${lzma_sdk_src}/C/LzFindOpt.c")
+    target_compile_definitions(den_lzma_encoder PUBLIC Z7_ST)
+    target_link_libraries(den_lzma_encoder PUBLIC den_lzma)
+    if(MSVC)
+        target_compile_options(den_lzma_encoder PRIVATE /w)
+    else()
+        target_compile_options(den_lzma_encoder PRIVATE -w)
+    endif()
+endif()
 
 # glslang and SPIRV-Cross turn imported Slang shaders (Vulkan GLSL) into this device's GLSL
 # (gfx/src/retro_compile.cpp): Khronos' compiler to SPIR-V and back, without SPIRV-Tools.
