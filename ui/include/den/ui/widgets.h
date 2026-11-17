@@ -13,6 +13,16 @@ namespace den::ui {
 
 enum class Tone { Text, Dim };
 
+/// Below this width a settings row stacks: a value that does not fit beside the label goes
+/// under it, and the description wraps to two lines.
+constexpr float ROW_STACK_WIDTH = 640;
+
+/// `text` in one line inside `rect`, cut with an ellipsis, centred vertically.
+void DrawTextIn(Context& ctx, const gfx::Rect& rect, const std::string& text, float size, int font,
+                gfx::Color color, Align align);
+/// `text` broken into lines at spaces (and at line breaks) so each fits `width`.
+std::vector<std::string> WrapText(gfx::Text& text, const std::string& in, float size, float width);
+
 /// One line of text, cut with an ellipsis when the node is narrower.
 class Label : public Node {
 public:
@@ -106,11 +116,21 @@ public:
     bool OnNav(input::Nav nav) override;
     bool WantsDrag(float x, float y) const override;
     void DragTo(float x, float y) override;
+    float HeightForWidth(Context& ctx, float width) override;
 
 protected:
     void DrawContent(Context& ctx) override;
 
 private:
+    // How the row lays out at a width under ROW_STACK_WIDTH.
+    struct Stack {
+        bool value_below = false; // the value (a slider's track) on a line of its own
+        float height = 0;
+    };
+    Stack StackFor(Context& ctx, float width) const;
+    std::string ValueText() const;
+    void DrawStacked(Context& ctx);
+    void DrawSlider(Context& ctx, const gfx::Rect& area, float text_y, float text_h);
     void Step(int direction);
     gfx::Rect track_; // a slider's track as last drawn
 };

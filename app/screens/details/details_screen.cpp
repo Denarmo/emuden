@@ -3,6 +3,8 @@
 
 // A game's page: cover, name, console, records and the actions. Route "details", param id.
 
+#include <algorithm>
+
 #include "den/app/collections.h"
 #include "den/app/game_widgets.h"
 #include "den/app/games.h"
@@ -14,6 +16,8 @@
 #include "den/base/files.h"
 #include "den/app/game_prefs.h"
 #include "den/app/launch.h"
+#include "den/app/model_widgets.h"
+#include "page_widths.h"
 
 namespace den::app {
 
@@ -30,13 +34,19 @@ public:
         const auto found = svc.library->Find(id);
         ui::Node& root = Root();
         root.axis = ui::Axis::Row;
-        root.gap = 56;
+        // A narrow page gets a smaller cover and margins, so the facts keep their width.
+        width_ = PageWidth();
+        const bool narrow = width_ < FULL_RAIL_MIN_PAGE;
+        const float pad_x = svc.theme->margin * (narrow ? 1.0f : 2.0f);
+        const float cover_w =
+            narrow ? std::clamp((width_ - pad_x * 2) * 0.36f, 140.0f, COVER_SIDE_W) : COVER_SIDE_W;
+        root.gap = narrow ? 28 : 56;
         // Centred when it all fits; on a small screen the facts and buttons scroll under the
         // title, above the hint bar.
         root.align = compact_ ? ui::Align::Stretch : ui::Align::Center;
         root.justify = ui::Align::Center;
         side_ = nullptr;
-        root.SetPadding(svc.theme->margin * 2, PAD);
+        root.SetPadding(pad_x, PAD);
         if (compact_) {
             root.pad_bottom = PAD + HINTS;
         }
@@ -49,18 +59,25 @@ public:
 
         ui::Node* cover = root.Add(ui::MakeBox(ui::Axis::Column, 0));
         cover->justify = ui::Align::Center;
-        auto* view = cover->Emplace<CoverView>(game.name, game.cover, COVER_SIDE_W, COVER_SIDE_H);
+        auto* view = cover->Emplace<CoverView>(game.name, game.cover, cover_w, cover_w * COVER_SIDE_H / COVER_SIDE_W);
         view->overlay_title = game.placeholder_cover;
         view->hack = IsHackGame(game);
 
         ui::Node* side = root.Add(ui::MakeBox(ui::Axis::Column, 6));
-        if (compact_) {
+        if (compact_ || narrow) {
             side->grow = 1;
         } else {
             side->width = 520;
         }
         side_ = side;
-        side->Emplace<ui::Label>(game.name, svc.theme->text_title, gfx::FONT_BOLD);
+        if (narrow) {
+            // Long names wrap rather than lose their end.
+            auto* title = side->Emplace<Paragraph>(game.name, width_ - pad_x * 2 - cover_w - root.gap);
+            title->size = svc.theme->text_heading + 4;
+            title->font = gfx::FONT_BOLD;
+        } else {
+            side->Emplace<ui::Label>(game.name, svc.theme->text_title, gfx::FONT_BOLD);
+        }
         auto* console = side->Emplace<ui::Label>(SystemName(game.system), svc.theme->text_heading, gfx::FONT_BOLD);
         console->tone = ui::Tone::Dim;
         console->pad_bottom = 6;
@@ -145,7 +162,10 @@ public:
     }
 
     void Update(ui::Context&) override {
-        if (!compact_ && side_ && side_->rect.h > Root().rect.h - PAD * 2 - HINTS) {
+        if (PageWidth() != width_) {
+            compact_ = false; // measured again at the new width
+            Rebuild();
+        } else if (!compact_ && side_ && side_->rect.h > Root().rect.h - PAD * 2 - HINTS) {
             compact_ = true;
             Rebuild();
         } else if (GamesRevision() != revision_) {
@@ -180,6 +200,7 @@ private:
     std::uint64_t revision_ = 0;
     ui::Node* side_ = nullptr;
     bool compact_ = false;
+    float width_ = 0;
 };
 
 } // namespace

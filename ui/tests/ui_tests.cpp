@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <algorithm>
+#include <cmath>
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
@@ -20,7 +23,35 @@ Node* AddBox(Node& parent, float w, float h, bool focusable = true) {
     return node;
 }
 
+// Text that wraps: one line per 100 units of width, 20 units each.
+class Wrapping final : public Node {
+public:
+    float HeightForWidth(Context&, float w) override {
+        return 20.0f * std::ceil(300.0f / std::max(1.0f, w));
+    }
+};
+
 } // namespace
+
+TEST_CASE("a column gives a wrapping child the height its width needs") {
+    Context ctx;
+    Node root;
+    root.gap = 10;
+    root.scrollable = true;
+    Node* group = root.Add(MakeBox(Axis::Column, 0)); // a plain column grows with what wraps in it
+    Node* text = group->Add(std::make_unique<Wrapping>());
+    Node* below = AddBox(root, AUTO, 40);
+    root.Measure(ctx);
+    root.Arrange(ctx, gfx::Rect{0, 0, 150, 500});
+    CHECK(text->rect.h == Catch::Approx(40));
+    CHECK(group->rect.h == Catch::Approx(40));
+    CHECK(below->rect.y == Catch::Approx(50));
+    CHECK(root.content_extent == Catch::Approx(90));
+    root.Measure(ctx);
+    root.Arrange(ctx, gfx::Rect{0, 0, 60, 500});
+    CHECK(text->rect.h == Catch::Approx(100));
+    CHECK(below->rect.y == Catch::Approx(110));
+}
 
 TEST_CASE("layout distributes free space to growing children") {
     Context ctx;

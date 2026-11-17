@@ -10,6 +10,7 @@
 #include "den/ui/page.h"
 #include "den/ui/selection.h"
 #include "den/ui/text_entry.h"
+#include "den/ui/widgets.h"
 
 namespace den::ui {
 
@@ -17,40 +18,6 @@ namespace {
 
 using input::Nav;
 constexpr float HINT_BAR_HEIGHT = 48;
-
-std::vector<std::string> Wrap(gfx::Text& text, const std::string& in, float size, float width) {
-    std::vector<std::string> lines;
-    std::string line, word;
-    const auto flush_word = [&] {
-        if (word.empty()) {
-            return;
-        }
-        const std::string joined = line.empty() ? word : line + " " + word;
-        if (!line.empty() && text.Measure(joined, size) > width) {
-            lines.push_back(line);
-            line = word;
-        } else {
-            line = joined;
-        }
-        word.clear();
-    };
-    for (const char c : in) {
-        if (c == ' ' || c == '\n') {
-            flush_word();
-            if (c == '\n') {
-                lines.push_back(line);
-                line.clear();
-            }
-        } else {
-            word.push_back(c);
-        }
-    }
-    flush_word();
-    if (!line.empty()) {
-        lines.push_back(line);
-    }
-    return lines;
-}
 
 } // namespace
 
@@ -161,12 +128,34 @@ struct Stage::Impl {
         gfx::Canvas& canvas = *ctx.canvas;
         const float y = canvas.Height() - HINT_BAR_HEIGHT;
         float x = canvas.Width() - theme.margin;
-        const std::vector<Hint> hints = page.Hints();
+        std::vector<Hint> hints = page.Hints();
         const float glyph_h = 26;
+        // Right of the side panels (the rail); on a narrow page the hints between the first
+        // and the last go first, then the spacing shrinks.
+        float left = theme.margin;
+        for (const auto& child : page.Root().Children()) {
+            if (child->chrome && child->visible) {
+                left = std::max(left, child->rect.Right() + theme.margin);
+            }
+        }
+        float spacing = 24;
+        const auto total = [&] {
+            float sum = spacing * static_cast<float>(hints.size() > 0 ? hints.size() - 1 : 0);
+            for (const Hint& hint : hints) {
+                sum += HintWidth(ctx, ctx.family, hint.nav, hint.text, glyph_h);
+            }
+            return sum;
+        };
+        while (hints.size() > 2 && total() > x - left) {
+            hints.erase(hints.end() - 2);
+        }
+        if (total() > x - left) {
+            spacing = 12;
+        }
         for (auto it = hints.rbegin(); it != hints.rend(); ++it) {
             x -= HintWidth(ctx, ctx.family, it->nav, it->text, glyph_h);
             DrawHint(ctx, ctx.family, it->nav, it->text, x, y + 11, glyph_h, theme.fg);
-            x -= 24;
+            x -= spacing;
         }
     }
 
@@ -205,7 +194,7 @@ struct Stage::Impl {
         gfx::Canvas& canvas = *ctx.canvas;
         canvas.FillRect(gfx::Rect{0, 0, canvas.Width(), canvas.Height()}, theme.scrim);
         const float w = std::min(560.0f, canvas.Width() - 48);
-        const std::vector<std::string> lines = Wrap(ctx.Text(), dialog->message, theme.text_body, w - 56);
+        const std::vector<std::string> lines = WrapText(ctx.Text(), dialog->message, theme.text_body, w - 56);
         const float h = 64 + 28 * static_cast<float>(lines.size()) + 96;
         const gfx::Rect box{(canvas.Width() - w) * 0.5f, (canvas.Height() - h) * 0.5f, w, h};
         canvas.FillRect(box, theme.dialog, theme.radius + 6);

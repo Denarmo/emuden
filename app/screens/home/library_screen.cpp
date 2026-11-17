@@ -15,12 +15,12 @@
 #include "den/app/game_widgets.h"
 #include "den/app/games.h"
 #include "den/app/strings.h"
+#include "page_widths.h"
 
 namespace den::app {
 
 namespace {
 
-constexpr float RAIL_W = 232;
 
 class LibraryScreen final : public ui::Page {
 public:
@@ -111,7 +111,7 @@ public:
             Svc().stage->Push("details", {{"id", game.id}});
         };
         options.on_focus = [this](const library::Entry& game) { selected_ = game.id; };
-        const float room = width_ - RAIL_W - svc.theme->margin * 2 - 10;
+        const float room = width_ - RailWidth(width_) - svc.theme->margin * 2 - 10;
         ui::Node* grid = AddGameGrid(content, games, GridColumns(room), options);
         grid->id = "library.grid";
     }

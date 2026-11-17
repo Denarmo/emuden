@@ -58,7 +58,12 @@ float UiScaleFor(const DeviceProfile& profile, const Screen& screen) {
         screen.inches * static_cast<float>(screen.height) /
         std::hypot(static_cast<float>(screen.width), static_cast<float>(screen.height));
     const float scale = std::round(4.2f / height_inches * 20.0f) / 20.0f;
-    return std::clamp(scale, 1.0f, 1.6f);
+    // A near-square screen (1240x1080) would get so few units across that the menus crowd:
+    // the default leaves them at least MIN_DEFAULT_UNITS wide. The user may still go bigger.
+    constexpr float LAYOUT_HEIGHT = 720.0f, MIN_DEFAULT_UNITS = 560.0f;
+    const float aspect = static_cast<float>(screen.width) / static_cast<float>(screen.height);
+    const float widest = std::floor(aspect * LAYOUT_HEIGHT / MIN_DEFAULT_UNITS * 20.0f) / 20.0f;
+    return std::clamp(std::min(scale, widest), 1.0f, 1.6f);
 }
 
 int ByTier(Tier tier, int low, int mid, int high, int very_high) {

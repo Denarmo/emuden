@@ -11,7 +11,8 @@
 //     system::Device().tier, system::UiScale()
 //
 // EMUDEN_FAKE_DEVICE=<id> (retroid-pocket-duo, ayn-thor, legion-go-s, steam-deck, rog-ally,
-// retroid-pocket-5, desktop, tv, tablet, phone-low) stands in for the real device.
+// retroid-pocket-5, retroid-pocket-classic, desktop, tv, tablet, phone-low) stands in for the
+// real device.
 
 #pragma once
 
