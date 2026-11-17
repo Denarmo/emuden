@@ -21,6 +21,14 @@ namespace den::plugins::feature {
 
 namespace {
 
+// Offered on `os` ("linux", ...): the entry lists no platform, "any", or a key of that system.
+bool OffersOs(const IndexPlugin& offered, const std::string& os) {
+    return offered.platforms.empty() || os.empty() ||
+           std::ranges::any_of(offered.platforms, [&](const std::string& key) {
+               return key == "any" || key.starts_with(os + "-");
+           });
+}
+
 std::uint64_t FolderBytes(const fs::path& dir) {
     std::uint64_t bytes = 0;
     std::error_code ec;
@@ -293,7 +301,8 @@ std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
     for (const Offer& offer : catalogue.offers) {
         const IndexPlugin& offered = *offer.plugin;
         const SourceView& view = views[offer.source];
-        if (!IsPackageKind(offered.kind) || installed_.contains(offered.id)) {
+        if (!IsPackageKind(offered.kind) || installed_.contains(offered.id) ||
+            !OffersOs(offered, deps_.platform)) {
             continue;
         }
         FeaturePlugin plugin;

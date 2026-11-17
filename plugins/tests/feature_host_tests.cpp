@@ -308,6 +308,17 @@ TEST_CASE("a feature plugin is listed from the signed index, installed, run and 
     CHECK_FALSE(fs::exists(f.scratch.dir / "data/plugin-data/tester.notes"));
 }
 
+TEST_CASE("a plugin for other operating systems is not offered") {
+    const std::string feature = R"({"entry":"main.lua"})";
+    for (const auto& [platforms, offered] : std::vector<std::pair<std::string, bool>>{
+             {R"(["linux-x86_64"])", false}, {R"(["test-arm64","linux-x86_64"])", true},
+             {R"(["any"])", true}, {"[]", true}}) {
+        Fixture f;
+        f.Publish(1, "emuden.notes", "1.0.0", feature, R"("platforms":)" + platforms + ",");
+        CHECK(Find(*f.MakeHost(), "emuden.notes").has_value() == offered);
+    }
+}
+
 TEST_CASE("a package that is not what the index announced is refused") {
     Fixture f;
     // More than was announced: the user accepted less.

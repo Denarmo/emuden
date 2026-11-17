@@ -142,6 +142,7 @@ Result<Index> ParseIndex(std::string_view text) {
             }
             plugin.kind = value.String("kind");
             plugin.engine = value.String("engine");
+            plugin.platforms = json::Strings(value, "platforms", false);
             if (plugin.kind.empty()) {
                 plugin.kind = "console";
             }
