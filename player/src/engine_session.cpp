@@ -50,6 +50,7 @@ public:
         frames_ = 0;
         resumed_ = false;
         resume_checked_ = false;
+        cheats_sent_ = false;
         states_.clear();
         if (!request.engine) {
             return Fail("No engine was chosen for this game.");
@@ -75,6 +76,7 @@ public:
             return Fail(started.error);
         }
         state_ = State::Running;
+        cheats_ = request.allowed.cheats ? LoadGameCheats(CheatsFile(), request.content) : std::vector<Cheat>();
         return {};
     }
 
@@ -130,6 +132,12 @@ public:
             ReadStates(*control);
             if (request_.resume && ResumeAllowed() && control->Has("states") && states_.count(RESUME_SLOT) != 0) {
                 resumed_ = control->LoadState(RESUME_SLOT).ok;
+            }
+        }
+        if (!cheats_sent_ && control->Playing()) {
+            cheats_sent_ = true;
+            if (!cheats_.empty()) {
+                SendCheats(*control);
             }
         }
         if (state_ == State::Running && control->Playing() && !control->Paused()) {
@@ -281,6 +289,27 @@ public:
         }
     }
 
+    std::vector<Cheat> Cheats() const override {
+        return cheats_;
+    }
+
+    Status SetCheats(std::vector<Cheat> cheats) override {
+        engine::Control* control = Live();
+        if (!request_.allowed.cheats || control == nullptr || !control->Has("cheats")) {
+            return Status::Fail("This game has no cheats.");
+        }
+        if (request_.hardcore) {
+            return Status::Fail("Hardcore mode is on: cheats are off.");
+        }
+        if (const Status tidy = TidyCheats(cheats); !tidy) {
+            return tidy;
+        }
+        const Status written = WriteCheats(CheatsFile(), cheats);
+        cheats_ = std::move(cheats);
+        SendCheats(*control);
+        return written;
+    }
+
     Snapshot GetSnapshot() const override {
         Snapshot snapshot;
         snapshot.state = state_;
@@ -301,6 +330,10 @@ public:
         snapshot.can_reset = control != nullptr && control->Has("reset");
         snapshot.can_options = control != nullptr && control->Has("settings");
         snapshot.can_volume = control != nullptr && (control->Has("volume") || HasSetting(*control, "audio.volume"));
+        snapshot.can_cheats = allowed.cheats && control != nullptr && control->Has("cheats");
+        snapshot.cheats_off = snapshot.can_cheats && request_.hardcore ? "Hardcore mode is on: cheats are off." : "";
+        snapshot.cheats_active = snapshot.can_cheats && !request_.hardcore ? static_cast<int>(std::count_if(
+            cheats_.begin(), cheats_.end(), [](const Cheat& cheat) { return cheat.enabled; })) : 0;
         if (control != nullptr) {
             const engine::Perf perf = control->GetPerf();
             snapshot.measured_fps = perf.fps;
@@ -364,6 +397,19 @@ private:
         default:
             break;
         }
+    }
+
+    std::filesystem::path CheatsFile() const {
+        return CheatFile(config_.data_dir, request_.system, request_.game_id);
+    }
+
+    // The whole list, as set_cheats takes it; none in hardcore.
+    void SendCheats(engine::Control& control) const {
+        std::vector<engine::CheatCode> codes;
+        for (const Cheat& cheat : request_.hardcore ? std::vector<Cheat>() : cheats_) {
+            codes.push_back({cheat.code, cheat.enabled, cheat.name});
+        }
+        control.SetCheats(codes);
     }
 
     void ReadStates(engine::Control& control) {
@@ -529,6 +575,8 @@ private:
     bool resumed_ = false;
     bool resume_checked_ = false;
     bool menu_requested_ = false;
+    bool cheats_sent_ = false;
+    std::vector<Cheat> cheats_;
     std::set<int> states_; // the engine's slots that hold a state
     gfx::Texture frame_;
 };

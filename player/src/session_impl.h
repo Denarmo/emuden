@@ -77,6 +77,11 @@ public:
     Status StartAudioCapture(double seconds) override;
     Result<AudioCapture> SaveAudioCapture(const std::filesystem::path& wav) override;
     Snapshot GetSnapshot() const override;
+    // session_cheats.cpp
+    std::vector<Cheat> Cheats() const override {
+        return cheats_;
+    }
+    Status SetCheats(std::vector<Cheat> cheats) override;
     // session_achievements.cpp
     const retro_memory_map* MemoryMap() const override;
     std::span<std::uint8_t> MemoryRegion(unsigned id) const override;
@@ -112,6 +117,11 @@ private:
     void SendStateToPeer(std::uint64_t frame);
     void TakeStateFromPeer();
     bool StoreLocalInput(int port, const RetroPad& mapped);
+
+    // session_cheats.cpp
+    void LoadCheats(const std::filesystem::path& content);
+    void ApplyCheats();
+    std::string CheatsOff() const;
 
     Status Fail(std::string message);
     Status Start(const OpenRequest& request);
@@ -217,6 +227,8 @@ private:
     std::array<ButtonMap, 4> button_maps_{};
     std::uint16_t held_buttons_ = 0; // port 1, for a shortcut
     std::string game_key_;
+
+    std::vector<Cheat> cheats_;
 
     // Playing with another device.
     TogetherRequest together_;

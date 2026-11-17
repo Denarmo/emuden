@@ -13,4 +13,4 @@ How EmuDEN maps the levels (`den::engine`, `engine/`):
 | 1, 2 | Engine apps a plugin manifest offers as one of a console's cores (`"type": "engine-app"`). Desktop: a child on `--ecp stdio` in a job object (Windows) or process group (Linux). Android: the PLAY intent and a loopback connection with a token. | `EcpLink` (`protocol/ecp_link.cpp`, `ecp/channel.cpp`) |
 
 What EmuDEN uses of level 2: `pause`, `menu`, `states`, `state_thumbnails`, `reset`,
-`fast_forward`, `rewind`, `settings`, `perf`, `volume`. See `docs/engines.md`.
+`fast_forward`, `rewind`, `settings`, `perf`, `volume`, `cheats`. See `docs/engines.md`.

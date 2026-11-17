@@ -48,6 +48,13 @@ struct StateInfo {
     Picture thumbnail;
 };
 
+/// A cheat for `set_cheats` (section 6.5): the code as the engine takes it.
+struct CheatCode {
+    std::string code;
+    bool enabled = false;
+    std::string description;
+};
+
 struct Perf {
     double fps = 0;
     double target_fps = 0;
@@ -82,6 +89,8 @@ public:
     virtual void SetSpeed(bool fast_forward, double factor) = 0;
     virtual void SetRewind(bool on) = 0;
     virtual void SetVolume(int percent, bool mute) = 0;
+    /// The whole list of the game's cheats, when it has `cheats`; an empty list turns them off.
+    virtual void SetCheats(const std::vector<CheatCode>& cheats) = 0;
     /// Sets the value for this session; the caller keeps it for the next launch.
     virtual void SetSetting(const std::string& key, const std::string& value) = 0;
 

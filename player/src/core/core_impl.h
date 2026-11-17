@@ -39,6 +39,8 @@ struct LibretroCore::Impl {
     void* (*retro_get_memory_data)(unsigned) = nullptr;
     std::size_t (*retro_get_memory_size)(unsigned) = nullptr;
     bool (*retro_load_game_special)(unsigned, const retro_game_info*, std::size_t) = nullptr; // optional
+    void (*retro_cheat_reset)() = nullptr;                          // optional: a few cores leave them out
+    void (*retro_cheat_set)(unsigned, bool, const char*) = nullptr; // optional
 
     bool initialized = false;
     bool game_loaded = false;

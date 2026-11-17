@@ -25,6 +25,7 @@
 #include "den/gfx/canvas.h"
 #include "den/input/input.h"
 #include "den/player/bfi.h"
+#include "den/player/cheats.h"
 #include "den/player/screens.h"
 
 namespace den::store {
@@ -61,6 +62,7 @@ struct Allowed {
     bool save_states = true; // false: no states, the resume state neither
     bool rewind = true;
     bool fast_forward = true;
+    bool cheats = true;
 };
 
 struct OpenRequest {
@@ -86,7 +88,8 @@ struct OpenRequest {
     /// An engine app (Android): what it shows until its game's first frame, the boot screen
     /// as it was (a PNG; empty for none).
     std::filesystem::path cover;
-    /// RetroAchievements hardcore: no state is loaded (the resume state neither) and no rewind.
+    /// RetroAchievements hardcore: no state is loaded (the resume state neither), no rewind
+    /// and no cheats.
     bool hardcore = false;
     Allowed allowed;
     TogetherRequest together;
@@ -166,7 +169,12 @@ struct Snapshot {
     bool can_volume = true;
     bool can_picture = true; // picture presets, screen size and button remapping (EmuDEN draws it)
     bool hardcore = false;   // states cannot be loaded and there is no rewind
-    /// Played with another device: no fast-forward, rewind or loaded states.
+    /// The game's cheats can be kept and applied (Cheats, SetCheats).
+    bool can_cheats = false;
+    /// Why they are off for now (hardcore, playing together); empty while they apply.
+    std::string cheats_off;
+    int cheats_active = 0; // enabled cheats the game was given
+    /// Played with another device: no fast-forward, rewind, loaded states or cheats.
     bool together = false;
     /// The game waits for the other device's buttons or state.
     bool waiting_for_peer = false;
@@ -374,6 +382,18 @@ public:
 
     virtual Snapshot GetSnapshot() const = 0;
 
+    /// The running game's cheats, kept in CheatFile (a .cht beside the ROM is taken in when
+    /// the game has none yet).
+    virtual std::vector<Cheat> Cheats() const {
+        return {};
+    }
+    /// Replaces the game's cheats, keeps them and gives the game the enabled ones at once
+    /// (its cheats are reset first). Refused while Snapshot::cheats_off says why.
+    virtual Status SetCheats(std::vector<Cheat> cheats) {
+        (void)cheats;
+        return Status::Fail("This game has no cheats.");
+    }
+
     /// True once after an engine paused and handed its menu over (the player opens it).
     virtual bool TakeMenuRequest() {
         return false;
@@ -394,8 +414,8 @@ public:
     virtual void SetFrameHook(std::function<void(FrameEvent)> hook) {
         (void)hook;
     }
-    /// Hardcore for the running game: LoadState fails and rewind is off. Turning it on does
-    /// not undo a state loaded before.
+    /// Hardcore for the running game: LoadState fails, rewind and cheats are off. Turning it
+    /// on does not undo a state loaded before.
     virtual void SetHardcore(bool on) {
         (void)on;
     }

@@ -139,6 +139,12 @@ public:
     Snapshot GetSnapshot() const override {
         return active_->GetSnapshot();
     }
+    std::vector<Cheat> Cheats() const override {
+        return active_->Cheats();
+    }
+    Status SetCheats(std::vector<Cheat> cheats) override {
+        return active_->SetCheats(std::move(cheats));
+    }
     bool TakeMenuRequest() override {
         return active_->TakeMenuRequest();
     }

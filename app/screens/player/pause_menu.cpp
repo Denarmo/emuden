@@ -7,6 +7,7 @@
 #include <format>
 
 #include "den/app/apps_catalog.h"
+#include "den/app/cheats.h"
 #include "den/app/second_screen.h"
 #include "den/app/pages.h"
 #include "den/base/files.h"
@@ -204,6 +205,10 @@ void PlayerScreen::BuildMain(ui::Node* list) {
                 OpenPage("options");
                 direct_ = false;
             }));
+    }
+    if (snapshot.can_cheats) {
+        rows.push_back(ValueRow("menu.cheats", "Cheats", [] { return CheatsSummary(); },
+                                [this] { OpenCheats(GetStage()); }));
     }
     if (!external) {
         rows.push_back(ActionRow("menu.buttons", "Buttons", [this] { Show(View::Buttons); }));

@@ -134,6 +134,7 @@ void ApplyCapabilities(const JsonValue* manifest_level, const JsonValue* system_
     console.save_states = on("save_states");
     console.rewind = on("rewind");
     console.fast_forward = on("fast_forward");
+    console.cheats = on("cheats");
     if (!on("achievements")) {
         console.rcheevos_console = 0;
     }

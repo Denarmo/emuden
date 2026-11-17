@@ -16,6 +16,7 @@
 
 #include "den/app/app_grid.h"
 #include "den/app/apps_catalog.h"
+#include "den/app/cheats.h"
 #include "den/app/beside.h"
 #include "den/app/game_widgets.h"
 #include "den/app/games.h"
@@ -266,6 +267,10 @@ private:
             if (!snapshot.external) {
                 rows.push_back(ActionRow("companion.section.controls", "Controls and core",
                                          [this] { Open(View::Controls); }));
+            }
+            if (snapshot.can_cheats) {
+                rows.push_back(ValueRow("companion.section.cheats", "Cheats", [] { return CheatsSummary(); },
+                                        [this] { OpenCheats(GetStage()); }));
             }
             if (AppsAvailable()) {
                 const std::string beside = other_volume_ ? Beside().App().label : std::string();

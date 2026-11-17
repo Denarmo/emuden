@@ -119,14 +119,16 @@ TEST_CASE("console manifests: platforms, depends, settings and capabilities") {
     CHECK(parsed->depends[0].range == ">=1.0.0");
     CHECK_FALSE(parsed->systems[0].console.netplay);
     CHECK(parsed->systems[0].console.save_states);
+    CHECK(parsed->systems[0].console.cheats);
     CHECK(parsed->systems[0].console.sync_states);
-    auto limited = ParseManifest(ConsoleJson("jdoe.dev", R"("capabilities":{"save_states":false,"rewind":false,"fast_forward":false},
+    auto limited = ParseManifest(ConsoleJson("jdoe.dev", R"("capabilities":{"save_states":false,"rewind":false,"fast_forward":false,"cheats":false},
         "sync":{"states":false,"settings":false},)", pinned));
     REQUIRE(limited.ok());
     const Console& console = limited->systems[0].console;
     CHECK_FALSE(console.save_states);
     CHECK_FALSE(console.rewind);
     CHECK_FALSE(console.fast_forward);
+    CHECK_FALSE(console.cheats);
     CHECK(console.sync_saves);
     CHECK_FALSE(console.sync_states);
     CHECK_FALSE(console.sync_settings);

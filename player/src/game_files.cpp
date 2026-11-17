@@ -44,12 +44,17 @@ fs::path GamePaths::ResumePicture() const {
     return state_dir / PathFromUtf8(base + ".resume.png");
 }
 
+fs::path GamePaths::Cheats() const {
+    return cheat_dir / PathFromUtf8(base + ".json");
+}
+
 GamePaths MakeGamePaths(const fs::path& data_dir, const std::string& system,
                         const std::string& game_id, const fs::path& content) {
     GamePaths paths;
     const fs::path folder = PathFromUtf8(SafeFileName(system.empty() ? "other" : system));
     paths.save_dir = data_dir / "saves" / folder;
     paths.state_dir = data_dir / "states" / folder;
+    paths.cheat_dir = data_dir / "cheats" / folder;
     paths.base = SafeFileName(game_id.empty() ? PathToUtf8(content.stem()) : game_id);
     return paths;
 }
