@@ -134,6 +134,11 @@ public:
     bool GameLoaded() const;
     void Reset();
 
+    /// retro_cheat_reset and retro_cheat_set; nothing happens for a core without them.
+    bool HasCheats() const;
+    void CheatReset();
+    void CheatSet(unsigned index, bool enabled, const std::string& code);
+
     const std::vector<ButtonName>& ButtonNames() const;
     void SetButtons(unsigned port, std::uint16_t buttons);
     /// stick 0 = left, 1 = right; x and y from -0x7fff to 0x7fff, +y down.

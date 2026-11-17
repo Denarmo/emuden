@@ -39,7 +39,7 @@ bool Ok(const JsonValue& result) {
 const std::vector<std::string>& FrontendCapabilities() {
     static const std::vector<std::string> capabilities = {
         "pause", "menu", "states", "state_thumbnails", "reset", "fast_forward",
-        "rewind", "settings", "perf", "volume", "configure",
+        "rewind", "settings", "perf", "volume", "configure", "cheats",
     };
     return capabilities;
 }
@@ -506,6 +506,17 @@ void Channel::SetRewind(bool on) {
 void Channel::SetVolume(int percent, bool mute) {
     if (Has("volume")) {
         Send("set_volume", {{"percent", JsonNumber(std::clamp(percent, 0, 100))}, {"mute", JsonBool(mute)}});
+    }
+}
+
+void Channel::SetCheats(const std::vector<CheatCode>& cheats) {
+    if (Has("cheats")) {
+        std::vector<JsonValue> items;
+        for (const CheatCode& cheat : cheats) {
+            items.push_back(JsonObject({{"code", JsonString(cheat.code)}, {"enabled", JsonBool(cheat.enabled)},
+                                        {"description", JsonString(cheat.description)}}));
+        }
+        Send("set_cheats", {{"cheats", JsonArray(std::move(items))}});
     }
 }
 

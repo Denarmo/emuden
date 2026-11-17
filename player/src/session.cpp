@@ -136,6 +136,8 @@ Status PlayerSession::Start(const OpenRequest& request) {
     LoadBatterySave();
     SetupRewind();
     StartTogether();
+    snapshot_.can_cheats = allowed_.cheats && core_->HasCheats();
+    LoadCheats(request.content);
 
     due_ = 0.0;
     step_ = 1.0;
@@ -165,6 +167,7 @@ void PlayerSession::Close() {
         core_.reset();
     }
     together_ = TogetherRequest{};
+    cheats_.clear();
     hw_.reset();
     audio_.Close();
     rewind_.reset();
@@ -331,6 +334,7 @@ void PlayerSession::Reset() {
         return;
     }
     core_->Reset();
+    ApplyCheats();
     pending_resume_ = false;
     Notify(FrameEvent::Reset);
     if (rewind_) {
@@ -489,6 +493,7 @@ Snapshot PlayerSession::GetSnapshot() const {
         snapshot.audio_underruns = std::max(snapshot.audio.underruns, snapshot.audio.refills);
         snapshot.audio_capturing = audio_.Capturing();
         snapshot.rewind_states = rewind_ ? rewind_->Count() : 0;
+        snapshot.cheats_off = snapshot.can_cheats ? CheatsOff() : std::string();
     }
     return snapshot;
 }

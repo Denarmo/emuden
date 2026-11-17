@@ -88,6 +88,7 @@ void PlayerSession::SetTogether(TogetherRequest request) {
     together_ = std::move(request);
     resume_enabled_ = resume_enabled_ && !together_.party;
     StartTogether();
+    ApplyCheats(); // off while playing together, on again alone
 }
 
 void PlayerSession::StopTogether() {

@@ -111,6 +111,20 @@ TEST_CASE("an engine game is driven through the player session", "[player][engin
     CHECK(snapshot.can_volume);
     CHECK_FALSE(snapshot.can_rewind);
     CHECK(snapshot.game_id == "game-1");
+    CHECK(snapshot.can_cheats);
+
+    // The whole cheat list goes in one set_cheats, and is kept for the game.
+    REQUIRE(f.session->SetCheats({{"Lives", " 7E0DBF:09 ", true}, {"Jump", "8009C6E4 0063", false}}));
+    REQUIRE(f.fake.WaitFor("set_cheats"));
+    const JsonValue sent = f.fake.Last("set_cheats");
+    const JsonValue* cheats = sent.Find("cheats");
+    REQUIRE(cheats != nullptr);
+    REQUIRE(cheats->items.size() == 2);
+    CHECK(cheats->items[0].String("code") == "7E0DBF:09");
+    CHECK(cheats->items[0].Find("enabled")->boolean);
+    CHECK(cheats->items[1].String("description") == "Jump");
+    CHECK(f.session->GetSnapshot().cheats_active == 1);
+    CHECK(player::ReadCheats(player::CheatFile(f.dir, "gba", "game-1"))->size() == 2);
 
     // The engine's schema is the options page; toggles and ranges get their values.
     const auto options = f.session->Options();

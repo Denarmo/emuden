@@ -187,6 +187,22 @@ A runnable folder: `powershell -ExecutionPolicy Bypass -File tools\package.ps1` 
   `audio_queued_ms`, `audio_underruns` and `picture`. While playing, Select + R1 holds
   fast-forward and Select + L1 rewind on every pad; button glyphs per pad family are drawn
   by `app/include/den/app/glyphs.h` (`DrawGlyph`, `HintLine`).
+- **Cheats** (`den/player/cheats.h`): a game's list of `Cheat` (name, code as the core takes
+  it: Game Genie, Action Replay, GameShark or raw, several joined by `+`; enabled) is kept in
+  `<data>/cheats/<system>/<game id>.json`. A game with no list yet takes a RetroArch `.cht`
+  beside its ROM (same stem) when it starts; `ParseCht` reads that format (`cheats = N`,
+  `cheatK_desc`, `cheatK_code`, `cheatK_enable`). `Session::Cheats()` and `SetCheats(list)`;
+  a libretro session calls `retro_cheat_reset`, then `retro_cheat_set` for each enabled cheat
+  (indexes from 0), after the game loads, after every change, after Reset and when hardcore or
+  playing together ends. An engine session sends the whole list as ECP `set_cheats` when the
+  engine has `cheats`. `Snapshot::can_cheats` (libretro sessions, unless the manifest's
+  `capabilities.cheats` is false: `OpenRequest::allowed.cheats`), `cheats_off` (hardcore,
+  playing together: cheats are reset and changes refused) and `cheats_active`. A core gives
+  no answer about a code, so only an empty code is refused. The page is `player.cheats` (pause
+  menu, by pad: Confirm toggles, Option edits) and `companion.cheats` (the second screen's
+  quick settings, by touch), both opened with `OpenCheats` (`app/include/den/app/cheats.h`);
+  Import uses the app's file picker. No cheat database is downloaded. Cheat files stay on the
+  device: sync has no category for them yet.
 - **Engine** (level 0 and the Emulator Control Protocol, levels 1 and 2; see `docs/engines.md`): `Available(system)`,
   `UnavailableReason`, `Find(system)` (the `Install` it would use), `Start(LaunchRequest)`,
   `Running`, `Current`, `Stop` (polite, forced after 5 s), `PollEvents()` giving `Started`,

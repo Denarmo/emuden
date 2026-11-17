@@ -125,6 +125,7 @@ struct Console {
     bool save_states = true;  // capabilities.save_states (the resume state too)
     bool rewind = true;       // capabilities.rewind
     bool fast_forward = true; // capabilities.fast_forward
+    bool cheats = true;       // capabilities.cheats
     std::vector<BiosSet> bios;
     bool developer = false;   // its plugin is in the developer folder, not signed
     /// presentation.screens: the screens of its cores' pictures (a core may have its own).

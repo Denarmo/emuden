@@ -115,6 +115,7 @@ public:
     void SetSpeed(bool fast_forward, double factor) override;
     void SetRewind(bool on) override;
     void SetVolume(int percent, bool mute) override;
+    void SetCheats(const std::vector<CheatCode>& cheats) override;
     void SetSetting(const std::string& key, const std::string& value) override;
     Result<StateInfo> SaveState(int slot) override;
     Status LoadState(int slot) override;

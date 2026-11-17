@@ -19,7 +19,7 @@ which device, are in `docs/history.md`; add new ones there, newest first.
   and no release carries or downloads its engine. Until its plugin is installed it shows
   nowhere and a `SWITCH 2` folder is no console's (`docs/engines.md`).
 - **Player.** Software, OpenGL and Vulkan cores (`docs/vulkan.md`); save states, rewind,
-  fast-forward, picture presets on a multi-pass chain, per-game and per-console settings,
+  fast-forward, cheats (typed in or imported from RetroArch `.cht` files), picture presets on a multi-pass chain, per-game and per-console settings,
   button remapping, black frame insertion at whole multiples of the game's rate, two screens (DS layouts, quick settings and the pause menu on the second
   display, an Android app beside the game).
 - **Feature plugins** (Lua 5.4 in a sandbox, `docs/feature-plugins.md`): the in-app browser
