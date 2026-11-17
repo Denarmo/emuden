@@ -117,6 +117,11 @@ void StartGame(const std::string& game_id, bool restart, const ui::Params& extra
         return;
     }
     if (console->runner == plugins::Runner::Engine) {
+        // One that speaks the protocol is played from the player screen, with its menu.
+        if (const auto found = FoundEngineCore(game->system); found && svc.stage->HasRoute("player")) {
+            StartInPlayer(*game, *found, restart, extra);
+            return;
+        }
         StartInEngine(*game);
     } else {
         StartRom(*game, restart, extra);

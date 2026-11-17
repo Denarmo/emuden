@@ -94,6 +94,9 @@ void PlayerScreen::Open() {
     if (!core) {
         core = CoreForGame(game_, Param("core"));
     }
+    if ((!core || !core->Ready()) && console && console->runner == plugins::Runner::Engine) {
+        core = FoundEngineCore(game_.system);
+    }
     if (!console || !core || !core->Ready()) {
         return Fail((console ? console->name : game_.name) + ": its core is not installed. Open Consoles to install it.");
     }

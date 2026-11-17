@@ -205,6 +205,24 @@ engine::Install EngineInstallFor(const plugins::CoreInfo& core) {
     return install;
 }
 
+std::optional<plugins::CoreInfo> FoundEngineCore(const std::string& system) {
+    const Services& svc = Svc();
+    const auto install = svc.engine ? svc.engine->Find(system) : std::nullopt;
+    if (!install || install->level < 1 || !install->package.empty()) {
+        return std::nullopt;
+    }
+    plugins::CoreInfo core;
+    core.id = PathToUtf8(install->executable.stem());
+    core.name = core.id;
+    core.system = system;
+    core.runner = plugins::Runner::Engine;
+    core.engine.level = install->level;
+    core.engine.executable = install->executable;
+    core.library = install->executable;
+    core.installed = true;
+    return core;
+}
+
 DEN_REGISTER_FRAME(Frame);
 
 } // namespace den::app
