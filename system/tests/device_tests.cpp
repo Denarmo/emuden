@@ -134,7 +134,7 @@ TEST_CASE("AYN Thor: two screens, high") {
     CHECK(Text(defaults, "player.shader_weight") == "heavy");
     CHECK(Text(defaults, "core_options.ppsspp.ppsspp_internal_resolution") == "1920x1088");
     CHECK(Text(defaults, "core_options.pcsxrearmed.pcsx_rearmed_neon_enhancement_enable") == "enabled");
-    CHECK(Text(defaults, "core_options.dolphinemu.dolphin_efb_scale") == "x2 (1280 x 1056)");
+    CHECK(Text(defaults, "core_options.dolphinemu.dolphin_efb_scale") == "2");
     CHECK(Flag(defaults, "engine.switch2.settings.docked"));
 }
 
@@ -257,5 +257,5 @@ TEST_CASE("tuned core options: the first case the device meets") {
     CHECK(system::TuneFor(rules[0], profile)->value == "small");
     const auto lines = system::DescribeDefaults(profile, rules);
     CHECK(std::find(lines.begin(), lines.end(), "Small") != lines.end());
-    CHECK(Text(Defaults(Profile("retroid-pocket-duo")), "core_options.dolphinemu.dolphin_efb_scale") == "x1 (640 x 528)");
+    CHECK(Text(Defaults(Profile("retroid-pocket-duo")), "core_options.dolphinemu.dolphin_efb_scale") == "1");
 }
