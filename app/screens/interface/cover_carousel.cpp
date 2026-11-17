@@ -39,6 +39,7 @@ void CoverCarousel::SetGames(std::vector<library::Entry> games, std::size_t sele
     pos_ = static_cast<float>(index_);
     id = games_.empty() ? std::string("iface.empty") : "iface.game." + games_[index_].id;
     label = games_.empty() ? std::string() : games_[index_].name;
+    OnGamesSet();
 }
 
 const library::Entry* CoverCarousel::Selected() const {

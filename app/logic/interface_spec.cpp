@@ -4,6 +4,7 @@
 #include "interface_spec.h"
 
 #include <algorithm>
+#include <cmath>
 #include <optional>
 
 #include "den/base/files.h"
@@ -63,6 +64,12 @@ void ReadBool(const JsonValue* object, std::string_view key, bool& out) {
     if (value != nullptr && value->kind == JsonValue::Kind::Bool) {
         out = value->boolean;
     }
+}
+
+void ReadInt(const JsonValue* object, std::string_view key, int min, int max, int& out) {
+    float value = static_cast<float>(out);
+    ReadNumber(object, key, static_cast<float>(min), static_cast<float>(max), value);
+    out = static_cast<int>(std::lround(value));
 }
 
 void ReadChoice(const JsonValue* object, std::string_view key, std::initializer_list<const char*> allowed,
@@ -132,7 +139,8 @@ void ReadObject(const JsonValue* object, const std::vector<std::string>& moulds,
 } // namespace
 
 bool KnownLayout(std::string_view layout) {
-    return layout == "carousel" || layout == "shelf3d";
+    return layout == "carousel" || layout == "shelf3d" || layout == "grid" || layout == "list" ||
+           layout == "wheel" || layout == "hero";
 }
 
 ConsoleLook InterfaceSpec::LookFor(std::string_view system, std::string_view group) const {
@@ -191,6 +199,30 @@ Result<InterfaceSpec> ParseInterface(std::string_view manifest_json, const std::
     ReadNumber(objects, "sway", 0, 30, sway_degrees);
     spec.side_angle = side_degrees * 0.0174533f;
     spec.sway = sway_degrees * 0.0174533f;
+
+    const JsonValue* grid = look->Find("grid");
+    ReadInt(grid, "columns", 0, 12, spec.grid.columns);
+    spec.grid.columns = spec.grid.columns == 1 ? 2 : spec.grid.columns;
+    ReadBool(grid, "panel", spec.grid.panel);
+    ReadBool(grid, "titles", spec.grid.titles);
+
+    const JsonValue* list = look->Find("list");
+    ReadInt(list, "rows", 5, 16, spec.list.rows);
+    ReadBool(list, "art", spec.list.art);
+    std::string side = spec.list.art_left ? "left" : "right";
+    ReadChoice(list, "art_side", {"left", "right"}, side);
+    spec.list.art_left = side == "left";
+    ReadBool(list, "thumbnails", spec.list.thumbnails);
+
+    const JsonValue* wheel = look->Find("wheel");
+    side = spec.wheel.left ? "left" : "right";
+    ReadChoice(wheel, "side", {"left", "right"}, side);
+    spec.wheel.left = side == "left";
+    ReadInt(wheel, "names", 5, 15, spec.wheel.names);
+    spec.wheel.names |= 1; // odd: the selected name in the middle
+    ReadNumber(wheel, "curve", 0, 1, spec.wheel.curve);
+
+    ReadNumber(look->Find("hero"), "strip", 0.14f, 0.4f, spec.hero.strip);
 
     const JsonValue* tabs = look->Find("tabs");
     ReadBool(tabs, "continue", spec.tab_continue);

@@ -51,13 +51,41 @@ struct ConsoleLook {
     ObjectLook object;
 };
 
+/// "grid": many covers per row, the selected game's details in a panel beside them.
+struct GridLook {
+    int columns = 0;    // covers per row; 0: as many as fit at the height `covers.height` gives
+    bool panel = true;  // the details panel (beside the grid, or under it on a tall screen)
+    bool titles = false; // each game's name under its cover
+};
+
+/// "list": the games as rows of text, the selected one's cover or picture large beside them.
+struct ListLook {
+    int rows = 9;             // rows on the screen at the default text size
+    bool art = true;          // the cover beside the list (left out on narrow screens)
+    bool art_left = false;    // that cover on the left instead of the right
+    bool thumbnails = true;   // a small cover at the start of each row
+};
+
+/// "wheel": game names on a turning arc at one side, the selected game's art filling the rest.
+struct WheelLook {
+    bool left = false; // the arc on the left instead of the right
+    int names = 9;     // names on the arc, the selected one in the middle
+    float curve = 0.5f; // 0: a straight column, 1: a deep arc
+};
+
+/// "hero": the selected game large across the screen, a thin row of covers under it.
+struct HeroLook {
+    float strip = 0.24f; // the row's share of the layout's height
+};
+
 struct InterfaceSpec {
     std::string id, name;
     std::filesystem::path dir; // the package
 
     /// The layout that draws it. "carousel": consoles as tabs, one row of covers with the
     /// selected one large in the middle. "shelf3d": the same row as 3D objects (cartridges,
-    /// cases, discs) that turn towards the selected one.
+    /// cases, discs) that turn towards the selected one. "grid", "list", "wheel" and "hero":
+    /// see GridLook, ListLook, WheelLook and HeroLook.
     std::string layout = "carousel";
 
     gfx::Color background{16, 17, 24, 255};
@@ -82,6 +110,11 @@ struct InterfaceSpec {
 
     float side_angle = 0.9f; // shelf3d: how far side objects turn towards the middle (radians)
     float sway = 0.12f;      // shelf3d: the selected object's slow turn either way (radians)
+
+    GridLook grid;
+    ListLook list;
+    WheelLook wheel;
+    HeroLook hero;
 
     bool tab_continue = true; // a "Continue" tab first: the games last played on any device
     bool tab_recent = true; // a "Recent" tab first when something was played

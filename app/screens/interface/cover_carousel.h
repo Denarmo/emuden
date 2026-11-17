@@ -17,7 +17,8 @@
 
 namespace den::app {
 
-/// The 2D layout ("carousel"); ObjectShelf draws the same row in 3D ("shelf3d").
+/// The 2D layout ("carousel"); ObjectShelf draws the same row in 3D ("shelf3d"), and the
+/// GameView layouts (game_views.h) draw the same games their own way.
 class CoverCarousel : public ui::Node {
 public:
     explicit CoverCarousel(std::shared_ptr<const InterfaceSpec> spec);
@@ -76,6 +77,8 @@ protected:
     virtual float LaunchSeconds() const {
         return spec_->launch_seconds;
     }
+    /// SetGames gave new games.
+    virtual void OnGamesSet() {}
     void DrawOne(ui::Context& ctx, const library::Entry& game, const Slot& slot, float lift);
 
     std::shared_ptr<const InterfaceSpec> spec_;

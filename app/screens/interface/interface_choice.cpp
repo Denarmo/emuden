@@ -149,7 +149,7 @@ std::unique_ptr<ui::Page> MakeChosenHome() {
     if (!spec) {
         return nullptr;
     }
-    return MakeCarouselHome(std::move(spec)); // both layouts so far (KnownLayout) share the page
+    return MakeCarouselHome(std::move(spec)); // every layout (KnownLayout) shares the page
 }
 
 DEN_REGISTER_FRAME(FollowChoice);
