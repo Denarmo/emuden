@@ -85,6 +85,11 @@ public:
         SDL_HideWindow(window_);
     }
     void Raise() override {
+        // gamescope ignores raising and shows the game's most recently mapped window, so
+        // mapping it again is what brings it over an engine's.
+        if (!GetEnv("GAMESCOPE_WAYLAND_DISPLAY").empty() && (SDL_GetWindowFlags(window_) & SDL_WINDOW_HIDDEN) == 0) {
+            SDL_HideWindow(window_);
+        }
         SDL_ShowWindow(window_);
         SDL_SetHint(SDL_HINT_FORCE_RAISEWINDOW, "1");
         SDL_RaiseWindow(window_);
