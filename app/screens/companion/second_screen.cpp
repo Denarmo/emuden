@@ -13,6 +13,7 @@
 //   screenshot <png path>  the second screen's next frame
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <deque>
 #include <format>
@@ -302,6 +303,10 @@ void Frame() {
     }
     const double now = pal::NowSeconds();
     svc.device->BeginFrame(width, height, svc.theme->page);
+    // What the canvas measures is the main window's again afterwards (see app.cpp).
+    const float main_scale = svc.canvas->Scale();
+    const int main_w = static_cast<int>(std::lround(svc.canvas->Width() * main_scale));
+    const int main_h = static_cast<int>(std::lround(svc.canvas->Height() * main_scale));
     svc.canvas->Begin(width, height, c.scale);
     ui::Context ctx;
     ctx.canvas = svc.canvas;
@@ -327,6 +332,7 @@ void Frame() {
     }
     DrawBootSecond(ctx);
     svc.canvas->End();
+    svc.canvas->SetSize(main_w, main_h, main_scale);
     TakeShot(c, width, height);
     display.EndFrame();
 }
