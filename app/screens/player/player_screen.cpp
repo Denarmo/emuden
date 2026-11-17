@@ -153,7 +153,7 @@ void PlayerScreen::Begin(const std::filesystem::path& content, bool resume) {
     request.resume = resume && Param("resume") != "0";
     request.title = game_.name;
     if (const auto console = svc.plugins->FindConsole(game_.system)) {
-        request.allowed = {console->save_states, console->rewind, console->fast_forward};
+        request.allowed = {console->save_states, console->rewind, console->fast_forward, console->cheats};
     }
     const PlayerStart start{game_, *this};
     for (const PlayerHooks& hooks : AllPlayerHooks()) {

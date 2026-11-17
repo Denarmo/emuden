@@ -19,7 +19,7 @@
 namespace den::app {
 
 /// Every action id the quick settings know, in EmuDEN's order. Not all are there at every
-/// moment (rewind needs a core that rewinds, "cheats" whatever adds it).
+/// moment (rewind needs a core that rewinds, cheats a game that takes them).
 const std::vector<std::string>& QuickActionIds();
 bool KnownQuickAction(std::string_view id);
 

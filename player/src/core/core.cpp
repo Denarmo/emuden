@@ -93,6 +93,8 @@ std::unique_ptr<LibretroCore> LibretroCore::Load(const LoadParams& params, std::
         return fail(std::string("This file is not a libretro core (no ") + missing + ").");
     }
     load(c.retro_load_game_special, "retro_load_game_special");
+    load(c.retro_cheat_reset, "retro_cheat_reset");
+    load(c.retro_cheat_set, "retro_cheat_set");
     // A core built to be loaded by Java finds the Java VM through JNI_OnLoad, which only
     // System.loadLibrary calls; DenSX2 (Play!) asks for it with its own setter.
     if (void* vm = pal::JavaVm()) {
@@ -228,6 +230,24 @@ void LibretroCore::Reset() {
     if (impl_->game_loaded) {
         HwScope scope(*impl_);
         impl_->retro_reset();
+    }
+}
+
+bool LibretroCore::HasCheats() const {
+    return impl_->retro_cheat_reset && impl_->retro_cheat_set;
+}
+
+void LibretroCore::CheatReset() {
+    if (impl_->game_loaded && HasCheats()) {
+        HwScope scope(*impl_);
+        impl_->retro_cheat_reset();
+    }
+}
+
+void LibretroCore::CheatSet(unsigned index, bool enabled, const std::string& code) {
+    if (impl_->game_loaded && HasCheats()) {
+        HwScope scope(*impl_);
+        impl_->retro_cheat_set(index, enabled, code.c_str());
     }
 }
 

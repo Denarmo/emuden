@@ -151,6 +151,7 @@ folders), and only paths shared that way, and what is inside them, can be opened
 | Widescreen | `video.widescreen_patches`, when the schema has it |
 | Game volume | `set_volume`, else `audio.volume` |
 | FPS overlay | `perf` |
+| Cheats | `set_cheats` with the whole list (empty in hardcore), sent after the first frame and after every change |
 
 A row whose capability the engine lacks is hidden. Picture presets, screen size, button
 remapping, players and rewind holds are EmuDEN's own drawing and input, so they are not shown

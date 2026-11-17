@@ -3,11 +3,13 @@
 
 // A tiny libretro core for the player's tests: it draws a moving pattern (64x48, RGB565),
 // beeps, moves a square with the D-pad, counts presses of A in its save RAM, has one option
-// and saves states. Content is optional; when given, its first byte seeds the pattern.
+// and saves states. Content is optional; when given, its first byte seeds the pattern. The
+// cheats it is given are written down for the tests (testcore_cheats).
 
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 #include "libretro.h"
 
@@ -29,6 +31,9 @@ State g_state;
 std::uint8_t g_save_ram[32];
 std::uint16_t g_pixels[WIDTH * HEIGHT];
 std::uint16_t g_square = 0xF800;
+
+std::string g_cheats; // "<index>:<on|off>:<code>;" per retro_cheat_set since the last reset
+int g_cheat_resets = 0;
 
 retro_environment_t g_environment;
 retro_video_refresh_t g_video;
@@ -197,8 +202,21 @@ RETRO_API bool retro_unserialize(const void* data, size_t size) {
     return true;
 }
 
-RETRO_API void retro_cheat_reset(void) {}
-RETRO_API void retro_cheat_set(unsigned, bool, const char*) {}
+RETRO_API void retro_cheat_reset(void) {
+    g_cheats.clear();
+    ++g_cheat_resets;
+}
+RETRO_API void retro_cheat_set(unsigned index, bool enabled, const char* code) {
+    g_cheats += std::to_string(index) + (enabled ? ":on:" : ":off:") + (code ? code : "") + ";";
+}
+
+// For the tests: the cheats set since the last reset, and how many resets there were.
+RETRO_API const char* testcore_cheats(void) {
+    return g_cheats.c_str();
+}
+RETRO_API int testcore_cheat_resets(void) {
+    return g_cheat_resets;
+}
 
 RETRO_API void* retro_get_memory_data(unsigned id) {
     return id == RETRO_MEMORY_SAVE_RAM ? g_save_ram : nullptr;

@@ -18,12 +18,16 @@ std::span<std::uint8_t> PlayerSession::MemoryRegion(unsigned id) const {
 }
 
 void PlayerSession::SetHardcore(bool on) {
+    const bool changed = hardcore_ != on;
     hardcore_ = on;
     snapshot_.hardcore = on;
     snapshot_.can_rewind = rewind_.has_value() && !on;
     if (on) {
         SetRewind(false);
         pending_resume_ = false;
+    }
+    if (changed) {
+        ApplyCheats();
     }
 }
 

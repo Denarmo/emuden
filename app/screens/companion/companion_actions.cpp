@@ -11,6 +11,7 @@
 #include "den/app/app.h"
 #include "den/app/apps_catalog.h"
 #include "den/app/beside.h"
+#include "den/app/cheats.h"
 #include "den/app/pages.h"
 #include "den/app/quick_actions.h"
 #include "den/app/volume_rows.h"
@@ -140,8 +141,14 @@ std::vector<QuickAction> CompanionPlay::MakeActions(const player::Snapshot& snap
             out.push_back(Make("options", "companion.quick.options", "Core options", Kind::Section, PlayerPage("options")));
             out.push_back(Make("buttons", "companion.quick.buttons", "Buttons", Kind::Section, PlayerPage("buttons")));
         }
+        if (snapshot.can_cheats) {
+            QuickAction& cheats = out.emplace_back(Make("cheats", "companion.section.cheats", "Cheats", Kind::Section,
+                                                        [this] { OpenCheats(GetStage()); }));
+            cheats.value = CheatsSummary();
+            cheats.rows.push_back(ValueRow(cheats.node_id, cheats.label, [] { return CheatsSummary(); }, cheats.run));
+        }
     }
-    // What other features added (cheats).
+    // What other features added.
     for (const QuickActionHook& hook : QuickActionHooks()) {
         const bool built_in = std::any_of(out.begin(), out.end(), [&](const QuickAction& a) { return a.id == hook.id; });
         if (built_in || !KnownQuickAction(hook.id) || !hook.run || (hook.available && !hook.available())) {

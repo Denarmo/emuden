@@ -14,8 +14,8 @@
 namespace den::app {
 
 struct QuickActionHook {
-    std::string id;    // "cheats"
-    std::string label; // "Cheats"
+    std::string id;    // one of QuickActionIds() that no built-in action has taken
+    std::string label;
     std::function<void()> run;
     std::function<bool()> available;    // while a game runs; empty: always
     std::function<std::string()> value; // a short state at the right ("2 on"); optional
@@ -27,7 +27,7 @@ const std::vector<QuickActionHook>& QuickActionHooks();
 
 } // namespace den::app
 
-/// DEN_REGISTER_QUICK_ACTION({"cheats", "Cheats", [] { OpenCheats(); }});
+/// DEN_REGISTER_QUICK_ACTION({"id", "Label", [] { ... }}); the id must be one of QuickActionIds().
 #define DEN_REGISTER_QUICK_ACTION(...)                                                            \
     static const bool DEN_QUICK_CONCAT(den_quick_action_, __LINE__) =                             \
         (::den::app::AddQuickAction(::den::app::QuickActionHook __VA_ARGS__), true)

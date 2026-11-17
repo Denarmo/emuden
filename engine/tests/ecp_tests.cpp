@@ -126,7 +126,7 @@ TEST_CASE("an ecp engine is launched, paused, saved and stopped", "[engine][ecp]
     CHECK(control->Level() == 2);
     CHECK(control->Has("states"));
     CHECK(control->Has("menu"));
-    CHECK_FALSE(control->Has("cheats")); // EmuDEN does not drive it, so it is not used
+    CHECK(control->Has("cheats"));
     CHECK(control->Ready());
     CHECK(control->Playing());
 

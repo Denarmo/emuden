@@ -224,7 +224,8 @@ private:
             Reply(message, true);
             Emit("stopped", {{"reason", JsonString("frontend")}});
             Close();
-        } else if (type == "set_speed" || type == "set_volume" || type == "reset" || type == "set_rewind") {
+        } else if (type == "set_speed" || type == "set_volume" || type == "reset" || type == "set_rewind" ||
+                   type == "set_cheats") {
             Reply(message, true);
         } else {
             Reply(message, false, {}, "unsupported");

@@ -125,7 +125,8 @@ void BuildDockLayout(QuickContext& ctx) {
         const library::Entry* game = ctx.game;
         auto* cover = stage->Emplace<CoverView>(game ? game->name : std::string("Game"),
                                                 game ? game->cover : std::string(), tall * 0.75f, tall);
-        cover->overlay_title = game && game->placeholder_cover;
+        // The title is drawn only on the plain panel shown when there is no picture at all.
+        cover->overlay_title = false;
         cover->hack = game && IsHackGame(*game);
     }
     ui::Node* side = stage->Add(ui::MakeBox(ui::Axis::Column, 10));

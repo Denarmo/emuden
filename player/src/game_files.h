@@ -20,6 +20,7 @@ namespace den::player {
 struct GamePaths {
     std::filesystem::path save_dir;  // <data>/saves/<system>: the core's own files too
     std::filesystem::path state_dir; // <data>/states/<system>
+    std::filesystem::path cheat_dir; // <data>/cheats/<system>
     std::string base;                // file name stem for this game
 
     std::filesystem::path BatterySave() const;      // <save_dir>/<base>.srm
@@ -27,6 +28,7 @@ struct GamePaths {
     std::filesystem::path Thumbnail(int slot) const; // the same with .png
     std::filesystem::path Resume() const;           // <state_dir>/<base>.resume.state
     std::filesystem::path ResumePicture() const;    // <state_dir>/<base>.resume.png
+    std::filesystem::path Cheats() const;           // <cheat_dir>/<base>.json
 };
 
 GamePaths MakeGamePaths(const std::filesystem::path& data_dir, const std::string& system,
