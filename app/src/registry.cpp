@@ -4,10 +4,7 @@
 #include <algorithm>
 
 #include "den/app/app.h"
-#include "den/app/frame.h"
 #include "den/app/registry.h"
-#include "den/base/files.h"
-#include "den/platform/pal.h"
 
 namespace den::app {
 
@@ -68,81 +65,6 @@ std::vector<SettingsSection> Registry::Settings() const {
     std::stable_sort(out.begin(), out.end(),
                      [](const SettingsSection& a, const SettingsSection& b) { return a.order < b.order; });
     return out;
-}
-
-namespace {
-
-// EmuDEN's mark ("D.", assets/branding), drawn in the theme's ink so it follows the theme.
-class BrandMark final : public ui::Node {
-public:
-    explicit BrandMark(float side) {
-        width = height = side;
-    }
-
-protected:
-    void DrawContent(ui::Context& ctx) override {
-        static const std::string path = PathToUtf8(pal::AssetsDir() / "branding" / "mark-white.png");
-        if (const gfx::Texture texture = ctx.textures ? ctx.textures->Get(path, 128) : gfx::Texture{}) {
-            ctx.canvas->DrawImage(rect, texture, ctx.theme->fg);
-        }
-    }
-};
-
-} // namespace
-
-ui::Node* BuildRailFrame(ui::Page& page, const std::string& title) {
-    const ui::Theme& theme = *Svc().theme;
-    ui::Node& root = page.Root();
-    root.axis = ui::Axis::Row;
-
-    ui::Node* rail = root.Add(ui::MakeBox(ui::Axis::Column, 8));
-    rail->id = "rail";
-    rail->chrome = true;
-    rail->width = 232;
-    rail->background = theme.panel;
-    rail->SetPadding(16, 24);
-    ui::Node* brand = rail->Add(ui::MakeBox(ui::Axis::Row, 8));
-    brand->align = ui::Align::Center;
-    brand->pad_left = 6;
-    brand->pad_bottom = 18;
-    brand->Emplace<BrandMark>(40.0f);
-    ui::Node* word = brand->Add(ui::MakeBox(ui::Axis::Row, 0));
-    word->Emplace<ui::Label>("Emu", 26.0f, gfx::FONT_REGULAR);
-    word->Emplace<ui::Label>("DEN", 26.0f, gfx::FONT_BOLD);
-    for (const RailEntry& entry : Registry::Get().Rail()) {
-        auto* button = rail->Emplace<ui::Button>(entry.label);
-        button->id = "rail." + entry.route;
-        button->centered = false;
-        button->selected = entry.route == page.Route();
-        button->on_activate = [route = entry.route, current = page.Route()] {
-            if (route != current) {
-                Svc().stage->PopToRoot();
-                Svc().stage->Replace(route);
-            }
-        };
-    }
-
-    ui::Node* content = root.Add(ui::MakeBox(ui::Axis::Column, 16));
-    content->id = "content";
-    content->grow = 1;
-    content->pad_left = theme.margin;
-    content->pad_top = 28;
-    if (!title.empty()) {
-        content->Emplace<ui::Label>(title, theme.text_title, gfx::FONT_BOLD);
-    }
-    return content;
-}
-
-ui::Node* BuildPlainFrame(ui::Page& page, const std::string& title) {
-    const ui::Theme& theme = *Svc().theme;
-    ui::Node& root = page.Root();
-    root.axis = ui::Axis::Column;
-    root.gap = 16;
-    root.SetPadding(theme.margin, 28);
-    if (!title.empty()) {
-        root.Emplace<ui::Label>(title, theme.text_title, gfx::FONT_BOLD);
-    }
-    return &root;
 }
 
 } // namespace den::app

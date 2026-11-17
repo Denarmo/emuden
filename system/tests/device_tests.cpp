@@ -110,6 +110,17 @@ TEST_CASE("Retroid Pocket Duo: two screens, medium, a clearly bigger interface")
     CHECK_FALSE(Flag(defaults, "engine.switch2.settings.docked"));
 }
 
+TEST_CASE("Retroid Pocket Classic: a small near-square screen keeps room across for the menus") {
+    const system::DeviceProfile profile = Profile("retroid-pocket-classic");
+    CHECK(profile.name == "Retroid Pocket Classic");
+    CHECK(profile.form == FormFactor::HandheldSmall);
+    // Its size alone asks for 1.6; at 1240x1080 that leaves 517 units across, so 1.45 (570).
+    const double scale = Number(Defaults(profile), "ui.scale");
+    CHECK(scale == Catch::Approx(1.45));
+    CHECK(720.0 * 1240.0 / 1080.0 / scale >= 560.0);
+    CHECK(Number(Defaults(Profile("retroid-pocket-5")), "ui.scale") == Catch::Approx(1.55)); // 16:9: unchanged
+}
+
 TEST_CASE("AYN Thor: two screens, high") {
     const system::DeviceProfile profile = Profile("ayn-thor");
     CHECK(profile.name == "AYN Thor");

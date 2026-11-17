@@ -26,7 +26,8 @@ namespace {
 
 // The UI is laid out for a window 720 units high; the scale follows the real height.
 constexpr float LOGICAL_HEIGHT = 720.0f;
-constexpr float MIN_LOGICAL_WIDTH = 760.0f;
+// The rail-framed pages adapt down to about this width (logic/page_widths.h).
+constexpr float MIN_LOGICAL_WIDTH = 480.0f;
 constexpr int KEY_F11 = 0x40000044; // SDLK_F11
 // How long closing may wait for the quit holds (a game's saves going up).
 constexpr double QUIT_HOLD_SECONDS = 10.0;

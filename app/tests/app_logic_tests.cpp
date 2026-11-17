@@ -11,6 +11,7 @@
 #include "core_options.h"
 #include "den/base/files.h"
 #include "interface_spec.h"
+#include "page_widths.h"
 #include "quick_spec.h"
 #include "web_rules.h"
 
@@ -220,4 +221,23 @@ TEST_CASE("downloads get a name that is free") {
     std::ofstream(dir / "hack (2).bps") << "2";
     CHECK(web::FreeFile(dir, "hack.bps") == dir / "hack (3).bps");
     fs::remove_all(dir);
+}
+
+TEST_CASE("page widths: the rail and Settings follow the room, not the device") {
+    constexpr float MARGIN = 32;
+    // 16:9 at the base size: the labelled rail and the sections beside the rows, as before.
+    CHECK_FALSE(SlimRail(1280));
+    CHECK(RailWidth(1280) == FULL_RAIL_WIDTH);
+    CHECK(SettingsSideBySide(RailContentWidth(1280, MARGIN)));
+    // 4:3 at the base size keeps the labelled rail; Settings goes to two levels.
+    CHECK_FALSE(SlimRail(960));
+    CHECK_FALSE(SettingsSideBySide(RailContentWidth(960, MARGIN)));
+    // A 1240x1080 screen at 1.45 (570 units) and at 1.6 (517): the slim rail, two levels.
+    for (const float page : {570.0f, 517.0f}) {
+        CHECK(SlimRail(page));
+        CHECK(RailWidth(page) == SLIM_RAIL_WIDTH);
+        CHECK_FALSE(SettingsSideBySide(RailContentWidth(page, MARGIN)));
+        CHECK(RailContentWidth(page, MARGIN) > 300);
+    }
+    CHECK_FALSE(SlimRail(0)); // not measured yet
 }

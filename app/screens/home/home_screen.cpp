@@ -22,6 +22,7 @@
 #include "den/app/games.h"
 #include "den/app/strings.h"
 #include "den/app/interfaces.h"
+#include "page_widths.h"
 
 namespace den::app {
 
@@ -133,7 +134,7 @@ public:
 
     void Draw(ui::Context& ctx, const gfx::Rect& area) override {
         // Behind the content only: the rail keeps its plain tint.
-        const float rail = 232;
+        const float rail = RailWidth(ctx.canvas->Width());
         backdrop_.Draw(ctx, gfx::Rect{rail, 0, ctx.canvas->Width() - rail, ctx.canvas->Height()});
         ui::Page::Draw(ctx, area);
     }

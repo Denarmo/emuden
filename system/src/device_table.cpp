@@ -22,6 +22,7 @@ const KnownDevice KNOWN[] = {
     {{"retroid", "pocketduo"}, "Retroid Pocket Duo", HandheldDual, Mid, 5.5f},
     {{"retroid", "flip"}, "Retroid Pocket Flip 2", HandheldSmall, Mid, 5.5f},
     {{"retroid", "pocketmini"}, "Retroid Pocket Mini", HandheldSmall, Mid, 3.9f},
+    {{"retroid", "classic"}, "Retroid Pocket Classic", HandheldSmall, Mid, 3.92f},
     {{"retroid", "pocket5"}, "Retroid Pocket 5", HandheldSmall, Mid, 5.5f},
     {{"ayn", "thor"}, "AYN Thor", HandheldDual, High, 6.0f},
     {{"odin3"}, "AYN Odin 3", HandheldSmall, VeryHigh, 6.0f},
@@ -192,6 +193,10 @@ std::optional<DeviceInfo> FakeDevice(std::string_view id) {
     if (id == "retroid-pocket-5") {
         return Android("Retroid", "Retroid Pocket 5", "SM8250", "Adreno (TM) 650", 7600,
                        {MakeScreen(1920, 1080, 60, 5.5f, 2.6f)});
+    }
+    if (id == "retroid-pocket-classic") {
+        return Android("Retroid", "Retroid Pocket Classic", "Qualcomm", "Adreno (TM)", 5600,
+                       {MakeScreen(1240, 1080, 60, 3.92f, 2.6f)});
     }
     if (id == "phone-low") {
         return Android("Generic", "Phone", "MT6765", "PowerVR Rogue GE8320", 2900,

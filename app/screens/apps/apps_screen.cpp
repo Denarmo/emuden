@@ -11,12 +11,12 @@
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/registry.h"
+#include "page_widths.h"
 
 namespace den::app {
 
 namespace {
 
-constexpr float RAIL_W = 232;
 
 class AppsScreen final : public ui::Page {
 public:
@@ -47,7 +47,7 @@ public:
         AppGridOptions options;
         options.id_prefix = "apps";
         options.query = query_;
-        options.width = width_ - (in_game_ ? svc.theme->margin * 2 : RAIL_W + svc.theme->margin * 2);
+        options.width = width_ - (in_game_ ? svc.theme->margin * 2 : RailWidth(width_) + svc.theme->margin * 2);
         options.on_open = [this](const system::AppItem& app) {
             OpenApp(app.id, in_game_, *Svc().stage);
         };

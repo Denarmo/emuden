@@ -70,6 +70,30 @@ Size Node::Measure(Context& ctx) {
     return measured_ = size;
 }
 
+float Node::HeightForWidth(Context& ctx, float w) {
+    // A plain column of wrapping children grows with them.
+    if (axis != Axis::Column || scrollable || height >= 0 || align != Align::Stretch || !visible) {
+        return -1;
+    }
+    const float inner = std::max(0.0f, w - pad_left - pad_right);
+    float total = 0;
+    int shown = 0;
+    bool changed = false;
+    for (auto& child : children_) {
+        if (!child->visible) {
+            continue;
+        }
+        const float h = child->width < 0 ? child->HeightForWidth(ctx, inner) : -1.0f;
+        changed = changed || h >= 0;
+        total += h >= 0 ? h : child->measured_.h;
+        ++shown;
+    }
+    if (!changed) {
+        return -1;
+    }
+    return total + gap * static_cast<float>(std::max(0, shown - 1)) + pad_top + pad_bottom;
+}
+
 void Node::Arrange(Context& ctx, const gfx::Rect& area) {
     rect = area;
     const bool row = axis == Axis::Row;
@@ -85,6 +109,11 @@ void Node::Arrange(Context& ctx, const gfx::Rect& area) {
         if (!child->visible) {
             continue;
         }
+        if (!row && align == Align::Stretch && child->width < 0) {
+            if (const float h = child->HeightForWidth(ctx, cross_size); h >= 0) {
+                child->measured_.h = h;
+            }
+        }
         total += row ? child->measured_.w : child->measured_.h;
         total_grow += child->grow;
         ++shown;
@@ -97,6 +126,7 @@ void Node::Arrange(Context& ctx, const gfx::Rect& area) {
     float cursor = row ? inner_x : inner_y;
 
     if (scrollable) {
+        content_extent = total + (row ? pad_left + pad_right : pad_top + pad_bottom); // wrapped rows included
         const float limit = std::max(0.0f, total - main_size);
         scroller.SetBounds(limit, main_size);
         // Past the ends while the rubber band is stretched, so not clamped here.

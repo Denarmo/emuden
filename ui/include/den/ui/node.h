@@ -139,6 +139,9 @@ public:
         return false;
     }
     virtual void DragTo(float x, float y) {}
+    /// The height the node needs when laid out `width` wide, for content that wraps; negative
+    /// keeps what Measure said. A column asks it of the children it stretches across.
+    virtual float HeightForWidth(Context& ctx, float width);
 
     Node* FindById(const std::string& wanted);
     /// Every visible focusable node below (and including) this one.

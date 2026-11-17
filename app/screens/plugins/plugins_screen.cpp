@@ -15,6 +15,7 @@
 #include "den/app/interfaces.h"
 #include "den/app/feature_api.h"
 #include "den/app/model_widgets.h"
+#include "page_widths.h"
 
 namespace den::app {
 
@@ -22,7 +23,7 @@ namespace {
 
 using plugins::FeaturePlugin;
 
-constexpr float ICON = 144, RAIL_W = 232;
+constexpr float ICON = 144;
 
 std::string Badge(const FeaturePlugin& plugin) {
     if (!plugin.error.empty()) {
@@ -78,7 +79,7 @@ public:
         selected_.clear();
         ui::Node* content = BuildRailFrame(*this, "Plugins");
         content->pad_right = svc.theme->margin;
-        const float room = (width_ > 0 ? width_ : 1280.0f) - RAIL_W - svc.theme->margin * 2;
+        const float room = RailContentWidth(width_ > 0 ? width_ : 1280.0f, svc.theme->margin);
         if (!host) {
             auto* text = content->Emplace<Paragraph>(
                 "Plugins add features to EmuDEN, such as installing ROM hacks on your own games. "
