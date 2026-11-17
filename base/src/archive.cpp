@@ -71,8 +71,19 @@ bool CanExtractArchiveEntry(const ZipEntry& entry) {
     if (entry.index < 0) {
         return CanExtractZipEntry(entry);
     }
-    return !entry.encrypted && !entry.symlink && !entry.unsupported &&
-           entry.block_size <= SEVEN_ZIP_MAX_BLOCK;
+    return SevenZipRefusal(entry, {}).empty();
+}
+
+std::string ArchiveEntryRefusal(const fs::path& archive, const ZipEntry& entry) {
+    const std::string shown = PathToUtf8(archive.filename());
+    if (entry.index >= 0) {
+        return SevenZipRefusal(entry, shown);
+    }
+    if (CanExtractZipEntry(entry)) {
+        return {};
+    }
+    return entry.encrypted ? shown + " needs a password, which EmuDEN does not ask for"
+                           : entry.name + " is packed in a way this build cannot read";
 }
 
 Status ExtractArchiveEntry(const fs::path& archive, const ZipEntry& entry, const fs::path& destination,

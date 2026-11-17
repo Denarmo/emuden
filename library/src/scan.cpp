@@ -10,6 +10,7 @@
 #include "den/base/files.h"
 #include "den/base/names.h"
 #include "den/base/archive.h"
+#include "den/base/log.h"
 #include "den/library/content.h"
 #include "den/library/names.h"
 #include "den/library/scan.h"
@@ -206,16 +207,23 @@ void AddRom(Scan& scan, const fs::path& file, const SystemDef* def, const fs::pa
     if (archive && !passed_zip) {
         const auto members = ListArchive(file);
         if (!members) {
+            log::Warn("library", "{} skipped: it cannot be read as an archive", PathToUtf8(file));
             return;
         }
         int best = -1;
+        std::string refusal;
         for (const ZipEntry& member : *members) {
             const std::string member_extension = scan.systems.RomExtension(ToLower(member.name));
             // Outside a system folder the archive's content says which console it is for.
             const SystemDef* member_def =
                 def != nullptr ? def : scan.systems.FromUniqueExtension(member_extension);
-            if (member_def == nullptr || !IsSafeRelativePath(member.name) ||
-                !CanExtractArchiveEntry(member)) {
+            if (member_def == nullptr || !IsSafeRelativePath(member.name)) {
+                continue;
+            }
+            if (!CanExtractArchiveEntry(member)) {
+                if (refusal.empty() && MemberRank(*member_def, member_extension) >= 0) {
+                    refusal = ArchiveEntryRefusal(file, member);
+                }
                 continue;
             }
             const int rank = MemberRank(*member_def, member_extension);
@@ -226,6 +234,9 @@ void AddRom(Scan& scan, const fs::path& file, const SystemDef* def, const fs::pa
             }
         }
         if (archive_member.empty()) {
+            if (!refusal.empty()) {
+                log::Warn("library", "{} skipped: {}", PathToUtf8(file), refusal);
+            }
             return;
         }
     }

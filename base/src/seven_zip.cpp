@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// 7z archives through the LZMA SDK's C decoder (public domain; cmake/deps.cmake). The SDK
-// unpacks a whole solid block into memory and hands out the file's part of it.
+// 7z archives through the LZMA SDK's C decoder (public domain; cmake/deps.cmake). A small
+// solid block is unpacked whole into memory and the file's part of it written out; a large
+// one is decoded in pieces (seven_zip_stream.cpp) straight into the file.
 
 #include <cstdlib>
 #include <cstring>
@@ -14,6 +15,7 @@
 #include <7zCrc.h>
 
 #include "seven_zip.h"
+#include "seven_zip_stream.h"
 
 namespace den {
 
@@ -31,7 +33,7 @@ constexpr std::uint32_t METHODS[] = {0x0,       0x3,       0x21,      0xA,      
                                      0x3030805};
 
 void* Allocate(ISzAllocPtr, std::size_t size) {
-    return size == 0 || size > SEVEN_ZIP_MAX_BLOCK ? nullptr : std::malloc(size);
+    return size == 0 || size > SevenZipLimits{}.max_memory_block ? nullptr : std::malloc(size);
 }
 
 void Release(ISzAllocPtr, void* address) {
@@ -39,6 +41,8 @@ void Release(ISzAllocPtr, void* address) {
 }
 
 const ISzAlloc ALLOC = {Allocate, Release};
+
+using Sink = SevenZipStream::Sink;
 
 // The SDK's seekable input over a file. `vt` is first, so the SDK's pointer is this object.
 struct FileIn {
@@ -104,7 +108,8 @@ std::string NameFromUtf16(const std::vector<UInt16>& name) {
 
 class SevenZip final : public ArchiveReader {
 public:
-    explicit SevenZip(const fs::path& archive) : archive_(archive), file_(archive, std::ios::binary) {
+    SevenZip(const fs::path& archive, const SevenZipLimits& limits)
+        : archive_(archive), limits_(limits), file_(archive, std::ios::binary) {
         static std::once_flag crc_table;
         std::call_once(crc_table, [] { CrcGenerateTable(); });
         in_.vt.Read = ReadFile;
@@ -169,45 +174,60 @@ public:
             SzArEx_IsDir(&db_, entry.index) || SzArEx_GetFileSize(&db_, entry.index) != entry.size) {
             return Status::Fail(entry.name + " is not a file of " + shown);
         }
-        if (!CanExtractArchiveEntry(entry)) {
-            return Status::Fail(Refusal(entry, shown));
+        if (const std::string refusal = SevenZipRefusal(entry, shown, limits_); !refusal.empty()) {
+            return Status::Fail(refusal);
         }
         if (cancelled && cancelled()) {
             return Status::Fail("cancelled");
         }
+        const UInt32 folder = db_.FileToFolder[entry.index];
+        // An empty file is part of no block.
+        if (folder == NO_BLOCK) {
+            return WritePart(destination, cancelled, [](const Sink&) { return std::string(); });
+        }
+        if (SevenZipStreams(entry, limits_)) {
+            return Stream(entry, folder, destination, cancelled);
+        }
         std::size_t offset = 0;
         std::size_t size = 0;
-        // An empty file is part of no block.
-        if (db_.FileToFolder[entry.index] != NO_BLOCK) {
-            const SRes code =
-                SzArEx_Extract(&db_, &look_.vt, static_cast<UInt32>(entry.index), &block_index_, &block_,
-                               &block_size_, &offset, &size, &ALLOC, &ALLOC);
-            if (code != SZ_OK) {
-                // The SDK leaves a block it could not finish; it is not a cache.
-                ISzAlloc_Free(&ALLOC, block_);
-                block_ = nullptr;
-                block_index_ = NO_BLOCK;
-                block_size_ = 0;
-                return Status::Fail(code == SZ_ERROR_MEM           ? "not enough memory to unpack " + shown
-                                    : code == SZ_ERROR_UNSUPPORTED ? Refusal(entry, shown)
-                                                                   : PathToUtf8(archive_) + " is damaged (" +
-                                                                         entry.name + ")");
-            }
+        const SRes code = SzArEx_Extract(&db_, &look_.vt, static_cast<UInt32>(entry.index), &block_index_,
+                                         &block_, &block_size_, &offset, &size, &ALLOC, &ALLOC);
+        if (code != SZ_OK) {
+            // The SDK leaves a block it could not finish; it is not a cache.
+            ISzAlloc_Free(&ALLOC, block_);
+            block_ = nullptr;
+            block_index_ = NO_BLOCK;
+            block_size_ = 0;
+            return Status::Fail(Failure(code, entry));
         }
-        return Write(block_ + offset, size, destination, cancelled);
+        const Byte* data = block_ + offset;
+        return WritePart(destination, cancelled, [&](const Sink& sink) {
+            for (std::size_t done = 0; done < size;) {
+                const std::size_t part = std::min(WRITE_BLOCK, size - done);
+                if (!sink(data + done, part)) {
+                    break;
+                }
+                done += part;
+            }
+            return std::string();
+        });
     }
 
 private:
     // Marks a file whose block uses a password or a method the SDK's decoder does not read.
     void Methods(UInt32 folder, ZipEntry& entry) const {
         CSzData data;
-        data.Data = db_.db.CodersData + db_.db.FoCodersOffsets[folder];
+        const Byte* const props = db_.db.CodersData + db_.db.FoCodersOffsets[folder];
+        data.Data = props;
         data.Size = db_.db.FoCodersOffsets[folder + 1] - db_.db.FoCodersOffsets[folder];
         CSzFolder coders;
         if (SzGetNextFolderItem(&coders, &data) != SZ_OK) {
             entry.unsupported = true;
             return;
         }
+        const SevenZipChain chain = ReadSevenZipChain(coders, props, entry.block_size);
+        entry.streams = chain.streams;
+        entry.window = chain.window;
         for (UInt32 i = 0; i < coders.NumCoders; ++i) {
             const std::uint32_t method = coders.Coders[i].MethodID;
             entry.encrypted = entry.encrypted || method == METHOD_AES;
@@ -219,33 +239,86 @@ private:
         }
     }
 
-    static std::string Refusal(const ZipEntry& entry, const std::string& shown) {
-        if (entry.encrypted) {
-            return shown + " needs a password, which EmuDEN does not ask for";
+    std::string Failure(SRes code, const ZipEntry& entry) const {
+        switch (code) {
+        case SZ_ERROR_MEM: return "not enough memory to unpack " + PathToUtf8(archive_.filename());
+        case SZ_ERROR_UNSUPPORTED: return entry.name + " is packed in a way this build cannot read";
+        case SZ_ERROR_READ: return "cannot read " + PathToUtf8(archive_);
+        default: return PathToUtf8(archive_) + " is damaged (" + entry.name + ")";
         }
-        if (entry.block_size > SEVEN_ZIP_MAX_BLOCK) {
-            return shown + " packs its files as one block of " + std::to_string(entry.block_size >> 20) +
-                   " MiB, more than EmuDEN unpacks from a 7z (1024 MiB)";
-        }
-        return entry.name + " is packed in a way this build cannot read";
     }
 
-    static Status Write(const Byte* data, std::size_t size, const fs::path& destination,
-                        const std::function<bool()>& cancelled) {
+    // Decodes the block from its start, or on from the file written from it last.
+    Status Stream(const ZipEntry& entry, UInt32 folder, const fs::path& destination,
+                  const std::function<bool()>& cancelled) {
+        const std::uint64_t offset =
+            db_.UnpackPositions[entry.index] - db_.UnpackPositions[db_.FolderToFile[folder]];
+        if (!stream_ || stream_->Folder() != folder || stream_->Position() > offset) {
+            stream_ = std::make_unique<SevenZipStream>();
+            if (const SRes code = stream_->Open(archive_, db_, folder, limits_.max_window); code != SZ_OK) {
+                stream_.reset();
+                return Status::Fail(Failure(code, entry));
+            }
+        }
+        // The files before this one in the block are decoded and dropped.
+        bool stopped = false;
+        SRes code = stream_->Read(offset - stream_->Position(), [&](const Byte*, std::size_t) {
+            stopped = cancelled && cancelled();
+            return !stopped;
+        });
+        if (code != SZ_OK) {
+            stream_.reset();
+            return Status::Fail(stopped ? "cancelled" : Failure(code, entry));
+        }
+        // A block of one file may carry the block's checksum instead of the file's.
+        const bool whole = entry.size == entry.block_size && SzBitWithVals_Check(&db_.db.FolderCRCs, folder);
+        UInt32 crc = CRC_INIT_VAL;
+        const Status written = WritePart(destination, cancelled, [&](const Sink& sink) {
+            code = stream_->Read(entry.size, [&](const Byte* data, std::size_t size) {
+                crc = CrcUpdate(crc, data, size);
+                return sink(data, size);
+            });
+            if (code == SZ_ERROR_PROGRESS) {
+                return std::string(); // the sink said why
+            }
+            if (code != SZ_OK) {
+                return Failure(code, entry);
+            }
+            const UInt32 expected = entry.crc_known ? entry.crc : whole ? db_.db.FolderCRCs.Vals[folder] : 0;
+            if ((entry.crc_known || whole) && CRC_GET_DIGEST(crc) != expected) {
+                return PathToUtf8(archive_) + " is damaged (" + entry.name + ")";
+            }
+            return std::string();
+        });
+        if (!written.ok) {
+            stream_.reset();
+        }
+        return written;
+    }
+
+    // Writes what `fill` hands its sink to "<destination>.part", renamed once complete.
+    // `fill` returns an error, or nothing when done or when the sink refused (it says why).
+    static Status WritePart(const fs::path& destination, const std::function<bool()>& cancelled,
+                            const std::function<std::string(const Sink&)>& fill) {
         fs::path partial = destination;
         partial += ".part";
         std::ofstream out(partial, std::ios::binary | std::ios::trunc);
         std::string error = out ? std::string() : "cannot write " + PathToUtf8(destination);
-        for (std::size_t done = 0; done < size && error.empty();) {
-            if (cancelled && cancelled()) {
-                error = "cancelled";
-                break;
-            }
-            const std::size_t part = std::min(WRITE_BLOCK, size - done);
-            out.write(reinterpret_cast<const char*>(data + done), static_cast<std::streamsize>(part));
-            done += part;
-            if (!out) {
-                error = "cannot write " + PathToUtf8(destination) + " (is the disk full?)";
+        if (error.empty()) {
+            const Sink sink = [&](const Byte* data, std::size_t size) {
+                if (cancelled && cancelled()) {
+                    error = "cancelled";
+                    return false;
+                }
+                out.write(reinterpret_cast<const char*>(data), static_cast<std::streamsize>(size));
+                if (!out) {
+                    error = "cannot write " + PathToUtf8(destination) + " (is the disk full?)";
+                    return false;
+                }
+                return true;
+            };
+            if (std::string failed = fill(sink); error.empty()) {
+                error = std::move(failed);
             }
         }
         out.close();
@@ -267,6 +340,7 @@ private:
     }
 
     fs::path archive_;
+    SevenZipLimits limits_;
     std::ifstream file_;
     FileIn in_{};
     CLookToRead2 look_{};
@@ -276,12 +350,37 @@ private:
     UInt32 block_index_ = NO_BLOCK;
     Byte* block_ = nullptr;
     std::size_t block_size_ = 0;
+    // A large block being decoded, positioned after the file written from it last.
+    std::unique_ptr<SevenZipStream> stream_;
 };
 
 } // namespace
 
-std::unique_ptr<ArchiveReader> OpenSevenZip(const fs::path& archive) {
-    auto reader = std::make_unique<SevenZip>(archive);
+std::string SevenZipRefusal(const ZipEntry& entry, const std::string& archive_name,
+                            const SevenZipLimits& limits) {
+    if (entry.encrypted) {
+        return archive_name + " needs a password, which EmuDEN does not ask for";
+    }
+    if (entry.symlink) {
+        return entry.name + " is a symbolic link, which EmuDEN does not unpack";
+    }
+    if (entry.unsupported) {
+        return entry.name + " is packed in a way this build cannot read";
+    }
+    if (SevenZipStreams(entry, limits) || entry.block_size <= limits.max_memory_block) {
+        return {};
+    }
+    if (entry.streams) {
+        return archive_name + " was packed with a dictionary of " + std::to_string(entry.window >> 20) +
+               " MiB, more than EmuDEN unpacks with (" + std::to_string(limits.max_window >> 20) + " MiB)";
+    }
+    return archive_name + " packs its files as one block of " + std::to_string(entry.block_size >> 20) +
+           " MiB with BCJ2 or several filters, more than EmuDEN unpacks in memory (" +
+           std::to_string(limits.max_memory_block >> 20) + " MiB)";
+}
+
+std::unique_ptr<ArchiveReader> OpenSevenZip(const fs::path& archive, const SevenZipLimits& limits) {
+    auto reader = std::make_unique<SevenZip>(archive, limits);
     if (!reader->Load()) {
         return nullptr;
     }
