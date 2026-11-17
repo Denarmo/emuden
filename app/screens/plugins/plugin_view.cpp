@@ -85,12 +85,12 @@ public:
             PageModel waiting;
             waiting.busy = true;
             shape_.clear();
-            nodes_ = BuildModel(BuildPlainFrame(*this, plugin.name), waiting, Sink());
+            nodes_ = BuildModel(BuildLevelFrame(*this, plugin.name), waiting, Sink());
             return;
         }
         const PageModel& top = pages.back();
         shape_ = ModelShape(top);
-        ui::Node* content = BuildPlainFrame(*this, top.title.empty() ? plugin.name : top.title);
+        ui::Node* content = BuildLevelFrame(*this, top.title.empty() ? plugin.name : top.title);
         content->gap = 12;
         nodes_ = BuildModel(content, top, Sink());
         if (nodes_.list) {

@@ -241,3 +241,13 @@ TEST_CASE("page widths: the rail and Settings follow the room, not the device") 
     }
     CHECK_FALSE(SlimRail(0)); // not measured yet
 }
+
+TEST_CASE("page widths: an opened Settings section has the rail's room for its two levels") {
+    constexpr float MARGIN = 32;
+    // Without the rail, 4:3 at the base size has the sections beside the rows.
+    CHECK(SettingsSideBySide(LevelContentWidth(1280, MARGIN)));
+    CHECK(SettingsSideBySide(LevelContentWidth(960, MARGIN)));
+    CHECK(LevelContentWidth(960, MARGIN) > RailContentWidth(960, MARGIN));
+    // A near-square handheld keeps the rows alone.
+    CHECK_FALSE(SettingsSideBySide(LevelContentWidth(570, MARGIN)));
+}
