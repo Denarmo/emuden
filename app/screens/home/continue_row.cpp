@@ -63,7 +63,7 @@ void ListOnlineGames() {
 }
 
 std::string DeviceText(const sync::ContinueItem& item) {
-    return item.device.empty() ? std::string("this device") : item.device;
+    return item.device.empty() ? Tr("this device") : item.device;
 }
 
 } // namespace
