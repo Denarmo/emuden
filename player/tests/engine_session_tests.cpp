@@ -179,10 +179,10 @@ TEST_CASE("an engine game is driven through the player session", "[player][engin
 
 TEST_CASE("an engine that fails to launch fails the session", "[player][engine]") {
     EngineFixture f;
-    f.fake.launch_error = "keys_missing";
+    f.fake.launch_error = "content_invalid";
     REQUIRE(f.session->Open(f.Request()));
     REQUIRE(f.AdvanceUntil([&] { return f.session->GetSnapshot().state == player::State::Failed; }));
-    CHECK(f.session->GetSnapshot().error.starts_with("This game is encrypted and EmuDEN has no keys for it."));
+    CHECK(f.session->GetSnapshot().error.starts_with("The engine cannot read this game. EmuDEN does not support encrypted games;"));
 }
 
 TEST_CASE("an engine session resumes from its resume state", "[player][engine]") {

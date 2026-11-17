@@ -358,11 +358,9 @@ std::string ErrorText(const JsonValue& result) {
             message = "The engine needs a BIOS that is not installed.";
         } else if (code == "firmware_missing") {
             message = "The engine needs firmware that is not installed.";
-        } else if (code == "keys_missing") {
-            message = "This game is encrypted and EmuDEN has no keys for it. Install your "
-                      "console's prod.keys, or dump the game again with decryption turned on.";
         } else if (code == "content_missing" || code == "content_invalid") {
-            message = "The engine cannot read this game.";
+            message = "The engine cannot read this game. EmuDEN does not support encrypted "
+                      "games; use a decrypted dump of the game.";
         } else if (code == "slot_empty") {
             message = "That slot is empty.";
         } else if (code == "state_incompatible") {
