@@ -18,6 +18,38 @@ namespace {
 using input::Nav;
 constexpr float HINT_BAR_HEIGHT = 48;
 
+// The longest start of `word` that fits beside `prefix`, cut at a character boundary and, when
+// one is in it, after the last path separator or dash (a long path has no spaces to wrap at).
+std::size_t FittingPart(gfx::Text& text, const std::string& prefix, const std::string& word, float size,
+                        float width) {
+    std::vector<std::size_t> cuts;
+    for (std::size_t i = 1; i <= word.size(); ++i) {
+        if (i == word.size() || (static_cast<unsigned char>(word[i]) & 0xC0) != 0x80) {
+            cuts.push_back(i);
+        }
+    }
+    std::size_t low = 0, high = cuts.size();
+    while (low < high) {
+        const std::size_t mid = (low + high + 1) / 2;
+        if (text.Measure(prefix + word.substr(0, cuts[mid - 1]), size) <= width) {
+            low = mid;
+        } else {
+            high = mid - 1;
+        }
+    }
+    if (low == 0) {
+        return 0;
+    }
+    const std::size_t fits = cuts[low - 1];
+    if (fits < word.size()) {
+        const std::size_t separator = word.find_last_of("/\\-_.", fits - 1);
+        if (separator != std::string::npos && separator + 1 >= fits / 2) {
+            return separator + 1;
+        }
+    }
+    return fits;
+}
+
 std::vector<std::string> Wrap(gfx::Text& text, const std::string& in, float size, float width) {
     std::vector<std::string> lines;
     std::string line, word;
@@ -26,11 +58,32 @@ std::vector<std::string> Wrap(gfx::Text& text, const std::string& in, float size
             return;
         }
         const std::string joined = line.empty() ? word : line + " " + word;
-        if (!line.empty() && text.Measure(joined, size) > width) {
+        if (text.Measure(joined, size) <= width) {
+            line = joined;
+        } else if (text.Measure(word, size) <= width) {
             lines.push_back(line);
             line = word;
         } else {
-            line = joined;
+            // Wider than a whole line: it starts beside what is there and breaks where it fits.
+            while (!word.empty()) {
+                const std::string prefix = line.empty() ? std::string() : line + " ";
+                std::size_t part = FittingPart(text, prefix, word, size, width);
+                if (part == 0 && !line.empty()) {
+                    lines.push_back(line);
+                    line.clear();
+                    continue;
+                }
+                part = std::max<std::size_t>(part, 1);
+                while (part < word.size() && (static_cast<unsigned char>(word[part]) & 0xC0) == 0x80) {
+                    ++part;
+                }
+                line = prefix + word.substr(0, part);
+                word.erase(0, part);
+                if (!word.empty()) {
+                    lines.push_back(line);
+                    line.clear();
+                }
+            }
         }
         word.clear();
     };
