@@ -17,8 +17,9 @@ namespace den::app {
 /// The chosen interface plugin's look, or null for the standard Home (also while the chosen
 /// one is not installed or cannot be read).
 std::shared_ptr<const InterfaceSpec> ChosenInterface();
-/// Makes `id` the Home interface ("" = the standard one) and shows Home with it.
-void UseInterface(const std::string& id);
+/// Makes `key` the Home interface ("" = the standard one, "<plugin>" its first look,
+/// "<plugin>/<look>" one of its looks) and shows Home with it.
+void UseInterface(const std::string& key);
 
 /// The Home page of the chosen interface, or null for the standard Home.
 std::unique_ptr<ui::Page> MakeChosenHome();

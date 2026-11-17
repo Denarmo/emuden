@@ -111,12 +111,16 @@ public:
                 // A plugin whose files are there but that was never accepted (a developer
                 // folder) is accepted first; an update waiting for consent still opens.
                 const bool accept = plugin.needs_consent && !plugin.update_available;
-                if (plugins::OffersHomeInterface(plugin)) {
+                const bool one_look = plugins::OffersHomeInterface(plugin) && !plugins::OffersHomeInterfaces(plugin);
+                if (one_look) {
                     tile->on_activate = [plugin] { OpenOrUpdate(plugin, [id = plugin.id] { UseInterface(id); }); };
                 } else if (plugin.kind == plugins::KIND_INTERFACE) {
-                    // Quick settings layouts only: they are picked under Settings, Interface.
-                    tile->on_activate = [plugin] {
-                        OpenOrUpdate(plugin, [] { Svc().stage->Push("settings", {{"section", "Interface"}}); });
+                    // Several Home looks and quick settings layouts are picked under Settings,
+                    // Interface; themes under Display.
+                    const bool themes_only = plugins::OffersThemes(plugin) && !plugins::OffersHomeInterface(plugin) &&
+                                             !plugins::OffersQuickSettings(plugin);
+                    tile->on_activate = [plugin, section = themes_only ? "Display" : "Interface"] {
+                        OpenOrUpdate(plugin, [section] { Svc().stage->Push("settings", {{"section", section}}); });
                     };
                 } else {
                     tile->on_activate = [plugin, accept] {
@@ -125,7 +129,7 @@ public:
                         });
                     };
                 }
-                tile->on_focus = [this, id = plugin.id, look = plugins::OffersHomeInterface(plugin)] {
+                tile->on_focus = [this, id = plugin.id, look = one_look] {
                     selected_ = id;
                     selected_look_ = look;
                 };

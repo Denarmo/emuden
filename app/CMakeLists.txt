@@ -21,9 +21,13 @@ endforeach()
 file(GLOB app_logic_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/logic/*.cpp")
 add_library(den_app_logic STATIC ${app_logic_sources})
 target_include_directories(den_app_logic PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/logic")
-target_link_libraries(den_app_logic PUBLIC den_plugins den_gfx den_platform den_patching den_base)
+target_link_libraries(den_app_logic PUBLIC den_plugins den_ui den_gfx den_platform den_patching den_base)
 den_warnings(den_app_logic)
 den_tests(app den_app_logic)
+if(TARGET den_app_tests AND EXISTS "${EMUDEN_PLUGINS_DIR}/plugins")
+    # The official interface plugins' looks and themes are read as the app reads them.
+    target_compile_definitions(den_app_tests PRIVATE DEN_EMUDEN_PLUGINS_DIR="${EMUDEN_PLUGINS_DIR}")
+endif()
 
 if(ANDROID)
     # SDL's activity loads libmain.so and calls SDL_main (shells/android). SDL is linked in,

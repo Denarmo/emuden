@@ -212,7 +212,7 @@ struct Stage::Impl {
             const float tw = ctx.Text().Measure(label, theme.text_body, gfx::FONT_BOLD);
             canvas.DrawText(label, r.x + (r.w - tw) * 0.5f, r.y + 12, theme.text_body, theme.fg, gfx::FONT_BOLD);
             if (selected) {
-                DrawSelectionBorder(canvas, r, theme.radius, ctx.time);
+                DrawSelectionBorder(canvas, r, theme.radius, ctx.time, theme.accent);
             }
         };
         button(dialog->no_rect, dialog->no, dialog->selected == 0);

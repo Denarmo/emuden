@@ -49,8 +49,11 @@ struct Services {
 
 Services& Svc();
 
-/// Switches the theme by name and remembers it ("ui.theme").
-void SetTheme(const std::string& name);
+/// Switches the theme and remembers it ("ui.theme"): an app theme's name, or "<plugin>/<theme>"
+/// (or "<plugin>" for its first) for a plugin's (theme_choice.cpp).
+void SetTheme(const std::string& key);
+/// The theme a "ui.theme" value names; the default (Light) while that plugin is not installed.
+const ui::Theme& ThemeForKey(const std::string& key);
 /// Switches and remembers full screen ("window.fullscreen").
 void SetFullscreen(bool on);
 

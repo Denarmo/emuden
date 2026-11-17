@@ -7,7 +7,9 @@
 
 namespace den::ui {
 
-/// Draws the accent border around the current selection. Nothing else may use the accent.
-void DrawSelectionBorder(gfx::Canvas& canvas, const gfx::Rect& rect, float radius, double time);
+/// Draws the accent border (Theme::accent) around the current selection. Nothing else may
+/// use the accent.
+void DrawSelectionBorder(gfx::Canvas& canvas, const gfx::Rect& rect, float radius, double time,
+                         gfx::Color accent);
 
 } // namespace den::ui

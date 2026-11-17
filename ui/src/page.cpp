@@ -437,7 +437,7 @@ void Page::Draw(Context& ctx, const gfx::Rect& area) {
         }
     }
     ctx.canvas->PushClip(clip);
-    DrawSelectionBorder(*ctx.canvas, focus_->FocusRect(), focus_->FocusRadius(*ctx.theme), ctx.time);
+    DrawSelectionBorder(*ctx.canvas, focus_->FocusRect(), focus_->FocusRadius(*ctx.theme), ctx.time, ctx.theme->accent);
     ctx.canvas->PopClip();
 }
 

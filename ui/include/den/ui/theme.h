@@ -11,10 +11,10 @@
 namespace den::ui {
 
 /// Every colour and size the kit draws with. Widgets read the theme at draw time, so switching
-/// it restyles the whole app. The selection accent is not here on purpose: it exists only in
-/// the selection border (selection.cpp).
+/// it restyles the whole app.
 struct Theme {
     std::string name;
+    std::string key; // what "ui.theme" stores; the name for the app's own themes
     gfx::Color page;         // the page background
     gfx::Color fg;           // text, icons and the base of every tint
     gfx::Color text_dim;     // secondary text
@@ -22,6 +22,9 @@ struct Theme {
     gfx::Color panel_strong; // a stronger tint: pressed and filled parts, tracks
     gfx::Color scrim;        // behind dialogs
     gfx::Color dialog;       // opaque dialog and toast surface
+    /// The selection border's colour. Only DrawSelectionBorder (selection.cpp) uses it: it is
+    /// never a fill or a text colour.
+    gfx::Color accent = gfx::Color::Rgb(0x00ffa7);
 
     float radius = 14;      // panels and tiles
     float radius_small = 8; // badges, switches
@@ -39,5 +42,8 @@ const Theme& DarkTheme();
 /// The theme with that name (case-insensitive); the default (Light) when unknown.
 const Theme& ThemeByName(const std::string& name);
 std::vector<std::string> ThemeNames();
+
+/// The WCAG contrast ratio (1 to 21) of `fg`, blended by its alpha onto the opaque `bg`.
+double ContrastRatio(gfx::Color fg, gfx::Color bg);
 
 } // namespace den::ui

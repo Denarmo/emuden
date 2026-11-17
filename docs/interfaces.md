@@ -92,8 +92,9 @@ Everything is in logical units: the window is always 720 units high, the width f
   `DrawKeys`, `KeysPointer`), which `app/screens/companion/second_screen.cpp` does. The
   app's choice is made every frame in `app/screens/settings/keyboard.cpp` (`ui.keyboard`:
   `system` or `emuden`).
-- `ui::Theme`: Light (default) and Dark; widgets read `ctx.theme`. The accent exists only in
-  `ui/src/selection.cpp`, as the border of the current selection.
+- `ui::Theme`: Light (default) and Dark; widgets read `ctx.theme`. `Theme::accent` is drawn
+  only by `ui/src/selection.cpp`, as the border of the current selection.
+  `ui::ContrastRatio(fg, bg)` is the WCAG ratio.
 
 ## Adding a feature to the app
 
@@ -375,7 +376,15 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
   noted in `<data>/cache/core_options/<core>.json` whenever a game runs. Whoever opens a
   session uses `CoreForGame`, not `plugins->CoreFor`.
 - Themes: Light, Dark, Green, Magenta, Amber, High contrast, High contrast dark
-  (`ui/src/theme.cpp`).
+  (`ui/src/theme.cpp`), and the `themes` of interface plugins (`themes.1`;
+  `app/logic/theme_spec.h` reads them and leaves out any whose text is under 4.5:1 on its
+  page). `ui.theme` holds an app theme's name or `<plugin>/<theme>`; `SetTheme(key)` and
+  `ThemeForKey(key)` (`den/app/app.h`, `app/screens/settings/theme_choice.cpp`) resolve it,
+  falling back to Light while the plugin is missing. The picker is under Settings > Display.
+- Home looks: an interface plugin has one (`interface`) or several (`interfaces`, with
+  `interfaces.1`; `ParseInterfaces` in `app/logic/interface_spec.h`). `ui.home.interface`
+  holds "" (the standard Home), `<plugin>` (its first look) or `<plugin>/<look>`; Settings >
+  Interface lists every look (`app/screens/interface/interface_choice.cpp`).
 
 ## In-app browser
 

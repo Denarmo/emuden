@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// The look an interface plugin describes (plugin.json, "interface"; docs/interface-plugins.md
-// in emuden-plugins). It is data only: the app's layouts draw it, the plugin picks one and
-// sets its colours, art and motion. Anything missing or out of range takes the default.
+// The look an interface plugin describes (plugin.json, "interface", or each entry of
+// "interfaces"; docs/interface-plugins.md in emuden-plugins). It is data only: the app's
+// layouts draw it, the plugin picks one and sets its colours, art and motion. Anything
+// missing or out of range takes the default.
 
 #pragma once
 
@@ -81,7 +82,11 @@ struct HeroLook {
 
 struct InterfaceSpec {
     std::string id, name;
+    std::string look_id;       // the entry of "interfaces"; empty for the one "interface"
     std::filesystem::path dir; // the package
+
+    /// The setting value that picks it: "<plugin>/<look>", or the plugin's id for its one look.
+    std::string Key() const;
 
     /// The layout that draws it. "carousel": consoles as tabs, one row of covers with the
     /// selected one large in the middle. "shelf3d": the same row as 3D objects (cartridges,
@@ -136,6 +141,10 @@ struct InterfaceSpec {
 /// besides "plain", "pocket" and "pocket_wide" (MouldNames()).
 Result<InterfaceSpec> ParseInterface(std::string_view manifest_json, const std::filesystem::path& dir,
                                      const std::vector<std::string>& moulds);
+/// Every Home look of the plugin: one per entry of "interfaces" (those with a layout this app
+/// has, each id once), else the "interface" object as one. Fails when none is left.
+Result<std::vector<InterfaceSpec>> ParseInterfaces(std::string_view manifest_json, const std::filesystem::path& dir,
+                                                   const std::vector<std::string>& moulds);
 
 /// The layouts this app draws.
 bool KnownLayout(std::string_view layout);

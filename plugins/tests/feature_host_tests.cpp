@@ -450,6 +450,34 @@ TEST_CASE("an interface manifest is data with nothing to grant") {
     CHECK_FALSE(OffersQuickSettings(home));
 }
 
+TEST_CASE("an interface manifest may hold several Home looks and themes") {
+    const std::string head = R"({"id":"tester.looks","name":"Looks","version":"1.0.0","kind":"interface",
+        "api":1,)";
+    const std::string looks = R"("icon":"top.png","interfaces":[{"id":"grid","layout":"grid","icon":"g.png"}]})";
+    Result<FeatureManifest> several =
+        ParseFeatureManifest(head + R"("needs":["kind.interface","interface.1","interfaces.1"],)" + looks);
+    REQUIRE(several.ok());
+    CHECK(several->icon == "top.png");
+    CHECK_FALSE(ParseFeatureManifest(head + R"("needs":["kind.interface","interface.1"],)" + looks).ok());
+    FeaturePlugin plugin;
+    plugin.kind = KIND_INTERFACE;
+    plugin.needs = several->needs;
+    CHECK(OffersHomeInterface(plugin));
+    CHECK(OffersHomeInterfaces(plugin));
+    CHECK_FALSE(OffersThemes(plugin));
+
+    const std::string themes = R"("themes":[{"id":"a","name":"A","colors":{"page":"#000000","fg":"#ffffff"}}]})";
+    Result<FeatureManifest> only = ParseFeatureManifest(head + R"("needs":["kind.interface","themes.1"],)" + themes);
+    REQUIRE(only.ok());
+    CHECK(only->icon.empty());
+    plugin.needs = only->needs;
+    CHECK(OffersThemes(plugin));
+    CHECK_FALSE(OffersHomeInterface(plugin));
+    CHECK_FALSE(OffersHomeInterfaces(plugin));
+    CHECK_FALSE(ParseFeatureManifest(head + R"("needs":["kind.interface"],)" + themes).ok());
+    CHECK_FALSE(ParseFeatureManifest(head + R"("needs":["kind.interface","themes.1"],"themes":[]})").ok());
+}
+
 TEST_CASE("an interface manifest may hold quick settings layouts instead of a Home look") {
     const std::string head = R"({"id":"tester.quick","name":"Quick","version":"1.0.0","kind":"interface",
         "api":1,)";

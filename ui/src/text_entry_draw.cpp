@@ -79,7 +79,7 @@ void TextEntry::DrawKeyGrid(Context& ctx, bool far, float key_h) {
                         label_size, lit ? theme.dialog : theme.fg, gfx::FONT_BOLD);
     }
     if (selected) {
-        DrawSelectionBorder(canvas, selected->rect, theme.radius_small, ctx.time);
+        DrawSelectionBorder(canvas, selected->rect, theme.radius_small, ctx.time, theme.accent);
     }
 }
 

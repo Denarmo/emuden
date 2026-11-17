@@ -32,13 +32,15 @@ class TuneServices;
 class ModServices;
 
 /// Package kinds the feature host installs: "feature" (a script) and "interface" (data only:
-/// a look for the Home screen and/or layouts of the quick settings, docs/interface-plugins.md
-/// and docs/quick-settings.md in emuden-plugins).
+/// looks for the Home screen, layouts of the quick settings and themes, docs/interface-plugins.md,
+/// docs/quick-settings.md and docs/themes.md in emuden-plugins).
 inline constexpr const char* KIND_FEATURE = "feature";
 inline constexpr const char* KIND_INTERFACE = "interface";
 /// What an interface plugin offers, by the capabilities it needs.
 inline constexpr const char* NEED_HOME_INTERFACE = "interface.1";
 inline constexpr const char* NEED_QUICK_SETTINGS = "quick_settings.1";
+inline constexpr const char* NEED_HOME_INTERFACES = "interfaces.1"; // several Home looks
+inline constexpr const char* NEED_THEMES = "themes.1";
 
 struct PermissionLine {
     std::string permission, text;
@@ -61,9 +63,13 @@ struct FeaturePlugin {
     std::string error; // last script failure, user-facing
 };
 
-/// An interface plugin with a look for Home. One that names neither capability (written
-/// before quick settings) is taken as a Home interface.
+/// An interface plugin with a look for Home. One that names no capability of what it offers
+/// (written before quick settings) is taken as a Home interface.
 bool OffersHomeInterface(const FeaturePlugin& plugin);
+/// An interface plugin with several Home looks ("interfaces"), picked under Settings, Interface.
+bool OffersHomeInterfaces(const FeaturePlugin& plugin);
+/// An interface plugin with themes for the whole app ("themes").
+bool OffersThemes(const FeaturePlugin& plugin);
 /// An interface plugin with layouts for the quick settings of the second screen.
 bool OffersQuickSettings(const FeaturePlugin& plugin);
 

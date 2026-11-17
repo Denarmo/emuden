@@ -170,8 +170,18 @@ bool IsPackageKind(std::string_view kind) {
 }
 
 bool OffersHomeInterface(const FeaturePlugin& plugin) {
+    const auto& needs = plugin.needs;
     return plugin.kind == KIND_INTERFACE &&
-           (Contains(plugin.needs, NEED_HOME_INTERFACE) || !Contains(plugin.needs, NEED_QUICK_SETTINGS));
+           (Contains(needs, NEED_HOME_INTERFACE) || Contains(needs, NEED_HOME_INTERFACES) ||
+            (!Contains(needs, NEED_QUICK_SETTINGS) && !Contains(needs, NEED_THEMES)));
+}
+
+bool OffersHomeInterfaces(const FeaturePlugin& plugin) {
+    return plugin.kind == KIND_INTERFACE && Contains(plugin.needs, NEED_HOME_INTERFACES);
+}
+
+bool OffersThemes(const FeaturePlugin& plugin) {
+    return plugin.kind == KIND_INTERFACE && Contains(plugin.needs, NEED_THEMES);
 }
 
 bool OffersQuickSettings(const FeaturePlugin& plugin) {
@@ -218,23 +228,42 @@ Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
     }
     if (manifest.kind == KIND_INTERFACE) {
         // Data only: what the app draws is the app's code, so there is nothing to grant. It
-        // has a look for Home ("interface"), layouts of the quick settings, or both.
-        const JsonValue* look = root->Find("interface");
-        const JsonValue* quick = root->Find("quick_settings");
-        const bool has_look = look != nullptr && look->kind == JsonValue::Kind::Object;
-        const bool has_quick = quick != nullptr && quick->kind == JsonValue::Kind::Object;
-        if (!has_look && !has_quick) {
+        // has looks for Home ("interface", or several in "interfaces"), layouts of the quick
+        // settings, themes, or several of these.
+        const auto object = [&](const char* key) {
+            const JsonValue* value = root->Find(key);
+            return value != nullptr && value->kind == JsonValue::Kind::Object ? value : nullptr;
+        };
+        const auto array = [&](const char* key) {
+            const JsonValue* value = root->Find(key);
+            return value != nullptr && value->kind == JsonValue::Kind::Array && !value->items.empty() ? value
+                                                                                                      : nullptr;
+        };
+        const JsonValue* look = object("interface");
+        const JsonValue* looks = array("interfaces");
+        const JsonValue* quick = object("quick_settings");
+        const JsonValue* themes = array("themes");
+        if (!look && !looks && !quick && !themes) {
             return Status::Fail(manifest.id + " has no interface object");
         }
-        if (has_quick && !Contains(needs, NEED_QUICK_SETTINGS)) {
+        if (quick && !Contains(needs, NEED_QUICK_SETTINGS)) {
             return Status::Fail(manifest.id + " does not ask for " + NEED_QUICK_SETTINGS);
+        }
+        if (looks && !Contains(needs, NEED_HOME_INTERFACES)) {
+            return Status::Fail(manifest.id + " does not ask for " + NEED_HOME_INTERFACES);
+        }
+        if (themes && !Contains(needs, NEED_THEMES)) {
+            return Status::Fail(manifest.id + " does not ask for " + NEED_THEMES);
         }
         if (root->Find("feature") != nullptr) {
             return Status::Fail("an interface plugin cannot ask for permissions");
         }
-        manifest.icon = has_look ? look->String("icon") : std::string();
-        if (manifest.icon.empty() && has_quick) {
-            manifest.icon = quick->String("icon");
+        manifest.icon = root->String("icon");
+        const JsonValue* first_look = looks ? &looks->items[0] : look;
+        for (const JsonValue* holder : {first_look, quick}) {
+            if (manifest.icon.empty() && holder != nullptr) {
+                manifest.icon = holder->String("icon");
+            }
         }
         if (!manifest.icon.empty() &&
             (!IsSafeRelativePath(manifest.icon) || !manifest.icon.ends_with(".png"))) {

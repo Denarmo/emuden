@@ -12,6 +12,7 @@
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
+#include "theme_choice.h"
 
 namespace den::app {
 
@@ -54,14 +55,7 @@ void ApplyTextScale() {
 
 std::vector<ui::RowSpec> DisplayRows() {
     std::vector<ui::RowSpec> rows;
-    rows.push_back(ChoiceRow(
-        "ui.theme", "Theme", ui::ThemeNames(),
-        [] {
-            const std::vector<std::string> names = ui::ThemeNames();
-            const auto it = std::find(names.begin(), names.end(), Svc().theme->name);
-            return it == names.end() ? 0 : static_cast<int>(it - names.begin());
-        },
-        [](int index) { SetTheme(ui::ThemeNames()[static_cast<std::size_t>(index)]); }));
+    rows.push_back(ThemeRow());
 
     rows.push_back(ChoiceRow(
         TEXT_SCALE_KEY, "Text size", {"Small", "Normal", "Large", "Extra large"},

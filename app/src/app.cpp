@@ -87,14 +87,6 @@ Services& Svc() {
     return g_services;
 }
 
-void SetTheme(const std::string& name) {
-    g_services.theme = &ui::ThemeByName(name);
-    g_services.settings->SetString("ui.theme", g_services.theme->name);
-    if (ui::Page* page = g_services.stage->Top()) {
-        page->Rebuild();
-    }
-}
-
 void SetFullscreen(bool on) {
     g_services.window->SetFullscreen(on);
     g_services.settings->SetBool("window.fullscreen", on);
@@ -116,7 +108,7 @@ int Run(int argc, char** argv) {
     system::NoteStart(settings);
     // The device's defaults sit below every setting read from here on.
     system::InitDevice(settings);
-    svc.theme = &ui::ThemeByName(settings.GetString("ui.theme", "Light"));
+    svc.theme = &ThemeForKey(settings.GetString("ui.theme", "Light")); // a plugin's once its host is up
 
     pal::WindowDesc desc;
     desc.fullscreen = !HasArg(argc, argv, "--windowed") &&

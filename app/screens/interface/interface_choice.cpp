@@ -25,7 +25,7 @@ namespace {
 constexpr const char* CHOSEN_KEY = "ui.home.interface";
 
 struct Cache {
-    std::string id;
+    std::string key;
     std::uint64_t revision = ~0ull;
     std::shared_ptr<const InterfaceSpec> spec;
     const InterfaceSpec* shown = nullptr; // what Home was last built with
@@ -48,18 +48,34 @@ std::vector<plugins::FeaturePlugin> InterfacePlugins() {
     return out;
 }
 
-std::shared_ptr<const InterfaceSpec> Load(const std::string& id) {
-    plugins::FeaturePlugin plugin;
-    if (!FindFeaturePlugin(id, plugin) || !plugin.installed || plugin.kind != plugins::KIND_INTERFACE) {
-        return nullptr;
+// The looks of an installed plugin; empty when it has none this app can draw.
+std::vector<InterfaceSpec> LooksOf(const plugins::FeaturePlugin& plugin) {
+    if (!plugin.installed || !plugins::OffersHomeInterface(plugin)) {
+        return {};
     }
     const auto text = ReadTextFile(plugin.dir / "plugin.json");
-    Result<InterfaceSpec> spec = text ? ParseInterface(*text, plugin.dir, MouldNames()) : Status::Fail("no manifest");
-    if (!spec) {
-        log::Warn("interface", "{}: {}", id, spec.error());
+    Result<std::vector<InterfaceSpec>> looks =
+        text ? ParseInterfaces(*text, plugin.dir, MouldNames()) : Status::Fail("no manifest");
+    if (!looks) {
+        log::Warn("interface", "{}: {}", plugin.id, looks.error());
+        return {};
+    }
+    return looks.take();
+}
+
+// "<plugin>/<look>", or a plugin's id alone for its first look.
+std::shared_ptr<const InterfaceSpec> Load(const std::string& key) {
+    const std::size_t slash = key.find('/');
+    const std::string id = key.substr(0, slash);
+    const std::string look = slash == std::string::npos ? std::string() : key.substr(slash + 1);
+    plugins::FeaturePlugin plugin;
+    if (!FindFeaturePlugin(id, plugin)) {
         return nullptr;
     }
-    return std::make_shared<const InterfaceSpec>(spec.take());
+    std::vector<InterfaceSpec> looks = LooksOf(plugin);
+    const auto it = std::find_if(looks.begin(), looks.end(),
+                                 [&](const InterfaceSpec& spec) { return look.empty() || spec.look_id == look; });
+    return it == looks.end() ? nullptr : std::make_shared<const InterfaceSpec>(std::move(*it));
 }
 
 // Home follows the choice: rebuilt when the chosen plugin arrives, changes or goes.
@@ -74,27 +90,44 @@ void FollowChoice() {
 
 std::vector<ui::RowSpec> InterfaceRows() {
     const std::vector<plugins::FeaturePlugin> found = InterfacePlugins();
-    std::vector<std::string> ids = {""};
+    struct Entry {
+        std::string key, plugin;
+        bool install = false;
+    };
+    std::vector<Entry> entries = {{"", "", false}};
     std::vector<std::string> names = {"EmuDEN (standard)"};
     for (const plugins::FeaturePlugin& plugin : found) {
-        ids.push_back(plugin.id);
-        names.push_back(plugin.installed ? plugin.name : plugin.name + " (download)");
+        const bool install = !plugin.installed || plugin.update_available;
+        const std::vector<InterfaceSpec> looks = LooksOf(plugin);
+        if (looks.empty()) {
+            // Not downloaded yet: its first look once it is.
+            entries.push_back({plugin.id, plugin.id, true});
+            names.push_back(plugin.name + (plugin.installed ? " (update)" : " (download)"));
+            continue;
+        }
+        for (const InterfaceSpec& look : looks) {
+            entries.push_back({look.Key(), plugin.id, install});
+            names.push_back(looks.size() > 1 ? plugin.name + ": " + look.name : plugin.name);
+        }
     }
     ui::RowSpec choice = ChoiceRow(
         CHOSEN_KEY, "Home interface", names,
-        [ids] {
+        [entries] {
             const std::string chosen = Svc().settings->GetString(CHOSEN_KEY);
-            const auto it = std::find(ids.begin(), ids.end(), chosen);
-            return it == ids.end() ? 0 : static_cast<int>(it - ids.begin());
+            auto it = std::find_if(entries.begin(), entries.end(), [&](const Entry& e) { return e.key == chosen; });
+            if (it == entries.end()) {
+                // A plugin's id alone: its first look.
+                const std::string plugin = chosen.substr(0, chosen.find('/'));
+                it = std::find_if(entries.begin() + 1, entries.end(), [&](const Entry& e) { return e.plugin == plugin; });
+            }
+            return it == entries.end() ? 0 : static_cast<int>(it - entries.begin());
         },
-        [ids, found](int index) {
-            const std::string& id = ids[static_cast<std::size_t>(index)];
-            Svc().settings->SetString(CHOSEN_KEY, id);
-            const auto plugin = std::find_if(found.begin(), found.end(),
-                                             [&](const plugins::FeaturePlugin& p) { return p.id == id; });
+        [entries](int index) {
+            const Entry& entry = entries[static_cast<std::size_t>(index)];
+            Svc().settings->SetString(CHOSEN_KEY, entry.key);
             // An interface asks for no permission: there is nothing to accept.
-            if (plugin != found.end() && (!plugin->installed || plugin->update_available)) {
-                InstallFeaturePlugin(id, true);
+            if (entry.install) {
+                InstallFeaturePlugin(entry.plugin, true);
             }
         });
     choice.description = "How the first screen shows your games. Interfaces come from plugin sources, like consoles";
@@ -127,18 +160,18 @@ std::vector<ui::RowSpec> InterfaceRows() {
 std::shared_ptr<const InterfaceSpec> ChosenInterface() {
     Cache& cache = GetCache();
     plugins::FeatureHost* host = FeatureHostSvc();
-    const std::string id = Svc().settings ? Svc().settings->GetString(CHOSEN_KEY) : std::string();
+    const std::string key = Svc().settings ? Svc().settings->GetString(CHOSEN_KEY) : std::string();
     const std::uint64_t revision = host ? host->Revision() : 0;
-    if (id != cache.id || revision != cache.revision) {
-        cache.id = id;
+    if (key != cache.key || revision != cache.revision) {
+        cache.key = key;
         cache.revision = revision;
-        cache.spec = id.empty() || !host ? nullptr : Load(id);
+        cache.spec = key.empty() || !host ? nullptr : Load(key);
     }
     return cache.spec;
 }
 
-void UseInterface(const std::string& id) {
-    Svc().settings->SetString(CHOSEN_KEY, id);
+void UseInterface(const std::string& key) {
+    Svc().settings->SetString(CHOSEN_KEY, key);
     ui::Stage& stage = *Svc().stage;
     stage.PopToRoot();
     stage.Replace("home");

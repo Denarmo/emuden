@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <algorithm>
+#include <cmath>
+
 #include "den/base/files.h"
 #include "den/ui/theme.h"
 
@@ -11,6 +14,7 @@ namespace {
 Theme Make(const char* name, gfx::Color page, gfx::Color fg, gfx::Color dialog) {
     Theme theme;
     theme.name = name;
+    theme.key = name;
     theme.page = page;
     theme.fg = fg;
     theme.text_dim = fg.WithAlpha(0.62f);
@@ -77,6 +81,23 @@ std::vector<std::string> ThemeNames() {
         names.push_back(theme.name);
     }
     return names;
+}
+
+namespace {
+
+double Luminance(double r, double g, double b) {
+    const auto linear = [](double c) { return c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4); };
+    return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+}
+
+} // namespace
+
+double ContrastRatio(gfx::Color fg, gfx::Color bg) {
+    const double a = fg.a / 255.0;
+    const auto mix = [a](std::uint8_t f, std::uint8_t b) { return (f * a + b * (1 - a)) / 255.0; };
+    const double front = Luminance(mix(fg.r, bg.r), mix(fg.g, bg.g), mix(fg.b, bg.b));
+    const double back = Luminance(bg.r / 255.0, bg.g / 255.0, bg.b / 255.0);
+    return (std::max(front, back) + 0.05) / (std::min(front, back) + 0.05);
 }
 
 } // namespace den::ui

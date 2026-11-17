@@ -180,7 +180,7 @@ void Fallback::Draw(ui::Context& ctx, const gfx::Rect& area, bool selected) {
     canvas.DrawText(label, button_.x + 28, button_.y + (button_.h - theme.text_body) * 0.5f - 2, theme.text_body, theme.fg,
                     gfx::FONT_BOLD);
     if (selected) {
-        ui::DrawSelectionBorder(canvas, button_, theme.radius, pal::NowSeconds());
+        ui::DrawSelectionBorder(canvas, button_, theme.radius, pal::NowSeconds(), theme.accent);
     }
     y = button_.Bottom() + 28;
 

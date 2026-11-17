@@ -156,16 +156,24 @@ ConsoleLook InterfaceSpec::LookFor(std::string_view system, std::string_view gro
     return {};
 }
 
-Result<InterfaceSpec> ParseInterface(std::string_view manifest_json, const std::filesystem::path& dir,
-                                     const std::vector<std::string>& moulds) {
-    const std::optional<JsonValue> root = ParseJson(manifest_json);
-    const JsonValue* look = root ? root->Find("interface") : nullptr;
+namespace {
+
+constexpr std::size_t MAX_LOOKS = 16;
+
+bool PlainLookId(std::string_view id) {
+    return !id.empty() && id.size() <= 32 && std::all_of(id.begin(), id.end(), [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
+    });
+}
+
+Result<InterfaceSpec> ReadLook(const JsonValue& manifest, const JsonValue* look, const std::filesystem::path& dir,
+                               const std::vector<std::string>& moulds) {
     if (look == nullptr || look->kind != JsonValue::Kind::Object) {
         return Status::Fail("the plugin describes no interface");
     }
     InterfaceSpec spec;
-    spec.id = root->String("id");
-    spec.name = root->String("name");
+    spec.id = manifest.String("id");
+    spec.name = manifest.String("name");
     spec.dir = dir;
     if (const std::string layout = look->String("layout"); !layout.empty()) {
         spec.layout = layout;
@@ -251,6 +259,55 @@ Result<InterfaceSpec> ParseInterface(std::string_view manifest_json, const std::
         }
     }
     return spec;
+}
+
+} // namespace
+
+std::string InterfaceSpec::Key() const {
+    return look_id.empty() ? id : id + "/" + look_id;
+}
+
+Result<InterfaceSpec> ParseInterface(std::string_view manifest_json, const std::filesystem::path& dir,
+                                     const std::vector<std::string>& moulds) {
+    const std::optional<JsonValue> root = ParseJson(manifest_json);
+    if (!root) {
+        return Status::Fail("the plugin describes no interface");
+    }
+    return ReadLook(*root, root->Find("interface"), dir, moulds);
+}
+
+Result<std::vector<InterfaceSpec>> ParseInterfaces(std::string_view manifest_json, const std::filesystem::path& dir,
+                                                   const std::vector<std::string>& moulds) {
+    const std::optional<JsonValue> root = ParseJson(manifest_json);
+    const JsonValue* looks = root ? root->Find("interfaces") : nullptr;
+    if (looks == nullptr || looks->kind != JsonValue::Kind::Array) {
+        Result<InterfaceSpec> one = ParseInterface(manifest_json, dir, moulds);
+        if (!one) {
+            return Status::Fail(one.error());
+        }
+        return std::vector<InterfaceSpec>{one.take()};
+    }
+    std::vector<InterfaceSpec> out;
+    for (const JsonValue& entry : looks->items) {
+        Result<InterfaceSpec> spec = ReadLook(*root, &entry, dir, moulds);
+        if (!spec || out.size() >= MAX_LOOKS) {
+            continue;
+        }
+        const std::string id = entry.String("id");
+        spec->look_id = PlainLookId(id) ? id : spec->layout;
+        if (const std::string name = entry.String("name").substr(0, 40); !name.empty()) {
+            spec->name = name;
+        }
+        const bool taken = std::any_of(out.begin(), out.end(),
+                                       [&](const InterfaceSpec& s) { return s.look_id == spec->look_id; });
+        if (!taken) {
+            out.push_back(spec.take());
+        }
+    }
+    if (out.empty()) {
+        return Status::Fail("This version of EmuDEN has none of the plugin's Home looks.");
+    }
+    return out;
 }
 
 } // namespace den::app

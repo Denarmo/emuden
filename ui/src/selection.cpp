@@ -10,15 +10,12 @@
 
 namespace den::ui {
 
-namespace {
-constexpr gfx::Color ACCENT = gfx::Color::Rgb(0x00ffa7);
-}
-
-void DrawSelectionBorder(gfx::Canvas& canvas, const gfx::Rect& rect, float radius, double time) {
+void DrawSelectionBorder(gfx::Canvas& canvas, const gfx::Rect& rect, float radius, double time,
+                         gfx::Color accent) {
     const float pulse = 0.5f + 0.5f * static_cast<float>(std::sin(time * 3.2));
     const float outset = 4.0f + pulse * 1.5f;
     const gfx::Rect ring{rect.x - outset, rect.y - outset, rect.w + outset * 2, rect.h + outset * 2};
-    canvas.StrokeRect(ring, ACCENT, 3.5f, radius + outset);
+    canvas.StrokeRect(ring, accent, 3.5f, radius + outset);
 }
 
 } // namespace den::ui
