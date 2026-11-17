@@ -85,6 +85,11 @@ public:
     virtual ~FeatureHost() = default;
     virtual std::vector<FeaturePlugin> Plugins() const = 0; // installed first, then available
     virtual std::uint64_t Revision() const = 0;             // list changed
+    /// The installed plugins' own texts in an app language ("translations"), and those a
+    /// language pack of that language adds for other plugins (plugin_strings.json), which win.
+    virtual Texts TranslationsFor(std::string_view /*language*/) const {
+        return {};
+    }
     /// Fails without consent when the plugin needs it.
     virtual JobPtr Install(const std::string& id, bool consent) = 0;
     /// `undo_mods`: what the plugin applied to games and the Vulkan layers it set up

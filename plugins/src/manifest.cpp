@@ -455,6 +455,7 @@ Result<Manifest> ParseManifest(std::string_view text, bool developer) {
     manifest.engine = root->String("engine");
     manifest.publisher = root->String("publisher");
     manifest.summary = root->String("summary");
+    manifest.translations = ParseTranslations(root->Find("translations"));
     manifest.api = static_cast<int>(json::Number(*root, "api", 0));
     manifest.needs = json::Strings(*root, "needs", false);
     if (json::Number(*root, "manifest_version", 0) != 1 || manifest.api > API_VERSION) {

@@ -51,6 +51,7 @@ public:
     ~RealFeatureHost() override;
 
     std::vector<FeaturePlugin> Plugins() const override;
+    Texts TranslationsFor(std::string_view language) const override;
     std::uint64_t Revision() const override {
         return revision_.load();
     }

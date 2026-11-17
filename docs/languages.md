@@ -33,6 +33,20 @@ A literal English text given to those widgets is therefore translated without `T
 `python tools/extract_strings.py --missing <pack>/strings.json` lists the English texts in the code
 that a pack lacks.
 
+## Plugins
+
+A plugin carries its own texts in other languages: `"translations": {"es": {"English": "Español"}}`
+in its manifest, any kind (`plugins/include/den/plugins/translations.h`). A language pack adds
+texts for other plugins in `plugin_strings.json` (`{"<plugin id>": {...}}`). For the app's
+language, `Settings > Language` gathers them (`FeatureHost::TranslationsFor`, then
+`Host::TranslationsFor` for console plugins) into the table's plugin layer, between the pack's
+`strings.json` and the English: a pack's text wins over a plugin's, a plugin's over the English.
+A plugin's own texts apply even with no pack installed; the official plugins have Spanish.
+
+A feature plugin's script asks for its texts with `den.tr("{} of {} done", a, b)` (its manifest's
+translations for the app's language, `{}` filled in order) and `den.language()`. Texts its page
+model gives as they are (row labels, buttons, paragraphs, chips) also go through the table.
+
 ## Games
 
 - A core that asks the frontend's language (libretro `GET_LANGUAGE`) gets it from the app

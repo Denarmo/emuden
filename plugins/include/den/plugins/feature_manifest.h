@@ -90,6 +90,7 @@ struct FeatureManifest {
     std::string entry; // the script to run, relative to the package; empty for an interface
     std::string icon;
     std::string language, language_name; // a language pack: "es", "Español"
+    Translations translations;           // its own texts in other languages
     std::vector<std::string> needs;
     FeatureAccess access;
     std::vector<std::string> file_types; // lower case, without the dot

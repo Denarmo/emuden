@@ -124,6 +124,39 @@ int StorageKeys(lua_State* L) {
     return 1;
 }
 
+std::string Language(const Runner& runner) {
+    const auto& language = runner.Config().language;
+    const std::string code = language ? language() : std::string();
+    return code.empty() ? std::string("en") : code;
+}
+
+// den.language(): the app's language code ("en", "es").
+int LanguageCode(lua_State* L) {
+    const std::string code = Language(Runner::Of(L));
+    lua_pushlstring(L, code.data(), code.size());
+    return 1;
+}
+
+// den.tr(text, ...): the plugin's own translation of `text` in the app's language (its
+// manifest's "translations"), else `text`, with each {} filled by the next value.
+int Translate(lua_State* L) {
+    Runner& runner = Runner::Of(L);
+    const std::string text = luaL_checkstring(L, 1);
+    const std::string* translated =
+        FindTranslation(runner.Config().manifest.translations, Language(runner), text);
+    std::vector<std::string> values;
+    const int count = lua_gettop(L);
+    for (int i = 2; i <= count; ++i) {
+        std::size_t size = 0;
+        const char* value = luaL_tolstring(L, i, &size);
+        values.emplace_back(value, size);
+        lua_pop(L, 1);
+    }
+    const std::string out = FillFields(translated ? *translated : text, values);
+    lua_pushlstring(L, out.data(), out.size());
+    return 1;
+}
+
 } // namespace
 
 void RegisterCore(lua_State* L, Runner& runner) {
@@ -143,6 +176,8 @@ void RegisterCore(lua_State* L, Runner& runner) {
 
     SetFunction(L, runner, "log", &Log);
     SetFunction(L, runner, "now", &Now);
+    SetFunction(L, runner, "language", &LanguageCode);
+    SetFunction(L, runner, "tr", &Translate);
     SetFunction(L, runner, "sleep", &Sleep);
     SetFunction(L, runner, "include", &Include);
     lua_newtable(L);

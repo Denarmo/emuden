@@ -36,7 +36,7 @@ struct Stage {
     std::shared_ptr<FakeServices> services = std::make_shared<FakeServices>();
 
     std::unique_ptr<ScriptRunner> Run(const std::string& script, const char* manifest = PLAIN,
-                                long long instructions = 5'000'000) {
+                                long long instructions = 5'000'000, std::string language = "en") {
         scratch.Write("package/main.lua", script);
         RunnerConfig config;
         config.manifest = ParseFeatureManifest(manifest).take();
@@ -49,6 +49,7 @@ struct Stage {
         config.services = services;
         config.now = [] { return std::int64_t{1794528000}; };
         config.instruction_limit = instructions;
+        config.language = [language] { return language; };
         auto runner = std::make_unique<ScriptRunner>(std::move(config));
         runner->Settle();
         return runner;
@@ -352,4 +353,31 @@ TEST_CASE("the page model keeps to its limits") {
     CHECK(page.body[1].fraction == 0.5f);
     CHECK(page.body[1].label == "Half");
     CHECK_FALSE(PatchElement(page, "missing", *ParseJson("{}")));
+}
+
+TEST_CASE("den.tr reads the plugin's own translations for the app's language") {
+    const char* const TRANSLATED = R"({"id":"test.sample","name":"Sample","version":"1.0.0",
+      "kind":"feature","api":1,"needs":["kind.feature","feature.lua.1"],
+      "translations":{"es":{"Sign in":"Iniciar sesión","{} of {} done":"{} de {} hechos"}},
+      "feature":{"entry":"main.lua","permissions":[]}})";
+    const char* const SCRIPT = R"(
+        den.log("lang=" .. den.language())
+        den.log("a=" .. den.tr("Sign in"))
+        den.log("b=" .. den.tr("{} of {} done", 2, 5))
+        den.log("c=" .. den.tr("Untranslated {}", true))
+        return {}
+    )";
+    Stage spanish;
+    const auto runner = spanish.Run(SCRIPT, TRANSLATED, 5'000'000, "es-ES");
+    CHECK(runner->Error().empty());
+    CHECK(Logged(*runner, "lang=es-ES"));
+    CHECK(Logged(*runner, "a=Iniciar sesión"));
+    CHECK(Logged(*runner, "b=2 de 5 hechos"));
+    CHECK(Logged(*runner, "c=Untranslated true"));
+
+    Stage english;
+    const auto plain = english.Run(SCRIPT, TRANSLATED);
+    CHECK(Logged(*plain, "lang=en"));
+    CHECK(Logged(*plain, "a=Sign in"));
+    CHECK(Logged(*plain, "b=2 of 5 done"));
 }

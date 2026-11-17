@@ -9,6 +9,7 @@
 #include <qrcodegen.hpp>
 
 #include "den/app/model_widgets.h"
+#include "den/ui/translate.h"
 
 namespace den::app {
 
@@ -32,6 +33,7 @@ Paragraph::Paragraph(std::string text_, float wrap_width_) : text(std::move(text
 void Paragraph::Wrap(ui::Context& ctx) {
     const float room = std::max(80.0f, wrap_width - (boxed ? BOX_PAD * 2 : 0));
     const float scale = ctx.Text().Scale();
+    const std::string& text = ui::Translate(this->text);
     if (wrapped_text_ == text && wrapped_width_ == room && wrapped_scale_ == scale) {
         return;
     }
@@ -118,7 +120,7 @@ void SearchField::DrawContent(ui::Context& ctx) {
     ctx.canvas->StrokeRect(gfx::Rect{cx - 9, cy - 9, 18, 18}, theme.text_dim, 2.5f, 9);
     ctx.canvas->FillRect(gfx::Rect{cx + 6, cy + 7, 9, 3}, theme.text_dim, 1.5f);
     const gfx::Rect area{rect.x + 56, rect.y, rect.w - 72, rect.h};
-    DrawLineIn(ctx, area, text.empty() ? placeholder : text, theme.text_body, gfx::FONT_REGULAR,
+    DrawLineIn(ctx, area, text.empty() ? ui::Translate(placeholder) : text, theme.text_body, gfx::FONT_REGULAR,
                text.empty() ? theme.text_dim : theme.fg, false);
 }
 
@@ -131,7 +133,7 @@ FilterChip::FilterChip(std::string text_) : text(std::move(text_)) {
 ui::Size FilterChip::MeasureContent(ui::Context& ctx) {
     // Bold (the chosen chip) is the wider face; the spare units keep layout rounding from
     // eliding a label that just fits.
-    return ui::Size{std::ceil(ctx.Text().Measure(text, ctx.theme->text_body, gfx::FONT_BOLD)) + 62, 44};
+    return ui::Size{std::ceil(ctx.Text().Measure(ui::Translate(text), ctx.theme->text_body, gfx::FONT_BOLD)) + 62, 44};
 }
 
 void FilterChip::DrawContent(ui::Context& ctx) {
@@ -144,7 +146,7 @@ void FilterChip::DrawContent(ui::Context& ctx) {
         ctx.canvas->FillRect(ring.Inset(4.5f), theme.fg, 4);
     }
     const gfx::Rect area{rect.x + 42, rect.y, rect.w - 58, rect.h};
-    DrawLineIn(ctx, area, text, theme.text_body, selected ? gfx::FONT_BOLD : gfx::FONT_REGULAR, theme.fg, false);
+    DrawLineIn(ctx, area, ui::Translate(text), theme.text_body, selected ? gfx::FONT_BOLD : gfx::FONT_REGULAR, theme.fg, false);
 }
 
 QrCode::QrCode(const std::string& text, float side) : side_(side) {
@@ -199,7 +201,7 @@ void ModelButton::DrawContent(ui::Context& ctx) {
     const ui::Theme& theme = *ctx.theme;
     ctx.canvas->FillRect(rect, theme.panel, theme.radius);
     const gfx::Rect inner{rect.x + pad_left, rect.y, rect.w - pad_left - pad_right, rect.h};
-    DrawLineIn(ctx, inner, text, theme.text_body, gfx::FONT_REGULAR, theme.text_dim, centered);
+    DrawLineIn(ctx, inner, ui::Translate(text), theme.text_body, gfx::FONT_REGULAR, theme.text_dim, centered);
 }
 
 ProgressLine::ProgressLine(std::string text, float fraction) {

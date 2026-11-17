@@ -45,6 +45,24 @@ TEST_CASE("a pack's texts win, the English stay for what it lacks") {
     CHECK_FALSE(table.HasPack());
 }
 
+TEST_CASE("plugins' own texts sit under the pack, over the English") {
+    StringTable table;
+    table.SetBase({{"common.ok", "OK"}});
+    table.SetPluginTexts({{"Sync now", "Sincronizar ahora"}, {"common.ok", "Vale"}, {"{} saves", "partidas"}});
+    CHECK(table.Rejected() == 1); // "{} saves" lost its field
+    CHECK(*table.Find("Sync now") == "Sincronizar ahora");
+    CHECK(*table.Find("common.ok") == "Vale"); // no pack yet: the plugin's
+    CHECK(table.Find("{} saves") == nullptr);
+
+    table.SetPack({{"common.ok", "Aceptar"}, {"Sync now", "Sincronizar"}});
+    CHECK(*table.Find("common.ok") == "Aceptar");
+    CHECK(*table.Find("Sync now") == "Sincronizar"); // a pack can reword a plugin's text
+
+    table.ClearPack();
+    CHECK(*table.Find("common.ok") == "OK");
+    CHECK(table.Find("Sync now") == nullptr);
+}
+
 TEST_CASE("a pack text with other fields than the English is refused") {
     StringTable table;
     table.SetBase({{"home.position", "{} of {}"}});

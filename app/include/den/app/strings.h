@@ -35,7 +35,9 @@ std::string TrF(std::string_view key, const Args&... args) {
 const std::string* PackText(std::string_view text);
 /// Makes `texts` the language pack in use; returns how many of its texts were refused.
 std::size_t SetLanguagePack(TextMap texts);
-/// Back to English.
+/// Makes `texts` the plugins' own texts in the app's language; returns how many were refused.
+std::size_t SetPluginTexts(TextMap texts);
+/// Back to English: no pack and no plugin texts.
 void ClearLanguagePack();
 
 /// "1 game", "5 games".

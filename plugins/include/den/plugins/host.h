@@ -11,12 +11,14 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "den/base/jobs.h"
 #include "den/base/json.h"
 #include "den/base/result.h"
+#include "den/plugins/translations.h"
 
 namespace den::store {
 class Settings;
@@ -328,6 +330,11 @@ public:
     }
     /// Grows whenever consoles or their installed state changed.
     virtual std::uint64_t Revision() const = 0;
+    /// The console plugins' own texts in an app language ("translations" of each manifest in
+    /// use); the first plugin's text wins.
+    virtual Texts TranslationsFor(std::string_view /*language*/) const {
+        return {};
+    }
 
     /// The official source first, then the added ones in the order they were added.
     virtual std::vector<SourceInfo> Sources() const {

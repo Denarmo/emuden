@@ -16,6 +16,7 @@
 
 #include "den/base/result.h"
 #include "den/plugins/host.h"
+#include "den/plugins/translations.h"
 
 namespace den::plugins {
 
@@ -162,6 +163,7 @@ struct Manifest {
     std::vector<ManifestSetting> settings; // those with a label of their own
     std::vector<std::string> platforms;    // empty: every platform
     std::vector<Dependency> depends;
+    Translations translations; // its own texts in other languages
 
     const Component* FindComponent(std::string_view component_id) const;
     /// The cores of the system with a download for the platform, best first.

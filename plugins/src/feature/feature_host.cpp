@@ -10,6 +10,7 @@
 #include "den/base/files.h"
 #include "den/base/hash.h"
 #include "den/base/log.h"
+#include "den/store/settings.h"
 #include "feature/host_impl.h"
 
 namespace den::plugins::feature {
@@ -97,6 +98,9 @@ Result<std::shared_ptr<Runner>> RealFeatureHost::Start(const std::string& id) {
         config.bookmarks_file = config_.data_dir / "browser" / "bookmarks.json";
     }
     config.app_version = config_.app_version;
+    config.language = [settings = config_.settings] {
+        return settings != nullptr ? settings->GetString("ui.language", "en") : std::string("en");
+    };
     config.platform = deps_.platform;
     config.developer = package.trust == FeaturePlugin::Trust::Developer;
     config.web_available = deps_.web_available;

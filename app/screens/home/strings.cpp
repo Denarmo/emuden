@@ -81,6 +81,12 @@ std::size_t SetLanguagePack(TextMap texts) {
     return table.Rejected();
 }
 
+std::size_t SetPluginTexts(TextMap texts) {
+    StringTable& table = Texts();
+    table.SetPluginTexts(std::move(texts));
+    return table.Rejected();
+}
+
 void ClearLanguagePack() {
     Texts().ClearPack();
 }

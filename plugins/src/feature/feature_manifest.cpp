@@ -208,6 +208,7 @@ Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
     manifest.publisher = root->String("publisher");
     manifest.summary = root->String("summary");
     manifest.license = root->String("license");
+    manifest.translations = ParseTranslations(root->Find("translations"));
     manifest.api = static_cast<int>(json::Number(*root, "api", 0));
     if (json::Number(*root, "manifest_version", 1) != 1 || manifest.api > API_VERSION) {
         return Status::Fail("Needs a newer EmuDEN");

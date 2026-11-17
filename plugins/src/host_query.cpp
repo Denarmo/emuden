@@ -343,6 +343,15 @@ void RealHost::AddSettingHints(const Loaded& loaded, const SystemDef& system, co
     }
 }
 
+Texts RealHost::TranslationsFor(std::string_view language) const {
+    std::lock_guard lock(mutex_);
+    Texts out;
+    for (const Loaded& loaded : manifests_) {
+        AddMissing(out, plugins::TranslationsFor(loaded.manifest.translations, language));
+    }
+    return out;
+}
+
 void RealHost::AddLanguageHint(const Component& core, CoreInfo& info) const {
     const std::string app = config_.settings != nullptr ? config_.settings->GetString("ui.language", "en") : "en";
     if (const std::string value = core.LanguageValue(app); !value.empty()) {

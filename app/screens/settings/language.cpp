@@ -63,10 +63,27 @@ std::string ChosenLanguage() {
     return code.empty() ? "en" : code;
 }
 
-// Loads the pack of `code` (its texts file), or English when it is not installed yet.
+// The plugins' own texts in `code`: the console plugins', then the feature and interface
+// plugins' with what a language pack adds for other plugins, which wins.
+void ApplyPluginTexts(const std::string& code) {
+    plugins::Texts texts;
+    if (plugins::FeatureHost* host = FeatureHostSvc()) {
+        texts = host->TranslationsFor(code);
+    }
+    if (Svc().plugins) {
+        plugins::AddMissing(texts, Svc().plugins->TranslationsFor(code));
+    }
+    if (const std::size_t refused = SetPluginTexts(TextMap(texts.begin(), texts.end())); refused > 0) {
+        log::Warn("language", "{} plugin texts left out for their fields", refused);
+    }
+}
+
+// Loads the pack of `code` (its texts file), or English when it is not installed yet, and the
+// plugins' own texts in that language (they apply without a pack).
 void Apply(const std::string& code) {
     ClearLanguagePack();
     if (LanguageBase(code) != "en") {
+        ApplyPluginTexts(code);
         for (const plugins::FeaturePlugin& plugin : LanguagePlugins()) {
             if (plugin.language != code || !plugin.installed) {
                 continue;
@@ -100,7 +117,8 @@ void Follow() {
     }
     State& state = GetState();
     const std::string code = ChosenLanguage();
-    const std::uint64_t revision = host ? host->Revision() : 0;
+    // Either list changing may bring texts: a pack, a plugin and its translations.
+    const std::uint64_t revision = (host ? host->Revision() : 0) * 1000003u + (svc.plugins ? svc.plugins->Revision() : 0);
     if (code == state.applied && revision == state.revision) {
         return;
     }

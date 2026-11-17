@@ -52,6 +52,7 @@ default; each tool still starts only when its environment variable is set.
 | `den/input/input.h` | `System::Poll` gives `Event`s (Nav, pointer, key, text); `PadState` by position for the player; `GlyphName`, `GlyphLabel` per pad family |
 | `den/ui/node.h`, `widgets.h`, `page.h`, `theme.h` | the UI kit, below |
 | `den/ui/translate.h` | `ui::SetTranslator`, `ui::Translate`: the kit draws texts in the app's language (`docs/languages.md`) |
+| `den/plugins/translations.h` | a plugin's own `translations` by language, a pack's `plugin_strings.json`: `TranslationsFor`, `FindTranslation`, `FillFields` |
 | `den/base/language.h` | language codes: `NormalizeLanguage`, `MatchLanguage` (the system's languages against the packs), `RetroLanguage` (libretro's number) |
 | `den/store/settings.h` | `Settings`: dotted keys in `settings.json` |
 | `den/platform/child.h` | `StartChild`: a child that never outlives the app (job object, parent-death signal), working directory, `RequestClose`, `Kill` |

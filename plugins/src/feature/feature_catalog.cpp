@@ -8,6 +8,7 @@
 #include <system_error>
 
 #include "den/base/files.h"
+#include "den/base/language.h"
 #include "den/base/log.h"
 #include "den/platform/pal.h"
 #include "den/platform/webview.h"
@@ -234,6 +235,24 @@ void RealFeatureHost::Scan() {
     std::lock_guard lock(mutex_);
     installed_ = std::move(found);
     ++revision_;
+}
+
+Texts RealFeatureHost::TranslationsFor(std::string_view language) const {
+    Texts own, from_packs;
+    const std::string code = NormalizeLanguage(language);
+    std::lock_guard lock(mutex_);
+    for (const auto& [id, package] : installed_) {
+        AddMissing(own, plugins::TranslationsFor(package.manifest.translations, language));
+        // A pack of this language (or of its language part) adds texts for other plugins.
+        const std::string& pack = package.manifest.language;
+        if (!pack.empty() && (pack == code || pack == LanguageBase(code))) {
+            if (const auto text = ReadTextFile(package.dir / PLUGIN_STRINGS_FILE)) {
+                AddMissing(from_packs, ParsePluginStrings(*text));
+            }
+        }
+    }
+    AddMissing(from_packs, own);
+    return from_packs;
 }
 
 std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {

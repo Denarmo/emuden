@@ -8,6 +8,7 @@
 #include "den/plugins/feature_manifest.h"
 #include "den/plugins/index.h"
 #include "den/plugins/manifest.h"
+#include "den/plugins/translations.h"
 
 using namespace den;
 using namespace den::plugins;
@@ -82,4 +83,44 @@ TEST_CASE("a core's language option is chosen from the app's language") {
     const Component* plain = manifest->FindComponent("plain");
     REQUIRE(plain);
     CHECK(plain->LanguageValue("es").empty());
+}
+
+TEST_CASE("a plugin's own translations, by language") {
+    Result<Manifest> manifest = ParseManifest(
+        R"({"manifest_version":1,"id":"tester.gb","name":"Game Boy","version":"1.0.0","kind":"console",)"
+        R"("engine":"libretro","api":1,"needs":["engine.libretro"],"systems":[{"id":"tt","name":"T","cores":[]}],)"
+        R"("translations":{"es":{"Colour":"Color","{} saves":"{} partidas"},"es_MX":{"Colour":"Colorcito"},)"
+        R"("en":{"Colour":"Color"},"fr":7}})");
+    REQUIRE(manifest.ok());
+    CHECK(manifest->translations.size() == 2); // "en" and a non-object are skipped
+    CHECK(TranslationsFor(manifest->translations, "en").empty());
+    CHECK(TranslationsFor(manifest->translations, "es").at("Colour") == "Color");
+    const Texts mexican = TranslationsFor(manifest->translations, "es-MX");
+    CHECK(mexican.at("Colour") == "Colorcito"); // the whole code over its language
+    CHECK(mexican.at("{} saves") == "{} partidas");
+    CHECK(TranslationsFor(manifest->translations, "de").empty());
+
+    REQUIRE(FindTranslation(manifest->translations, "es-ES", "Colour") != nullptr);
+    CHECK(*FindTranslation(manifest->translations, "es-ES", "Colour") == "Color");
+    CHECK(FindTranslation(manifest->translations, "es", "Hue") == nullptr);
+}
+
+TEST_CASE("fields are filled in order, doubled braces are braces") {
+    CHECK(FillFields("{} de {}", {"3", "7"}) == "3 de 7");
+    CHECK(FillFields("{{{}}}", {"x"}) == "{x}");
+    CHECK(FillFields("{} y {}", {"uno"}) == "uno y ");
+    CHECK(FillFields("sin campos", {"a"}) == "sin campos");
+}
+
+TEST_CASE("a language pack's texts for other plugins") {
+    const Texts texts = ParsePluginStrings(
+        R"({"emuden.sync.gdrive":{"Sign in":"Iniciar sesión"},"other.plugin":{"Go":"Ir"},"bad":3})");
+    CHECK(texts.at("Sign in") == "Iniciar sesión");
+    CHECK(texts.at("Go") == "Ir");
+    CHECK(ParsePluginStrings("not json").empty());
+
+    Texts into{{"Go", "Vamos"}};
+    AddMissing(into, texts);
+    CHECK(into.at("Go") == "Vamos"); // what was there stays
+    CHECK(into.at("Sign in") == "Iniciar sesión");
 }

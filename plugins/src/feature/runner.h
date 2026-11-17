@@ -55,6 +55,7 @@ struct RunnerConfig {
     std::shared_ptr<ModServices> mods;    // den.mods; may be null
     std::filesystem::path mods_dir;       // <data>/mods/<id>: what den.mods applied
     std::function<std::int64_t()> now;
+    std::function<std::string()> language; // the app's language code ("es"); empty: English
     long long instruction_limit = 200'000'000;
     pal::Secrets* secrets = nullptr;      // den.secrets; null: pal::GetSecrets()
     std::shared_ptr<SyncLink> sync;       // den.sync, for a plugin with the sync permission
