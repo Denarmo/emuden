@@ -8,6 +8,7 @@
 #include <array>
 #include <deque>
 #include <optional>
+#include <set>
 
 #include "core/core.h"
 #include "core/hw_render.h"
@@ -80,6 +81,8 @@ struct LibretroCore::Impl {
     std::vector<std::string> option_order;
     retro_core_options_update_display_callback_t update_display = nullptr;
     bool options_changed = false;
+    // "key=value" pairs set to a value the core does not offer, logged once each.
+    mutable std::set<std::string> unknown_values;
     // What the core announced while running; it wins over retro_get_system_av_info.
     std::optional<retro_game_geometry> geometry;
     std::optional<retro_system_timing> timing;

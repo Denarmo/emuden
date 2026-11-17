@@ -64,6 +64,15 @@ const std::string* LibretroCore::Impl::OptionValue(const std::string& key) const
                         [&](const OptionChoice& value) { return value.value == set->second; })) {
             return &set->second;
         }
+        // A hint or tuning value written for another version of the core.
+        if (unknown_values.insert(key + "=" + set->second).second) {
+            std::string offered;
+            for (const OptionChoice& value : values) {
+                offered += (offered.empty() ? "" : ", ") + value.value;
+            }
+            log::Warn("core", "option {}: \"{}\" is not one of the core's values ({}); it uses \"{}\"", key,
+                      set->second, offered, declared->second.default_value);
+        }
     }
     return declared != option_table.end() ? &declared->second.default_value : nullptr;
 }

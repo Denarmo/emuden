@@ -13,6 +13,7 @@
 #include "audio_out.h"
 #include "core/core.h"
 #include "den/base/files.h"
+#include "den/base/log.h"
 #include "den/player/session.h"
 #include "den/store/settings.h"
 #include "game_files.h"
@@ -266,9 +267,17 @@ TEST_CASE("the core host runs the test core") {
         core->SetOption("testcore_color", "blue");
         core->RunFrame();
         REQUIRE(PixelAt(core->Frame(), 10, 10).b == 255);
-        // A value the core never offered falls back to its default.
+        // A value the core never offered falls back to its default, and the log says so once.
+        const fs::path log_file = FreshDir("option_log") / "log.txt";
+        log::SetFile(log_file);
         core->SetOption("testcore_color", "purple");
         REQUIRE(core->GetOption("testcore_color") == "red");
+        REQUIRE(core->GetOption("testcore_color") == "red");
+        log::SetFile({});
+        const std::string logged = ReadTextFile(log_file).value_or("");
+        const std::string warning = "option testcore_color: \"purple\" is not one of the core's values";
+        REQUIRE(logged.find(warning) != std::string::npos);
+        REQUIRE(logged.find(warning) == logged.rfind(warning));
     }
     SECTION("input moves the square and a state brings it back") {
         std::vector<std::uint8_t> state(core->StateSize());
