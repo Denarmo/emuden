@@ -95,13 +95,11 @@ std::unique_ptr<LibretroCore> LibretroCore::Load(const LoadParams& params, std::
     load(c.retro_load_game_special, "retro_load_game_special");
     load(c.retro_cheat_reset, "retro_cheat_reset");
     load(c.retro_cheat_set, "retro_cheat_set");
-    // A core built to be loaded by Java finds the Java VM through JNI_OnLoad, which only
-    // System.loadLibrary calls; DenSX2 (Play!) asks for it with its own setter.
+    // DenSX2 (Play!) is handed the Java VM with its own setter. A core's JNI_OnLoad is not
+    // called, as no libretro frontend does: Dolphin's looks up the Java classes of Dolphin's
+    // own app there and aborts the process when they are missing.
     if (void* vm = pal::JavaVm()) {
         auto* object = static_cast<SDL_SharedObject*>(c.library);
-        if (auto on_load = reinterpret_cast<int (*)(void*, void*)>(SDL_LoadFunction(object, "JNI_OnLoad"))) {
-            on_load(vm, nullptr);
-        }
         if (auto set_vm = reinterpret_cast<void (*)(void*)>(
                 SDL_LoadFunction(object, "_ZN9Framework7CJavaVM9SetJavaVMEP7_JavaVM"))) {
             set_vm(vm);
