@@ -99,7 +99,7 @@ public:
         bios_imports_ = BiosImports();
         const std::string system = Param("system");
         const auto console = svc.plugins->FindConsole(system);
-        ui::Node* content = BuildPlainFrame(*this, console ? console->name : "Console");
+        ui::Node* content = BuildLevelFrame(*this, console ? console->name : "Console");
         ui::Node* list = content->Add(ui::MakeList(8));
         list->id = "console.list";
         list->pad_bottom = 24;

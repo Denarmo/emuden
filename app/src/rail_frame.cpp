@@ -3,6 +3,7 @@
 
 // The frame of the top-level screens: the rail at the left and a titled content column. A
 // narrow page gets a slim rail of icons with short captions, so the content keeps the width.
+// A page's second level gives the rail up, so no more than two levels show at once.
 
 #include <cmath>
 #include <numbers>
@@ -105,6 +106,27 @@ private:
     std::string route_, text_;
 };
 
+// A square with a chevron pointing back, for a finger.
+class BackButton final : public ui::Node {
+public:
+    BackButton() {
+        id = "page.back";
+        label = "Back";
+        focusable = true;
+        chrome = true; // the content gets the first focus
+        width = height = 48;
+    }
+
+protected:
+    void DrawContent(ui::Context& ctx) override {
+        const ui::Theme& theme = *ctx.theme;
+        ctx.canvas->FillRect(rect, focused ? theme.panel_strong : theme.panel, theme.radius);
+        const float cx = rect.CenterX() - 2, cy = rect.CenterY();
+        ui::DrawLine(*ctx.canvas, cx + 5, cy - 9, cx - 4, cy, 3, theme.fg);
+        ui::DrawLine(*ctx.canvas, cx - 4, cy, cx + 5, cy + 9, 3, theme.fg);
+    }
+};
+
 std::function<void()> GoTo(const std::string& route, const std::string& current) {
     return [route, current] {
         if (route != current) {
@@ -194,6 +216,25 @@ ui::Node* BuildPlainFrame(ui::Page& page, const std::string& title) {
         root.Emplace<ui::Label>(title, SlimRail(PageWidth()) ? theme.text_title - 4 : theme.text_title,
                                 gfx::FONT_BOLD);
     }
+    return &root;
+}
+
+ui::Node* BuildLevelFrame(ui::Page& page, const std::string& title) {
+    const ui::Theme& theme = *Svc().theme;
+    ui::Node& root = page.Root();
+    root.axis = ui::Axis::Column;
+    root.gap = 16;
+    const bool slim = SlimRail(PageWidth());
+    root.SetPadding(theme.margin, slim ? 20 : 28);
+    ui::Node* header = root.Add(ui::MakeBox(ui::Axis::Row, 12));
+    header->align = ui::Align::Center;
+    auto* back = header->Emplace<BackButton>();
+    back->on_activate = [&page] {
+        if (!page.OnNav(input::Nav::Back)) {
+            page.GetStage().Pop();
+        }
+    };
+    header->Emplace<ui::Label>(title, slim ? theme.text_title - 4 : theme.text_title, gfx::FONT_BOLD);
     return &root;
 }
 

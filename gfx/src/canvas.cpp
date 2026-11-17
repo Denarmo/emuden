@@ -84,6 +84,13 @@ void Canvas::Begin(int pixel_width, int pixel_height, float scale) {
     RestoreState();
 }
 
+void Canvas::SetSize(int pixel_width, int pixel_height, float scale) {
+    width_ = pixel_width;
+    height_ = pixel_height;
+    scale_ = scale > 0.0f ? scale : 1.0f;
+    text_->SetScale(scale_);
+}
+
 void Canvas::RestoreState() {
     gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
     gl::Viewport(0, 0, width_, height_);

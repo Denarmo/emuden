@@ -12,8 +12,8 @@ namespace den::app {
 inline constexpr float FULL_RAIL_MIN_PAGE = 900;
 inline constexpr float FULL_RAIL_WIDTH = 232;
 inline constexpr float SLIM_RAIL_WIDTH = 84;
-/// Settings shows its sections beside the rows from this content width; below, the sections
-/// fill the page and a chosen one opens its rows on their own.
+/// An opened Settings section shows the sections beside its rows from this content width;
+/// below, its rows alone.
 inline constexpr float SETTINGS_SIDE_BY_SIDE_MIN = 720;
 /// The sections column beside the rows, and the gap between them.
 inline constexpr float SETTINGS_SECTIONS_WIDTH = 220;
@@ -30,6 +30,11 @@ inline constexpr float RailWidth(float page_width) {
 /// What a rail frame leaves for its content column: the page less the rail and both margins.
 inline constexpr float RailContentWidth(float page_width, float margin) {
     return page_width - RailWidth(page_width) - margin * 2;
+}
+
+/// What a page's second level, which has no rail, leaves for its content.
+inline constexpr float LevelContentWidth(float page_width, float margin) {
+    return page_width - margin * 2;
 }
 
 inline constexpr bool SettingsSideBySide(float content_width) {

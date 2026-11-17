@@ -21,6 +21,9 @@ public:
 
     void Begin(int pixel_width, int pixel_height, float scale);
     void End();
+    /// The size and scale Width(), Height() and Scale() report until the next Begin, without
+    /// drawing: the main window's, for input and pages built between frames.
+    void SetSize(int pixel_width, int pixel_height, float scale);
     float Width() const {
         return width_ / scale_;
     }

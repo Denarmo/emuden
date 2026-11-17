@@ -21,4 +21,9 @@ ui::Node* BuildRailFrame(ui::Page& page, const std::string& title);
 /// A content column with a title and no rail, for pages reached from another page.
 ui::Node* BuildPlainFrame(ui::Page& page, const std::string& title);
 
+/// The frame of a page's second level (a Settings section, a plugin's page): no rail, so at
+/// most two levels show, and a back button before the title that does what the pad's Back
+/// does. Returns the content column, across the page.
+ui::Node* BuildLevelFrame(ui::Page& page, const std::string& title);
+
 } // namespace den::app

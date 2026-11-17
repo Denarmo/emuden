@@ -296,6 +296,9 @@ int Run(int argc, char** argv) {
             canvas.Begin(width, height, bar_scale);
             title_bar.Draw(ctx, *svc.window, width, bar);
             canvas.End();
+            // Until the next frame the canvas measures the page: events, frame hooks and pages
+            // built between frames lay out and hit-test by it, not by the bar's scale.
+            canvas.SetSize(width, height - bar, scale);
             for (const auto& hook : registry.AfterDraw()) {
                 hook(width, height);
             }

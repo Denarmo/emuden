@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// System settings: the sections features registered with DEN_REGISTER_SETTINGS at the left,
-// the rows of the chosen one at the right. On a narrow page they are two levels: the sections,
-// then the rows of the one chosen.
+// System settings, in two levels: with the rail, the sections features registered with
+// DEN_REGISTER_SETTINGS; a chosen section then gives the rail up for the sections beside its
+// rows, or for its rows alone on a narrow page.
 
 #include <algorithm>
 
@@ -12,38 +12,15 @@
 #include "den/app/pages.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
-#include "den/ui/glyphs.h"
 #include "page_widths.h"
 
 namespace den::app {
 
 namespace {
 
-// A square with a chevron pointing back, for a finger (the pad's Back does the same).
-class BackButton final : public ui::Node {
-public:
-    BackButton() {
-        id = "settings.back";
-        label = "Back";
-        focusable = true;
-        chrome = true; // the rows get the first focus
-        width = height = 48;
-    }
-
-protected:
-    void DrawContent(ui::Context& ctx) override {
-        const ui::Theme& theme = *ctx.theme;
-        ctx.canvas->FillRect(rect, focused ? theme.panel_strong : theme.panel, theme.radius);
-        const float cx = rect.CenterX() - 2, cy = rect.CenterY();
-        ui::DrawLine(*ctx.canvas, cx + 5, cy - 9, cx - 4, cy, 3, theme.fg);
-        ui::DrawLine(*ctx.canvas, cx - 4, cy, cx + 5, cy + 9, 3, theme.fg);
-    }
-};
-
 class SettingsScreen final : public ui::Page {
 public:
     void Build() override {
-        Services& svc = Svc();
         const std::vector<SettingsSection> sections = Registry::Get().Settings();
         if (!started_) {
             started_ = true;
@@ -58,41 +35,11 @@ public:
         }
         current_ = std::min(current_, sections.empty() ? 0 : sections.size() - 1);
         signature_ = Signature();
-        side_by_side_ = SettingsSideBySide(RailContentWidth(PageWidth(), svc.theme->margin));
-        if (!side_by_side_) {
-            BuildNarrow(sections);
-            return;
-        }
-
-        ui::Node* content = BuildRailFrame(*this, "Settings");
-        content->pad_right = svc.theme->margin;
-        ui::Node* panes = content->Add(ui::MakeBox(ui::Axis::Row, SETTINGS_PANE_GAP));
-        panes->grow = 1;
-
-        ui::Node* list = panes->Add(ui::MakeList(6));
-        list->id = "settings.sections";
-        list->grow = 0;
-        list->width = SETTINGS_SECTIONS_WIDTH;
-        list->pad_bottom = 24;
-        for (std::size_t i = 0; i < sections.size(); ++i) {
-            auto* button = list->Emplace<ui::Button>(sections[i].title);
-            button->id = "section." + sections[i].title;
-            button->centered = false;
-            button->selected = i == current_;
-            button->on_focus = [this, i] {
-                if (current_ != i && focus_after_build_.empty()) {
-                    current_ = i;
-                    Rebuild(false);
-                }
-            };
-            button->on_activate = [this] { FocusFirstRow(); };
-        }
-
-        ui::Node* rows = panes->Add(ui::MakeList(8));
-        rows->id = "settings.rows";
-        rows->pad_bottom = 24;
-        if (!sections.empty()) {
-            AddRows(rows, sections[current_].rows());
+        side_by_side_ = SideBySide();
+        if (!opened_ || sections.empty()) {
+            BuildSections(sections);
+        } else {
+            BuildOpened(sections);
         }
     }
 
@@ -105,45 +52,46 @@ public:
                 SetFocus(button, false);
             }
         }
+        // Into the rows once they are built: a tap on a section rebuilds the page first.
+        if (focus_rows_) {
+            focus_rows_ = false;
+            FocusFirstRow();
+        }
         if (Signature() != signature_) {
             Rebuild();
         }
-        if (SettingsSideBySide(RailContentWidth(PageWidth(), Svc().theme->margin)) != side_by_side_) {
-            // Narrowed with the rows in use: they stay open on their own.
-            ui::Node* rows = Root().FindById("settings.rows");
-            opened_ = side_by_side_ ? rows && Focus() && IsUnder(Focus(), rows) : opened_;
-            if (!opened_) {
-                focus_after_build_ = SectionId();
-            }
+        if (opened_ && SideBySide() != side_by_side_) {
             Rebuild(false);
         }
     }
 
     std::vector<ui::Hint> Hints() const override {
-        if (!side_by_side_ && !opened_) {
+        if (!opened_) {
             return {{input::Nav::Confirm, "Open"}, {input::Nav::Back, "Back"}};
         }
         return {{input::Nav::Confirm, "Change"}, {input::Nav::Back, "Back"}};
     }
 
     bool OnNav(input::Nav nav) override {
+        ui::Node* sections = Root().FindById("settings.sections");
+        const bool on_sections = opened_ && Focus() && sections && IsUnder(Focus(), sections);
+        if (nav == input::Nav::Left && on_sections) {
+            Close(); // towards the rail, as from the sections beside it
+            return true;
+        }
         if (nav != input::Nav::Back) {
             return false;
         }
-        // Back leaves the rows first, then the page.
-        if (!side_by_side_ && opened_) {
-            Close();
-            return true;
-        }
-        ui::Node* sections = Root().FindById("settings.sections");
-        if (Focus() && sections && Focus()->Parent() != sections) {
-            const std::vector<SettingsSection> all = Registry::Get().Settings();
-            if (current_ < all.size()) {
-                if (ui::Node* button = Root().FindById("section." + all[current_].title)) {
-                    SetFocus(button);
-                    return true;
-                }
+        // Back leaves the rows for their section, then the section for the rail.
+        if (opened_) {
+            ui::Node* rows = Root().FindById("settings.rows");
+            ui::Node* button = Root().FindById(SectionId());
+            if (side_by_side_ && button && Focus() && rows && IsUnder(Focus(), rows)) {
+                SetFocus(button);
+            } else {
+                Close();
             }
+            return true;
         }
         if (GetStage().Depth() > 1) {
             GetStage().Pop();
@@ -161,44 +109,70 @@ private:
                static_cast<std::uint64_t>(svc.input->PadCount());
     }
 
-    // Narrow pages: the sections fill the content column, or the chosen section's rows do,
-    // under its name.
-    void BuildNarrow(const std::vector<SettingsSection>& sections) {
-        const ui::Theme& theme = *Svc().theme;
-        if (!opened_ || sections.empty()) {
-            ui::Node* content = BuildRailFrame(*this, "Settings");
-            content->pad_right = theme.margin;
-            ui::Node* list = content->Add(ui::MakeList(6));
+    static bool SideBySide() {
+        return SettingsSideBySide(LevelContentWidth(PageWidth(), Svc().theme->margin));
+    }
+
+    // The first level: the rail and the sections.
+    void BuildSections(const std::vector<SettingsSection>& sections) {
+        ui::Node* content = BuildRailFrame(*this, "Settings");
+        content->pad_right = Svc().theme->margin;
+        ui::Node* list = content->Add(ui::MakeList(6));
+        list->id = "settings.sections";
+        list->pad_bottom = 24;
+        for (std::size_t i = 0; i < sections.size(); ++i) {
+            auto* button = list->Emplace<ui::Button>(sections[i].title);
+            button->id = "section." + sections[i].title;
+            button->centered = false;
+            button->on_activate = [this, i] { Open(i); };
+        }
+    }
+
+    // The second level, without the rail: the sections beside the chosen one's rows, or its
+    // rows alone under its name.
+    void BuildOpened(const std::vector<SettingsSection>& sections) {
+        ui::Node* content = BuildLevelFrame(*this, side_by_side_ ? "Settings" : sections[current_].title);
+        ui::Node* rows_parent = content;
+        if (side_by_side_) {
+            ui::Node* panes = content->Add(ui::MakeBox(ui::Axis::Row, SETTINGS_PANE_GAP));
+            panes->grow = 1;
+            ui::Node* list = panes->Add(ui::MakeList(6));
             list->id = "settings.sections";
+            list->grow = 0;
+            list->width = SETTINGS_SECTIONS_WIDTH;
             list->pad_bottom = 24;
             for (std::size_t i = 0; i < sections.size(); ++i) {
                 auto* button = list->Emplace<ui::Button>(sections[i].title);
                 button->id = "section." + sections[i].title;
                 button->centered = false;
-                button->on_activate = [this, i] {
-                    current_ = i;
-                    opened_ = true;
-                    focus_after_build_.clear();
-                    Rebuild(false);
+                button->selected = i == current_;
+                button->on_focus = [this, i] {
+                    if (current_ != i && focus_after_build_.empty()) {
+                        current_ = i;
+                        Rebuild(false);
+                    }
                 };
+                button->on_activate = [this] { focus_rows_ = true; };
             }
-            return;
+            rows_parent = panes;
         }
-        ui::Node* content = BuildRailFrame(*this, "");
-        content->pad_right = theme.margin;
-        ui::Node* header = content->Add(ui::MakeBox(ui::Axis::Row, 12));
-        header->align = ui::Align::Center;
-        auto* back = header->Emplace<BackButton>();
-        back->on_activate = [this] { Close(); };
-        header->Emplace<ui::Label>(sections[current_].title, theme.text_title - 4, gfx::FONT_BOLD);
-        ui::Node* rows = content->Add(ui::MakeList(8));
+        ui::Node* rows = rows_parent->Add(ui::MakeList(8));
         rows->id = "settings.rows";
         rows->pad_bottom = 24;
         AddRows(rows, sections[current_].rows());
     }
 
+    void Open(std::size_t section) {
+        current_ = section;
+        opened_ = true;
+        focus_after_build_.clear();
+        focus_rows_ = true;
+        Rebuild(false);
+    }
+
     void Close() {
         opened_ = false;
+        focus_rows_ = false;
         focus_after_build_ = SectionId();
         Rebuild(false);
     }
@@ -231,8 +205,9 @@ private:
     std::uint64_t signature_ = 0;
     std::string focus_after_build_;
     bool started_ = false;
-    bool side_by_side_ = true;
-    bool opened_ = false; // narrow pages: the rows of current_ are shown, not the sections
+    bool side_by_side_ = true; // an opened section shows the sections beside its rows
+    bool opened_ = false;      // the second level: a section's rows, without the rail
+    bool focus_rows_ = false;  // the focus goes into the rows after the next build
 };
 
 } // namespace

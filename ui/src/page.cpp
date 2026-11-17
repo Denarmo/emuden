@@ -214,12 +214,18 @@ void Page::Prepare() {
         CollectScrolls(root_, scrolls);
     }
     keep_scroll_ = true;
+    // A finger on the page keeps its press, its drag or its slider through the rebuild, on
+    // the nodes with the same ids; when one of them is gone it lets go.
+    Node* const before[] = {press_node_, drag_node_, value_node_};
+    std::string held_ids[3];
+    for (int i = 0; i < 3; ++i) {
+        held_ids[i] = before[i] ? before[i]->id : std::string();
+    }
     focus_ = nullptr;
     press_node_ = nullptr;
     drag_node_ = nullptr;
     value_node_ = nullptr;
     held_.clear();
-    pressed_ = dragging_ = false;
     root_.Clear();
     Build();
     built_ = true;
@@ -227,6 +233,21 @@ void Page::Prepare() {
     for (const auto& [id, position] : scrolls) {
         if (Node* node = root_.FindById(id); node && node->scrollable) {
             node->scroller.Jump(position);
+        }
+    }
+    if (pressed_) {
+        Node* found[3] = {};
+        bool lost = false;
+        for (int i = 0; i < 3; ++i) {
+            found[i] = held_ids[i].empty() ? nullptr : root_.FindById(held_ids[i]);
+            lost = lost || (before[i] && !found[i]);
+        }
+        if (lost || (found[1] && !found[1]->scrollable)) {
+            pressed_ = dragging_ = false;
+        } else {
+            press_node_ = found[0];
+            drag_node_ = found[1];
+            value_node_ = found[2]; // the drag takes hold of the new list at the next move
         }
     }
     Node* target = keep.empty() ? nullptr : root_.FindById(keep);
@@ -354,8 +375,12 @@ void Page::Pointer(const input::Event& event, float scale, double time) {
             break; // the content follows the finger from here, without a jump
         }
         if (dragging_ && value_node_) {
-            value_node_->DragTo(x, y); // may rebuild the page, which ends the drag
+            value_node_->DragTo(x, y); // may rebuild the page; the drag goes on with the new row
         } else if (dragging_ && drag_node_) {
+            if (!drag_node_->scroller.Dragging()) { // the page was rebuilt under the finger
+                drag_node_->scroller.BeginDrag(time);
+                held_.push_back(drag_node_);
+            }
             drag_node_->scroller.DragBy(drag_node_->axis == Axis::Row ? -dx : -dy, time);
         }
         break;
