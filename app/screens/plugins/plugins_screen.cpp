@@ -110,8 +110,13 @@ public:
                 // A plugin whose files are there but that was never accepted (a developer
                 // folder) is accepted first; an update waiting for consent still opens.
                 const bool accept = plugin.needs_consent && !plugin.update_available;
-                if (plugin.kind == plugins::KIND_INTERFACE) {
+                if (plugins::OffersHomeInterface(plugin)) {
                     tile->on_activate = [plugin] { OpenOrUpdate(plugin, [id = plugin.id] { UseInterface(id); }); };
+                } else if (plugin.kind == plugins::KIND_INTERFACE) {
+                    // Quick settings layouts only: they are picked under Settings, Interface.
+                    tile->on_activate = [plugin] {
+                        OpenOrUpdate(plugin, [] { Svc().stage->Push("settings", {{"section", "Interface"}}); });
+                    };
                 } else {
                     tile->on_activate = [plugin, accept] {
                         OpenOrUpdate(plugin, [id = plugin.id, accept] {
@@ -119,7 +124,7 @@ public:
                         });
                     };
                 }
-                tile->on_focus = [this, id = plugin.id, look = plugin.kind == plugins::KIND_INTERFACE] {
+                tile->on_focus = [this, id = plugin.id, look = plugins::OffersHomeInterface(plugin)] {
                     selected_ = id;
                     selected_look_ = look;
                 };

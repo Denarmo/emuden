@@ -9,6 +9,7 @@
 
 #include <filesystem>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -105,5 +106,8 @@ Result<InterfaceSpec> ParseInterface(std::string_view manifest_json, const std::
 
 /// The layouts this app draws.
 bool KnownLayout(std::string_view layout);
+
+/// "#rrggbb" or "#rrggbbaa"; nothing for anything else.
+std::optional<gfx::Color> ParseHexColor(std::string_view text);
 
 } // namespace den::app

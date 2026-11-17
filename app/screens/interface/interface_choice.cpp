@@ -15,6 +15,7 @@
 #include "den/base/log.h"
 #include "den/app/boot.h"
 #include "den/app/interfaces.h"
+#include "den/app/quick_layouts.h"
 #include "object_build.h"
 
 namespace den::app {
@@ -39,7 +40,7 @@ std::vector<plugins::FeaturePlugin> InterfacePlugins() {
     std::vector<plugins::FeaturePlugin> out;
     if (plugins::FeatureHost* host = FeatureHostSvc()) {
         for (plugins::FeaturePlugin& plugin : host->Plugins()) {
-            if (plugin.kind == plugins::KIND_INTERFACE) {
+            if (plugins::OffersHomeInterface(plugin)) {
                 out.push_back(std::move(plugin));
             }
         }
@@ -108,7 +109,7 @@ std::vector<ui::RowSpec> InterfaceRows() {
         [] { return Svc().settings->GetBool(LAUNCH_SOUND_KEY, true); },
         [](bool on) { Svc().settings->SetBool(LAUNCH_SOUND_KEY, on); });
     sound.description = "A short chime with the EmuDEN logo";
-    std::vector<ui::RowSpec> rows = {std::move(choice), std::move(animation), std::move(sound)};
+    std::vector<ui::RowSpec> rows = {std::move(choice), QuickLayoutRow(), std::move(animation), std::move(sound)};
     for (const plugins::FeaturePlugin& plugin : found) {
         ui::RowSpec row = ValueRow(
             "interface.about." + plugin.id, plugin.name,

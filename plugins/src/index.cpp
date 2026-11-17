@@ -152,6 +152,7 @@ Result<Index> ParseIndex(std::string_view text) {
                 plugin.http_hosts = json::Strings(value, "http_hosts", false);
                 plugin.open_hosts = json::Strings(value, "open_hosts", false);
                 plugin.browse_hosts = json::Strings(value, "browse_hosts", false);
+                plugin.needs = json::Strings(value, "needs", false);
                 // Not "systems": in an entry that field lists console objects, and readers
                 // older than feature plugins expect it to.
                 plugin.systems = json::Strings(value, "feature_systems", false);

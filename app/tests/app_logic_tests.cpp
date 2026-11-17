@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <random>
@@ -10,6 +11,7 @@
 #include "core_options.h"
 #include "den/base/files.h"
 #include "interface_spec.h"
+#include "quick_spec.h"
 #include "web_rules.h"
 
 using namespace den;
@@ -74,6 +76,96 @@ TEST_CASE("an interface plugin's look, with defaults for what is missing or out 
     CHECK_FALSE(ParseInterface(R"({"interface": {"layout": "grid"}})", dir, {}));
     CHECK_FALSE(ParseInterface(R"({"id": "x"})", dir, {}));
     CHECK(KnownLayout("carousel"));
+}
+
+TEST_CASE("an interface plugin's quick settings layouts, each a choice") {
+    auto choices = ParseQuickSettings(R"({
+        "id": "emuden.quick-layouts", "name": "Quick Layouts",
+        "quick_settings": {
+            "icon": "icon.png",
+            "layouts": [
+                {"id": "big", "name": "Big tiles", "layout": "grid", "columns": 9, "tile_size": 3,
+                 "colors": {"background": "#101820", "accent": "#ff8800", "text": "white"},
+                 "actions": ["exit", "states", "nonsense", "exit"], "hidden": ["fps", "bogus"]},
+                {"layout": "dock", "dock": 1, "cover": false},
+                {"layout": "dock", "name": "Same id again"},
+                {"layout": "hologram"},
+                {"layout": "split", "id": "Bad Id!", "columns": 1}
+            ]
+        }})");
+    REQUIRE(choices);
+    REQUIRE(choices->size() == 3); // the second dock reuses its id, the hologram is unknown
+    const QuickSpec& big = (*choices)[0];
+    CHECK(big.plugin_id == "emuden.quick-layouts");
+    CHECK(big.Key() == "emuden.quick-layouts/big");
+    CHECK(big.name == "Big tiles");
+    CHECK(big.layout == "grid");
+    CHECK(big.columns == 6);
+    CHECK(big.tile_size == 1.5f);
+    REQUIRE(big.background);
+    CHECK(Same(*big.background, {0x10, 0x18, 0x20, 255}));
+    CHECK(big.accent);
+    CHECK_FALSE(big.text);
+    CHECK(big.order == std::vector<std::string>{"exit", "states"});
+    CHECK(big.hidden == std::vector<std::string>{"fps"});
+    const QuickSpec& dock = (*choices)[1];
+    CHECK(dock.choice_id == "dock");
+    CHECK(dock.name == "Dock");
+    CHECK(dock.dock == 3);
+    CHECK_FALSE(dock.cover);
+    const QuickSpec& split = (*choices)[2];
+    CHECK(split.choice_id == "split");
+    CHECK(split.columns == 0);
+
+    // One layout as the object itself.
+    auto one = ParseQuickSettings(R"({"id": "jdoe.q", "quick_settings": {"layout": "compact"}})");
+    REQUIRE(one);
+    REQUIRE(one->size() == 1);
+    CHECK(one->front().Key() == "jdoe.q/compact");
+    CHECK_FALSE(ParseQuickSettings(R"({"id": "jdoe.q", "quick_settings": {"layout": "nope"}})"));
+    CHECK_FALSE(ParseQuickSettings(R"({"id": "jdoe.q", "interface": {}})"));
+    CHECK(QuickSpec{}.Key().empty());
+}
+
+TEST_CASE("quick actions in a layout's order, the plugin's first, those there now") {
+    QuickSpec standard;
+    const std::vector<std::string> everything = QuickActionIds();
+    // EmuDEN's own: the card's controls, then today's sections.
+    CHECK(ArrangeQuickActions(standard, everything) ==
+          std::vector<std::string>{"pause", "rewind", "fast_forward", "exit", "states", "screen", "bfi",
+                                   "controls", "cheats", "apps", "volume"});
+    // Without a rewinding core and without anyone adding cheats.
+    CHECK(ArrangeQuickActions(standard, {"exit", "pause", "volume", "states"}) ==
+          std::vector<std::string>{"pause", "exit", "states", "volume"});
+
+    QuickSpec grid;
+    grid.layout = "grid";
+    grid.order = {"states", "swap"};
+    grid.hidden = {"fps", "pause"};
+    const std::vector<std::string> arranged = ArrangeQuickActions(grid, everything);
+    CHECK(arranged.front() == "states");
+    CHECK(arranged[1] == "swap");
+    CHECK(std::find(arranged.begin(), arranged.end(), "fps") == arranged.end());
+    CHECK(std::find(arranged.begin(), arranged.end(), "pause") == arranged.end());
+    CHECK(std::count(arranged.begin(), arranged.end(), "swap") == 1);
+    // Every section stays reachable in every layout.
+    for (const char* layout : {"standard", "grid", "compact", "dock", "split"}) {
+        INFO(layout);
+        CHECK(KnownQuickLayout(layout));
+        QuickSpec spec;
+        spec.layout = layout;
+        const std::vector<std::string> ids = ArrangeQuickActions(spec, everything);
+        for (const char* section : {"pause", "exit", "states", "screen", "bfi", "apps", "volume", "cheats"}) {
+            CHECK(std::find(ids.begin(), ids.end(), section) != ids.end());
+        }
+        const bool controls = std::find(ids.begin(), ids.end(), "controls") != ids.end();
+        const bool pages = std::find(ids.begin(), ids.end(), "options") != ids.end() &&
+                           std::find(ids.begin(), ids.end(), "buttons") != ids.end();
+        CHECK((controls || pages));
+    }
+    CHECK_FALSE(KnownQuickLayout("carousel"));
+    CHECK(KnownQuickAction("cheats"));
+    CHECK_FALSE(KnownQuickAction("teleport"));
 }
 
 TEST_CASE("noted core options round-trip and name their settings keys") {

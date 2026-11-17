@@ -32,9 +32,13 @@ class TuneServices;
 class ModServices;
 
 /// Package kinds the feature host installs: "feature" (a script) and "interface" (data only:
-/// a look for the Home screen, docs/interface-plugins.md in emuden-plugins).
+/// a look for the Home screen and/or layouts of the quick settings, docs/interface-plugins.md
+/// and docs/quick-settings.md in emuden-plugins).
 inline constexpr const char* KIND_FEATURE = "feature";
 inline constexpr const char* KIND_INTERFACE = "interface";
+/// What an interface plugin offers, by the capabilities it needs.
+inline constexpr const char* NEED_HOME_INTERFACE = "interface.1";
+inline constexpr const char* NEED_QUICK_SETTINGS = "quick_settings.1";
 
 struct PermissionLine {
     std::string permission, text;
@@ -49,12 +53,19 @@ struct FeaturePlugin {
     bool installed = false, update_available = false, running = false;
     bool needs_consent = false; // install or update asks for permissions not yet granted
     std::vector<PermissionLine> permissions, new_permissions;
+    std::vector<std::string> needs;           // the capabilities its manifest names
     std::vector<std::string> sync_categories; // a sync provider: what it can keep in step
     std::string sync_listing;                 // and how it lists (feature.sync.listing)
     std::uint64_t data_bytes = 0;
     int applied_mods = 0; // games and Vulkan layers den.mods changed for it
     std::string error; // last script failure, user-facing
 };
+
+/// An interface plugin with a look for Home. One that names neither capability (written
+/// before quick settings) is taken as a Home interface.
+bool OffersHomeInterface(const FeaturePlugin& plugin);
+/// An interface plugin with layouts for the quick settings of the second screen.
+bool OffersQuickSettings(const FeaturePlugin& plugin);
 
 class FeatureHost {
 public:

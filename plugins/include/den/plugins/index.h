@@ -41,6 +41,7 @@ struct IndexPlugin {
     std::vector<std::string> open_hosts;
     std::vector<std::string> browse_hosts;
     std::vector<std::string> systems; // a feature's systems, a console plugin's system ids
+    std::vector<std::string> needs;   // feature and interface plugins: the capabilities named
 };
 
 struct Revocation {

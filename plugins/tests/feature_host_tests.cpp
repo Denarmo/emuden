@@ -9,6 +9,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "den/plugins/feature_manifest.h"
+#include "den/plugins/index.h"
 #include "den/plugins/signature.h"
 #include "den/store/settings.h"
 #include "feature/host_impl.h"
@@ -431,4 +432,47 @@ TEST_CASE("an interface manifest is data with nothing to grant") {
                                             "\"interface\":{}}").ok());
     CHECK_FALSE(ParseFeatureManifest(head + R"("interface":{"icon":"../x.png"}})").ok());
     CHECK_FALSE(ParseFeatureManifest(head + R"("nothing":{}})").ok());
+    FeaturePlugin home;
+    home.kind = KIND_INTERFACE;
+    home.needs = look->needs;
+    CHECK(OffersHomeInterface(home));
+    CHECK_FALSE(OffersQuickSettings(home));
+}
+
+TEST_CASE("an interface manifest may hold quick settings layouts instead of a Home look") {
+    const std::string head = R"({"id":"tester.quick","name":"Quick","version":"1.0.0","kind":"interface",
+        "api":1,)";
+    const std::string quick = R"("quick_settings":{"icon":"icon.png","layouts":[{"layout":"grid"}]}})";
+    Result<FeatureManifest> only =
+        ParseFeatureManifest(head + R"("needs":["kind.interface","quick_settings.1"],)" + quick);
+    REQUIRE(only.ok());
+    CHECK(only->icon == "icon.png");
+    CHECK(Empty(only->access));
+    FeaturePlugin plugin;
+    plugin.kind = KIND_INTERFACE;
+    plugin.needs = only->needs;
+    CHECK(OffersQuickSettings(plugin));
+    CHECK_FALSE(OffersHomeInterface(plugin));
+    plugin.needs.push_back("interface.1");
+    CHECK(OffersHomeInterface(plugin));
+    plugin.kind = KIND_FEATURE;
+    CHECK_FALSE(OffersQuickSettings(plugin));
+
+    // quick_settings needs its capability; both objects together are fine.
+    CHECK_FALSE(ParseFeatureManifest(head + R"("needs":["kind.interface"],)" + quick).ok());
+    CHECK(ParseFeatureManifest(head + R"("needs":["kind.interface","interface.1","quick_settings.1"],)" +
+                               R"("interface":{"layout":"carousel"},)" + quick)
+              .ok());
+    CHECK_FALSE(ParseFeatureManifest(head + R"("needs":["kind.interface","quick_settings.1"],)" +
+                                     R"("quick_settings":{"icon":"../x.png"}})")
+                    .ok());
+
+    // A source lists what an interface plugin offers before it is downloaded.
+    Result<Index> index = ParseIndex(R"({"index_version":1,"sequence":1,"plugins":[{"id":"tester.quick",
+        "name":"Quick","version":"1.0.0","kind":"interface","needs":["kind.interface","quick_settings.1"],
+        "package":{"url":"q.emuplugin","size":10,
+                   "sha256":"0000000000000000000000000000000000000000000000000000000000000000"}}]})");
+    REQUIRE(index.ok());
+    REQUIRE(index->plugins.size() == 1);
+    CHECK(index->plugins[0].needs == std::vector<std::string>{"kind.interface", "quick_settings.1"});
 }

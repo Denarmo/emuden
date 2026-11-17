@@ -89,6 +89,7 @@ struct FeatureManifest {
     int api = 0;
     std::string entry; // the script to run, relative to the package; empty for an interface
     std::string icon;
+    std::vector<std::string> needs;
     FeatureAccess access;
     std::vector<std::string> file_types; // lower case, without the dot
     std::vector<std::string> sync_categories; // feature.sync.categories, with PERMISSION_SYNC

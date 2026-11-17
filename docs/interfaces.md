@@ -259,6 +259,15 @@ Use your own port when several agents test at once (`--port N`). Give nodes an `
   settings while a game runs: pause, fast-forward, rewind, exit, save and load slots with
   their pictures, the picture preset, the volume). Touch only; the pad stays with the main
   screen. Setting `ui.companion.enabled`: `auto` (on when `Present()`), `on`, `off`.
+- `companion.play` is a list of actions with stable ids (`app/logic/quick_spec.h`:
+  `pause`, `rewind`, `fast_forward`, `exit`, `states`, `screen`, `swap`, `fps`, `bfi`,
+  `controls`, `options`, `buttons`, `cheats`, `apps`, `volume`) that a layout arranges
+  (`companion_quick.h`: `standard`, EmuDEN's own, and `grid`, `compact`, `dock`, `split`).
+  Setting `ui.companion.quick` picks one: "" for the standard layout, `<plugin>/<choice>` for
+  a layout of an interface plugin with `quick_settings` (its order, hidden ids, colours, tile
+  size; docs/quick-settings.md in emuden-plugins), chosen under Settings > Interface. A
+  feature adds an action by a known id with `DEN_REGISTER_QUICK_ACTION`
+  (`den/app/quick_actions.h`); `cheats` is added that way when `den/app/cheats.h` exists.
 - For a console with two screens: `ClaimSecondScreen({draw, pointer})` gives the screen to
   the player instead of the companion pages until `ReleaseSecondScreen()`. `draw(ctx, area)`
   runs every frame with the canvas begun for the second screen; `pointer(event)` gets its

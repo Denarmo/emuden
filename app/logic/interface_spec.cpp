@@ -131,6 +131,10 @@ void ReadObject(const JsonValue* object, const std::vector<std::string>& moulds,
 
 } // namespace
 
+std::optional<gfx::Color> ParseHexColor(std::string_view text) {
+    return ParseColor(text);
+}
+
 bool KnownLayout(std::string_view layout) {
     return layout == "carousel" || layout == "shelf3d";
 }

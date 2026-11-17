@@ -169,6 +169,15 @@ bool IsPackageKind(std::string_view kind) {
     return kind == KIND_FEATURE || kind == KIND_INTERFACE;
 }
 
+bool OffersHomeInterface(const FeaturePlugin& plugin) {
+    return plugin.kind == KIND_INTERFACE &&
+           (Contains(plugin.needs, NEED_HOME_INTERFACE) || !Contains(plugin.needs, NEED_QUICK_SETTINGS));
+}
+
+bool OffersQuickSettings(const FeaturePlugin& plugin) {
+    return plugin.kind == KIND_INTERFACE && Contains(plugin.needs, NEED_QUICK_SETTINGS);
+}
+
 Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
     if (text.size() > MAX_MANIFEST_SIZE) {
         return Status::Fail("the manifest is too large");
@@ -197,6 +206,7 @@ Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
         return Status::Fail(manifest.id + " is not a feature plugin");
     }
     const std::vector<std::string> needs = json::Strings(*root, "needs", false);
+    manifest.needs = needs;
     if (!Contains(needs, "kind." + manifest.kind)) {
         return Status::Fail(manifest.id + " does not ask for kind." + manifest.kind);
     }
@@ -207,15 +217,25 @@ Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
         }
     }
     if (manifest.kind == KIND_INTERFACE) {
-        // Data only: what the app draws is the app's code, so there is nothing to grant.
+        // Data only: what the app draws is the app's code, so there is nothing to grant. It
+        // has a look for Home ("interface"), layouts of the quick settings, or both.
         const JsonValue* look = root->Find("interface");
-        if (look == nullptr || look->kind != JsonValue::Kind::Object) {
+        const JsonValue* quick = root->Find("quick_settings");
+        const bool has_look = look != nullptr && look->kind == JsonValue::Kind::Object;
+        const bool has_quick = quick != nullptr && quick->kind == JsonValue::Kind::Object;
+        if (!has_look && !has_quick) {
             return Status::Fail(manifest.id + " has no interface object");
+        }
+        if (has_quick && !Contains(needs, NEED_QUICK_SETTINGS)) {
+            return Status::Fail(manifest.id + " does not ask for " + NEED_QUICK_SETTINGS);
         }
         if (root->Find("feature") != nullptr) {
             return Status::Fail("an interface plugin cannot ask for permissions");
         }
-        manifest.icon = look->String("icon");
+        manifest.icon = has_look ? look->String("icon") : std::string();
+        if (manifest.icon.empty() && has_quick) {
+            manifest.icon = quick->String("icon");
+        }
         if (!manifest.icon.empty() &&
             (!IsSafeRelativePath(manifest.icon) || !manifest.icon.ends_with(".png"))) {
             return Status::Fail("the icon is not a PNG of the package");
