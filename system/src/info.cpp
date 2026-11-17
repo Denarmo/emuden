@@ -7,7 +7,12 @@
 namespace den::system {
 
 std::string Version() {
-    return "0.1.0";
+    const std::string release = ReleaseVersion();
+    return release.empty() ? DEN_PROJECT_VERSION : release;
+}
+
+std::string ReleaseVersion() {
+    return DEN_RELEASE_VERSION;
 }
 
 std::string Describe() {

@@ -1,18 +1,20 @@
 # Assembles a runnable EmuDEN folder from a finished build.
-#   powershell -ExecutionPolicy Bypass -File tools\package.ps1 [-BuildDir build\win] [-Out dist\windows] [-Build] [-Zip]
-# -Build runs tools\build.ps1 for the app first; -Zip also writes <Out>.zip.
+#   powershell -ExecutionPolicy Bypass -File tools\package.ps1 [-BuildDir build\win] [-Out dist\windows] [-Build] [-Zip] [-Version 0.2.0]
+# -Build runs tools\build.ps1 for the app first; -Zip also writes <Out>.zip. -Version (with
+# -Build) builds it as that release, which offers updates.
 param(
     [string]$BuildDir = 'build\win',
     [string]$Out = 'dist\windows',
     [switch]$Build,
-    [switch]$Zip
+    [switch]$Zip,
+    [string]$Version = ''
 )
 $ErrorActionPreference = 'Stop'
 $root = Resolve-Path (Join-Path $PSScriptRoot '..')
 Set-Location $root
 
 if ($Build) {
-    & (Join-Path $PSScriptRoot 'build.ps1') -Preset win -BuildDir $BuildDir -Target den_app
+    & (Join-Path $PSScriptRoot 'build.ps1') -Preset win -BuildDir $BuildDir -Target den_app -Version $Version
     if ($LASTEXITCODE -ne 0) { throw 'build failed' }
 }
 $bin = Join-Path $BuildDir 'bin'

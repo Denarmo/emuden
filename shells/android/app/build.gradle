@@ -35,6 +35,8 @@ def commitCount = { ->
 }
 def emudenVersionCode = providers.gradleProperty('emudenVersionCode').map { it.toInteger() }.getOrElse(commitCount())
 def emudenVersionName = providers.gradleProperty('emudenVersion').getOrElse('0.1.0')
+// Only a build given -PemudenVersion is a release, which offers updates (EMUDEN_VERSION).
+def emudenReleaseVersion = providers.gradleProperty('emudenVersion').getOrElse('')
 
 android {
     namespace 'io.github.denarmo.emuden'
@@ -55,7 +57,7 @@ android {
             cmake {
                 // The same variables as the "android" CMake preset.
                 arguments '-DANDROID_STL=c++_shared', '-DDEN_BUILD_TESTS=OFF',
-                        '-DCMAKE_BUILD_TYPE=RelWithDebInfo'
+                        '-DCMAKE_BUILD_TYPE=RelWithDebInfo', "-DEMUDEN_VERSION=${emudenReleaseVersion}"
                 targets 'den_app'
             }
         }
