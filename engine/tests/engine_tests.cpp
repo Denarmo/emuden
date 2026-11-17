@@ -125,6 +125,24 @@ TEST_CASE("the engine program chosen on this device is looked at first") {
     CHECK_FALSE(f.host->Find("nochoice"));
 }
 
+TEST_CASE("EmuDEN's Switch 2 engine is driven over ECP, chosen or found") {
+    Fixture f;
+    const auto folder = f.dir / "engines" / "switch2";
+    std::filesystem::create_directories(folder);
+    std::ofstream(folder / "lichii.exe") << "x";
+    std::ofstream(folder / "emuden-switch2") << "x";
+    REQUIRE(f.host->Find("switch2"));
+    CHECK(f.host->Find("switch2")->executable == folder / "emuden-switch2");
+    CHECK(f.host->Find("switch2")->level == 2);
+
+    f.settings->SetString(engine::PathKey("switch2"), PathToUtf8(folder / "emuden-switch2"));
+    REQUIRE(f.host->Find("switch2"));
+    CHECK(f.host->Find("switch2")->source == "setting");
+    CHECK(f.host->Find("switch2")->level == 2);
+    f.settings->SetString(engine::PathKey("switch2"), PathToUtf8(folder / "lichii.exe"));
+    CHECK(f.host->Find("switch2")->level == 0);
+}
+
 TEST_CASE("level 0 reports the exit and books the play time") {
     Fixture f;
     f.UseShell("ping -n 3 127.0.0.1 >nul & exit 3", "sleep 2; exit 3");

@@ -20,10 +20,12 @@ struct KnownEngine {
     const char* desktop_folder; // a copy the user keeps on the desktop
 };
 
-// The Switch 2 engine of this stage is the previous emulator's own executable.
+// EmuDEN's own Switch 2 engine speaks ECP; the previous emulator only takes a game file.
 const std::vector<KnownEngine>& Known() {
     static const std::vector<KnownEngine> known = {
-        {"switch2", {{"lichii.exe", 0}, {"lichii", 0}}, "Lichii"},
+        {"switch2",
+         {{"emuden-switch2.exe", 2}, {"emuden-switch2", 2}, {"lichii.exe", 0}, {"lichii", 0}},
+         "Lichii"},
     };
     return known;
 }
@@ -35,6 +37,19 @@ const KnownEngine* FindKnown(const std::string& system) {
         }
     }
     return nullptr;
+}
+
+// The level a program chosen by hand is driven at: that of the known engine it is named as.
+int LevelOf(const KnownEngine* engine, const std::filesystem::path& file) {
+    if (engine) {
+        const std::string name = PathToUtf8(file.filename());
+        for (const KnownEngine::Name& known : engine->names) {
+            if (name == known.file) {
+                return known.level;
+            }
+        }
+    }
+    return 0;
 }
 
 std::optional<Install> InFolder(const KnownEngine& engine, const std::filesystem::path& folder,
@@ -81,7 +96,7 @@ std::optional<Install> Locate(const std::string& system, const std::filesystem::
     if (!chosen.empty()) {
         const std::filesystem::path path = PathFromUtf8(chosen);
         if (IsRegularFile(path)) {
-            return Install{path, "setting", 0};
+            return Install{path, "setting", LevelOf(engine, path)};
         }
         return engine ? InFolder(*engine, path, "setting") : std::nullopt;
     }
