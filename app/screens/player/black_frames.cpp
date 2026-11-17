@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "den/app/strings.h"
 #include "den/app/black_frames.h"
 
 #include <cmath>
@@ -145,20 +146,20 @@ std::string BlackFrames::Status(const player::Snapshot& snapshot) const {
     }
     const player::BfiPlan& plan = snapshot.bfi;
     if (!plan.Active()) {
-        return std::format("Switching the display to {} Hz", player::RateText(requested_));
+        return TrF("Switching the display to {} Hz", player::RateText(requested_));
     }
     if (snapshot.fast_forward || snapshot.rewinding) {
         return "Paused while fast-forwarding or rewinding";
     }
     if (!snapshot.bfi_steady && snapshot.bfi_display_hz > 0) {
-        return std::format("The display shows only {} frames a second", player::RateText(snapshot.bfi_display_hz));
+        return TrF("The display shows only {} frames a second", player::RateText(snapshot.bfi_display_hz));
     }
     if (snapshot.bfi_display_hz > 0 && snapshot.bfi_display_hz < plan.refresh_hz * MISSES_BELOW) {
         // The game is too heavy to draw every refresh: a missed one shows no black frame.
-        return std::format("Uneven: {} of {} refreshes a second are drawn", player::RateText(snapshot.bfi_display_hz),
+        return TrF("Uneven: {} of {} refreshes a second are drawn", player::RateText(snapshot.bfi_display_hz),
                            player::RateText(plan.refresh_hz));
     }
-    return std::format("At {} Hz: {} black frame{} after each of the game's", player::RateText(plan.refresh_hz),
+    return TrF("At {} Hz: {} black frame{} after each of the game's", player::RateText(plan.refresh_hz),
                        plan.black, plan.black == 1 ? "" : "s");
 }
 

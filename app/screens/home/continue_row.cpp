@@ -8,6 +8,7 @@
 #include <map>
 #include <utility>
 
+#include "den/app/strings.h"
 #include "den/app/launch.h"
 #include "den/app/sync_glue.h"
 #include "den/app/continue_row.h"
@@ -133,10 +134,10 @@ std::string ContinueSignature(const std::vector<ContinueCard>& cards) {
 std::string ContinueLine(const ContinueCard& card) {
     if (Downloading(card)) {
         const float fraction = SyncSvc() ? SyncSvc()->State().fraction : -1;
-        return fraction >= 0 ? std::format("Downloading {}%", static_cast<int>(std::lround(fraction * 100)))
+        return fraction >= 0 ? TrF("Downloading {}%", static_cast<int>(std::lround(fraction * 100)))
                              : std::string("Downloading\xE2\x80\xA6");
     }
-    std::string line = "On " + DeviceText(card.item) + " \xC2\xB7 " + sync::AgoText(card.item.time, Now());
+    std::string line = TrF("On {}", DeviceText(card.item)) + " \xC2\xB7 " + sync::AgoText(card.item.time, Now());
     if (card.item.game_id.empty()) {
         line += card.online ? " \xC2\xB7 Download " + SizeText(card.online->size) : std::string(" \xC2\xB7 Not here");
     }
@@ -176,18 +177,18 @@ void ChooseContinue(const ContinueCard& card) {
     }
     const std::string name = card.game.name;
     if (Downloading(card)) {
-        stage.Toast(name + " is downloading.");
+        stage.Toast(TrF("{} is downloading.", name));
         return;
     }
     if (!card.online || SyncSvc() == nullptr) {
-        stage.Toast(name + " is only on " + DeviceText(card.item) +
-                        ". Turn on \"Upload my games\" there to download it here.",
+        stage.Toast(TrF("{} is only on {}. Turn on \"Upload my games\" there to download it here.", name,
+                        DeviceText(card.item)),
                     5.0f);
         return;
     }
-    stage.Confirm("Download " + name + "?",
-                  "It was last played on " + DeviceText(card.item) + ". Download it (" + SizeText(card.online->size) +
-                      ") to pick up where you left off.",
+    stage.Confirm(TrF("Download {}?", name),
+                  TrF("It was last played on {}. Download it ({}) to pick up where you left off.",
+                      DeviceText(card.item), SizeText(card.online->size)),
                   "Download",
                   [game = *card.online, key = card.item.key] {
                       if (SyncSvc() != nullptr) {

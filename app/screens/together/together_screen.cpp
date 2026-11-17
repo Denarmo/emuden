@@ -7,6 +7,7 @@
 
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/player.h"
 #include "den/app/model_widgets.h"
 #include "den/app/app.h"
@@ -132,7 +133,7 @@ private:
         if (!core || !core->Ready()) {
             const std::string name = core && !core->name.empty() ? core->name : plan_.core_id;
             ui::RowSpec row = ValueRow(
-                "together.install", "Install " + name, [this] { return JobText(install_, "Needed on both devices"); },
+                "together.install", TrF("Install {}", name), [this] { return JobText(install_, "Needed on both devices"); },
                 [this] {
                     if (!install_) {
                         install_ = Svc().plugins->InstallCore(game_.system, plan_.core_id);
@@ -150,7 +151,7 @@ private:
             return rows;
         }
         ui::RowSpec host = ActionRow("together.host", "Host", [this] { HostNow(); });
-        host.description = "Show this device to others nearby as \"" + DeviceLabel() + "\"";
+        host.description = TrF("Show this device to others nearby as \"{}\"", DeviceLabel());
         rows.push_back(std::move(host));
         net::GameInfo mine;
         mine.system = game_.system;
@@ -164,9 +165,9 @@ private:
                     continue;
                 }
                 ui::RowSpec row = ValueRow(
-                    "together.host." + found.address.ToString(), "Join " + found.beacon.device,
+                    "together.host." + found.address.ToString(), TrF("Join {}", found.beacon.device),
                     [found, mine] { return JoinText(found, mine); }, [this, found] { JoinNow(found); });
-                row.description = found.beacon.title + (found.beacon.rom_hash == mine.rom_hash ? "" : "  \xC2\xB7  another game");
+                row.description = found.beacon.title + (found.beacon.rom_hash == mine.rom_hash ? "" : "  \xC2\xB7  " + Tr("another game"));
                 rows.push_back(std::move(row));
                 ++listed;
             }
@@ -184,8 +185,7 @@ private:
         ui::RowSpec state = ValueRow("together.state", party.IsHost() ? "Hosting" : "Joining",
                                      [] { return Together::Get().StatusText(); });
         if (party.IsHost()) {
-            state.description = "Shown to others as \"" + DeviceLabel() + "\" (port " +
-                                std::to_string(party.Port()) + ")";
+            state.description = TrF("Shown to others as \"{}\" (port {})", DeviceLabel(), party.Port());
         }
         rows.push_back(std::move(state));
         if (party.Joined() || (party.IsHost() && plan_.mode == net::Mode::Link)) {
@@ -207,9 +207,9 @@ private:
             return then();
         }
         const auto core = TogetherCore(game_, plan_);
-        GetStage().Confirm("Start again with " + (core ? core->name : plan_.core_id) + "?",
-                           game_.name + " closes and starts again from its last in-game save. "
-                                        "Save in the game first.",
+        GetStage().Confirm(TrF("Start again with {}?", core ? core->name : plan_.core_id),
+                           TrF("{} closes and starts again from its last in-game save. Save in the game first.",
+                               game_.name),
                            "Start again", std::move(then));
     }
 

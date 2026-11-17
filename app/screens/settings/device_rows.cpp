@@ -9,6 +9,7 @@
 #include <format>
 #include <iterator>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
@@ -60,7 +61,7 @@ std::vector<ui::RowSpec> DeviceRows() {
     name.description = system::Label(device.form);
     rows.push_back(std::move(name));
 
-    std::vector<std::string> tiers{std::format("Automatic ({})", system::Label(device.detected))};
+    std::vector<std::string> tiers{TrF("Automatic ({})", system::Label(device.detected))};
     for (const system::Tier tier : TIERS) {
         tiers.emplace_back(system::Label(tier));
     }
@@ -78,7 +79,7 @@ std::vector<ui::RowSpec> DeviceRows() {
     tier.description = "Found from: " + device.tier_reason;
     rows.push_back(std::move(tier));
 
-    std::vector<std::string> sizes{std::format("Automatic ({})", Percent(system::DeviceUiScale()))};
+    std::vector<std::string> sizes{TrF("Automatic ({})", Percent(system::DeviceUiScale()))};
     for (const float scale : SCALES) {
         sizes.push_back(Percent(scale));
     }

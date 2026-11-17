@@ -5,6 +5,7 @@
 
 #include "den/base/files.h"
 #include "den/base/json.h"
+#include "den/base/language.h"
 #include "den/plugins/index.h"
 #include "den/plugins/signature.h"
 #include "den/plugins/sources.h"
@@ -154,6 +155,8 @@ Result<Index> ParseIndex(std::string_view text) {
                 plugin.open_hosts = json::Strings(value, "open_hosts", false);
                 plugin.browse_hosts = json::Strings(value, "browse_hosts", false);
                 plugin.needs = json::Strings(value, "needs", false);
+                plugin.language = NormalizeLanguage(value.String("language"));
+                plugin.language_name = value.String("language_name");
                 // Not "systems": in an entry that field lists console objects, and readers
                 // older than feature plugins expect it to.
                 plugin.systems = json::Strings(value, "feature_systems", false);

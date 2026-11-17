@@ -10,6 +10,7 @@
 #include <format>
 #include <utility>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/pages.h"
@@ -297,7 +298,7 @@ private:
             case AskKind::OpenUrl:
                 // An address of a host the plugin declared, after something the user pressed.
                 if (!pal::OpenUrl(ask.value).ok) {
-                    GetStage().Toast(std::format("Open in your browser: {}", ask.value), 6.0f);
+                    GetStage().Toast(TrF("Open in your browser: {}", ask.value), 6.0f);
                 }
                 break;
             case AskKind::OpenWeb:

@@ -9,6 +9,7 @@
 #include <cctype>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/game_prefs.h"
 #include "den/app/launch.h"
 #include "den/app/game_widgets.h"
@@ -50,7 +51,7 @@ std::vector<std::string> DetailLines(const library::GameDetails& d) {
     if (d.rating > 0 && d.votes > 0) {
         rating = std::format("rated {:.1f} of 5", d.rating);
     }
-    const std::string players = d.players > 1 ? std::format("Up to {} players", d.players)
+    const std::string players = d.players > 1 ? TrF("Up to {} players", d.players)
                                 : d.players == 1 ? std::string("1 player")
                                                  : std::string();
     std::string last = join({players, rating}, " · ");
@@ -132,13 +133,13 @@ public:
             label->tone = ui::Tone::Dim;
             return label;
         };
-        fact("Played " + (game.play_seconds > 0 ? PlayTimeText(game.play_seconds) : std::string("not yet")))->pad_top = 6;
+        fact(game.play_seconds > 0 ? TrF("Played {}", PlayTimeText(game.play_seconds)) : Tr("Not played yet"))->pad_top = 6;
         if (game.last_played > 0) {
-            fact("Last played " + LastPlayedText(game.last_played));
+            fact(TrF("Last played {}", LastPlayedText(game.last_played)));
         }
         if (const auto core = CoreForGame(game)) {
             const std::string name = core->name.empty() ? core->id : core->name;
-            fact(core->installed ? "Runs with " + name : name + " is downloaded on Play");
+            fact(core->installed ? TrF("Runs with {}", name) : TrF("{} is downloaded on Play", name));
         }
 
         // The overview takes what the picture and the buttons leave.

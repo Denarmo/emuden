@@ -252,6 +252,8 @@ std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
         plugin.summary = manifest.summary;
         plugin.kind = manifest.kind;
         plugin.needs = manifest.needs;
+        plugin.language = manifest.language;
+        plugin.language_name = manifest.language_name;
         plugin.dir = package.dir;
         plugin.source_name = TrustName(package, views, origin);
         plugin.trust = package.trust;
@@ -313,6 +315,8 @@ std::vector<FeaturePlugin> RealFeatureHost::Plugins() const {
         plugin.summary = offered.summary;
         plugin.kind = offered.kind;
         plugin.needs = offered.needs;
+        plugin.language = offered.language;
+        plugin.language_name = offered.language_name;
         plugin.source_name = SourceName(view);
         plugin.trust = TrustOf(view);
         plugin.permissions = PermissionLines(AccessOf(offered));

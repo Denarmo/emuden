@@ -8,6 +8,7 @@
 #include <cmath>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/pages.h"
@@ -76,7 +77,7 @@ std::vector<ui::RowSpec> ControllerRows() {
     const int count = input.PadCount();
     std::vector<std::string> players;
     for (int i = 0; i < count; ++i) {
-        players.push_back(std::format("Player {}", i + 1));
+        players.push_back(TrF("Player {}", i + 1));
     }
     for (int i = 0; i < count; ++i) {
         const input::PadState& pad = input.Pad(i);
@@ -177,7 +178,7 @@ protected:
                 held += (held.empty() ? "" : ", ") + ui::PadButtonName(pad.family, static_cast<PadButton>(i));
             }
         }
-        const std::string line = held.empty() ? "Press any button" : "Pressed: " + held;
+        const std::string line = held.empty() ? "Press any button" : TrF("Pressed: {}", held);
         const float line_w = ctx.Text().Measure(line, theme.text_body, gfx::FONT_BOLD);
         canvas.DrawText(line, cx - line_w * 0.5f, cy + 3.6f * u, theme.text_body,
                         held.empty() ? theme.text_dim : theme.fg, gfx::FONT_BOLD);

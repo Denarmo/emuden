@@ -122,6 +122,10 @@ double NowSeconds();
 void SleepMs(int ms);
 std::string GetEnv(const char* name);
 
+/// The languages the user chose for the system, best first, as codes ("es-ES", "en-US"); empty
+/// when the system says none. EMUDEN_LOCALE (comma separated) stands in for them.
+std::vector<std::string> PreferredLanguages();
+
 // HTTP.
 struct HttpRequest {
     std::string url;

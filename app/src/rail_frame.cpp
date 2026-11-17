@@ -13,6 +13,7 @@
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/platform/pal.h"
+#include "den/ui/translate.h"
 #include "den/ui/glyphs.h"
 #include "den/ui/widgets.h"
 #include "page_widths.h"
@@ -98,7 +99,7 @@ protected:
             ctx.canvas->StrokeRect(box.Inset(1), theme.fg, 2, 11);
             ui::DrawTextIn(ctx, box, text_.substr(0, 1), theme.text_small, gfx::FONT_BOLD, theme.fg, ui::Align::Center);
         }
-        ui::DrawTextIn(ctx, gfx::Rect{rect.x + 2, rect.y + 35, rect.w - 4, 16}, text_, 12,
+        ui::DrawTextIn(ctx, gfx::Rect{rect.x + 2, rect.y + 35, rect.w - 4, 16}, ui::Translate(text_), 12,
                        selected || focused ? gfx::FONT_BOLD : gfx::FONT_REGULAR, theme.fg, ui::Align::Center);
     }
 

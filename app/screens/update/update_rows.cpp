@@ -5,6 +5,7 @@
 
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
@@ -22,7 +23,7 @@ std::vector<ui::RowSpec> ReleaseRows(bool with_notes) {
         return rows;
     }
     if (with_notes) {
-        rows.push_back(ActionRow("update.notes", std::format("What's new in {}", state.release->version),
+        rows.push_back(ActionRow("update.notes", TrF("What's new in {}", state.release->version),
                                  [] { Svc().stage->Push("update"); }));
     }
     ui::RowSpec install = ValueRow(

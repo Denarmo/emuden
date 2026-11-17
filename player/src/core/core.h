@@ -113,6 +113,8 @@ public:
         std::filesystem::path save_dir;
         /// Option values the core reads from its very first call on.
         std::map<std::string, std::string> options;
+        /// The app's language code ("es"): what the core is told when it asks the frontend's language.
+        std::string language;
         /// Lets the core draw with OpenGL; without it only software cores start. It must
         /// outlive the core.
         HwRenderHost* hw_host = nullptr;

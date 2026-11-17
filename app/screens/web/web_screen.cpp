@@ -20,6 +20,7 @@
 #include <cmath>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/base/json.h"
@@ -383,7 +384,7 @@ void WebScreen::Refused(const pal::WebNavigation& navigation) {
         return;
     }
     g_state.leave_asked = navigation.host;
-    GetStage().Confirm("Leaving this site", std::format("This link goes to {}. Open it?", navigation.host), "Open",
+    GetStage().Confirm("Leaving this site", TrF("This link goes to {}. Open it?", navigation.host), "Open",
                        [url = navigation.url, host = navigation.host] {
                            if (g_screen && g_screen->view_) {
                                g_screen->hosts_.push_back(host);

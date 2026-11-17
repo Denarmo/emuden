@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "companion_quick.h"
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/game_widgets.h"
 #include "den/app/games.h"
@@ -224,7 +225,7 @@ void AddQuickCover(ui::Node& parent, const QuickContext& ctx, float cover_w, flo
     info->Emplace<ui::Label>(game ? game->name : std::string("Game"), Svc().theme->text_heading, gfx::FONT_BOLD);
     std::string about = game ? SystemName(game->system) : std::string();
     if (game && game->play_seconds > 0) {
-        about += " · " + PlayTimeText(game->play_seconds) + " played";
+        about += " · " + TrF("{} played", PlayTimeText(game->play_seconds));
     }
     if (!about.empty()) {
         info->Emplace<ui::Label>(about)->tone = ui::Tone::Dim;

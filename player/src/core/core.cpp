@@ -10,6 +10,7 @@
 
 #include "core/core_impl.h"
 #include "den/base/files.h"
+#include "den/base/language.h"
 #include "den/platform/pal.h"
 
 namespace den::player {
@@ -113,6 +114,7 @@ std::unique_ptr<LibretroCore> LibretroCore::Load(const LoadParams& params, std::
         PathToUtf8(params.system_dir.empty() ? fs::temp_directory_path(ec) : params.system_dir);
     c.save_dir = params.save_dir.empty() ? c.system_dir : PathToUtf8(params.save_dir);
     c.options = params.options;
+    c.language = RetroLanguage(params.language);
     c.hw_host = params.hw_host;
 
     g_core = &c;

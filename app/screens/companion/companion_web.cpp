@@ -12,6 +12,7 @@
 #include <memory>
 #include <thread>
 
+#include "den/app/strings.h"
 #include "den/app/web_browser.h"
 #include "companion_page.h"
 #include "den/app/app.h"
@@ -154,7 +155,7 @@ public:
         Root().Emplace<ui::Label>(record.message);
         for (const downloads::AddedGame& game : record.games) {
             const auto entry = svc.library->Find(game.id);
-            Root().Emplace<ui::Label>(entry ? std::format("In the library: {} ({})", entry->name, record.system_name)
+            Root().Emplace<ui::Label>(entry ? TrF("In the library: {} ({})", entry->name, record.system_name)
                                             : std::format("{}: not in the library now", game.name))
                 ->tone = ui::Tone::Dim;
         }

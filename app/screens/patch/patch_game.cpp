@@ -10,6 +10,7 @@
 #include <mutex>
 #include <utility>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/pages.h"
@@ -70,7 +71,7 @@ public:
         seen_ = work_->stamp;
         const std::string name = PathToUtf8(PathFromUtf8(Param("file")).filename());
         if (!work_->opened) {
-            list->Emplace<ui::Label>("Reading " + name);
+            list->Emplace<ui::Label>(TrF("Reading {}", name));
             return;
         }
         if (!work_->open_status) {

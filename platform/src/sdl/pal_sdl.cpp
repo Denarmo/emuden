@@ -378,6 +378,34 @@ std::string GetEnv(const char* name) {
     return value ? std::string(value) : std::string();
 }
 
+std::vector<std::string> PreferredLanguages() {
+    std::vector<std::string> out;
+    if (const std::string forced = GetEnv("EMUDEN_LOCALE"); !forced.empty()) {
+        std::size_t start = 0;
+        while (start <= forced.size()) {
+            const std::size_t end = std::min(forced.find(',', start), forced.size());
+            if (end > start) {
+                out.push_back(forced.substr(start, end - start));
+            }
+            start = end + 1;
+        }
+        return out;
+    }
+    int count = 0;
+    SDL_Locale** locales = SDL_GetPreferredLocales(&count);
+    for (int i = 0; locales != nullptr && i < count; ++i) {
+        if (locales[i] != nullptr && locales[i]->language != nullptr) {
+            std::string code = locales[i]->language;
+            if (locales[i]->country != nullptr && locales[i]->country[0] != '\0') {
+                code += std::string("-") + locales[i]->country;
+            }
+            out.push_back(std::move(code));
+        }
+    }
+    SDL_free(locales);
+    return out;
+}
+
 Result<std::unique_ptr<Process>> StartProcess(const ProcessDesc& desc) {
     if (!g_caps.child_processes) {
         return Status::Fail("this device cannot start child processes");

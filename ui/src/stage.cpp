@@ -11,6 +11,7 @@
 #include "den/ui/selection.h"
 #include "den/ui/text_entry.h"
 #include "den/ui/widgets.h"
+#include "den/ui/translate.h"
 
 namespace den::ui {
 
@@ -142,7 +143,7 @@ struct Stage::Impl {
         const auto total = [&] {
             float sum = spacing * static_cast<float>(hints.size() > 0 ? hints.size() - 1 : 0);
             for (const Hint& hint : hints) {
-                sum += HintWidth(ctx, ctx.family, hint.nav, hint.text, glyph_h);
+                sum += HintWidth(ctx, ctx.family, hint.nav, Translate(hint.text), glyph_h);
             }
             return sum;
         };
@@ -153,8 +154,8 @@ struct Stage::Impl {
             spacing = 12;
         }
         for (auto it = hints.rbegin(); it != hints.rend(); ++it) {
-            x -= HintWidth(ctx, ctx.family, it->nav, it->text, glyph_h);
-            DrawHint(ctx, ctx.family, it->nav, it->text, x, y + 11, glyph_h, theme.fg);
+            x -= HintWidth(ctx, ctx.family, it->nav, Translate(it->text), glyph_h);
+            DrawHint(ctx, ctx.family, it->nav, Translate(it->text), x, y + 11, glyph_h, theme.fg);
             x -= spacing;
         }
     }
@@ -288,7 +289,7 @@ std::size_t Stage::Depth() const {
 
 void Stage::Toast(std::string text, float seconds) {
     log::Info("ui", "toast: {}", text);
-    impl_->toasts.push_back({std::move(text), seconds});
+    impl_->toasts.push_back({Translate(text), seconds});
     if (impl_->toasts.size() > 4) {
         impl_->toasts.erase(impl_->toasts.begin());
     }
@@ -298,7 +299,7 @@ void Stage::SetNote(std::string text, float fraction) {
     if (text != impl_->note && !text.empty() && impl_->note.empty()) {
         log::Info("ui", "note: {}", text);
     }
-    impl_->note = std::move(text);
+    impl_->note = Translate(text);
     impl_->note_fraction = fraction;
 }
 
@@ -306,10 +307,10 @@ void Stage::Confirm(std::string title, std::string message, std::string yes_labe
                     std::function<void()> on_yes, std::string no_label, bool yes_first,
                     std::function<void()> on_no) {
     impl_->dialog = std::make_unique<Impl::Dialog>();
-    impl_->dialog->title = std::move(title);
-    impl_->dialog->message = std::move(message);
-    impl_->dialog->yes = std::move(yes_label);
-    impl_->dialog->no = std::move(no_label);
+    impl_->dialog->title = Translate(title);
+    impl_->dialog->message = Translate(message);
+    impl_->dialog->yes = Translate(yes_label);
+    impl_->dialog->no = Translate(no_label);
     impl_->dialog->on_yes = std::move(on_yes);
     impl_->dialog->on_no = std::move(on_no);
     impl_->dialog->selected = yes_first ? 1 : 0;

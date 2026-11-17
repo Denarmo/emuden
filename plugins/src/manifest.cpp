@@ -377,9 +377,23 @@ const std::vector<std::string>& HostCapabilities() {
         "feature.tune.1",     "feature.achievements.1",
         "feature.browser.1",  "presentation.screens", "core.netplay",
         "core.tuning",        "feature.mods.1", "quick_settings.1",
-        "interfaces.1",       "themes.1",
+        "interfaces.1",       "themes.1",         "languages.1",
     };
     return capabilities;
+}
+
+std::string Component::LanguageValue(std::string_view app_language) const {
+    if (language_option.empty()) {
+        return {};
+    }
+    const std::string whole(app_language);
+    const std::string base = whole.substr(0, whole.find('-'));
+    for (const std::string& key : {whole, base, std::string("*")}) {
+        if (const auto it = language_values.find(key); it != language_values.end()) {
+            return it->second;
+        }
+    }
+    return {};
 }
 
 const Download* Component::DownloadFor(std::string_view platform_key) const {

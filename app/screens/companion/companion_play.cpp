@@ -16,6 +16,7 @@
 #include <format>
 
 #include "companion_pictures.h"
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/app_grid.h"
 #include "den/app/apps_catalog.h"
@@ -201,13 +202,13 @@ void CompanionPlay::BesideRow(ui::Node& parent) {
     // These settings lie over an app the user opened beside the game: the way back to it
     // comes first.
     ui::Node* over = parent.Add(ui::MakeBox(ui::Axis::Row, 10));
-    auto* back = over->Emplace<AppChip>("Back to " + beside.App().label, beside.App().icon);
+    auto* back = over->Emplace<AppChip>(TrF("Back to {}", beside.App().label), beside.App().icon);
     back->id = "companion.back_to_app";
     back->strong = true;
     back->grow = 1;
     back->height = ROW_HEIGHT;
     back->on_activate = [] { BesideBackToApp(); };
-    auto* close = over->Emplace<ui::Button>("Close " + beside.App().label, [] { BesideClose(); });
+    auto* close = over->Emplace<ui::Button>(TrF("Close {}", beside.App().label), [] { BesideClose(); });
     close->id = "companion.close_app";
     close->height = ROW_HEIGHT;
     close->SetPadding(18, 0);

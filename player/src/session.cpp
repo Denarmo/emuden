@@ -81,6 +81,7 @@ Status PlayerSession::Start(const OpenRequest& request) {
     params.core = request.core;
     params.system_dir = request.system_dir;
     params.save_dir = paths_.save_dir;
+    params.language = settings ? settings->GetString("ui.language", "en") : std::string("en");
     for (const auto& [key, value] : request.option_hints) {
         params.options[key] = value;
     }

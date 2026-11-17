@@ -6,6 +6,7 @@
 #include <cmath>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/base/files.h"
 #include "den/app/player_view.h"
@@ -30,12 +31,12 @@ std::string Age(const fs::path& file) {
         return "Saved just now";
     }
     if (minutes < 60) {
-        return std::format("Saved {} min ago", minutes);
+        return TrF("Saved {} min ago", minutes);
     }
     if (minutes < 60 * 48) {
-        return std::format("Saved {} h ago", minutes / 60);
+        return TrF("Saved {} h ago", minutes / 60);
     }
-    return std::format("Saved {} days ago", minutes / (60 * 24));
+    return TrF("Saved {} days ago", minutes / (60 * 24));
 }
 
 } // namespace
@@ -107,7 +108,7 @@ SlotRow::SlotRow(int slot, bool filled, const fs::path& thumbnail) : filled_(fil
     focusable = true;
     height = 76;
     id = std::format("slot.{}", slot);
-    title_ = std::format("Slot {}", slot + 1);
+    title_ = TrF("Slot {}", slot + 1);
     label = title_;
     if (filled && !thumbnail.empty() && IsRegularFile(thumbnail)) {
         thumbnail_ = PathToUtf8(thumbnail);

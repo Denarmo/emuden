@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/feature_api.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
@@ -147,7 +148,7 @@ std::vector<ui::RowSpec> InterfaceRows() {
         ui::RowSpec row = ValueRow(
             "interface.about." + plugin.id, plugin.name,
             [id = plugin.id, installed = plugin.installed, version = plugin.version] {
-                return JobText(FeaturePluginJob(id), installed ? "Version " + version : "Not installed");
+                return JobText(FeaturePluginJob(id), installed ? TrF("Version {}", version) : Tr("Not installed"));
             });
         row.description = std::format("{}  ·  {}  ·  {}", plugin.publisher, plugin.summary, plugin.source_name);
         rows.push_back(std::move(row));

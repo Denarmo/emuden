@@ -343,6 +343,13 @@ void RealHost::AddSettingHints(const Loaded& loaded, const SystemDef& system, co
     }
 }
 
+void RealHost::AddLanguageHint(const Component& core, CoreInfo& info) const {
+    const std::string app = config_.settings != nullptr ? config_.settings->GetString("ui.language", "en") : "en";
+    if (const std::string value = core.LanguageValue(app); !value.empty()) {
+        info.option_hints.emplace_back(core.language_option, value);
+    }
+}
+
 CoreInfo RealHost::Describe(const Loaded& loaded, const SystemDef& system, const Component& core) const {
     if (core.type == TYPE_ENGINE_APP) {
         return DescribeEngineApp(loaded, system, core);
@@ -353,7 +360,8 @@ CoreInfo RealHost::Describe(const Loaded& loaded, const SystemDef& system, const
     info.system = system.console.id;
     info.system_dir = bios_dir_;
     info.needs_gl = core.opengl;
-    info.option_hints = core.option_hints;
+    AddLanguageHint(core, info); // first, so the manifest's own hints and the user's options win
+    info.option_hints.insert(info.option_hints.end(), core.option_hints.begin(), core.option_hints.end());
     info.option_hints.insert(info.option_hints.end(), core.forced_core_options.begin(), core.forced_core_options.end());
     AddSettingHints(loaded, system, core, info);
     info.screens = core.screens.empty() ? system.console.screens : core.screens;

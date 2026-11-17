@@ -67,7 +67,7 @@ public:
         static const char* const TITLES[] = {"setup.welcome", "setup.games", "setup.consoles", "setup.done"};
         // The first step says what was set up for this device; nothing is asked.
         ui::Node* content =
-            BuildPlainFrame(*this, step_ == 0 ? "Set up for " + system::Device().name : Tr(TITLES[step_]));
+            BuildPlainFrame(*this, step_ == 0 ? TrF("Set up for {}", system::Device().name) : Tr(TITLES[step_]));
         content->pad_right = svc.theme->margin;
         auto* progress = content->Emplace<ui::Label>(TrF("setup.step", step_ + 1, 4));
         progress->tone = ui::Tone::Dim;

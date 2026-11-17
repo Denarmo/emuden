@@ -51,6 +51,8 @@ default; each tool still starts only when its environment variable is set.
 | `den/gfx/images.h` | `DecodeImage`, `LoadImageFile`, `TextureCache::Get(path)` (async decode) |
 | `den/input/input.h` | `System::Poll` gives `Event`s (Nav, pointer, key, text); `PadState` by position for the player; `GlyphName`, `GlyphLabel` per pad family |
 | `den/ui/node.h`, `widgets.h`, `page.h`, `theme.h` | the UI kit, below |
+| `den/ui/translate.h` | `ui::SetTranslator`, `ui::Translate`: the kit draws texts in the app's language (`docs/languages.md`) |
+| `den/base/language.h` | language codes: `NormalizeLanguage`, `MatchLanguage` (the system's languages against the packs), `RetroLanguage` (libretro's number) |
 | `den/store/settings.h` | `Settings`: dotted keys in `settings.json` |
 | `den/platform/child.h` | `StartChild`: a child that never outlives the app (job object, parent-death signal), working directory, `RequestClose`, `Kill` |
 | `den/system/settings.h` | layered settings: `Key<T> K{"a.b", default, {meta}}` declared next to the feature registers itself; `system::Store().Get(K, Scope::Game(system, id))` resolves game, console, global (`settings.json`), default; overrides in `settings-overrides.json` (versioned); `Keys()`, `KeysIn(section)` for pages |

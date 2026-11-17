@@ -12,6 +12,7 @@
 #include "companion_cells.h"
 #include "companion_pictures.h"
 #include "companion_play.h"
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/picture_choice.h"
@@ -56,7 +57,7 @@ void CompanionPlay::BuildStates(ui::Node& root, int columns) {
     CompanionGrid(root, player::STATE_SLOTS, columns > 0 ? columns : SLOT_COLUMNS, GAP, [&](ui::Node& row, int slot) -> ui::Node* {
         const bool used = svc.player->HasState(slot);
         auto* cell = row.Emplace<CompanionSlot>(
-            std::format("Slot {}", slot + 1),
+            TrF("Slot {}", slot + 1),
             used ? PathToUtf8(svc.player->StateThumbnail(slot)) : std::string());
         cell->id = std::format("companion.slot{}", slot);
         cell->on_activate = [this, slot] {
@@ -258,11 +259,11 @@ void CompanionPlay::Save(int slot) {
         }
         // The picture of the slot changed under the same file name.
         Svc().textures->Forget(PathToUtf8(Svc().player->StateThumbnail(slot)));
-        GetStage().Toast(std::format("Saved to slot {}", slot + 1));
+        GetStage().Toast(TrF("Saved to slot {}", slot + 1));
         Rebuild();
     };
     if (Svc().player->HasState(slot)) {
-        GetStage().Confirm(std::format("Replace slot {}?", slot + 1), "The state saved there is overwritten.",
+        GetStage().Confirm(TrF("Replace slot {}?", slot + 1), "The state saved there is overwritten.",
                            "Replace", save);
     } else {
         save();
@@ -271,11 +272,11 @@ void CompanionPlay::Save(int slot) {
 
 void CompanionPlay::Load(int slot) {
     if (!Svc().player->HasState(slot)) {
-        GetStage().Toast(std::format("Slot {} is empty", slot + 1));
+        GetStage().Toast(TrF("Slot {} is empty", slot + 1));
         return;
     }
     const Status loaded = Svc().player->LoadState(slot);
-    GetStage().Toast(loaded ? std::format("Loaded slot {}", slot + 1)
+    GetStage().Toast(loaded ? TrF("Loaded slot {}", slot + 1)
                      : loaded.error.empty() ? std::string("The state could not be loaded")
                                             : loaded.error);
 }

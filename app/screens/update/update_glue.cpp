@@ -8,6 +8,7 @@
 #include <chrono>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
@@ -93,7 +94,7 @@ void ToastWhenFree() {
         return;
     }
     g_toast_pending = false;
-    Svc().stage->Toast(std::format("EmuDEN {} is available", Updates().release->version), 5.0f);
+    Svc().stage->Toast(TrF("EmuDEN {} is available", Updates().release->version), 5.0f);
 }
 
 void Startup() {
@@ -115,7 +116,7 @@ void Startup() {
     if (state.target.method == Method::WindowsPortable) {
         const update::PortableLayout layout = update::LayoutFor(state.target.location);
         if (const auto result = update::TakeHelperResult(layout)) {
-            Svc().stage->Toast(result->ok ? std::format("Updated to EmuDEN {}", result->version)
+            Svc().stage->Toast(result->ok ? TrF("Updated to EmuDEN {}", result->version)
                                           : "The update failed: " + result->error,
                                6.0f);
             log::Info("update", "helper: {} {} {}", result->ok ? "ok" : "failed", result->version, result->error);
@@ -164,7 +165,7 @@ void Finish(const update::Release& release) {
     case Method::AppImage:
         state.restart_pending = true;
         Svc().stage->Confirm(
-            std::format("EmuDEN {} is installed", version), "It starts the next time EmuDEN opens.", "Restart now",
+            TrF("EmuDEN {} is installed", version), "It starts the next time EmuDEN opens.", "Restart now",
             [] {
                 if (const Status started = pal::self_update::StartAfterExit(Updates().target.location); !started) {
                     Svc().stage->Toast(started.error, 6.0f);
@@ -177,7 +178,7 @@ void Finish(const update::Release& release) {
     case Method::WindowsPortable:
         state.restart_pending = true;
         Svc().stage->Confirm(
-            std::format("Restart to update to {}?", version),
+            TrF("Restart to update to {}?", version),
             "EmuDEN closes, puts the new version in place and starts again. Your games, saves and settings stay.",
             "Restart now",
             [version] {
@@ -258,7 +259,7 @@ void CheckForUpdates(bool automatic) {
     }
     if (!automatic && state.check_error.empty() && state.checked_at > 0 && Now() - state.checked_at < MANUAL_GAP &&
         Now() >= state.checked_at) {
-        Svc().stage->Toast(state.newer ? std::format("EmuDEN {} is available", state.release->version)
+        Svc().stage->Toast(state.newer ? TrF("EmuDEN {} is available", state.release->version)
                                        : "EmuDEN is up to date");
         return;
     }
@@ -299,7 +300,7 @@ void CheckForUpdates(bool automatic) {
             if (automatic) {
                 g_toast_pending = state.newer;
             } else {
-                Svc().stage->Toast(state.newer ? std::format("EmuDEN {} is available", state.release->version)
+                Svc().stage->Toast(state.newer ? TrF("EmuDEN {} is available", state.release->version)
                                                : "EmuDEN is up to date");
             }
             RebuildIfShown();
@@ -358,7 +359,7 @@ std::string CheckStatusText() {
         return "Could not check";
     }
     if (state.newer) {
-        return std::format("EmuDEN {} is available", state.release->version);
+        return TrF("EmuDEN {} is available", state.release->version);
     }
     return state.checked_at > 0 ? "Up to date" : "Not checked yet";
 }
@@ -379,12 +380,12 @@ std::string LastCheckText() {
         return "Checked just now";
     }
     if (ago < 3600) {
-        return std::format("Checked {} min ago", ago / 60);
+        return TrF("Checked {} min ago", ago / 60);
     }
     if (ago < 86400) {
-        return std::format("Checked {} h ago", ago / 3600);
+        return TrF("Checked {} h ago", ago / 3600);
     }
-    return std::format("Checked {} days ago", ago / 86400);
+    return TrF("Checked {} days ago", ago / 86400);
 }
 
 DEN_REGISTER_STARTUP(Startup);

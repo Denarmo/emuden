@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include "companion_quick.h"
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/game_widgets.h"
 #include "den/app/games.h"
@@ -89,7 +90,7 @@ void BuildStandardLayout(QuickContext& ctx) {
     if (game) {
         std::string line = SystemName(game->system);
         if (game->play_seconds > 0) {
-            line += " · " + PlayTimeText(game->play_seconds) + " played";
+            line += " · " + TrF("{} played", PlayTimeText(game->play_seconds));
         }
         info->Emplace<ui::Label>(line)->tone = ui::Tone::Dim;
     }

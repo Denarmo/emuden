@@ -9,6 +9,7 @@
 #include "den/ui/glyphs.h"
 #include "den/ui/selection.h"
 #include "den/ui/text_entry.h"
+#include "den/ui/translate.h"
 #include "text_entry_parts.h"
 
 namespace den::ui {
@@ -37,7 +38,7 @@ void DrawField(Context& ctx, const gfx::Rect& field, const std::string& value, c
     const float text_w = text.Measure(value, size);
     const float text_x = line.x + std::min(0.0f, line.w - 4 - text_w);
     if (value.empty()) {
-        canvas.DrawText(placeholder, line.x + 8, text_y, size, theme.text_dim);
+        canvas.DrawText(Translate(placeholder), line.x + 8, text_y, size, theme.text_dim);
     } else {
         canvas.DrawText(value, text_x, text_y, size, theme.fg);
     }
@@ -107,7 +108,7 @@ void TextEntry::Draw(Context& ctx) {
     const gfx::Rect box{(canvas.Width() - w) * 0.5f, std::max(8.0f, (room - h) * 0.5f), w, h};
     canvas.FillRect(box, theme.dialog, theme.radius + 6);
     const float left = box.x + PANEL_PAD, inner = w - PANEL_PAD * 2;
-    canvas.DrawText(text.Elide(request_.title, theme.text_heading, inner, gfx::FONT_BOLD), left, box.y + 24,
+    canvas.DrawText(text.Elide(Translate(request_.title), theme.text_heading, inner, gfx::FONT_BOLD), left, box.y + 24,
                     theme.text_heading, theme.fg, gfx::FONT_BOLD);
 
     const float shake = refused_ > 0 ? std::sin(refused_ * 50.0f) * 5.0f * refused_ : 0.0f;
@@ -115,7 +116,7 @@ void TextEntry::Draw(Context& ctx) {
     DrawField(ctx, field, text_, request_.placeholder, request_.max_length);
     float y = field.Bottom();
     if (note) {
-        canvas.DrawText(note, left, y + 10, theme.text_small, theme.text_dim);
+        canvas.DrawText(Translate(note), left, y + 10, theme.text_small, theme.text_dim);
         y += NOTE_H;
     }
     y += 16;
@@ -161,7 +162,7 @@ void TextEntry::DrawKeys(Context& ctx) {
     canvas.FillRect(gfx::Rect{0, 0, canvas.Width(), canvas.Height()}, theme.page);
     const float margin = 28;
     const float inner = canvas.Width() - margin * 2;
-    canvas.DrawText(ctx.Text().Elide(request_.title, theme.text_heading, inner, gfx::FONT_BOLD), margin, 20,
+    canvas.DrawText(ctx.Text().Elide(Translate(request_.title), theme.text_heading, inner, gfx::FONT_BOLD), margin, 20,
                     theme.text_heading, theme.fg, gfx::FONT_BOLD);
     const gfx::Rect field{margin, 60, inner, FIELD_H};
     DrawField(ctx, field, text_, request_.placeholder, request_.max_length);

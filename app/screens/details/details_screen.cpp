@@ -123,7 +123,7 @@ public:
             if (saves.active) {
                 fact(saves.conflict  ? std::string("Saves synced, with a conflict: see Settings, Sync")
                      : saves.waiting ? std::string("Saves sync when the game ends")
-                     : saves.synced > 0 ? "Saves synced " + SyncTimeText(saves.synced)
+                     : saves.synced > 0 ? TrF("Saves synced {}", SyncTimeText(saves.synced))
                                         : std::string("Saves not synced yet"));
             }
         }

@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "boot_draw.h"
+#include "den/app/strings.h"
 #include "den/app/shelf_parts.h"
 #include "boot_media.h"
 #include "den/app/app.h"
@@ -90,7 +91,7 @@ void BootDraw::Main(ui::Context& ctx, float out, const std::string& wait_text, f
     const bool told = !wait_text.empty();
     const float from = times.logo_end + (told ? 0.3f : 3.5f);
     if (const float wait = Ease(t, from, from + 0.4f) * shown; wait > 0) {
-        const std::string text = told ? wait_text : "Starting " + game.name + "\xE2\x80\xA6";
+        const std::string text = told ? wait_text : TrF("Starting {}\xE2\x80\xA6", game.name);
         const float size = ctx.theme->text_body;
         const float w = ctx.Text().Measure(text, size);
         const float y = canvas.Height() * 0.8f;

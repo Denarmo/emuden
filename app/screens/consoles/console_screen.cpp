@@ -196,7 +196,7 @@ private:
             rows.push_back(ActionRow("console.repair", "Repair", [console] { Start(console, "repaired"); },
                                      "Downloads and checks the core again"));
             rows.push_back(ActionRow("console.remove", "Remove", [console] {
-                Svc().stage->Confirm("Remove " + console.name + "?",
+                Svc().stage->Confirm(TrF("Remove {}?", console.name),
                                      "Its core is deleted. Games, saves and states stay.", "Remove", [console] {
                                          TrackConsoleJob(console.id, console.name, "removed",
                                                          Svc().plugins->Remove(console.id));
@@ -315,7 +315,7 @@ private:
                            "and saves and settings stay in that emulator";
         rows.push_back(std::move(note));
         rows.push_back(ActionRow("console.remove", "Remove", [console] {
-            Svc().stage->Confirm("Remove " + console.name + "?",
+            Svc().stage->Confirm(TrF("Remove {}?", console.name),
                                  "Its plugin is removed; install it from a file to have it again. Games, saves "
                                  "and the engine program stay.",
                                  "Remove", [console] {

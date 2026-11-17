@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/apps_catalog.h"
 #include "den/app/cheats.h"
 #include "den/app/second_screen.h"
@@ -152,8 +153,8 @@ void PlayerScreen::BuildMain(ui::Node* list) {
             const input::PadFamily family = PadFamilyShown();
             return console_.right_stick_holds
                        ? std::string("Hold the right stick left")
-                       : "Press " + PadButtonText(family, input::PadButton::Select) + " + " +
-                             PadButtonText(family, input::PadButton::L1);
+                       : TrF("Press {} + {}", PadButtonText(family, input::PadButton::Select),
+                             PadButtonText(family, input::PadButton::L1));
         }));
     }
     if (snapshot.can_picture) {
@@ -284,13 +285,13 @@ void PlayerScreen::SaveSlot(int slot) {
             GetStage().Toast(saved.error.empty() ? "The state could not be saved" : saved.error, 5.0f);
             return;
         }
-        GetStage().Toast(std::format("Saved to slot {}", slot + 1));
+        GetStage().Toast(TrF("Saved to slot {}", slot + 1));
         // The slot's picture changed under the same file name.
         Svc().textures->Forget(PathToUtf8(Svc().player->StateThumbnail(slot)));
         Rebuild();
     };
     if (Svc().player->HasState(slot)) {
-        GetStage().Confirm(std::format("Replace slot {}?", slot + 1), "The state saved there is overwritten.",
+        GetStage().Confirm(TrF("Replace slot {}?", slot + 1), "The state saved there is overwritten.",
                            "Replace", save);
     } else {
         save();
@@ -299,7 +300,7 @@ void PlayerScreen::SaveSlot(int slot) {
 
 void PlayerScreen::LoadSlot(int slot) {
     if (!Svc().player->HasState(slot)) {
-        GetStage().Toast(std::format("Slot {} is empty", slot + 1));
+        GetStage().Toast(TrF("Slot {} is empty", slot + 1));
         return;
     }
     const Status loaded = Svc().player->LoadState(slot);
@@ -307,7 +308,7 @@ void PlayerScreen::LoadSlot(int slot) {
         GetStage().Toast(loaded.error.empty() ? "The state could not be loaded" : loaded.error, 5.0f);
         return;
     }
-    GetStage().Toast(std::format("Loaded slot {}", slot + 1));
+    GetStage().Toast(TrF("Loaded slot {}", slot + 1));
     CloseMenu();
 }
 

@@ -5,6 +5,7 @@
 
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/model_widgets.h"
@@ -28,13 +29,13 @@ public:
         }
         const update::Release& release = *state.release;
         ui::Node* content =
-            BuildPlainFrame(*this, !release.name.empty() ? release.name : std::format("EmuDEN {}", release.version));
+            BuildPlainFrame(*this, !release.name.empty() ? release.name : TrF("EmuDEN {}", release.version));
         ui::Node* list = content->Add(ui::MakeList(12));
         list->id = "update.list";
         list->grow = 1;
         list->pad_bottom = 24;
 
-        std::string about = std::format("You have {}.", UpdatesOffered() ? state.running : "a development build");
+        std::string about = TrF("You have {}.", UpdatesOffered() ? state.running : "a development build");
         if (!release.published.empty()) {
             about += std::format(" Released {}.", update::DateText(release.published));
         }

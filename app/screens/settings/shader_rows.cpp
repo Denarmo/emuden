@@ -7,6 +7,7 @@
 #include <format>
 #include <system_error>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
@@ -30,7 +31,7 @@ void StartImport(std::string name, std::function<Status(Job&)> work) {
     g_import = Svc().jobs->Run("Importing shaders", std::move(work), [name](Job& job) {
         if (job.State() == JobState::Done) {
             player::RefreshImportedPresets();
-            Svc().stage->Toast("Imported " + name + ". Its presets are under Imported in the picture list.", 5.0f);
+            Svc().stage->Toast(TrF("Imported {}. Its presets are under Imported in the picture list.", name), 5.0f);
         } else if (job.State() == JobState::Failed) {
             Svc().stage->Toast(job.Error(), 6.0f);
         }
@@ -95,7 +96,7 @@ std::vector<ui::RowSpec> ShaderRows() {
         rows.push_back(ValueRow(
             std::format("shaders.imported.{}", index++), name, [] { return std::string("Remove"); },
             [folder, name] {
-                Svc().stage->Confirm("Remove " + name + "?", "Its presets leave the picture list.", "Remove",
+                Svc().stage->Confirm(TrF("Remove {}?", name), "Its presets leave the picture list.", "Remove",
                                      [folder] {
                                          std::error_code ignored;
                                          fs::remove_all(folder, ignored);

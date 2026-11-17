@@ -7,6 +7,7 @@
 #include <format>
 #include <functional>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/pages.h"
@@ -53,8 +54,8 @@ void OpenOrUpdate(const FeaturePlugin& plugin, std::function<void()> open) {
         open();
         return;
     }
-    Svc().stage->Confirm("Update " + plugin.name + "?",
-                         "A newer version of " + plugin.name + " is available. Update it before opening it?",
+    Svc().stage->Confirm(TrF("Update {}?", plugin.name),
+                         TrF("A newer version of {} is available. Update it before opening it?", plugin.name),
                          "Update", [plugin] { StartUpdate(plugin); }, "Not now", true, std::move(open));
 }
 
@@ -160,7 +161,7 @@ public:
                 ui::RowSpec row = ValueRow(
                     "plugins.manage." + plugin.id, plugin.name,
                     [id = plugin.id, update = plugin.update_available, version = plugin.version] {
-                        return JobText(FeaturePluginJob(id), update ? "Update available" : "Version " + version);
+                        return JobText(FeaturePluginJob(id), update ? Tr("Update available") : TrF("Version {}", version));
                     },
                     [id = plugin.id] { Svc().stage->Push("plugin.manage", {{"id", id}}); });
                 row.description = std::format("{}  ·  {}", plugin.publisher, plugin.source_name);

@@ -8,6 +8,7 @@
 #include <cmath>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/pages.h"
 #include "den/app/picture_choice.h"
 #include "player_screen.h"
@@ -86,7 +87,7 @@ std::string PictureName(const std::string& id, const std::string& system) {
     }
     // Short enough for a row: "Dot matrix (green)" is "Auto: Dot matrix".
     const std::string preset = name(player::AutoPicture(system));
-    return "Auto: " + preset.substr(0, preset.find(" ("));
+    return TrF("Auto: {}", preset.substr(0, preset.find(" (")));
 }
 
 const std::vector<player::PictureLook>& PictureLooks() {
@@ -155,14 +156,14 @@ void PlayerScreen::BuildPicture(ui::Node* list) {
     const std::string console = console_.short_name.empty() ? console_.name : console_.short_name;
     std::vector<ui::RowSpec> top;
     top.push_back(ChoiceRow(
-        "picture.scope", "Apply to", {"This game", "All " + console + " games", "Every console"},
+        "picture.scope", "Apply to", {"This game", TrF("All {} games", console), "Every console"},
         [this] { return picture_scope_; },
         [this](int index) {
             picture_scope_ = index;
             SavePicture(game_, static_cast<PictureScope>(index), picture_);
         }));
     if (!Svc().player->PictureParams().empty()) {
-        top.push_back(ActionRow("picture.adjust", "Adjust " + PictureName(Svc().player->GetSnapshot().picture),
+        top.push_back(ActionRow("picture.adjust", TrF("Adjust {}", PictureName(Svc().player->GetSnapshot().picture)),
                                 [this] { Show(View::PictureAdjust); }));
     }
     AddRows(list, std::move(top), ROW_HEIGHT);

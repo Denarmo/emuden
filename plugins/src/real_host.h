@@ -160,6 +160,8 @@ private:
     }
     bool SystemFilesGood(const Manifest& manifest, const Component& files) const;
     Console Describe(const Loaded& loaded, const SystemDef& system) const;
+    /// The core's language option, given the app's language ("ui.language"), before other hints.
+    void AddLanguageHint(const Component& core, CoreInfo& info) const;
     void AddSettingHints(const Loaded& loaded, const SystemDef& system, const Component& core, CoreInfo& info) const;
     CoreInfo Describe(const Loaded& loaded, const SystemDef& system, const Component& core) const;
     void AddManifest(Manifest manifest, bool from_index, const std::string& origin, bool developer = false,

@@ -7,6 +7,7 @@
 // left with the system's Back or Home gesture on this screen. Held, an app is pinned.
 // Route "companion.apps" on the companion stage.
 
+#include "den/app/strings.h"
 #include "den/app/app_grid.h"
 #include "den/app/apps_catalog.h"
 #include "companion_page.h"
@@ -37,7 +38,7 @@ public:
         back->height = BAR_HEIGHT;
         auto* title = bar->Emplace<ui::Label>("Apps", svc.theme->text_heading, gfx::FONT_BOLD);
         title->pad_left = 8;
-        auto* search = bar->Emplace<ui::Button>(query_.empty() ? "Search" : "Search: " + query_,
+        auto* search = bar->Emplace<ui::Button>(query_.empty() ? "Search" : TrF("Search: {}", query_),
                                                 [this] { AskQuery(); });
         search->id = "companion.apps.search";
         search->centered = false;

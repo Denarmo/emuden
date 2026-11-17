@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/pages.h"
 #include "player_screen.h"
 
@@ -29,7 +30,7 @@ PadFamily PlayerScreen::PadFamilyShown() const {
 void PlayerScreen::BuildOptions(ui::Node* list) {
     options_ = Svc().player->Options();
     std::vector<ui::RowSpec> rows;
-    const std::string everyone = "All " + (console_.short_name.empty() ? console_.name : console_.short_name) + " games";
+    const std::string everyone = TrF("All {} games", console_.short_name.empty() ? console_.name : console_.short_name);
     rows.push_back(ChoiceRow(
         "option.scope", "Apply to", {everyone, "This game"}, [this] { return options_for_game_ ? 1 : 0; },
         [this](int index) { options_for_game_ = index == 1; }));
@@ -86,7 +87,7 @@ void PlayerScreen::BuildPlayers(ui::Node* list) {
             who = who.empty() ? "Keyboard" : who + " + keyboard";
         }
         // Choosing a pad's row makes it player 1; the pad that was player 1 takes its place.
-        rows.push_back(ValueRow(std::format("players.{}", port + 1), std::format("Player {}", port + 1),
+        rows.push_back(ValueRow(std::format("players.{}", port + 1), TrF("Player {}", port + 1),
                                 [who] { return who; }, [this, port] {
                                     if (port > 0 && Svc().input->Pad(port).connected) {
                                         Svc().input->SetPlayer(port, 0);

@@ -49,8 +49,7 @@ public:
             }
             ui::RowSpec row = ActionRow(std::format("sync.conflict.{}", i), name, [i, name] {
                 Svc().stage->Confirm("Use this one instead?",
-                                     "The kept copy of " + name + " replaces the current one, which is kept "
-                                     "here in its place.",
+                                     TrF("The kept copy of {} replaces the current one, which is kept here in its place.", name),
                                      "Use this one", [i] {
                                          // It waits for a sync in progress, so not on the main thread.
                                          if (SyncSvc()->State().running) {
@@ -70,7 +69,7 @@ public:
                                              });
                                      });
             });
-            row.description = std::format("From {}, {}. Use this one instead", conflict.from,
+            row.description = TrF("From {}, {}. Use this one instead", conflict.from,
                                           SyncTimeText(conflict.time));
             rows.push_back(std::move(row));
         }

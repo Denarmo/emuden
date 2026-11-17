@@ -13,6 +13,7 @@
 #include <format>
 #include <set>
 
+#include "den/app/strings.h"
 #include "den/app/achievements_glue.h"
 #include "achievements_state.h"
 #include "den/achievements/chime.h"
@@ -165,13 +166,14 @@ void ShowEvent(const Event& event) {
         break;
     case EventKind::LeaderboardSubmitted: {
         Event shown = event;
-        shown.text = "Submitted: " + event.value;
+        shown.text = TrF("Submitted: {}", event.value);
         Push(shown, "Leaderboard", 4);
         break;
     }
     case EventKind::LeaderboardRank: {
         Event shown = event;
-        shown.text = "Rank " + event.value + (event.text.empty() ? "" : "  \xC2\xB7  best " + event.text);
+        shown.text = event.text.empty() ? TrF("Rank {}", event.value)
+                                        : TrF("Rank {}  \xC2\xB7  best {}", event.value, event.text);
         Push(shown, "Leaderboard", 5);
         break;
     }

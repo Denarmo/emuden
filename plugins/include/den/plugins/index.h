@@ -42,6 +42,7 @@ struct IndexPlugin {
     std::vector<std::string> browse_hosts;
     std::vector<std::string> systems; // a feature's systems, a console plugin's system ids
     std::vector<std::string> needs;   // feature and interface plugins: the capabilities named
+    std::string language, language_name; // a language pack's code ("es") and its own name
     std::vector<std::string> platforms; // platform keys ("linux-x86_64", "any"); empty: all
 };
 

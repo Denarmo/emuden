@@ -48,7 +48,7 @@ public:
                 },
                 [id = console.id] { Svc().stage->Push("console", {{"system", id}}); });
             const int games = GameCount(console.id);
-            std::string detail = games == 1 ? "1 game" : std::format("{} games", games);
+            std::string detail = games == 1 ? Tr("library.count_one") : TrF("library.count", games);
             if (console.runner == plugins::Runner::Engine) {
                 detail += "  ·  runs in its own engine";
             } else if (const auto core = svc.plugins->CoreFor(console.id)) {

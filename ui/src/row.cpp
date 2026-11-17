@@ -5,6 +5,7 @@
 #include <cmath>
 #include <format>
 
+#include "den/ui/translate.h"
 #include "den/ui/widgets.h"
 
 namespace den::ui {
@@ -25,7 +26,7 @@ constexpr float PLAIN_HEIGHT = 56;
 Row::Row(RowSpec spec_) : spec(std::move(spec_)) {
     focusable = true;
     id = spec.id;
-    label = spec.label;
+    label = Translate(spec.label);
     height = spec.description.empty() ? 56.0f : 72.0f;
 }
 
@@ -94,12 +95,12 @@ std::string Row::ValueText() const {
         const int index = spec.get_index ? spec.get_index() : 0;
         std::string text;
         if (index >= 0 && index < static_cast<int>(spec.options.size())) {
-            text = spec.options[static_cast<std::size_t>(index)];
+            text = Translate(spec.options[static_cast<std::size_t>(index)]);
         }
         return focused ? ARROW_LEFT + text + ARROW_RIGHT : text;
     }
     if (spec.kind == RowSpec::Kind::Value || spec.kind == RowSpec::Kind::Action) {
-        return spec.value ? spec.value() : std::string();
+        return spec.value ? Translate(spec.value()) : std::string();
     }
     return {};
 }
@@ -115,13 +116,13 @@ Row::Stack Row::StackFor(Context& ctx, float w) const {
         // By the widest option, so stepping through them does not move the row.
         float widest = 0;
         for (const std::string& option : spec.options) {
-            widest = std::max(widest, text.Measure(ARROW_LEFT + option + ARROW_RIGHT, theme.text_body, gfx::FONT_BOLD));
+            widest = std::max(widest, text.Measure(ARROW_LEFT + Translate(option) + ARROW_RIGHT, theme.text_body, gfx::FONT_BOLD));
         }
-        stack.value_below = text.Measure(spec.label, theme.text_body) + 12 + widest > inner;
+        stack.value_below = text.Measure(Translate(spec.label), theme.text_body) + 12 + widest > inner;
     } else if (spec.kind != RowSpec::Kind::Toggle) {
         const std::string value = ValueText();
         stack.value_below =
-            !value.empty() && text.Measure(spec.label, theme.text_body) + 12 + text.Measure(value, theme.text_body) > inner;
+            !value.empty() && text.Measure(Translate(spec.label), theme.text_body) + 12 + text.Measure(value, theme.text_body) > inner;
     }
     // A description always gets two lines, so described rows match whatever their text.
     float bottom = TOP + LINE + (stack.value_below ? VALUE_LINE : 0.0f);
@@ -173,7 +174,7 @@ void Row::DrawStacked(Context& ctx) {
     const float desc_w = inner - (toggle ? SWITCH_W + 12 : 0.0f);
     std::vector<std::string> lines;
     if (described) {
-        const std::string text = spec.live_description ? spec.live_description() : spec.description;
+        const std::string text = Translate(spec.live_description ? spec.live_description() : spec.description);
         lines = WrapText(ctx.Text(), text, theme.text_small, desc_w);
         if (lines.size() > 2) {
             std::string rest = lines[1];
@@ -197,7 +198,7 @@ void Row::DrawStacked(Context& ctx) {
         DrawTextIn(ctx, gfx::Rect{right - value_w, label_line.y, value_w, label_line.h}, value, theme.text_body,
                    value_font, value_color, Align::End);
     }
-    DrawTextIn(ctx, gfx::Rect{left, label_line.y, label_w, label_line.h}, spec.label, theme.text_body,
+    DrawTextIn(ctx, gfx::Rect{left, label_line.y, label_w, label_line.h}, Translate(spec.label), theme.text_body,
                gfx::FONT_REGULAR, theme.fg, Align::Start);
 
     float y = rect.y + TOP + shift + LINE;
@@ -245,18 +246,18 @@ void Row::DrawContent(Context& ctx) {
         const int value_font = spec.kind == RowSpec::Kind::Choice ? gfx::FONT_BOLD : gfx::FONT_REGULAR;
         const float wanted =
             value_text.empty() ? 0.0f : ctx.Text().Measure(value_text, theme.text_body, value_font) + 2;
-        const float label_width = ctx.Text().Measure(spec.label, theme.text_body) + 2;
+        const float label_width = ctx.Text().Measure(Translate(spec.label), theme.text_body) + 2;
         value_width = std::min(wanted, std::max(value_width, inner - 12 - label_width));
     }
     const gfx::Rect text_area{left, rect.y, std::max(0.0f, inner - value_width - (value_width > 0 ? 12 : 0)),
                               rect.h};
     if (spec.description.empty()) {
-        DrawTextIn(ctx, text_area, spec.label, theme.text_body, gfx::FONT_REGULAR, theme.fg, Align::Start);
+        DrawTextIn(ctx, text_area, Translate(spec.label), theme.text_body, gfx::FONT_REGULAR, theme.fg, Align::Start);
     } else {
-        DrawTextIn(ctx, gfx::Rect{left, rect.y + 10, text_area.w, 26}, spec.label, theme.text_body,
+        DrawTextIn(ctx, gfx::Rect{left, rect.y + 10, text_area.w, 26}, Translate(spec.label), theme.text_body,
                    gfx::FONT_REGULAR, theme.fg, Align::Start);
         DrawTextIn(ctx, gfx::Rect{left, rect.y + 38, text_area.w, 22},
-                   spec.live_description ? spec.live_description() : spec.description,
+                   Translate(spec.live_description ? spec.live_description() : spec.description),
                    theme.text_small, gfx::FONT_REGULAR, theme.text_dim, Align::Start);
     }
     const gfx::Rect value_area{right - value_width, rect.y, value_width, rect.h};

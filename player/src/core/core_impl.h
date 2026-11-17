@@ -61,6 +61,7 @@ struct LibretroCore::Impl {
     std::string rom_path;
     std::string system_dir;
     std::string save_dir;
+    unsigned language = 0; // RETRO_LANGUAGE_*, what GET_LANGUAGE answers
     retro_pixel_format pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
     VideoFrame frame;
     std::uint64_t frame_count = 0;

@@ -41,6 +41,10 @@ inline constexpr const char* NEED_HOME_INTERFACE = "interface.1";
 inline constexpr const char* NEED_QUICK_SETTINGS = "quick_settings.1";
 inline constexpr const char* NEED_HOME_INTERFACES = "interfaces.1"; // several Home looks
 inline constexpr const char* NEED_THEMES = "themes.1";
+/// A language pack: the app's texts in one language (docs/language-packs.md in emuden-plugins).
+inline constexpr const char* NEED_LANGUAGES = "languages.1";
+/// The texts file of a language pack, in the package's folder.
+inline constexpr const char* LANGUAGE_STRINGS_FILE = "strings.json";
 
 struct PermissionLine {
     std::string permission, text;
@@ -56,6 +60,7 @@ struct FeaturePlugin {
     bool needs_consent = false; // install or update asks for permissions not yet granted
     std::vector<PermissionLine> permissions, new_permissions;
     std::vector<std::string> needs;           // the capabilities its manifest names
+    std::string language, language_name;      // a language pack: its code ("es") and own name ("Español")
     std::vector<std::string> sync_categories; // a sync provider: what it can keep in step
     std::string sync_listing;                 // and how it lists (feature.sync.listing)
     std::uint64_t data_bytes = 0;
@@ -70,6 +75,8 @@ bool OffersHomeInterface(const FeaturePlugin& plugin);
 bool OffersHomeInterfaces(const FeaturePlugin& plugin);
 /// An interface plugin with themes for the whole app ("themes").
 bool OffersThemes(const FeaturePlugin& plugin);
+/// An interface plugin that is a language pack.
+bool OffersLanguage(const FeaturePlugin& plugin);
 /// An interface plugin with layouts for the quick settings of the second screen.
 bool OffersQuickSettings(const FeaturePlugin& plugin);
 

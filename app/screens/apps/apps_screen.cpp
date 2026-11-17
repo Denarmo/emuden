@@ -6,6 +6,7 @@
 // "from=game" (the pause menu, on a device with one display) it has no rail and Back
 // returns to the game.
 
+#include "den/app/strings.h"
 #include "den/app/app_grid.h"
 #include "den/app/apps_catalog.h"
 #include "den/app/app.h"
@@ -33,7 +34,7 @@ public:
         bar->chrome = true; // the first focus is an app, not the search
         bar->pad_left = 10;
         bar->pad_right = svc.theme->margin;
-        auto* search = bar->Emplace<ui::Button>(query_.empty() ? "Search apps" : "Search: " + query_,
+        auto* search = bar->Emplace<ui::Button>(query_.empty() ? "Search apps" : TrF("Search: {}", query_),
                                                 [this] { AskQuery(); });
         search->id = "apps.search";
         search->centered = false;

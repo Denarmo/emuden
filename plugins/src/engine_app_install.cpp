@@ -149,6 +149,7 @@ CoreInfo RealHost::DescribeEngineApp(const Loaded& loaded, const SystemDef& syst
     }
     // The widescreen row works through the engine's standard setting.
     info.widescreen_options = {{"video.widescreen_patches", "true"}};
+    AddLanguageHint(core, info);
     AddSettingHints(loaded, system, core, info);
     return info;
 }

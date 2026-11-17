@@ -491,7 +491,7 @@ bool RETRO_CALLCONV EnvironmentCallback(unsigned command, void* data) {
         static_cast<retro_log_callback*>(data)->log = LogCallback;
         return true;
     case RETRO_ENVIRONMENT_GET_LANGUAGE:
-        *static_cast<unsigned*>(data) = RETRO_LANGUAGE_ENGLISH;
+        *static_cast<unsigned*>(data) = g_core->language;
         return true;
     case RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION:
         *static_cast<unsigned*>(data) = 1;

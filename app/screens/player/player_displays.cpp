@@ -12,6 +12,7 @@
 #include <iterator>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/apps_catalog.h"
 #include "den/app/beside.h"
 #include "den/app/second_screen.h"
@@ -373,7 +374,7 @@ void PlayerScreen::Draw(ui::Context& ctx, const gfx::Rect& area) {
     if (phase_ != Phase::Running) {
         canvas.FillRect(area, gfx::Color::Rgb(0x000000));
         if (phase_ == Phase::Preparing) {
-            const std::string text = "Preparing " + game_.name + "\xE2\x80\xA6";
+            const std::string text = TrF("Preparing {}\xE2\x80\xA6", game_.name);
             const float size = ctx.theme->text_heading;
             canvas.DrawText(text, area.CenterX() - ctx.Text().Measure(text, size) * 0.5f, area.CenterY() - size,
                             size, gfx::Color::Rgb(0xffffff));

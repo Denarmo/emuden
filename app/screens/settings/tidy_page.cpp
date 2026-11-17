@@ -11,6 +11,7 @@
 #include <mutex>
 #include <thread>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/pages.h"
@@ -54,13 +55,13 @@ std::string Line(const tidy::Change& change) {
     case tidy::ChangeKind::Rename:
         return std::format("{}  \xE2\x86\x92  {}", PathToUtf8(change.from.filename()), PathToUtf8(change.to.filename()));
     case tidy::ChangeKind::ShowName:
-        return std::format("{}  shown as  {}  ({})", PathToUtf8(change.from.filename()), change.name, change.why);
+        return TrF("{}  shown as  {}  ({})", PathToUtf8(change.from.filename()), change.name, change.why);
     case tidy::ChangeKind::RemoveJunk:
-        return "Delete " + PathToUtf8(change.from) + "  (a Mac's leftover file)";
+        return TrF("Delete {}  (a Mac's leftover file)", PathToUtf8(change.from));
     case tidy::ChangeKind::RemoveFolder:
-        return "Delete the empty folder " + PathToUtf8(change.from);
+        return TrF("Delete the empty folder {}", PathToUtf8(change.from));
     case tidy::ChangeKind::LinkHack:
-        return std::format("{}  is a hack of  {}", PathToUtf8(change.from.filename()), change.name);
+        return TrF("{}  is a hack of  {}", PathToUtf8(change.from.filename()), change.name);
     }
     return {};
 }
@@ -90,7 +91,7 @@ public:
             return;
         }
         if (step == Step::Working) {
-            list->Emplace<ui::Label>(std::format("Tidying up... {}%", static_cast<int>(progress_.load() * 100)));
+            list->Emplace<ui::Label>(TrF("Tidying up... {}%", static_cast<int>(progress_.load() * 100)));
             return;
         }
         if (step == Step::Done) {
@@ -120,7 +121,7 @@ public:
                 Svc().library->RetryCovers();
                 Svc().library->Scan();
             }
-            list->Emplace<ui::Label>(std::format("All {} games have clean names already. Games without box art "
+            list->Emplace<ui::Label>(TrF("All {} games have clean names already. Games without box art "
                                                  "look for it again.",
                                                  plan_.games));
             rows.push_back(ActionRow("tidy.close", "Close", [this] { GetStage().Pop(); }));
@@ -222,7 +223,7 @@ private:
                 },
                 [this](float fraction) { progress_ = fraction; });
             std::lock_guard lock(mutex_);
-            summary_ = std::format("Done: {} renamed, {} shown clean, {} deleted{}.", Count(done.renamed, "file", "files"),
+            summary_ = TrF("Done: {} renamed, {} shown clean, {} deleted{}.", Count(done.renamed, "file", "files"),
                                    Count(done.named, "name", "names"), Count(done.removed, "leftover", "leftovers"),
                                    done.linked > 0 ? ", " + Count(done.linked, "hack", "hacks") + (done.linked == 1 ? " linked to its game" : " linked to their games") : "");
             done_ = std::move(done);

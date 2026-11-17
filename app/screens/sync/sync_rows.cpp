@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/games.h"
 #include "den/app/feature_api.h"
 #include "den/app/app.h"
@@ -55,11 +56,11 @@ const char* CategoryHelp(const std::string& category) {
 std::string StatusText() {
     const sync::SyncState state = SyncSvc()->State();
     if (state.running && state.games_pass) {
-        return std::format("Uploading game {} of {}", std::min(state.games_done + 1, state.games_total),
+        return TrF("Uploading game {} of {}", std::min(state.games_done + 1, state.games_total),
                            state.games_total);
     }
     if (state.running) {
-        return state.total > 0 ? std::format("Syncing {} of {}", std::min(state.done + 1, state.total), state.total)
+        return state.total > 0 ? TrF("Syncing {} of {}", std::min(state.done + 1, state.total), state.total)
                                : std::string("Syncing");
     }
     return SyncTimeText(state.last_sync);
@@ -147,7 +148,7 @@ std::vector<ui::RowSpec> SyncRows() {
         return rows;
     }
     rows.push_back(ActionRow(
-        "sync.setup", "Set up " + info->name, [id = info->id] { Svc().stage->Push("plugin.view", {{"id", id}}); },
+        "sync.setup", TrF("Set up {}", info->name), [id = info->id] { Svc().stage->Push("plugin.view", {{"id", id}}); },
         "Sign in, choose the server or the folder"));
     ui::RowSpec status = ValueRow("sync.now", "Sync now", StatusText, [] { SyncSvc()->SyncNow(); });
     status.description = StatusHelp();

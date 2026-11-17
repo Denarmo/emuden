@@ -7,6 +7,7 @@
 #include <cctype>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/collections.h"
 #include "den/app/games.h"
 #include "den/app/app.h"
@@ -36,7 +37,7 @@ std::string GamesKey(const std::string& name) {
 std::string Refusal(const std::string& name, const std::string& current) {
     for (const std::string& other : Collections()) {
         if (other != current && GamesKey(other) == GamesKey(name)) {
-            return std::format("There is a collection called {} already", other);
+            return TrF("There is a collection called {} already", other);
         }
     }
     return {};
@@ -90,7 +91,7 @@ std::vector<ui::RowSpec> CollectionRows() {
             },
             [name] {
                 ui::TextRequest request;
-                request.title = std::format("Rename {}", name);
+                request.title = TrF("Rename {}", name);
                 request.text = name;
                 Svc().stage->AskText(std::move(request), [name](const std::string& text) { Rename(name, text); });
             });

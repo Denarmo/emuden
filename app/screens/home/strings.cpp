@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <functional>
 #include <map>
 
 #include "den/app/app.h"
@@ -8,62 +9,80 @@
 #include "den/base/json.h"
 #include "den/base/log.h"
 #include "den/app/strings.h"
+#include "string_table.h"
 
 namespace den::app {
 
 namespace {
 
-using Table = std::map<std::string, std::string, std::less<>>;
-
-void Load(Table& table, const std::string& language) {
+TextMap LoadFile(const std::string& language) {
     const auto file = pal::AssetsDir() / "strings" / (language + ".json");
     const auto text = ReadTextFile(file);
-    const auto json = text ? ParseJson(*text) : std::nullopt;
-    if (!json || json->kind != JsonValue::Kind::Object) {
-        log::Warn("strings", "no texts in {}", PathToUtf8(file));
-        return;
+    if (auto texts = text ? ParseTexts(*text) : std::nullopt) {
+        return std::move(*texts);
     }
-    for (const auto& [key, value] : json->members) {
-        if (value.kind == JsonValue::Kind::String) {
-            table[key] = value.string;
-        }
-    }
+    log::Warn("strings", "no texts in {}", PathToUtf8(file));
+    return {};
 }
 
 // Texts of this folder's screens that the strings file does not have yet; the file wins.
-void LoadBuiltIn(Table& table) {
-    table["home.recently_added"] = "Recently added";
-    table["details.added"] = "Added: {}";
-    table["statistics.week"] = "Last 7 days";
-    table["statistics.week_value"] = "{} in {}";
-    table["statistics.sessions_one"] = "1 session";
-    table["statistics.sessions_count"] = "{} sessions";
+TextMap BuiltIn() {
+    return {
+        {"home.recently_added", "Recently added"},
+        {"details.added", "Added: {}"},
+        {"statistics.week", "Last 7 days"},
+        {"statistics.week_value", "{} in {}"},
+        {"statistics.sessions_one", "1 session"},
+        {"statistics.sessions_count", "{} sessions"},
+    };
 }
 
-Table& Texts() {
-    static Table table = [] {
-        Table loaded;
-        LoadBuiltIn(loaded);
-        Load(loaded, "en");
-        const std::string language =
-            Svc().settings ? Svc().settings->GetString("ui.language", "en") : std::string("en");
-        if (language != "en") {
-            Load(loaded, language);
+StringTable& Texts() {
+    static StringTable table = [] {
+        StringTable loaded;
+        TextMap base = BuiltIn();
+        for (auto& [key, value] : LoadFile("en")) {
+            base[key] = std::move(value);
         }
+        loaded.SetBase(std::move(base));
         return loaded;
     }();
     return table;
 }
 
+// A key no table has is its own text; kept so the reference stays valid.
+std::map<std::string, std::string, std::less<>>& Unknown() {
+    static std::map<std::string, std::string, std::less<>> keys;
+    return keys;
+}
+
 } // namespace
 
 const std::string& Tr(std::string_view key) {
-    Table& table = Texts();
-    auto it = table.find(key);
-    if (it == table.end()) {
-        it = table.emplace(std::string(key), std::string(key)).first;
+    if (const std::string* text = Texts().Find(key)) {
+        return *text;
+    }
+    auto& unknown = Unknown();
+    auto it = unknown.find(key);
+    if (it == unknown.end()) {
+        it = unknown.emplace(std::string(key), std::string(key)).first;
     }
     return it->second;
+}
+
+
+const std::string* PackText(std::string_view text) {
+    return Texts().Pack(text);
+}
+
+std::size_t SetLanguagePack(TextMap texts) {
+    StringTable& table = Texts();
+    table.SetPack(std::move(texts));
+    return table.Rejected();
+}
+
+void ClearLanguagePack() {
+    Texts().ClearPack();
 }
 
 } // namespace den::app

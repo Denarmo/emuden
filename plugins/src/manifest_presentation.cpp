@@ -108,6 +108,15 @@ void ParsePresentation(const JsonValue& presentation, Console& console) {
 
 void ParseCoreExtras(const JsonValue& value, Component& component) {
     component.option_hints = StringMembers(value.Find("option_hints"));
+    if (const JsonValue* language = value.Find("language"); language && language->kind == JsonValue::Kind::Object) {
+        component.language_option = language->String("option");
+        for (const auto& [code, option] : StringMembers(language->Find("values"))) {
+            component.language_values[code] = option;
+        }
+        if (component.language_values.empty()) {
+            component.language_option.clear();
+        }
+    }
     if (const JsonValue* presentation = value.Find("presentation")) {
         if (const JsonValue* screens = presentation->Find("screens")) {
             component.screens = ParseScreens(*screens);

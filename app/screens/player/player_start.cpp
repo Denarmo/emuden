@@ -9,6 +9,7 @@
 
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/game_prefs.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
@@ -75,7 +76,7 @@ void PlayerScreen::MatchResumeCore() {
         // from its save.
         log::Info("player", "the resume state of {} is {}'s: {} plays it, from its save", game_.name, input.wrote,
                   core_.name);
-        GetStage().Toast(std::format("Where you left off was saved with {}, which {} cannot load: starting from "
+        GetStage().Toast(TrF("Where you left off was saved with {}, which {} cannot load: starting from "
                                      "the game's save",
                                      input.wrote, core_.name),
                          5.0f);

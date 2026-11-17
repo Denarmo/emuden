@@ -6,6 +6,7 @@
 #include <format>
 
 #include "den/ui/widgets.h"
+#include "den/ui/translate.h"
 
 namespace den::ui {
 
@@ -95,14 +96,14 @@ Label::Label(std::string text_, float size_, int font_) : text(std::move(text_))
 
 Size Label::MeasureContent(Context& ctx) {
     const float s = SizeOr(size, ctx.theme->text_body);
-    return Size{ctx.Text().Measure(text, s, font), ctx.Text().Metrics(s, font).line_height};
+    return Size{ctx.Text().Measure(Translate(text), s, font), ctx.Text().Metrics(s, font).line_height};
 }
 
 void Label::DrawContent(Context& ctx) {
     const float s = SizeOr(size, ctx.theme->text_body);
     const gfx::Rect inner{rect.x + pad_left, rect.y + pad_top, rect.w - pad_left - pad_right,
                           rect.h - pad_top - pad_bottom};
-    DrawTextIn(ctx, inner, text, s, font, tone == Tone::Dim ? ctx.theme->text_dim : ctx.theme->fg,
+    DrawTextIn(ctx, inner, Translate(text), s, font, tone == Tone::Dim ? ctx.theme->text_dim : ctx.theme->fg,
                text_align);
 }
 
@@ -177,14 +178,14 @@ Button::Button(std::string text_, std::function<void()> action) : text(std::move
 
 Size Button::MeasureContent(Context& ctx) {
     // A little room: a width rounded to whole pixels must not cut the bold text.
-    return Size{ctx.Text().Measure(text, ctx.theme->text_body, gfx::FONT_BOLD) + 2, 24};
+    return Size{ctx.Text().Measure(Translate(text), ctx.theme->text_body, gfx::FONT_BOLD) + 2, 24};
 }
 
 void Button::DrawContent(Context& ctx) {
     const Theme& theme = *ctx.theme;
     ctx.canvas->FillRect(rect, selected || focused ? theme.panel_strong : theme.panel, theme.radius);
     const gfx::Rect inner{rect.x + pad_left, rect.y, rect.w - pad_left - pad_right, rect.h};
-    DrawTextIn(ctx, inner, text, theme.text_body, selected || focused ? gfx::FONT_BOLD : gfx::FONT_REGULAR,
+    DrawTextIn(ctx, inner, Translate(text), theme.text_body, selected || focused ? gfx::FONT_BOLD : gfx::FONT_REGULAR,
                theme.fg, centered ? Align::Center : Align::Start);
 }
 

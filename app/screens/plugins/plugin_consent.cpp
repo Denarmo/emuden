@@ -99,7 +99,7 @@ public:
         AddFact(list, "Version", plugin.version);
         if (careful) {
             auto* warning = list->Emplace<Paragraph>(
-                std::format("EmuDEN did not check this plugin. {} it only if you trust {}.", allow ? "Run" : "Install",
+                TrF("EmuDEN did not check this plugin. {} it only if you trust {}.", allow ? "Run" : "Install",
                             plugin.publisher.empty() ? std::string("where it comes from") : plugin.publisher),
                 TextWidth());
             warning->boxed = true;
@@ -195,7 +195,7 @@ public:
         AddFact(list, "Trust", TrustText(plugin));
         AddFact(list, "Its data", SizeOf(plugin.data_bytes));
         if (!plugin.error.empty()) {
-            auto* error = list->Emplace<Paragraph>("It stopped: " + plugin.error, TextWidth());
+            auto* error = list->Emplace<Paragraph>(TrF("It stopped: {}", plugin.error), TextWidth());
             error->boxed = true;
         }
 
@@ -244,7 +244,7 @@ public:
                     message += undo_mods_ ? " What it set up in your games is undone."
                                           : " What it set up in your games stays; installing it again can undo it.";
                 }
-                GetStage().Confirm(std::format("Remove {}?", name), message, "Remove", [this, id, mods, name] {
+                GetStage().Confirm(TrF("Remove {}?", name), message, "Remove", [this, id, mods, name] {
                     TrackFeaturePluginJob(id, name, "was removed",
                                           FeatureHostSvc()->Remove(id, delete_data_, delete_hacks_, mods && undo_mods_));
                     GetStage().Pop();

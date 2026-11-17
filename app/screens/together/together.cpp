@@ -7,6 +7,7 @@
 #include <map>
 #include <mutex>
 
+#include "den/app/strings.h"
 #include "den/app/game_prefs.h"
 #include "den/app/app.h"
 #include "den/app/registry.h"
@@ -128,8 +129,8 @@ std::string Together::StatusText() const {
     }
     if (party_->Joined()) {
         const double ping = party_->PingMs();
-        return ping >= 0 ? std::format("With {}  \xC2\xB7  {:.0f} ms", party_->Peer().device, ping)
-                         : "With " + party_->Peer().device;
+        return ping >= 0 ? TrF("With {}  \xC2\xB7  {:.0f} ms", party_->Peer().device, ping)
+                         : TrF("With {}", party_->Peer().device);
     }
     switch (party_->GetState()) {
     case net::Party::State::Hosting:
@@ -301,7 +302,7 @@ std::string TogetherWaitText() {
     if (!party || !party->Joined()) {
         return "Waiting for the other player";
     }
-    return party->PeerPaused() ? party->Peer().device + " paused the game" : "Waiting for " + party->Peer().device;
+    return party->PeerPaused() ? TrF("{} paused the game", party->Peer().device) : TrF("Waiting for {}", party->Peer().device);
 }
 
 namespace {

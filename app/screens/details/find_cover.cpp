@@ -7,6 +7,7 @@
 
 #include <memory>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/pages.h"
@@ -73,7 +74,7 @@ public:
         Services& svc = Svc();
         const std::string id = Param("id");
         const auto game = svc.library->Find(id);
-        ui::Node* content = BuildPlainFrame(*this, game ? "Find cover: " + game->name : "Find cover");
+        ui::Node* content = BuildPlainFrame(*this, game ? TrF("Find cover: {}", game->name) : Tr("Find cover"));
         if (!game) {
             return;
         }

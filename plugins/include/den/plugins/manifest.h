@@ -89,6 +89,11 @@ struct Component {
     std::map<std::string, Download, std::less<>> downloads; // by platform key or "any"
     std::vector<std::string> cores; // system files: the cores they are for (empty = all)
     EngineAppSpec engine_app;       // type engine-app
+    /// "language": the core option that sets the language of a game, and the option value of
+    /// each app language code ("es" -> "Spanish"; "*" for any other). The app gives it the
+    /// app's language before the manifest's other hints and the user's own options.
+    std::string language_option;
+    std::map<std::string, std::string, std::less<>> language_values;
     /// option_hints: values applied before forced_core_options and the user's own (a layout
     /// the player's presentation.screens know).
     std::vector<std::pair<std::string, std::string>> option_hints;
@@ -98,6 +103,9 @@ struct Component {
     JsonValue tuning; // an object, or null
 
     const Download* DownloadFor(std::string_view platform_key) const;
+    /// The option value for an app language ("es-MX": "es-MX", else "es", else "*"); empty
+    /// when the core has no language option or no value for it.
+    std::string LanguageValue(std::string_view app_language) const;
     /// It can be installed on the platform: a download (an engine app also needs its
     /// executable there), or on Android a package with an APK or a store page.
     bool OffersPlatform(std::string_view platform_key) const;

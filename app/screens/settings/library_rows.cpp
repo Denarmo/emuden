@@ -5,6 +5,7 @@
 
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
@@ -38,7 +39,7 @@ void AddFolder() {
             Svc().stage->Toast(added.error.empty() ? "That folder could not be added" : added.error, 5.0f);
             return;
         }
-        Svc().stage->Toast("Added " + path);
+        Svc().stage->Toast(TrF("Added {}", path));
         Rescan();
         RebuildTop();
     });

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/pages.h"
 #include "den/base/files.h"
 #include "den/app/glyphs.h"
@@ -45,9 +46,9 @@ std::string ShortcutLabel(Shortcut shortcut) {
     case Shortcut::Rewind:
         return "Rewind on or off";
     case Shortcut::SaveState:
-        return std::format("Save state (slot {})", QUICK_SLOT + 1);
+        return TrF("Save state (slot {})", QUICK_SLOT + 1);
     case Shortcut::LoadState:
-        return std::format("Load state (slot {})", QUICK_SLOT + 1);
+        return TrF("Load state (slot {})", QUICK_SLOT + 1);
     case Shortcut::NextPicture:
         return "Next picture";
     case Shortcut::SwapScreens:
@@ -290,7 +291,7 @@ void PlayerScreen::RunShortcut(Shortcut shortcut) {
         break;
     case Shortcut::SaveState:
         if (const Status saved = Svc().player->SaveState(QUICK_SLOT); saved) {
-            GetStage().Toast(std::format("Saved to slot {}", QUICK_SLOT + 1));
+            GetStage().Toast(TrF("Saved to slot {}", QUICK_SLOT + 1));
             Svc().textures->Forget(PathToUtf8(Svc().player->StateThumbnail(QUICK_SLOT)));
         } else {
             GetStage().Toast(saved.error.empty() ? "The state could not be saved" : saved.error, 5.0f);
@@ -298,9 +299,9 @@ void PlayerScreen::RunShortcut(Shortcut shortcut) {
         break;
     case Shortcut::LoadState:
         if (!Svc().player->HasState(QUICK_SLOT)) {
-            GetStage().Toast(std::format("Slot {} is empty", QUICK_SLOT + 1));
+            GetStage().Toast(TrF("Slot {} is empty", QUICK_SLOT + 1));
         } else if (const Status loaded = Svc().player->LoadState(QUICK_SLOT); loaded) {
-            GetStage().Toast(std::format("Loaded slot {}", QUICK_SLOT + 1));
+            GetStage().Toast(TrF("Loaded slot {}", QUICK_SLOT + 1));
         } else {
             GetStage().Toast(loaded.error.empty() ? "The state could not be loaded" : loaded.error, 5.0f);
         }

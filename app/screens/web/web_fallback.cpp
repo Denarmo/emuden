@@ -5,6 +5,7 @@
 #include <format>
 #include <sstream>
 
+#include "den/app/strings.h"
 #include "den/base/files.h"
 #include "den/base/log.h"
 #include "den/platform/webview.h"
@@ -112,8 +113,8 @@ void Fallback::Update(ui::Stage& stage) {
     ++offers_;
     const std::string folder = PathToUtf8(file.path.parent_path());
     stage.Confirm(
-        std::format("Install {}?", file.name),
-        std::format("It appeared in {} after this page was opened. EmuDEN takes a copy; your download stays where it is.",
+        TrF("Install {}?", file.name),
+        TrF("It appeared in {} after this page was opened. EmuDEN takes a copy; your download stays where it is.",
                     folder),
         "Install",
         [shared = shared_, file, host = host_, dir = folder_.empty() ? InboxDir() : folder_] {
@@ -146,7 +147,7 @@ void Fallback::Draw(ui::Context& ctx, const gfx::Rect& area, bool selected) {
     const float x = area.x + theme.margin, width = std::max(0.0f, std::min(area.w - 2 * theme.margin, 900.0f));
     float y = area.y + theme.margin;
     const std::string site = host_.empty() ? std::string("the site") : host_;
-    canvas.DrawText(ctx.Text().Elide(std::format("Open {} in your browser", site), theme.text_title, width, gfx::FONT_BOLD),
+    canvas.DrawText(ctx.Text().Elide(TrF("Open {} in your browser", site), theme.text_title, width, gfx::FONT_BOLD),
                     x, y, theme.text_title, theme.fg, gfx::FONT_BOLD);
     y += theme.text_title + 22;
 
@@ -162,7 +163,7 @@ void Fallback::Draw(ui::Context& ctx, const gfx::Rect& area, bool selected) {
     }
     paragraph("Browse the site in your own browser and press its download button there.", theme.fg);
     if (watch_) {
-        paragraph(std::format("EmuDEN watches {} and offers to install the {} files that arrive after now. "
+        paragraph(TrF("EmuDEN watches {} and offers to install the {} files that arrive after now. "
                               "Files that were already there are left alone, and ROM images are never taken.",
                               Watching(), List(wanted_)),
                   theme.fg);

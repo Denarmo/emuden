@@ -5,6 +5,7 @@
 
 #include <algorithm>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/frame.h"
 #include "den/app/pages.h"
@@ -172,7 +173,7 @@ void ChooseEnginePath(const std::string& system) {
     }
     Pick(std::move(options), [key](const std::string& path) {
         Svc().settings->SetString(key, path);
-        Svc().stage->Toast("Engine: " + path);
+        Svc().stage->Toast(TrF("Engine: {}", path));
         RebuildTop();
     });
 }

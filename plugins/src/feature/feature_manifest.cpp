@@ -3,6 +3,7 @@
 
 #include <algorithm>
 
+#include "den/base/language.h"
 #include "den/plugins/feature_manifest.h"
 #include "json_util.h"
 
@@ -173,11 +174,16 @@ bool OffersHomeInterface(const FeaturePlugin& plugin) {
     const auto& needs = plugin.needs;
     return plugin.kind == KIND_INTERFACE &&
            (Contains(needs, NEED_HOME_INTERFACE) || Contains(needs, NEED_HOME_INTERFACES) ||
-            (!Contains(needs, NEED_QUICK_SETTINGS) && !Contains(needs, NEED_THEMES)));
+            (!Contains(needs, NEED_QUICK_SETTINGS) && !Contains(needs, NEED_THEMES) &&
+             !Contains(needs, NEED_LANGUAGES)));
 }
 
 bool OffersHomeInterfaces(const FeaturePlugin& plugin) {
     return plugin.kind == KIND_INTERFACE && Contains(plugin.needs, NEED_HOME_INTERFACES);
+}
+
+bool OffersLanguage(const FeaturePlugin& plugin) {
+    return plugin.kind == KIND_INTERFACE && Contains(plugin.needs, NEED_LANGUAGES);
 }
 
 bool OffersThemes(const FeaturePlugin& plugin) {
@@ -243,8 +249,20 @@ Result<FeatureManifest> ParseFeatureManifest(std::string_view text) {
         const JsonValue* looks = array("interfaces");
         const JsonValue* quick = object("quick_settings");
         const JsonValue* themes = array("themes");
-        if (!look && !looks && !quick && !themes) {
+        const JsonValue* language = object("language");
+        if (!look && !looks && !quick && !themes && !language) {
             return Status::Fail(manifest.id + " has no interface object");
+        }
+        if (language) {
+            if (!Contains(needs, NEED_LANGUAGES)) {
+                return Status::Fail(manifest.id + " does not ask for " + NEED_LANGUAGES);
+            }
+            manifest.language = NormalizeLanguage(language->String("code"));
+            manifest.language_name = language->String("name");
+            if (manifest.language.empty() || LanguageBase(manifest.language) == "en" ||
+                manifest.language_name.empty() || manifest.language_name.size() > 64) {
+                return Status::Fail(manifest.id + " has no valid language code and name");
+            }
         }
         if (quick && !Contains(needs, NEED_QUICK_SETTINGS)) {
             return Status::Fail(manifest.id + " does not ask for " + NEED_QUICK_SETTINGS);

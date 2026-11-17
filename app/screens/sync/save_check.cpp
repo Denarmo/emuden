@@ -11,6 +11,7 @@
 #include <ctime>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/app.h"
 #include "den/app/boot.h"
 #include "den/app/game_widgets.h"
@@ -192,10 +193,10 @@ public:
         const sync::GameCheck& result = check_->result;
         const std::string device = result.online_device.empty() ? "another device" : result.online_device;
         panel->Emplace<ui::Label>("Which save do you want?", theme.text_heading, gfx::FONT_BOLD);
-        line(game_.name + " was played on " + device, true);
+        line(TrF("{} was played on {}", game_.name, device), true);
         line("and on this device since they last synced.", true);
-        line("Online: " + device + ", " + When(result.online_time), false);
-        line("This device: " + When(result.local_time), false);
+        line(TrF("Online: {}, {}", device, When(result.online_time)), false);
+        line(TrF("This device: {}", When(result.local_time)), false);
         auto* note = panel->Emplace<ui::Label>("The other one is kept under Settings > Sync > Conflicts.",
                                                theme.text_small);
         note->tone = ui::Tone::Dim;

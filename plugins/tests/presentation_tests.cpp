@@ -37,6 +37,7 @@ const char* const MANIFEST = R"({"manifest_version":1,"id":"jdoe.duo","name":"Du
      "downloads":{"any":{"url":"https://example.org/a.zip","sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
        "size":4,"archive":"zip","entry":"a.dll"}}},
     {"id":"second","type":"libretro-core","options_name":"Second Core",
+     "language":{"option":"duo_language","values":{"es":"Spanish","*":"English"}},
      "presentation":{"screens":[{"frame":[256,384],"screens":[{"rect":[0,0,1,0.5]},{"rect":[0,0.5,1,0.5]}]}]},
      "netplay":{"mode":"lockstep","subsystem":257,"description":"Linked.",
        "host":{"save_memory":256,"options":{"side":"one"}},"guest":{"save_memory":768,"options":{"side":"two"}}},
@@ -145,9 +146,17 @@ TEST_CASE("the host chooses the default core and hands out the core's presentati
         deps.platform_key = "any-plat";
         deps.bundled = false;
         auto host = CreateHostWith(config, std::move(deps));
+        settings.SetString("ui.language", "es-MX");
         auto core = host->CoreFor("duo");
         REQUIRE(core);
         CHECK(core->id == "second");
+        // The app's language reaches a core that names its language option.
+        CHECK(core->option_hints == std::vector<std::pair<std::string, std::string>>{{"duo_language", "Spanish"}});
+        settings.SetString("ui.language", "fr");
+        CHECK(host->CoreFor("duo")->option_hints.front().second == "English");
+        settings.Remove("ui.language");
+        CHECK(host->CoreFor("duo")->option_hints.front().second == "English");
+        core = host->CoreFor("duo");
         CHECK(core->options_name == "Second Core");
         CHECK(core->netplay.subsystem == 257);
         REQUIRE(core->screens.size() == 1);
@@ -205,6 +214,8 @@ TEST_CASE("the official manifests say what the app's tables said") {
     CHECK(gbads.screens[0].frame_width == 240);
     CHECK_FALSE(gbads.screens[0].screens.at(1).touch);
     CHECK(CoreOf(all, "emuden.nds", "melonds").option_hints.front().first == "melonds_screen_layout");
+    CHECK(CoreOf(all, "emuden.nds", "melonds").language_option == "melonds_language");
+    CHECK(CoreOf(all, "emuden.nds", "melonds").LanguageValue("es") == "Spanish");
     CHECK(CoreOf(all, "emuden.nds", "desmume").option_hints.front().first == "desmume_screens_layout");
     for (const char* plugin : {"emuden.gb", "emuden.gbc"}) {
         const NetplaySpec& tgb = CoreOf(all, plugin, "tgbdual").netplay;

@@ -7,6 +7,7 @@
 #include <cmath>
 #include <format>
 
+#include "den/app/strings.h"
 #include "den/app/boot.h"
 #include "den/app/second_screen.h"
 #include "den/app/game_prefs.h"
@@ -170,7 +171,7 @@ void PlayerScreen::Begin(const std::filesystem::path& content, bool resume) {
     }
     log::Info("player", "open {} with {}", game_.name, core_.id);
     if (const Status opened = svc.player->Open(request); !opened) {
-        return Fail(opened.error.empty() ? game_.name + " could not be started." : opened.error);
+        return Fail(opened.error.empty() ? TrF("{} could not be started.", game_.name) : opened.error);
     }
     phase_ = Phase::Running;
     if (BootCovers()) {
@@ -425,7 +426,7 @@ void PlayerScreen::Update(ui::Context& ctx) {
             Begin(*prepared_);
         } else {
             const std::string error = job->Error();
-            Fail(error.empty() ? game_.name + " could not be unpacked." : error);
+            Fail(error.empty() ? TrF("{} could not be unpacked.", game_.name) : error);
         }
         return;
     }
@@ -454,7 +455,7 @@ void PlayerScreen::Update(ui::Context& ctx) {
         return;
     }
     if (snapshot.state == player::State::Failed) {
-        return Fail(snapshot.error.empty() ? game_.name + " stopped." : snapshot.error);
+        return Fail(snapshot.error.empty() ? TrF("{} stopped.", game_.name) : snapshot.error);
     }
     // The state is taken on the first frame the core runs, not in Open.
     if (!resume_told_ && snapshot.resumed) {
