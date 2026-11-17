@@ -101,6 +101,13 @@
             android:grantUriPermissions="true"
             android:permission="android.permission.MANAGE_DOCUMENTS" />
 
+        <!-- An update of EmuDEN itself, for the package installer only (UpdateInstall.java). -->
+        <provider
+            android:name=".UpdateInstall$Provider"
+            android:authorities="${applicationId}.updates"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
         <!-- Shows nothing: started on a display to move the input focus there. -->
         <activity
             android:name=".FocusHop"

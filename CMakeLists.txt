@@ -15,6 +15,9 @@ option(DEN_BUILD_TESTS "Build the unit tests" ON)
 # The automation and test endpoints and the sample plugin host (each still needs its environment
 # variable at run time). Off leaves them out of the app.
 option(EMUDEN_DEV_TOOLS "Build the developer and test tools into the app" ON)
+# The release this build is ("0.2.0"), set by the packaging scripts. Empty is a development
+# build, which never offers an update.
+set(EMUDEN_VERSION "" CACHE STRING "Release version built into the app; empty for a development build")
 
 include(cmake/deps.cmake)
 include(cmake/module.cmake)
@@ -23,7 +26,7 @@ if(DEN_BUILD_TESTS)
 endif()
 
 # Order matters: a directory never includes one listed after it.
-foreach(dir base platform net patching states gfx input ui store library plugins online engine player achievements system sync app)
+foreach(dir base platform net patching states gfx input ui store library plugins online engine player achievements system update sync app)
     if(EXISTS "${CMAKE_SOURCE_DIR}/${dir}/CMakeLists.txt")
         add_subdirectory(${dir})
     endif()

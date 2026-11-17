@@ -21,6 +21,8 @@ if(ANDROID)
     list(APPEND platform_exclude "/src/sdl/refresh_desktop.cpp")
     # The web view is android.webkit.WebView (src/android).
     list(APPEND platform_exclude "/src/posix/webview_posix.cpp")
+    # Updates go to the package installer (src/android).
+    list(APPEND platform_exclude "/src/posix/self_update_posix.cpp")
 else()
     list(APPEND platform_exclude "/src/android/")
 endif()

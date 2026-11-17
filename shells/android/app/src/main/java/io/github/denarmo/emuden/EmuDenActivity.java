@@ -402,6 +402,12 @@ public class EmuDenActivity extends SDLActivity {
         return activity != null ? EngineApps.install(activity, apk) : "error:The app is closing";
     }
 
+    /** Called from native code (platform/src/android/self_update_android.cpp). */
+    public static String updateInstall(String apk) {
+        EmuDenActivity activity = self;
+        return activity != null ? UpdateInstall.install(activity, apk) : "error:The app is closing";
+    }
+
     public static String engineStore(String url) {
         EmuDenActivity activity = self;
         return activity != null ? EngineApps.store(activity, url) : "error:The app is closing";

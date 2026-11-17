@@ -5,8 +5,8 @@ file(GLOB_RECURSE app_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/screens/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/pages/*.cpp")
 # Developer tools and the stand-ins built when they are left out (EMUDEN_DEV_TOOLS).
-set(dev_tools_files automation fake_host sample_pages test_endpoint web_endpoint)
-set(dev_tools_stubs automation_off fake_host_off)
+set(dev_tools_files automation fake_host sample_pages test_endpoint update_test web_endpoint)
+set(dev_tools_stubs automation_off fake_host_off update_test_off)
 if(EMUDEN_DEV_TOOLS)
     set(left_out ${dev_tools_stubs})
 else()
@@ -43,7 +43,7 @@ endif()
 target_include_directories(den_app PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(den_app PRIVATE den_app_logic
-    den_sync den_system den_achievements den_player den_engine den_plugins den_library den_store
+    den_sync den_update den_system den_achievements den_player den_engine den_plugins den_library den_store
     den_ui den_input den_gfx den_platform den_base den_qrcodegen)
 den_warnings(den_app)
 if(WIN32)
