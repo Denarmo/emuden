@@ -88,6 +88,21 @@ float Score(const gfx::Rect& from, const gfx::Rect& to, Nav direction) {
     return along + across * 4.0f + centre * 0.05f;
 }
 
+// Each build starts from a plain root: one frame's padding, gap or axis do not carry over to
+// the next (Settings going back from a section to the rail).
+void ResetRoot(Node& root) {
+    root.axis = Axis::Column;
+    root.gap = 0;
+    root.SetPadding(0);
+    root.width = root.height = AUTO;
+    root.grow = 0;
+    root.align = Align::Stretch;
+    root.justify = Align::Start;
+    root.background = gfx::Color{0, 0, 0, 0};
+    root.radius = 0;
+    root.scrollable = false;
+}
+
 void CollectScrolls(const Node& node, std::vector<std::pair<std::string, float>>& out) {
     if (node.scrollable && !node.id.empty()) {
         out.emplace_back(node.id, node.scroller.Destination());
@@ -227,6 +242,7 @@ void Page::Prepare() {
     value_node_ = nullptr;
     held_.clear();
     root_.Clear();
+    ResetRoot(root_);
     Build();
     built_ = true;
     rebuild_ = false;

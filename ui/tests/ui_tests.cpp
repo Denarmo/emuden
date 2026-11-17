@@ -179,3 +179,85 @@ TEST_CASE("a real keyboard types into the text entry without acting twice") {
     // Escape arrives as navigation only.
     CHECK(entry.HandleEvent(Event::MakeNav(input::Nav::Back), 1.0f) == TextEntry::Outcome::Cancelled);
 }
+
+namespace {
+
+bool g_second_level = false;
+
+// The rail and a column at the first level; at the second, a padded column without the rail.
+class LevelsPage final : public Page {
+public:
+    void Build() override {
+        Node& root = Root();
+        if (g_second_level) {
+            root.axis = Axis::Column;
+            root.gap = 16;
+            root.SetPadding(32, 28);
+            AddBox(root, AUTO, 48);
+            return;
+        }
+        root.axis = Axis::Row;
+        Node* rail = AddBox(root, 232, AUTO, false);
+        rail->id = "rail";
+        rail->chrome = true;
+        Node* content = root.Add(MakeBox(Axis::Column, 16));
+        content->id = "content";
+        content->grow = 1;
+        AddBox(*content, AUTO, 48);
+    }
+};
+
+class EmptyPage final : public Page {
+public:
+    void Build() override {}
+};
+
+} // namespace
+
+TEST_CASE("a page rebuilt into its first level lays out as when it was first built") {
+    Stage stage;
+    Context ctx;
+    stage.Register("levels", [] { return std::make_unique<LevelsPage>(); });
+    stage.Register("other", [] { return std::make_unique<EmptyPage>(); });
+    const auto layout = [&] {
+        Node& root = stage.Top()->Root();
+        root.Measure(ctx);
+        root.Arrange(ctx, gfx::Rect{0, 0, 1280, 672});
+    };
+    // A rebuild of the page under "other", applied when that one goes.
+    const auto rebuild = [&] {
+        stage.Top()->Rebuild();
+        stage.Push("other");
+        stage.Pop();
+        stage.HandleEvent(input::Event::MakeNav(input::Nav::None));
+        layout();
+    };
+    g_second_level = false;
+    stage.Push("levels");
+    stage.HandleEvent(input::Event::MakeNav(input::Nav::None));
+    layout();
+    const gfx::Rect rail = stage.Top()->Root().FindById("rail")->rect;
+    const gfx::Rect content = stage.Top()->Root().FindById("content")->rect;
+    CHECK(rail.x == 0);
+    CHECK(rail.y == 0);
+
+    g_second_level = true;
+    rebuild();
+    CHECK(stage.Top()->Root().FindById("rail") == nullptr);
+    g_second_level = false;
+    rebuild();
+    const Node& root = stage.Top()->Root();
+    CHECK(root.pad_left == 0);
+    CHECK(root.pad_top == 0);
+    CHECK(root.gap == 0);
+    const gfx::Rect rail_after = stage.Top()->Root().FindById("rail")->rect;
+    const gfx::Rect content_after = stage.Top()->Root().FindById("content")->rect;
+    CHECK(rail_after.x == rail.x);
+    CHECK(rail_after.y == rail.y);
+    CHECK(rail_after.w == rail.w);
+    CHECK(rail_after.h == rail.h);
+    CHECK(content_after.x == content.x);
+    CHECK(content_after.y == content.y);
+    CHECK(content_after.w == content.w);
+    CHECK(content_after.h == content.h);
+}
