@@ -189,7 +189,7 @@ TEST_CASE("the official manifests say what the app's tables said") {
             INFO(console.id);
             CHECK(console.pad_layout == (nintendo.contains(console.id) ? "nintendo" : "other"));
             CHECK(console.digital_only == std::optional<bool>(digital.contains(console.id)));
-            CHECK(console.sync == (console.id != "steam"));
+            CHECK(console.sync == (console.id != "steam" && console.id != "psremote"));
             if (!console.media.shape.empty()) {
                 media.insert(console.id);
             }
