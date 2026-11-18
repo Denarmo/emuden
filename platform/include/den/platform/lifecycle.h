@@ -20,5 +20,7 @@ bool PrepareFrame();
 /// Events must be taken without the system's own pump this frame (it would wait for the
 /// hidden window). For den::input.
 bool EventPumpHeld();
+/// Subtle tactile pulse when the user presses a touch control (no-op on desktop).
+void HapticTick();
 
 } // namespace den::pal

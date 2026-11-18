@@ -7,6 +7,7 @@
 #include <format>
 
 #include "den/app/strings.h"
+#include "den/app/frame.h"
 #include "den/app/apps_catalog.h"
 #include "den/app/cheats.h"
 #include "den/app/second_screen.h"
@@ -14,6 +15,7 @@
 #include "den/base/files.h"
 #include "den/app/glyphs.h"
 #include "den/app/picture_choice.h"
+#include "den/app/touch_settings.h"
 #include "den/platform/audio.h"
 #include "player_screen.h"
 #include "den/app/volume_rows.h"
@@ -37,19 +39,26 @@ void PlayerScreen::BuildMenu() {
     built_apart_ = menu_apart_;
     menu_ = PlaceMenu(menu_area_.w > 0 ? menu_area_ : area_,
                       !menu_apart_ && (view_ == View::Picture || view_ == View::PictureAdjust));
+    const bool choosing = view_ == View::Picture || view_ == View::PictureAdjust;
+    const gfx::Rect active_area = menu_area_.w > 0 ? menu_area_ : area_;
+    const bool full_portrait = !menu_apart_ && !choosing && active_area.h > active_area.w;
     root.axis = menu_.stacked ? ui::Axis::Column : ui::Axis::Row;
     if (menu_.stacked) {
         root.Add(ui::MakeBox(ui::Axis::Column))->height = menu_.room.h;
     }
     ui::Node* panel = root.Add(ui::MakeBox(ui::Axis::Column, 10));
     panel->id = "menu";
-    if (menu_.stacked || menu_apart_) {
+    if (menu_.stacked || menu_apart_ || full_portrait) {
         panel->grow = 1;
     } else {
         panel->width = menu_.panel.w;
     }
     panel->background = theme.dialog;
-    panel->SetPadding(24, 26);
+    const Services::SafePadding safe = SafeMargins();
+    panel->pad_left = menu_.stacked ? 24.0f + safe.left : std::max(24.0f, safe.left + 12.0f);
+    panel->pad_right = 24.0f + safe.right;
+    panel->pad_top = menu_.stacked ? 22.0f : std::max(26.0f, safe.top + 10.0f);
+    panel->pad_bottom = std::max(26.0f, safe.bottom + 10.0f);
 
     const char* titles[] = {"",        "",        "Save state", "Load state",         "Core options",
                             "Buttons", "Players", "Picture",    "Adjust the picture", "Screens", ""};
@@ -105,6 +114,9 @@ void PlayerScreen::BuildMenu() {
             Svc().input->ActiveFamily(),
             std::vector<HintLine::Item>{{Nav::Confirm, "Select"}, {Nav::Back, main ? "Resume" : "Back"}});
         hints->pad_top = 6;
+    } else if (!main) {
+        auto* back = panel->Emplace<ui::Button>("Back", [this] { OnNav(Nav::Back); });
+        back->id = "menu.back";
     }
 }
 
@@ -212,6 +224,7 @@ void PlayerScreen::BuildMain(ui::Node* list) {
                                 [this] { OpenCheats(GetStage()); }));
     }
     if (!external) {
+        rows.push_back(TouchModeRow());
         rows.push_back(ActionRow("menu.buttons", "Buttons", [this] { Show(View::Buttons); }));
         rows.push_back(ValueRow(
             "menu.players", "Players",

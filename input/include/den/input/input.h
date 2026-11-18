@@ -73,6 +73,9 @@ struct Event {
         PointerDown, // x, y in pixels (mouse and touch alike)
         PointerMove, // x, y; down says whether the button or finger is held
         PointerUp,
+        FingerDown,  // x, y in pixels, finger id (multi-touch)
+        FingerMove,
+        FingerUp,
         Wheel, // x, y, dx, dy (lines)
         Text,  // text
         Key,   // key (SDL keycode), down
@@ -86,6 +89,8 @@ struct Event {
     PadFamily family = PadFamily::Keyboard;
     float x = 0, y = 0, dx = 0, dy = 0;
     bool down = false;
+    bool touch_synthetic = false; // Pointer* synthesized by SDL from a touch finger
+    std::uint64_t finger = 0;
     int key = 0;
     std::string text;
 

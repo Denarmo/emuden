@@ -35,6 +35,7 @@ public:
     void Pause() override;
     void Resume() override;
     void SetPad(int port, const input::PadState& pad) override;
+    void SetTouch(const TouchState& touch) override;
     void SetPointer(float x, float y, bool pressed) override;
     void SetAspectOverride(float aspect) override {
         aspect_override_ = aspect;
@@ -98,6 +99,8 @@ public:
     void SetBfi(const BfiRequest& request) override;
 
 private:
+    void PushPort0Input(const RetroPad& base);
+
     void Notify(FrameEvent event) {
         if (frame_hook_) {
             frame_hook_(event);
@@ -225,6 +228,8 @@ private:
 
     // Input: the button map per pad family, with the user's remap.
     std::array<ButtonMap, 4> button_maps_{};
+    TouchState touch_{};
+    RetroPad last_pad0_{};
     std::uint16_t held_buttons_ = 0; // port 1, for a shortcut
     std::string game_key_;
 

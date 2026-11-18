@@ -33,23 +33,28 @@ public:
         const std::string id = Param("id");
         const auto found = svc.library->Find(id);
         ui::Node& root = Root();
-        root.axis = ui::Axis::Row;
-        // A narrow page gets a smaller cover and margins, so the facts keep their width.
         width_ = PageWidth();
+        height_ = PageHeight();
+        const Services::SafePadding safe = SafeMargins();
+        const bool stacked = height_ > width_;
         const bool narrow = width_ < FULL_RAIL_MIN_PAGE;
+        root.axis = stacked ? ui::Axis::Column : ui::Axis::Row;
+        root.scrollable = stacked;
+        // A narrow page gets a smaller cover and margins, so the facts keep their width.
         const float pad_x = svc.theme->margin * (narrow ? 1.0f : 2.0f);
-        const float cover_w =
-            narrow ? std::clamp((width_ - pad_x * 2) * 0.36f, 140.0f, COVER_SIDE_W) : COVER_SIDE_W;
-        root.gap = narrow ? 28 : 56;
+        const float cover_w = stacked ? std::clamp((width_ - pad_x * 2) * 0.48f, 150.0f, 220.0f)
+                              : (narrow ? std::clamp((width_ - pad_x * 2) * 0.36f, 140.0f, COVER_SIDE_W)
+                                        : COVER_SIDE_W);
+        root.gap = stacked ? 18 : (narrow ? 28 : 56);
         // Centred when it all fits; on a small screen the facts and buttons scroll under the
         // title, above the hint bar.
-        root.align = compact_ ? ui::Align::Stretch : ui::Align::Center;
-        root.justify = ui::Align::Center;
+        root.align = stacked || compact_ ? ui::Align::Stretch : ui::Align::Center;
+        root.justify = stacked ? ui::Align::Start : ui::Align::Center;
         side_ = nullptr;
-        root.SetPadding(pad_x, PAD);
-        if (compact_) {
-            root.pad_bottom = PAD + HINTS;
-        }
+        root.pad_left = pad_x + safe.left;
+        root.pad_right = pad_x + safe.right;
+        root.pad_top = std::max(static_cast<float>(PAD), safe.top + 10.0f);
+        root.pad_bottom = (compact_ || stacked ? PAD + HINTS : PAD) + safe.bottom;
         if (!found) {
             root.Emplace<ui::Label>(Tr("launch.gone"));
             return;
@@ -59,18 +64,25 @@ public:
 
         ui::Node* cover = root.Add(ui::MakeBox(ui::Axis::Column, 0));
         cover->justify = ui::Align::Center;
+        cover->align = stacked ? ui::Align::Center : ui::Align::Start;
         auto* view = cover->Emplace<CoverView>(game.name, game.cover, cover_w, cover_w * COVER_SIDE_H / COVER_SIDE_W);
         view->overlay_title = game.placeholder_cover;
         view->hack = IsHackGame(game);
 
         ui::Node* side = root.Add(ui::MakeBox(ui::Axis::Column, 6));
-        if (compact_ || narrow) {
+        if (stacked) {
+            // Let the whole stacked page scroll naturally.
+        } else if (compact_ || narrow) {
             side->grow = 1;
         } else {
             side->width = 520;
         }
         side_ = side;
-        if (narrow) {
+        if (stacked) {
+            auto* title = side->Emplace<Paragraph>(game.name, width_ - root.pad_left - root.pad_right);
+            title->size = svc.theme->text_heading + 4;
+            title->font = gfx::FONT_BOLD;
+        } else if (narrow) {
             // Long names wrap rather than lose their end.
             auto* title = side->Emplace<Paragraph>(game.name, width_ - pad_x * 2 - cover_w - root.gap);
             title->size = svc.theme->text_heading + 4;
@@ -81,8 +93,8 @@ public:
         auto* console = side->Emplace<ui::Label>(SystemName(game.system), svc.theme->text_heading, gfx::FONT_BOLD);
         console->tone = ui::Tone::Dim;
         console->pad_bottom = 6;
-        ui::Node* body = compact_ ? side->Add(ui::MakeList(6)) : side;
-        if (compact_) {
+        ui::Node* body = !stacked && compact_ ? side->Add(ui::MakeList(6)) : side;
+        if (!stacked && compact_) {
             body->id = "details.body";
         }
         const auto fact = [&](const std::string& text) {
@@ -159,13 +171,16 @@ public:
                                      Svc().stage->Pop();
                                  });
         });
+        if (stacked && Svc().input->TouchOnly()) {
+            action("details.back", Tr("common.back"), [] { Svc().stage->Pop(); });
+        }
     }
 
     void Update(ui::Context&) override {
-        if (PageWidth() != width_) {
-            compact_ = false; // measured again at the new width
+        if (PageWidth() != width_ || PageHeight() != height_) {
+            compact_ = false; // measured again at the new size
             Rebuild();
-        } else if (!compact_ && side_ && side_->rect.h > Root().rect.h - PAD * 2 - HINTS) {
+        } else if (height_ <= width_ && !compact_ && side_ && side_->rect.h > Root().rect.h - PAD * 2 - HINTS) {
             compact_ = true;
             Rebuild();
         } else if (GamesRevision() != revision_) {
@@ -201,6 +216,7 @@ private:
     ui::Node* side_ = nullptr;
     bool compact_ = false;
     float width_ = 0;
+    float height_ = 0;
 };
 
 } // namespace

@@ -267,6 +267,10 @@ Android 16, Adreno 722, two screens, on 2026-11-12:
   landscape and to portrait and back, and the app moved to the second screen and back while
   the NDS game ran: same process, picture back every time.
 
+## Orientation, insets, and haptics
+
+`EmuDenActivity` uses `android:screenOrientation="fullUser"` with all four SDL orientations (`SDL_ORIENTATIONS`) enabled, and updates Settings > Display `Orientation` (`Auto` / `Landscape` / `Portrait`) via `requestOrientation(int)`. Window insets combine display cutouts and mandatory system gestures (`safeInsets()`) so portrait bottom rails, portrait controller decks, landscape peripheral overlays, and headers clear camera holes and gesture bars without shrinking horizontal content with side gesture padding. On-screen button taps and D-pad changes trigger `hapticTick()` (`VibrationEffect.EFFECT_TICK`). `DeviceFacts.builtInPad()` checks `getMotionRanges()` / `getControllerNumber() > 0` to ignore virtual kernel daemons such as `uinput-xiaomi`.
+
 ## Limits for now
 
 - **Storage:** a picked folder is copied, not read in place, and once a folder has been

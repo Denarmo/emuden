@@ -99,6 +99,45 @@ bool EventPumpHeld() {
     return g_hidden.load() && g_stopped.load();
 }
 
+SafeInsets PlatformSafeInsets() {
+    const jni::ActivityCall call;
+    const jmethodID method = call.Method("safeInsets", "()[I");
+    if (!method) {
+        return {};
+    }
+    const auto array = static_cast<jintArray>(call.env->CallStaticObjectMethod(call.activity_class, method));
+    if (call.Threw() || !array) {
+        return {};
+    }
+    SafeInsets insets;
+    if (call.env->GetArrayLength(array) >= 4) {
+        jint values[4] = {};
+        call.env->GetIntArrayRegion(array, 0, 4, values);
+        insets = {values[0], values[1], values[2], values[3]};
+    }
+    call.env->DeleteLocalRef(array);
+    return insets;
+}
+
+void SetPlatformOrientation(Orientation orientation) {
+    const jni::ActivityCall call;
+    if (const jmethodID method = call.Method("requestOrientation", "(I)V")) {
+        const jint mode = orientation == Orientation::Landscape ? 1
+                        : orientation == Orientation::Portrait  ? 2
+                                                                : 0;
+        call.env->CallStaticVoidMethod(call.activity_class, method, mode);
+        call.Threw();
+    }
+}
+
+void HapticTick() {
+    const jni::ActivityCall call;
+    if (const jmethodID method = call.Method("hapticTick", "()V")) {
+        call.env->CallStaticVoidMethod(call.activity_class, method);
+        call.Threw();
+    }
+}
+
 bool PrepareFrame() {
     const EGLContext current = eglGetCurrentContext();
     if (!g_hidden.load()) {

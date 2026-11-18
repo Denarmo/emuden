@@ -32,23 +32,30 @@ constexpr int KEY_F11 = 0x40000044; // SDLK_F11
 // How long closing may wait for the quit holds (a game's saves going up).
 constexpr double QUIT_HOLD_SECONDS = 10.0;
 
-// Pixels per logical unit: the window's height over the layout's, times the interface size
-// (bigger on small screens), held back where a narrow window would get too few units across.
+// Pixels per logical unit: the short edge over the layout's 720 units keeps physical sizing
+// consistent between portrait and landscape, while clamping narrow portrait views to >= 480 units.
 float PixelScale(int width, int height) {
-    const float base = static_cast<float>(height) / LOGICAL_HEIGHT;
+    if (width <= 0 || height <= 0) {
+        return 1.0f;
+    }
+    const int short_edge = std::min(width, height);
+    const float base = static_cast<float>(short_edge) / LOGICAL_HEIGHT;
     const float widest = std::max(1.0f, static_cast<float>(width) / (MIN_LOGICAL_WIDTH * base));
     return base * std::min(system::UiScale(), widest);
 }
 
-// What the button hints start from: a handheld has a pad of its own, a tablet has none.
+// What the button hints start from: a handheld has a pad of its own, a touch phone/tablet has none.
 input::DeviceKind HintDevice() {
     const system::DeviceProfile& device = system::Device();
-    if (device.info.builtin_pad || device.form == system::FormFactor::HandheldSmall ||
-        device.form == system::FormFactor::HandheldDual) {
+    if (device.info.builtin_pad || device.form == system::FormFactor::HandheldDual) {
         return input::DeviceKind::Handheld;
     }
-    return device.form == system::FormFactor::Tablet && device.info.touch ? input::DeviceKind::TouchOnly
-                                                                          : input::DeviceKind::Desktop;
+    if (device.info.touch && (device.form == system::FormFactor::Tablet ||
+                              device.form == system::FormFactor::HandheldSmall)) {
+        return input::DeviceKind::TouchOnly;
+    }
+    return device.form == system::FormFactor::HandheldSmall ? input::DeviceKind::Handheld
+                                                            : input::DeviceKind::Desktop;
 }
 
 std::string GlText(gl::Enum name) {
@@ -236,7 +243,9 @@ int Run(int argc, char** argv) {
                 }
                 using T = input::Event::Type;
                 if (event.type == T::PointerDown || event.type == T::PointerMove ||
-                    event.type == T::PointerUp || event.type == T::Wheel) {
+                    event.type == T::PointerUp || event.type == T::Wheel ||
+                    event.type == T::FingerDown || event.type == T::FingerMove ||
+                    event.type == T::FingerUp) {
                     event.y -= static_cast<float>(svc.title_bar_px); // the screens start under the bar
                 }
                 if (event.type == input::Event::Type::Quit) {
@@ -277,6 +286,14 @@ int Run(int argc, char** argv) {
             const int bar = title_bar.PixelHeight(*svc.window, bar_scale);
             svc.title_bar_px = bar;
             const float scale = PixelScale(width, height - bar);
+            const pal::SafeInsets insets = svc.window->SafeArea();
+            const float inv = scale > 0.0f ? 1.0f / scale : 1.0f;
+            svc.safe = {
+                static_cast<float>(insets.left) * inv,
+                bar > 0 ? 0.0f : static_cast<float>(insets.top) * inv,
+                static_cast<float>(insets.right) * inv,
+                static_cast<float>(insets.bottom) * inv,
+            };
             device.BeginFrame(width, height, svc.theme->page);
             canvas.Begin(width, height - bar, scale);
             ui::Context ctx;

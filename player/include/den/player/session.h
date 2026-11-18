@@ -257,6 +257,17 @@ constexpr int STATE_SLOTS = 10;
 /// under core_options.<core>.<key> for the console and game_options.<system>.<game>.<key>
 /// for one game; the game's value wins. Remapped buttons are under
 /// player.buttons.<system>.<button> (den/player/buttons.h).
+/// Normalized axes and RetroPad bitmask from on-screen touch controls for port 0.
+struct TouchState {
+    std::uint16_t buttons = 0;
+    float lx = 0;
+    float ly = 0;
+    float rx = 0;
+    float ry = 0;
+    float lt = 0;
+    float rt = 0;
+};
+
 class Session {
 public:
     virtual ~Session() = default;
@@ -271,6 +282,7 @@ public:
     virtual void Resume() = 0;
     /// The pad for a port (0 = player one), by position. Call before Advance.
     virtual void SetPad(int port, const input::PadState& pad) = 0;
+    virtual void SetTouch(const TouchState& /*touch*/) {}
     /// A finger or the mouse on the picture (a touch screen console), in the units of the
     /// canvas last drawn to. Outside the picture it counts as lifted.
     virtual void SetPointer(float x, float y, bool pressed) = 0;

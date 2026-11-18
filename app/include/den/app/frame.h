@@ -5,12 +5,15 @@
 
 #include <string>
 
+#include "den/app/app.h"
 #include "den/ui/page.h"
 
 namespace den::app {
 
 /// The width of the page in logical units (the canvas'), which the layouts follow.
 float PageWidth();
+float PageHeight();
+Services::SafePadding SafeMargins();
 
 /// Builds the frame every top-level screen shares into the page's root: the rail at the left
 /// (from the registry, the entry for `page`'s route marked; slim on a narrow page, see

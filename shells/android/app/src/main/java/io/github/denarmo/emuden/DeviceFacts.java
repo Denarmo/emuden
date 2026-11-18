@@ -65,9 +65,13 @@ public final class DeviceFacts {
             if (device == null || device.isVirtual()) {
                 continue;
             }
-            boolean pad = (device.getSources() & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD;
+            int sources = device.getSources();
+            boolean pad = (sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD;
             boolean external = Build.VERSION.SDK_INT >= 29 && device.isExternal();
-            if (pad && !external) {
+            // Exclude virtual OEM daemons (e.g. uinput-xiaomi) that advertise SOURCE_GAMEPAD with
+            // no axes and ControllerNumber 0.
+            boolean realPad = !device.getMotionRanges().isEmpty() || device.getControllerNumber() > 0;
+            if (pad && !external && realPad) {
                 return true;
             }
         }

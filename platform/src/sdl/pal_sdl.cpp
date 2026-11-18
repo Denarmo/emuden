@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <map>
 #include <mutex>
 
@@ -65,6 +66,38 @@ public:
     float DisplayScale() const override {
         const float scale = SDL_GetWindowDisplayScale(window_);
         return scale > 0.0f ? scale : 1.0f;
+    }
+    SafeInsets SafeArea() const override {
+        const SafeInsets platform = PlatformSafeInsets();
+        if (platform.left > 0 || platform.top > 0 || platform.right > 0 || platform.bottom > 0) {
+            return platform;
+        }
+        if (g_caps.os != "android") {
+            return {};
+        }
+        int pw = 0, ph = 0;
+        SDL_GetWindowSizeInPixels(window_, &pw, &ph);
+        SDL_Rect safe{};
+        if (!SDL_GetWindowSafeArea(window_, &safe) || pw <= 0 || ph <= 0 || safe.w <= 0 || safe.h <= 0) {
+            return {};
+        }
+        int ww = 0, wh = 0;
+        SDL_GetWindowSize(window_, &ww, &wh);
+        const float sx = ww > 0 ? static_cast<float>(pw) / static_cast<float>(ww) : 1.0f;
+        const float sy = wh > 0 ? static_cast<float>(ph) / static_cast<float>(wh) : 1.0f;
+        SafeInsets out;
+        out.top = std::max(0, static_cast<int>(std::lround(safe.y * sy)));
+        out.bottom = std::max(0, ph - static_cast<int>(std::lround((safe.y + safe.h) * sy)));
+        return out;
+    }
+    void SetOrientation(Orientation orientation) override {
+        const char* hint = orientation == Orientation::Landscape
+                               ? "LandscapeLeft LandscapeRight"
+                           : orientation == Orientation::Portrait
+                               ? "Portrait PortraitUpsideDown"
+                               : "LandscapeLeft LandscapeRight Portrait PortraitUpsideDown";
+        SDL_SetHint(SDL_HINT_ORIENTATIONS, hint);
+        SetPlatformOrientation(orientation);
     }
     void Swap() override {
         SDL_GL_SwapWindow(window_);

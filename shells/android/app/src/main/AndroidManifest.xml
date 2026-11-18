@@ -52,14 +52,14 @@
         android:theme="@style/AppTheme">
 
         <meta-data android:name="SDL_ENV.SDL_ANDROID_TRAP_BACK_BUTTON" android:value="1" />
-        <meta-data android:name="SDL_ENV.SDL_ORIENTATIONS" android:value="LandscapeLeft LandscapeRight" />
+        <meta-data android:name="SDL_ENV.SDL_ORIENTATIONS" android:value="LandscapeLeft LandscapeRight Portrait PortraitUpsideDown" />
 
         <activity
             android:name=".EmuDenActivity"
             android:label="@string/app_name"
             android:alwaysRetainTaskState="true"
             android:launchMode="singleInstance"
-            android:screenOrientation="sensorLandscape"
+            android:screenOrientation="fullUser"
             android:resizeableActivity="true"
             android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:preferMinimalPostProcessing="true"

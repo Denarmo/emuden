@@ -117,6 +117,11 @@ void DualScreens::Stop() {
     }
     claimed_ = false;
     split_ = false;
+    if (held_display_ >= 0 || release_at_ > 0) {
+        Svc().player->SetScreenPointer(held_screen_, 0, 0, false);
+    }
+    finger_active_ = false;
+    held_finger_ = 0;
     held_display_ = -1;
     release_at_ = 0;
     screens_.clear();
@@ -136,7 +141,7 @@ void DualScreens::Update() {
         client.draw = [this](ui::Context& ctx, const gfx::Rect& area) { DrawSecond(ctx, area); };
         client.pointer = [this](const input::Event& event) {
             const float scale = std::max(0.001f, SecondScreenScale());
-            Touch(1, event.type, event.x / scale, event.y / scale);
+            Touch(1, event.finger, event.type, event.x / scale, event.y / scale);
         };
         claimed_ = ClaimSecondScreen(std::move(client));
     } else if (!want && claimed_) {
@@ -149,6 +154,7 @@ void DualScreens::Update() {
         // A finger that was down belongs to a layout that is gone.
         if (held_display_ >= 0) {
             svc.player->SetScreenPointer(0, 0, 0, false);
+            finger_active_ = false;
             held_display_ = -1;
         }
     }
@@ -232,16 +238,20 @@ void DualScreens::DrawSecond(ui::Context& ctx, const gfx::Rect& area) {
     Svc().player->DrawScreen(canvas, static_cast<int>(shown), target);
 }
 
-void DualScreens::Touch(int display, input::Event::Type type, float x, float y) {
+void DualScreens::Touch(int display, std::uint64_t finger, input::Event::Type type, float x, float y) {
     using Type = input::Event::Type;
     if (!Active() || display < 0 || display > 1) {
         return;
     }
+    const bool down = type == Type::PointerDown || type == Type::FingerDown;
+    const bool up = type == Type::PointerUp || type == Type::FingerUp;
     const auto& rects = rects_[static_cast<std::size_t>(display)];
-    if (type == Type::PointerDown) {
+    if (down && !finger_active_) {
         for (int i = 0; i < 2; ++i) {
             const gfx::Rect& r = rects[static_cast<std::size_t>(i)];
             if (screens_[static_cast<std::size_t>(i)].touch && r.w > 0 && r.h > 0 && r.Contains(x, y)) {
+                finger_active_ = true;
+                held_finger_ = finger;
                 held_display_ = display;
                 held_screen_ = i;
                 pressed_at_ = pal::NowSeconds();
@@ -249,11 +259,12 @@ void DualScreens::Touch(int display, input::Event::Type type, float x, float y) 
             }
         }
     }
-    if (held_display_ != display || held_screen_ < 0) {
+    if (!finger_active_ || held_display_ != display || held_finger_ != finger || held_screen_ < 0) {
         return;
     }
     const gfx::Rect& r = rects[static_cast<std::size_t>(held_screen_)];
-    if (type == Type::PointerUp || r.w <= 0 || r.h <= 0) {
+    if (up || r.w <= 0 || r.h <= 0) {
+        finger_active_ = false;
         held_display_ = -1;
         // A tap that began and ended between two frames still reaches the game.
         if (pal::NowSeconds() - pressed_at_ < SHORTEST_PRESS) {
@@ -267,13 +278,18 @@ void DualScreens::Touch(int display, input::Event::Type type, float x, float y) 
     Svc().player->SetScreenPointer(held_screen_, (x - r.x) / r.w, (y - r.y) / r.h, true);
 }
 
-bool DualScreens::Pointer(const input::Event& event, float x, float y) {
-    if (event.type == input::Event::Type::PointerDown && button_.w > 0 && button_.Contains(x, y)) {
+bool DualScreens::PointerFinger(std::uint64_t finger, input::Event::Type type, float x, float y) {
+    using Type = input::Event::Type;
+    if ((type == Type::PointerDown || type == Type::FingerDown) && button_.w > 0 && button_.Contains(x, y)) {
         Swap();
         return true;
     }
-    Touch(0, event.type, x, y);
+    Touch(0, finger, type, x, y);
     return false;
+}
+
+bool DualScreens::Pointer(const input::Event& event, float x, float y) {
+    return PointerFinger(0xFFFFFFFFFFFFFFFEULL, event.type, x, y);
 }
 
 void DualScreens::Swap() {

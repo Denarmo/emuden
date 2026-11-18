@@ -25,6 +25,7 @@
 #include "den/player/buttons.h"
 #include "den/app/black_frames.h"
 #include "dual_screen.h"
+#include "touch_pad.h"
 #include "den/app/player_view.h"
 
 namespace den::app {
@@ -133,6 +134,7 @@ private:
     void DrawOverlays(ui::Context& ctx, const gfx::Rect& area, const player::Snapshot& snapshot);
     void DrawFrameGraph(gfx::Canvas& canvas, const gfx::Rect& box, float text_size) const;
     bool TabPressed(const input::Event& event, const gfx::Rect& area, float scale);
+    void HandlePlayTouch(const input::Event& event, float menu_corner);
 
     // pause_menu.cpp: the menu's pages as rows.
     void BuildMenu();
@@ -173,6 +175,7 @@ private:
     double started_ = 0;
 
     DualScreens dual_;               // a console with two screens
+    TouchPad touch_;                 // console-authentic on-screen touch controller
     BlackFrames bfi_;
     ScreenSize size_ = ScreenSize::Fit;
     float aspect_sent_ = 0;

@@ -73,7 +73,7 @@ public:
         field_->placeholder = Tr("search.placeholder");
         // A narrow page has no room for the keys beside the results: the field opens the
         // text entry instead, and the results get the width.
-        keys_ = RailContentWidth(width_, svc.theme->margin) >= KEYBOARD_W + 28 + MIN_RESULTS_W;
+        keys_ = RailContentWidth(width_, PageHeight(), svc.theme->margin) >= KEYBOARD_W + 28 + MIN_RESULTS_W;
         if (!keys_ || pal::GetTextInput().Available()) {
             // Where the device has a keyboard of its own, the field opens it (the text entry
             // decides between it and the app's keys); the results follow the typing.
@@ -214,7 +214,8 @@ private:
             Svc().stage->Push("details", {{"id", game.id}});
         };
         options.on_focus = [this](const library::Entry& game) { selected_ = game.id; };
-        const float room = RailContentWidth(width_, Svc().theme->margin) - (keys_ ? KEYBOARD_W + 28 : 0.0f) - 10;
+        const float room =
+            RailContentWidth(width_, PageHeight(), Svc().theme->margin) - (keys_ ? KEYBOARD_W + 28 : 0.0f) - 10;
         AddGameGrid(results_, games, GridColumns(room), options)->id = "search.grid";
     }
 

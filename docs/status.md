@@ -1,6 +1,6 @@
 # Status
 
-What EmuDEN is today (2026-11-16). The check records of each round, with what was run on
+What EmuDEN is today (2026-11-18). The check records of each round, with what was run on
 which device, are in `docs/history.md`; add new ones there, newest first.
 
 ## What is there
@@ -21,7 +21,7 @@ which device, are in `docs/history.md`; add new ones there, newest first.
 - **Player.** Software, OpenGL and Vulkan cores (`docs/vulkan.md`); save states, rewind,
   fast-forward, cheats (typed in or imported from RetroArch `.cht` files), picture presets on a multi-pass chain, per-game and per-console settings,
   button remapping, black frame insertion at whole multiples of the game's rate, two screens (DS layouts, quick settings and the pause menu on the second
-  display, an Android app beside the game).
+  display, an Android app beside the game), and console-inspired multi-touch controls across all 37 bundled systems (below the game in portrait, peripheral overlay in landscape).
 - **Feature plugins** (Lua 5.4 in a sandbox, `docs/feature-plugins.md`): the in-app browser
   (`docs/in-app-browser.md`), four ROM hack site plugins, RetroAchievements, interface
   plugins for the home screen, tuning advice, and sync providers.
@@ -33,7 +33,7 @@ which device, are in `docs/history.md`; add new ones there, newest first.
   hacks patched from BPS, IPS, UPS, xdelta and other formats, covers (`docs/covers.md`), the library
   tidy-up.
 - **Platforms.** Windows, Linux (AppImage, SteamOS in Game Mode: `docs/steamos.md`) and
-  Android (Retroid Pocket Duo is the test device; `shells/android/README.md`).
+  Android (portrait and landscape orientation with cutout/gesture insets; Retroid Pocket Duo and Xiaomi 24122RKC7G Android 16 phone tested; `shells/android/README.md`).
 
 ## Known problems
 

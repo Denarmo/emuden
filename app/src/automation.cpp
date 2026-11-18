@@ -170,6 +170,31 @@ void Automation::Pump() {
             } else {
                 reply = "error touch needs down, move or up";
             }
+        } else if (command == "finger") {
+            // "finger <id> down|move|up x y": one multi-touch finger event in logical units.
+            std::uint64_t id = 0;
+            std::string what;
+            float x = 0, y = 0;
+            in >> id >> what >> x >> y;
+            input::Event event;
+            event.finger = id;
+            event.x = x * svc.canvas->Scale();
+            event.y = y * svc.canvas->Scale() + svc.title_bar_px;
+            if (what == "down") {
+                event.type = input::Event::Type::FingerDown;
+                event.down = true;
+                svc.input->Inject(event);
+            } else if (what == "move") {
+                event.type = input::Event::Type::FingerMove;
+                event.down = true;
+                svc.input->Inject(event);
+            } else if (what == "up") {
+                event.type = input::Event::Type::FingerUp;
+                event.down = false;
+                svc.input->Inject(event);
+            } else {
+                reply = "error finger needs down, move or up";
+            }
         } else if (command == "wheel") {
             // "wheel x y lines": the mouse wheel over a point; positive lines scroll up.
             input::Event event;

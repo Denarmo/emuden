@@ -10,6 +10,7 @@ Start the app with EMUDEN_AUTOMATION=<port> (default here: 5577), then:
     drive.py go settings                push a route; "go details id=abc" passes parameters
     drive.py pad start 200              hold game buttons (south east west north up down left right l r start select)
     drive.py tap 640 360                a tap in logical units (the window is 720 units high)
+    drive.py finger 1 down 100 500      multi-touch finger down|move|up in logical units
     drive.py screenshot C:/tmp/a.png    the next frame as a PNG
     drive.py quit
 
@@ -87,7 +88,7 @@ def main(argv):
     for n, command in enumerate(c for c in commands if c):
         if n:
             time.sleep(pause)
-        own = command[0] in ("vpad", "player", "audio", "wav", "bfi")
+        own = command[0] in ("vpad", "player", "audio", "wav", "bfi", "screens", "touchpad")
         reply = send(port + 1 if own else port, " ".join(command), wait)
         print(reply)
         failed = failed or reply.startswith("error")

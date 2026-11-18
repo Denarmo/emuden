@@ -9,6 +9,7 @@
 
 #include "den/app/strings.h"
 #include "den/app/boot.h"
+#include "den/app/frame.h"
 #include "den/app/second_screen.h"
 #include "den/app/game_prefs.h"
 #include "den/app/engine_setup.h"
@@ -475,6 +476,10 @@ void PlayerScreen::Update(ui::Context& ctx) {
         svc.stage->Toast("Controller disconnected");
     }
     pads_seen_ = pads;
+    const gfx::Rect active_area = area_.w > 0 ? area_ : gfx::Rect{0, 0, PageWidth(), PageHeight()};
+    touch_.Sync(console_.id, active_area, dual_.Active(), snapshot.can_fast_forward, fast_toggle_,
+                view_ == View::Closed && !snapshot.external);
+    svc.player->SetTouch(touch_.State());
     if (view_ == View::Closed) {
         FeedPads();
     }
@@ -532,9 +537,11 @@ bool PlayerScreen::OnEvent(const input::Event& event) {
         }
         return true;
     }
-    const bool touch = event.type == Type::PointerDown || event.type == Type::PointerMove ||
-                       event.type == Type::PointerUp || event.type == Type::Wheel;
-    if (touch && phase_ == Phase::Running) {
+    const bool pointer = event.type == Type::PointerDown || event.type == Type::PointerMove ||
+                         event.type == Type::PointerUp;
+    const bool finger = event.type == Type::FingerDown || event.type == Type::FingerMove ||
+                        event.type == Type::FingerUp;
+    if ((pointer || finger || event.type == Type::Wheel) && phase_ == Phase::Running) {
         const bool menu_here = view_ != View::Closed && !menu_second_;
         if (swapped_ && !menu_here) {
             // The game is on the other display: this window shows the quick settings.
@@ -549,30 +556,8 @@ bool PlayerScreen::OnEvent(const input::Event& event) {
         // The game has the input: only the way into the menu is left.
         const bool menu = event.type == Type::Nav && !event.repeat &&
                           (event.nav == Nav::Back || event.nav == Nav::Menu || event.nav == Nav::Home);
-        const bool pointer = event.type == Type::PointerDown || event.type == Type::PointerMove ||
-                             event.type == Type::PointerUp;
-        if (pointer) {
-            // The picture is a touch screen for the consoles that have one; the corner is the
-            // way into the menu without a pad or a keyboard.
-            const float scale = Svc().canvas->Scale();
-            const float x = event.x / scale, y = event.y / scale;
-            if (TabPressed(event, area_, scale)) {
-                return true;
-            }
-            if (event.type == Type::PointerDown && x < MENU_CORNER && y < MENU_CORNER) {
-                pointer_down_ = false;
-                OpenMenu();
-                return true;
-            }
-            if (dual_.Active()) {
-                // Two screens: the touch goes to wherever the touch screen is drawn.
-                dual_.Pointer(event, x, y);
-                return true;
-            }
-            if (event.type != Type::PointerMove) {
-                pointer_down_ = event.type == Type::PointerDown;
-            }
-            Svc().player->SetPointer(x, y, pointer_down_);
+        if (finger || (pointer && !event.touch_synthetic)) {
+            HandlePlayTouch(event, MENU_CORNER);
         }
         if (menu) {
             OpenMenu();

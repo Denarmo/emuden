@@ -19,12 +19,40 @@ namespace den::app {
 namespace {
 
 constexpr const char* TEXT_SCALE_KEY = "ui.text_scale";
+constexpr const char* ORIENTATION_KEY = "ui.orientation";
 constexpr const char* VOLUME_KEY = "player.volume"; // 0..1, read by the player when a game opens
 constexpr float TEXT_SCALES[] = {0.9f, 1.0f, 1.15f, 1.3f};
+constexpr const char* ORIENTATIONS[] = {"auto", "landscape", "portrait"};
 
 ui::Theme g_scaled;
 const ui::Theme* g_base = nullptr;
 float g_scale = 1.0f;
+int g_orientation = -1;
+
+int OrientationIndex(std::string_view value) {
+    if (value == "landscape") {
+        return 1;
+    }
+    if (value == "portrait") {
+        return 2;
+    }
+    return 0;
+}
+
+void ApplyOrientation() {
+    Services& svc = Svc();
+    if (!svc.settings || !svc.window || pal::GetCaps().windowed) {
+        return;
+    }
+    const int idx = OrientationIndex(svc.settings->GetString(ORIENTATION_KEY, "auto"));
+    if (idx == g_orientation) {
+        return;
+    }
+    g_orientation = idx;
+    const pal::Orientation mode = idx == 1 ? pal::Orientation::Landscape
+                                           : (idx == 2 ? pal::Orientation::Portrait : pal::Orientation::Auto);
+    svc.window->SetOrientation(mode);
+}
 
 void ApplyTextScale() {
     Services& svc = Svc();
@@ -77,6 +105,13 @@ std::vector<ui::RowSpec> DisplayRows() {
             [](bool on) { SetFullscreen(on); });
         fullscreen.description = "F11 switches too";
         rows.push_back(std::move(fullscreen));
+    } else {
+        rows.push_back(ChoiceRow(
+            ORIENTATION_KEY, "Orientation", {"Auto", "Landscape", "Portrait"},
+            [] { return OrientationIndex(Svc().settings->GetString(ORIENTATION_KEY, "auto")); },
+            [](int index) {
+                Svc().settings->SetString(ORIENTATION_KEY, ORIENTATIONS[std::clamp(index, 0, 2)]);
+            }));
     }
     return rows;
 }
@@ -94,6 +129,7 @@ std::vector<ui::RowSpec> AudioRows() {
 } // namespace
 
 DEN_REGISTER_FRAME(ApplyTextScale);
+DEN_REGISTER_FRAME(ApplyOrientation);
 DEN_REGISTER_SETTINGS(10, "Display", DisplayRows);
 DEN_REGISTER_SETTINGS(20, "Audio", AudioRows);
 

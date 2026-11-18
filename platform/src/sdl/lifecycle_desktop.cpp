@@ -75,6 +75,14 @@ void LifecycleBeforeInit() {
 
 void LifecycleAfterInit() {}
 
+SafeInsets PlatformSafeInsets() {
+    return {};
+}
+
+void SetPlatformOrientation(Orientation) {}
+
+void HapticTick() {}
+
 bool MainWindowHidden() {
     return false;
 }

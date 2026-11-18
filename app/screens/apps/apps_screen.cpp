@@ -48,7 +48,8 @@ public:
         AppGridOptions options;
         options.id_prefix = "apps";
         options.query = query_;
-        options.width = width_ - (in_game_ ? svc.theme->margin * 2 : RailWidth(width_) + svc.theme->margin * 2);
+        options.width = in_game_ ? width_ - svc.theme->margin * 2
+                                 : RailContentWidth(width_, PageHeight(), svc.theme->margin);
         options.on_open = [this](const system::AppItem& app) {
             OpenApp(app.id, in_game_, *Svc().stage);
         };

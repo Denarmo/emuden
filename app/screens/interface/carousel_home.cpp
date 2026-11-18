@@ -20,6 +20,7 @@
 #include "game_views.h"
 #include "object_shelf.h"
 #include "den/app/app.h"
+#include "den/app/frame.h"
 #include "den/app/registry.h"
 #include "den/base/files.h"
 #include "den/platform/pal.h"
@@ -110,7 +111,11 @@ public:
         BuildTabs();
         ui::Node& root = Root();
         root.axis = ui::Axis::Column;
-        root.SetPadding(theme_.margin, 18);
+        const Services::SafePadding safe = SafeMargins();
+        root.pad_left = theme_.margin + safe.left;
+        root.pad_right = theme_.margin + safe.right;
+        root.pad_top = std::max(18.0f, safe.top + 8.0f);
+        root.pad_bottom = std::max(18.0f, safe.bottom + 8.0f);
         root.gap = 6;
 
         ui::Node* bar = root.Add(ui::MakeBox(ui::Axis::Row, 10));

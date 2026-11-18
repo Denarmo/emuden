@@ -46,6 +46,8 @@ public:
     /// A press on the main display, in the canvas's units. True when it was for the swap
     /// button and not for the game.
     bool Pointer(const input::Event& event, float x, float y);
+    /// Multi-touch aware variant tracking independent finger IDs.
+    bool PointerFinger(std::uint64_t finger, input::Event::Type type, float x, float y);
     void Swap();
 
     /// The rows of the pause menu's "Screens" page.
@@ -55,7 +57,7 @@ public:
 
 private:
     void DrawSecond(ui::Context& ctx, const gfx::Rect& area);
-    void Touch(int display, input::Event::Type type, float x, float y);
+    void Touch(int display, std::uint64_t finger, input::Event::Type type, float x, float y);
     void Note();
 
     std::vector<player::GameScreen> screens_;
@@ -66,6 +68,8 @@ private:
     std::array<std::array<gfx::Rect, 2>, 2> rects_{};
     gfx::Rect button_;
     gfx::Rect room_;
+    bool finger_active_ = false;
+    std::uint64_t held_finger_ = 0;
     int held_display_ = -1; // the display a finger is down on
     int held_screen_ = -1;
     double pressed_at_ = 0;

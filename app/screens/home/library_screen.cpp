@@ -111,7 +111,7 @@ public:
             Svc().stage->Push("details", {{"id", game.id}});
         };
         options.on_focus = [this](const library::Entry& game) { selected_ = game.id; };
-        const float room = width_ - RailWidth(width_) - svc.theme->margin * 2 - 10;
+        const float room = RailContentWidth(width_, PageHeight(), svc.theme->margin) - 10;
         ui::Node* grid = AddGameGrid(content, games, GridColumns(room), options);
         grid->id = "library.grid";
     }

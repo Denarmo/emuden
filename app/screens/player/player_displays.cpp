@@ -15,6 +15,7 @@
 #include "den/app/strings.h"
 #include "den/app/apps_catalog.h"
 #include "den/app/beside.h"
+#include "den/app/frame.h"
 #include "den/app/second_screen.h"
 #include "den/base/log.h"
 #include "den/platform/lifecycle.h"
@@ -158,6 +159,7 @@ void PlayerScreen::StopDisplays() {
     if (g_current == this) {
         g_current = nullptr;
     }
+    touch_.Stop();
     held_ = false;
     if (second_down_) {
         second_down_ = false;
@@ -286,16 +288,20 @@ void PlayerScreen::DrawGameLayer(ui::Context& ctx, const gfx::Rect& area, bool m
     const player::Snapshot snapshot = svc.player->GetSnapshot();
     // The picture pages leave the game as it is, beside the menu: it is what is being chosen.
     const bool choosing = menu_here && (view_ == View::Picture || view_ == View::PictureAdjust);
-    const gfx::Rect room = choosing ? PlaceMenu(area, true).room : area;
+    const bool portrait_deck = touch_.PortraitActive(area) && !choosing;
+    const gfx::Rect room = choosing ? PlaceMenu(area, true).room : (portrait_deck ? touch_.GameRoom() : area);
     // A black frame of black frame insertion: the game's place stays black on this display,
     // and the second display shows its screen as always.
     const bool black = snapshot.bfi_black && !swapped_;
     svc.black_frame = black;
+    if (portrait_deck && !black) {
+        touch_.DrawShell(ctx);
+    }
     if (dual_.Active()) {
         // Each screen at its own size; what the second display shows is drawn by its own frame.
         const bool integer = size_ == ScreenSize::PixelPerfect ||
                              svc.settings->GetBool("player.integer_scale", false);
-        dual_.DrawMain(ctx, room, integer, view_ == View::Closed, black);
+        dual_.DrawMain(ctx, room, integer, view_ == View::Closed && !touch_.Visible(), black);
     } else if (!black) {
         const Placement placement = Place(size_, room, snapshot.frame_width, snapshot.frame_height,
                                           snapshot.aspect, canvas.Scale());
@@ -305,7 +311,18 @@ void PlayerScreen::DrawGameLayer(ui::Context& ctx, const gfx::Rect& area, bool m
         }
         svc.player->Draw(canvas, placement.area);
     }
-    DrawOverlays(ctx, area, snapshot);
+    const Services::SafePadding safe = SafeMargins();
+    const float room_bottom = portrait_deck ? touch_.GameRoom().Bottom() - area.y : area.h;
+    const gfx::Rect overlay_room{
+        area.x + safe.left,
+        area.y + safe.top,
+        std::max(100.0f, area.w - safe.left - safe.right),
+        std::max(100.0f, room_bottom - safe.top - (portrait_deck ? 0.0f : safe.bottom)),
+    };
+    DrawOverlays(ctx, overlay_room, snapshot);
+    if (touch_.Visible() && !choosing) {
+        touch_.DrawControls(ctx, black);
+    }
     if (!menu_here && Beside().WantsTab()) {
         DrawTab(ctx, area);
     }
@@ -314,6 +331,52 @@ void PlayerScreen::DrawGameLayer(ui::Context& ctx, const gfx::Rect& area, bool m
             canvas.FillRect(area, ctx.theme->scrim);
         }
         DrawMenu(ctx, area);
+    }
+}
+
+void PlayerScreen::HandlePlayTouch(const input::Event& event, float menu_corner) {
+    using Type = input::Event::Type;
+    const bool is_finger =
+        event.type == Type::FingerDown || event.type == Type::FingerMove || event.type == Type::FingerUp;
+    const float scale = Svc().canvas->Scale();
+    const float x = event.x / scale, y = event.y / scale;
+    if (!is_finger && TabPressed(event, area_, scale)) {
+        return;
+    }
+    const TouchPad::InputAction action = touch_.HandleEvent(event, scale);
+    if (action.open_menu) {
+        pointer_down_ = false;
+        OpenMenu();
+        return;
+    }
+    if (action.toggle_fast) {
+        fast_toggle_ = !fast_toggle_;
+        return;
+    }
+    if (action.swap_screens) {
+        dual_.Swap();
+        return;
+    }
+    if (action.consumed) {
+        return;
+    }
+    const bool down = event.type == Type::FingerDown || event.type == Type::PointerDown;
+    if (!touch_.Visible() && down && x < menu_corner && y < menu_corner) {
+        pointer_down_ = false;
+        OpenMenu();
+        return;
+    }
+    if (dual_.Active()) {
+        const std::uint64_t fid = is_finger ? event.finger : 0xFFFFFFFFFFFFFFFEULL;
+        dual_.PointerFinger(fid, event.type, x, y);
+        return;
+    }
+    if (event.type == Type::PointerDown || event.type == Type::PointerUp ||
+        event.type == Type::FingerDown || event.type == Type::FingerUp) {
+        pointer_down_ = down;
+        Svc().player->SetPointer(x, y, pointer_down_);
+    } else if (event.type == Type::PointerMove || event.type == Type::FingerMove) {
+        Svc().player->SetPointer(x, y, is_finger ? true : pointer_down_);
     }
 }
 

@@ -13,6 +13,7 @@
 #include "den/app/frame.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
+#include "den/app/touch_settings.h"
 #include "den/ui/glyphs.h"
 
 namespace den::app {
@@ -105,6 +106,9 @@ std::vector<ui::RowSpec> ControllerRows() {
         [] { Svc().stage->Push("controller_glyphs"); });
     active.description = "Follow the device used last. Select to see every symbol";
     rows.push_back(std::move(active));
+    for (ui::RowSpec& row : TouchSettingRows()) {
+        rows.push_back(std::move(row));
+    }
     return rows;
 }
 

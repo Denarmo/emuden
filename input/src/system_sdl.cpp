@@ -380,6 +380,7 @@ struct System::Impl {
             event.x = e.button.x * Density();
             event.y = e.button.y * Density();
             event.down = pointer_down;
+            event.touch_synthetic = e.button.which == SDL_TOUCH_MOUSEID;
             out.push_back(event);
             break;
         }
@@ -391,14 +392,36 @@ struct System::Impl {
             event.dx = e.motion.xrel * Density();
             event.dy = e.motion.yrel * Density();
             event.down = pointer_down;
+            event.touch_synthetic = e.motion.which == SDL_TOUCH_MOUSEID;
             out.push_back(event);
             break;
         }
         case SDL_EVENT_FINGER_DOWN:
-            if (kind == DeviceKind::TouchOnly && pads.empty()) {
+        case SDL_EVENT_FINGER_MOTION:
+        case SDL_EVENT_FINGER_UP:
+        case SDL_EVENT_FINGER_CANCELED: {
+            if (e.type == SDL_EVENT_FINGER_DOWN && kind == DeviceKind::TouchOnly && pads.empty()) {
                 ChooseStartHints();
             }
+            int pw = 0, ph = 0;
+            if (window) {
+                SDL_GetWindowSizeInPixels(window, &pw, &ph);
+            }
+            if (pw > 0 && ph > 0) {
+                Event event;
+                event.type = e.type == SDL_EVENT_FINGER_DOWN   ? Event::Type::FingerDown
+                           : e.type == SDL_EVENT_FINGER_MOTION ? Event::Type::FingerMove
+                                                               : Event::Type::FingerUp;
+                event.finger = static_cast<std::uint64_t>(e.tfinger.fingerID);
+                event.x = e.tfinger.x * static_cast<float>(pw);
+                event.y = e.tfinger.y * static_cast<float>(ph);
+                event.dx = e.tfinger.dx * static_cast<float>(pw);
+                event.dy = e.tfinger.dy * static_cast<float>(ph);
+                event.down = e.type == SDL_EVENT_FINGER_DOWN || e.type == SDL_EVENT_FINGER_MOTION;
+                out.push_back(event);
+            }
             break;
+        }
         case SDL_EVENT_MOUSE_WHEEL: {
             Event event;
             event.type = Event::Type::Wheel;

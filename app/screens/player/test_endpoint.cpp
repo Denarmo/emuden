@@ -37,6 +37,7 @@
 #include "den/base/log.h"
 #include "den/gfx/gl.h"
 #include "dual_screen.h"
+#include "touch_pad.h"
 
 namespace den::app {
 
@@ -325,6 +326,8 @@ void Pump() {
             reply = PlayerJson();
         } else if (command == "screens") {
             reply = DualScreenJson();
+        } else if (command == "touchpad") {
+            reply = TouchPadJson();
         } else if (command == "bfi") {
             Trace& trace = endpoint.trace;
             if (trace.request) {

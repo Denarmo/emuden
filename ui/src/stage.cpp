@@ -382,9 +382,10 @@ void Stage::Frame(Context& ctx) {
         const gfx::Rect area{0, 0, canvas.Width(), canvas.Height() - (immersive ? 0 : HINT_BAR_HEIGHT)};
         page->Draw(ctx, area);
         if (!immersive) {
-            // Side panels (the rail) run down beside the hint bar.
+            // Side panels (the rail) run down beside the hint bar; bottom rails do not.
             for (const auto& child : page->Root().Children()) {
-                if (child->chrome && child->background.a > 0) {
+                if (child->chrome && child->background.a > 0 &&
+                    child->rect.w < area.w * 0.6f && child->rect.h >= area.h * 0.5f) {
                     canvas.FillRect({child->rect.x, area.h, child->rect.w, HINT_BAR_HEIGHT}, child->background);
                 }
             }

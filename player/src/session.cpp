@@ -50,6 +50,9 @@ Status PlayerSession::Fail(std::string message) {
 
 Status PlayerSession::Open(const OpenRequest& request) {
     Close();
+    touch_ = TouchState{};
+    last_pad0_ = RetroPad{};
+    held_buttons_ = 0;
     snapshot_ = Snapshot{};
     snapshot_.game_id = request.game_id;
     return Start(request);
@@ -185,6 +188,9 @@ void PlayerSession::Close() {
         fs::remove_all(content_cache_, ec);
         content_cache_.clear();
     }
+    touch_ = TouchState{};
+    last_pad0_ = RetroPad{};
+    held_buttons_ = 0;
     snapshot_ = Snapshot{};
 }
 
@@ -253,19 +259,68 @@ void PlayerSession::Resume() {
     }
 }
 
+void PlayerSession::PushPort0Input(const RetroPad& base) {
+    if (!core_) {
+        return;
+    }
+    RetroPad mapped = base;
+    mapped.buttons |= touch_.buttons;
+    if (touch_.lt > 0.35f) {
+        mapped.buttons |= (1u << 12);
+    }
+    if (touch_.rt > 0.35f) {
+        mapped.buttons |= (1u << 13);
+    }
+    auto to_axis = [](float v) {
+        return static_cast<std::int16_t>(std::clamp(v, -1.0f, 1.0f) * 32767.0f);
+    };
+    if (touch_.lx * touch_.lx + touch_.ly * touch_.ly > 0.0025f) {
+        if (PadTraitsOf(system_).digital_only) {
+            constexpr float THRESH = 0.45f;
+            if (touch_.ly < -THRESH) mapped.buttons |= (1u << 4);
+            if (touch_.ly > THRESH) mapped.buttons |= (1u << 5);
+            if (touch_.lx < -THRESH) mapped.buttons |= (1u << 6);
+            if (touch_.lx > THRESH) mapped.buttons |= (1u << 7);
+        }
+        mapped.lx = to_axis(touch_.lx);
+        mapped.ly = to_axis(touch_.ly);
+    }
+    if (touch_.rx * touch_.rx + touch_.ry * touch_.ry > 0.0025f) {
+        mapped.rx = to_axis(touch_.rx);
+        mapped.ry = to_axis(touch_.ry);
+    }
+    if (StoreLocalInput(0, mapped)) {
+        return;
+    }
+    mapped.buttons |= held_buttons_;
+    core_->SetButtons(0, mapped.buttons);
+    if (!snapshot_.game_buttons.empty()) {
+        snapshot_.game_buttons[0] = mapped.buttons;
+    }
+    core_->SetAnalog(0, 0, mapped.lx, mapped.ly);
+    core_->SetAnalog(0, 1, mapped.rx, mapped.ry);
+}
+
+void PlayerSession::SetTouch(const TouchState& touch) {
+    touch_ = touch;
+    PushPort0Input(last_pad0_);
+}
+
 void PlayerSession::SetPad(int port, const input::PadState& pad) {
     if (!core_ || port < 0 || port >= static_cast<int>(MAX_PORTS)) {
         return;
     }
     const auto family = std::min(static_cast<std::size_t>(pad.family), button_maps_.size() - 1);
     RetroPad mapped = MapPad(pad, system_, button_maps_[family]);
+    if (port == 0) {
+        last_pad0_ = mapped;
+        PushPort0Input(mapped);
+        return;
+    }
     if (StoreLocalInput(port, mapped)) {
         return;
     }
     const auto index = static_cast<unsigned>(port);
-    if (index == 0) {
-        mapped.buttons |= held_buttons_;
-    }
     core_->SetButtons(index, mapped.buttons);
     if (index < snapshot_.game_buttons.size()) {
         snapshot_.game_buttons[index] = mapped.buttons;

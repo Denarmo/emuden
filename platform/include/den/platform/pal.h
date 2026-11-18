@@ -37,6 +37,12 @@ Status Init();
 void Shutdown();
 const Caps& GetCaps();
 
+struct SafeInsets {
+    int left = 0, top = 0, right = 0, bottom = 0;
+};
+
+enum class Orientation { Auto, Landscape, Portrait };
+
 struct WindowDesc {
     std::string title = "EmuDEN";
     int width = 1280;
@@ -57,6 +63,11 @@ public:
     virtual void PixelSize(int& width, int& height) const = 0;
     /// Pixels per logical unit of the display the window is on (1.0 at 96 dpi).
     virtual float DisplayScale() const = 0;
+    /// Pixels from each window edge covered by display cutouts or system gesture bars.
+    virtual SafeInsets SafeArea() const {
+        return {};
+    }
+    virtual void SetOrientation(Orientation) {}
     virtual void Swap() = 0;
     virtual void SetVsync(bool on) = 0;
     virtual void SetFullscreen(bool on) = 0;

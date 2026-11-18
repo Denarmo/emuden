@@ -79,32 +79,41 @@ bool DrawRailIcon(gfx::Canvas& canvas, const std::string& route, float x, float 
     return true;
 }
 
-// A rail entry of the slim rail: the picture over a short caption.
+// A rail entry of the slim or bottom rail: the picture over a short caption.
 class RailIcon final : public ui::Node {
 public:
-    RailIcon(std::string route, std::string text) : route_(std::move(route)), text_(std::move(text)) {
+    RailIcon(std::string route, std::string text, bool bottom = false)
+        : route_(std::move(route)), text_(std::move(text)), bottom_(bottom) {
         focusable = true;
         label = text_;
-        height = 58;
+        height = bottom_ ? 54.0f : 58.0f;
+        if (bottom_) {
+            grow = 1.0f;
+        }
     }
     bool selected = false;
 
 protected:
     void DrawContent(ui::Context& ctx) override {
         const ui::Theme& theme = *ctx.theme;
-        ctx.canvas->FillRect(rect, selected || focused ? theme.panel_strong : theme.panel, theme.radius);
-        const gfx::Rect box{rect.CenterX() - 12, rect.y + 8, 24, 24};
+        const bool lit = selected || focused;
+        if (lit || !bottom_) {
+            ctx.canvas->FillRect(rect, lit ? theme.panel_strong : theme.panel, theme.radius);
+        }
+        const gfx::Rect box{rect.CenterX() - 12, rect.y + (bottom_ ? 6.0f : 8.0f), 24, 24};
         if (!DrawRailIcon(*ctx.canvas, route_, box.x, box.y, theme.fg) && !text_.empty()) {
             // An entry a feature added without a picture: its initial in a ring.
             ctx.canvas->StrokeRect(box.Inset(1), theme.fg, 2, 11);
             ui::DrawTextIn(ctx, box, text_.substr(0, 1), theme.text_small, gfx::FONT_BOLD, theme.fg, ui::Align::Center);
         }
-        ui::DrawTextIn(ctx, gfx::Rect{rect.x + 2, rect.y + 35, rect.w - 4, 16}, ui::Translate(text_), 12,
-                       selected || focused ? gfx::FONT_BOLD : gfx::FONT_REGULAR, theme.fg, ui::Align::Center);
+        ui::DrawTextIn(ctx, gfx::Rect{rect.x + 2, rect.y + (bottom_ ? 32.0f : 35.0f), rect.w - 4, 16},
+                       ui::Translate(text_), bottom_ ? 11 : 12, lit ? gfx::FONT_BOLD : gfx::FONT_REGULAR,
+                       theme.fg, ui::Align::Center);
     }
 
 private:
     std::string route_, text_;
+    bool bottom_ = false;
 };
 
 // A square with a chevron pointing back, for a finger.
@@ -137,11 +146,19 @@ std::function<void()> GoTo(const std::string& route, const std::string& current)
     };
 }
 
-// A page built with the other rail than its width now asks for is built again.
+// A page built with the other rail (full, slim or bottom) than its size asks for is built again.
 void FollowWidth() {
     ui::Page* page = Svc().stage ? Svc().stage->Top() : nullptr;
     ui::Node* rail = page ? page->Root().FindById("rail") : nullptr;
-    if (rail && rail->Parent() == &page->Root() && rail->width != RailWidth(PageWidth())) {
+    if (!rail || rail->Parent() != &page->Root()) {
+        return;
+    }
+    const float w = PageWidth();
+    const float h = PageHeight();
+    const bool bottom = BottomRail(w, h);
+    const bool was_bottom = rail->axis == ui::Axis::Row;
+    if (bottom != was_bottom || (!bottom && rail->width != RailWidth(w, h)) ||
+        (bottom && rail->height != BOTTOM_RAIL_HEIGHT + SafeMargins().bottom)) {
         page->Rebuild();
     }
 }
@@ -153,11 +170,80 @@ float PageWidth() {
     return svc.canvas && svc.canvas->Width() > 0 ? svc.canvas->Width() : 1280.0f;
 }
 
+float PageHeight() {
+    const Services& svc = Svc();
+    return svc.canvas && svc.canvas->Height() > 0 ? svc.canvas->Height() : 720.0f;
+}
+
+Services::SafePadding SafeMargins() {
+    return Svc().safe;
+}
+
 ui::Node* BuildRailFrame(ui::Page& page, const std::string& title) {
     const ui::Theme& theme = *Svc().theme;
+    const float width = PageWidth();
+    const float height = PageHeight();
+    const Services::SafePadding safe = SafeMargins();
+    const bool bottom = BottomRail(width, height);
+    const bool slim = !bottom && SlimRail(width);
+
     ui::Node& root = page.Root();
-    root.axis = ui::Axis::Row;
-    const bool slim = SlimRail(PageWidth());
+    root.axis = bottom ? ui::Axis::Column : ui::Axis::Row;
+
+    ui::Node* content = nullptr;
+    auto add_content = [&] {
+        content = root.Add(ui::MakeBox(ui::Axis::Column, 16));
+        content->id = "content";
+        content->grow = 1;
+        content->pad_left = theme.margin + (bottom ? safe.left : 0.0f);
+        content->pad_top = std::max(slim || bottom ? 20.0f : 28.0f, safe.top + 8.0f);
+        if (!title.empty()) {
+            content->Emplace<ui::Label>(title, slim || bottom ? theme.text_title - 4 : theme.text_title,
+                                        gfx::FONT_BOLD);
+        }
+    };
+
+    auto add_rail_entries = [&](ui::Node* rail) {
+        const auto& entries = Registry::Get().Rail();
+        for (const RailEntry& entry : entries) {
+            ui::Node* item = nullptr;
+            if (bottom || slim) {
+                auto* icon = rail->Emplace<RailIcon>(entry.route, entry.label, bottom);
+                icon->selected = entry.route == page.Route();
+                if (bottom && entries.size() > 7) {
+                    icon->grow = 0;
+                    icon->width = 68;
+                }
+                item = icon;
+            } else {
+                auto* button = rail->Emplace<ui::Button>(entry.label);
+                button->centered = false;
+                button->selected = entry.route == page.Route();
+                item = button;
+            }
+            item->id = "rail." + entry.route;
+            item->on_activate = GoTo(entry.route, page.Route());
+        }
+    };
+
+    if (bottom) {
+        add_content();
+        ui::Node* rail = root.Add(ui::MakeBox(ui::Axis::Row, 4));
+        rail->id = "rail";
+        rail->chrome = true;
+        rail->height = BOTTOM_RAIL_HEIGHT + safe.bottom;
+        rail->background = theme.panel;
+        rail->align = ui::Align::Center;
+        rail->pad_left = 8.0f + safe.left;
+        rail->pad_right = 8.0f + safe.right;
+        rail->pad_top = 4.0f;
+        rail->pad_bottom = 4.0f + safe.bottom;
+        if (Registry::Get().Rail().size() > 7) {
+            rail->scrollable = true;
+        }
+        add_rail_entries(rail);
+        return content;
+    }
 
     ui::Node* rail = root.Add(ui::MakeBox(ui::Axis::Column, slim ? 6 : 8));
     rail->id = "rail";
@@ -166,11 +252,15 @@ ui::Node* BuildRailFrame(ui::Page& page, const std::string& title) {
     rail->background = theme.panel;
     if (slim) {
         // No room for the brand; the entries scroll when the page is short.
-        rail->SetPadding(8, 14);
+        rail->SetPadding(8 + safe.left * 0.4f, 14 + safe.top * 0.5f);
+        rail->pad_bottom = 14 + safe.bottom;
         rail->scrollable = true;
         rail->scroll_margin = 14;
     } else {
-        rail->SetPadding(16, 24);
+        rail->pad_left = 16 + safe.left;
+        rail->pad_right = 16;
+        rail->pad_top = std::max(24.0f, safe.top + 8.0f);
+        rail->pad_bottom = std::max(24.0f, safe.bottom + 8.0f);
         ui::Node* brand = rail->Add(ui::MakeBox(ui::Axis::Row, 8));
         brand->align = ui::Align::Center;
         brand->pad_left = 6;
@@ -180,53 +270,39 @@ ui::Node* BuildRailFrame(ui::Page& page, const std::string& title) {
         word->Emplace<ui::Label>("Emu", 26.0f, gfx::FONT_REGULAR);
         word->Emplace<ui::Label>("DEN", 26.0f, gfx::FONT_BOLD);
     }
-    for (const RailEntry& entry : Registry::Get().Rail()) {
-        ui::Node* item = nullptr;
-        if (slim) {
-            auto* icon = rail->Emplace<RailIcon>(entry.route, entry.label);
-            icon->selected = entry.route == page.Route();
-            item = icon;
-        } else {
-            auto* button = rail->Emplace<ui::Button>(entry.label);
-            button->centered = false;
-            button->selected = entry.route == page.Route();
-            item = button;
-        }
-        item->id = "rail." + entry.route;
-        item->on_activate = GoTo(entry.route, page.Route());
-    }
-
-    ui::Node* content = root.Add(ui::MakeBox(ui::Axis::Column, 16));
-    content->id = "content";
-    content->grow = 1;
-    content->pad_left = theme.margin;
-    content->pad_top = slim ? 20 : 28;
-    if (!title.empty()) {
-        content->Emplace<ui::Label>(title, slim ? theme.text_title - 4 : theme.text_title, gfx::FONT_BOLD);
-    }
+    add_rail_entries(rail);
+    add_content();
     return content;
 }
 
 ui::Node* BuildPlainFrame(ui::Page& page, const std::string& title) {
     const ui::Theme& theme = *Svc().theme;
+    const Services::SafePadding safe = SafeMargins();
+    const bool narrow = SlimRail(PageWidth()) || BottomRail(PageWidth(), PageHeight());
     ui::Node& root = page.Root();
     root.axis = ui::Axis::Column;
     root.gap = 16;
-    root.SetPadding(theme.margin, 28);
+    root.pad_left = theme.margin + safe.left;
+    root.pad_right = theme.margin + safe.right;
+    root.pad_top = std::max(28.0f, safe.top + 8.0f);
+    root.pad_bottom = std::max(28.0f, safe.bottom + 8.0f);
     if (!title.empty()) {
-        root.Emplace<ui::Label>(title, SlimRail(PageWidth()) ? theme.text_title - 4 : theme.text_title,
-                                gfx::FONT_BOLD);
+        root.Emplace<ui::Label>(title, narrow ? theme.text_title - 4 : theme.text_title, gfx::FONT_BOLD);
     }
     return &root;
 }
 
 ui::Node* BuildLevelFrame(ui::Page& page, const std::string& title) {
     const ui::Theme& theme = *Svc().theme;
+    const Services::SafePadding safe = SafeMargins();
+    const bool narrow = SlimRail(PageWidth()) || BottomRail(PageWidth(), PageHeight());
     ui::Node& root = page.Root();
     root.axis = ui::Axis::Column;
     root.gap = 16;
-    const bool slim = SlimRail(PageWidth());
-    root.SetPadding(theme.margin, slim ? 20 : 28);
+    root.pad_left = theme.margin + safe.left;
+    root.pad_right = theme.margin + safe.right;
+    root.pad_top = std::max(narrow ? 20.0f : 28.0f, safe.top + 8.0f);
+    root.pad_bottom = std::max(narrow ? 20.0f : 28.0f, safe.bottom + 8.0f);
     ui::Node* header = root.Add(ui::MakeBox(ui::Axis::Row, 12));
     header->align = ui::Align::Center;
     auto* back = header->Emplace<BackButton>();
@@ -235,7 +311,7 @@ ui::Node* BuildLevelFrame(ui::Page& page, const std::string& title) {
             page.GetStage().Pop();
         }
     };
-    header->Emplace<ui::Label>(title, slim ? theme.text_title - 4 : theme.text_title, gfx::FONT_BOLD);
+    header->Emplace<ui::Label>(title, narrow ? theme.text_title - 4 : theme.text_title, gfx::FONT_BOLD);
     return &root;
 }
 

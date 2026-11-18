@@ -4,6 +4,21 @@ Check records moved out of `docs/status.md` on 2026-11-16, newest first as they 
 Each says what was built and run then; the code may have changed since. What holds today is
 in `docs/status.md`. SteamOS feature by feature: `docs/steamos.md`.
 
+## Android portrait mode and console touch controls (2026-11-18)
+
+- **What was built:**
+  - Full portrait and landscape orientation support on Android (`AndroidManifest.xml` `fullUser` / four-orientation SDL hint, `EmuDenActivity.requestOrientation`, and Settings > Display `Orientation`: `Auto` / `Landscape` / `Portrait`), display cutout + mandatory system gesture inset forwarding (`EmuDenActivity.safeInsets()`, `Window::SafeArea()`), tick haptics (`HapticTick()`), short-edge physical UI scaling, a bottom navigation rail when `height > width` (keeping near-square landscape devices like 1240x1080 on the left rail), safe-padded screens, portrait stacked Details, and TouchOnly back buttons.
+  - Multi-touch SDL `FingerDown`/`FingerMove`/`FingerUp` events (`den::input::Event`), direct port-0 `TouchState` mixing (`den::player::Session::SetTouch`), multi-finger `DualScreens::PointerFinger`, and console-inspired controller specs and layouts across all 37 bundled systems (`app/logic/touch_spec.h`, `touch_consoles_*.cpp`, `touch_layout.cpp`, `touch_input.cpp`, `app/screens/player/touch_pad.*`): unoccluded lower console housings (GB, GBC, GBA, DS Lite, New 3DS, N64, GameCube, NES, SNES, Virtual Boy, PSP/PS1/PS2, Sega, Atari, Arcade, etc.) in portrait, translucent edge overlays in landscape, 8-way rolling D-pads, concave/octagonal/ball sticks, rolling face clusters, `Menu`/`FF`/`Swap` pills, and Settings/Pause rows (`On-screen controls`, `Touch control opacity`, `Touch vibration`).
+- **Compiled & unit-tested (Windows):** `tools\build.ps1 -Preset win -Test` passed 20/20 test suites (`den_app_tests` including 37-system portrait/landscape layout & multi-touch tests, `den_app_feature_includes`, `den_player_tests`, `den_input_tests`, etc.). Desktop windowed portrait smoke test (`540x1200`) verified bottom rail Home, Consoles, and Settings layouts via screenshot inspection.
+- **Measured on Xiaomi 24122RKC7G** (1080x2400, Android 16, debug APK `io.github.denarmo.emuden.next` over USB ADB):
+  - Caught and fixed virtual OEM input daemon `uinput-xiaomi` (`/dev/input/event1`, `ControllerNumber: 0`, zero motion ranges) falsely reporting a built-in gamepad in `DeviceFacts.builtInPad()`.
+  - Verified Setup, Home shelves, Library 2-column grid, Details stacked view, Display (`Orientation` -> Landscape and back), Settings > Controllers touch rows, folder picker for `/storage/emulated/0/ROMS`, cutout top spacing, and bottom 7-tab rail clearing the gesture bar without controller button hints.
+  - Verified real core execution and multi-touch input via `tools/drive.py`:
+    - **Mario Golf (GBC, mGBA)**: Grape GBC deck rendered clearly above/below screen; simultaneous `D-Pad Right + A` `finger` events verified (`game_buttons[0] = 384`, released `0`); `|| MENU` utility pill opened full-width portrait pause menu; landscape rotation switched to peripheral overlay.
+    - **Wario Land 4 (GBA, mGBA)**: Indigo AGB-001 deck with `L`/`R` bumpers; simultaneous `L + B` `finger` events verified (`game_buttons[0] = 1025`).
+    - **Pokemon - SoulSilver Version (NDS, melonDS)**: stacked top + bottom screens above Porcelain DS Lite deck; simultaneous `A` button (`game_buttons[0] = 256`) + Finger 2 on bottom DS touchscreen verified via `touchpad`, `screens`, and `player`.
+  - **Not run live on phone ROMs:** `PoPoLoCrois (Europe).iso` sat in `/storage/ROMS` root rather than a `psp/` subfolder so the shared-`.iso` library rule did not index it; the remaining 34 console layouts were verified through the `touch_tests` layout/input suite rather than per-ROM device launches.
+
 ## Black frame insertion (2026-11-16)
 
 - **What it does:** at a display rate that is a whole multiple of the game's, each game frame

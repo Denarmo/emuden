@@ -4,20 +4,26 @@
 package io.github.denarmo.emuden;
 
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
+import android.graphics.Insets;
 import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.system.Os;
 import android.util.Log;
+import android.view.DisplayCutout;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 
@@ -48,6 +54,9 @@ public class EmuDenActivity extends SDLActivity {
     private long lastBack;
     private boolean windowFocus = true;
     private boolean topResumed = true;
+    private volatile int[] safeInsets = new int[4];
+    private int orientationMode = -1;
+    private Vibrator vibrator;
 
     @Override
     protected String[] getLibraries() {
@@ -66,6 +75,15 @@ public class EmuDenActivity extends SDLActivity {
         self = this;
         super.onCreate(savedInstanceState);
         setVolumeControlStream(AudioManager.STREAM_MUSIC);
+        vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+        View decor = getWindow() != null ? getWindow().getDecorView() : null;
+        if (decor != null) {
+            decor.setOnApplyWindowInsetsListener((v, insets) -> {
+                updateSafeInsets(insets);
+                return v.onApplyWindowInsets(insets);
+            });
+            decor.requestApplyInsets();
+        }
         AppList.watch(this);
         AppBeside.watch(this);
         trapBack();
@@ -103,6 +121,10 @@ public class EmuDenActivity extends SDLActivity {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        View decor = getWindow() != null ? getWindow().getDecorView() : null;
+        if (decor != null) {
+            decor.requestApplyInsets();
+        }
         secondScreen.onConfigurationChanged();
     }
 
@@ -209,6 +231,76 @@ public class EmuDenActivity extends SDLActivity {
 
     private void tellFocus() {
         AppBeside.focus(AppBeside.MAIN, windowFocus && topResumed);
+    }
+
+    /** Called from native code (platform/src/android/lifecycle_android.cpp): safe insets in pixels. */
+    public static int[] safeInsets() {
+        EmuDenActivity activity = self;
+        if (activity == null) {
+            return new int[4];
+        }
+        View decor = activity.getWindow() != null ? activity.getWindow().getDecorView() : null;
+        if (decor != null) {
+            WindowInsets insets = decor.getRootWindowInsets();
+            if (insets != null) {
+                activity.updateSafeInsets(insets);
+            }
+        }
+        return activity.safeInsets;
+    }
+
+    private void updateSafeInsets(WindowInsets insets) {
+        if (insets == null) {
+            return;
+        }
+        int left = 0, top = 0, right = 0, bottom = 0;
+        if (Build.VERSION.SDK_INT >= 30) {
+            Insets cutout = insets.getInsets(WindowInsets.Type.displayCutout());
+            Insets gesture = insets.getInsets(WindowInsets.Type.mandatorySystemGestures());
+            left = cutout.left;
+            top = cutout.top;
+            right = cutout.right;
+            bottom = Math.max(cutout.bottom, gesture.bottom);
+        } else {
+            DisplayCutout cutout = insets.getDisplayCutout();
+            if (cutout != null) {
+                left = cutout.getSafeInsetLeft();
+                top = cutout.getSafeInsetTop();
+                right = cutout.getSafeInsetRight();
+                bottom = cutout.getSafeInsetBottom();
+            }
+        }
+        safeInsets = new int[] {left, top, right, bottom};
+    }
+
+    /** Called from native code: 0 = auto, 1 = landscape, 2 = portrait. */
+    public static void requestOrientation(int mode) {
+        EmuDenActivity activity = self;
+        if (activity == null || activity.orientationMode == mode) {
+            return;
+        }
+        activity.orientationMode = mode;
+        int requested = mode == 1 ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                : mode == 2 ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                : ActivityInfo.SCREEN_ORIENTATION_FULL_USER;
+        activity.runOnUiThread(() -> activity.setRequestedOrientation(requested));
+    }
+
+    /** Called from native code: short tactile pulse on virtual button press. */
+    public static void hapticTick() {
+        EmuDenActivity activity = self;
+        if (activity == null || activity.vibrator == null || !activity.vibrator.hasVibrator()) {
+            return;
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= 29) {
+                activity.vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK));
+            } else {
+                activity.vibrator.vibrate(VibrationEffect.createOneShot(10, 80));
+            }
+        } catch (RuntimeException e) {
+            // Ignore when battery saver or device denies vibration.
+        }
     }
 
     /** Called from native code (platform/src/android/apps_android.cpp). */

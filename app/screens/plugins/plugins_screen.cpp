@@ -80,7 +80,7 @@ public:
         selected_.clear();
         ui::Node* content = BuildRailFrame(*this, "Plugins");
         content->pad_right = svc.theme->margin;
-        const float room = RailContentWidth(width_ > 0 ? width_ : 1280.0f, svc.theme->margin);
+        const float room = RailContentWidth(width_ > 0 ? width_ : 1280.0f, PageHeight(), svc.theme->margin);
         if (!host) {
             auto* text = content->Emplace<Paragraph>(
                 "Plugins add features to EmuDEN, such as installing ROM hacks on your own games. "

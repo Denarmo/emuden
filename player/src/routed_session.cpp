@@ -34,6 +34,9 @@ public:
     void SetPad(int port, const input::PadState& pad) override {
         active_->SetPad(port, pad);
     }
+    void SetTouch(const TouchState& touch) override {
+        active_->SetTouch(touch);
+    }
     void SetPointer(float x, float y, bool pressed) override {
         active_->SetPointer(x, y, pressed);
     }

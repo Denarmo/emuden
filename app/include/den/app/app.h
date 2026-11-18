@@ -40,9 +40,18 @@ struct Services {
     std::filesystem::path data_dir;
     double fps = 0;
     bool quit = false;
+    /// Safe-area padding in logical UI units (cutout / status bar / gesture bar).
+    struct SafePadding {
+        float left = 0;
+        float top = 0;
+        float right = 0;
+        float bottom = 0;
+    };
+
     /// Pixels the app's own title bar takes at the top of the window (0 without one); the
     /// screens are drawn below it and their pointer positions start under it.
     int title_bar_px = 0;
+    SafePadding safe;
     /// The frame drawn now is a black one of black frame insertion: no screenshot is taken of it.
     bool black_frame = false;
 };

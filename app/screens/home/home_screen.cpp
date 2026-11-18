@@ -56,7 +56,7 @@ public:
         content->gap = 4;
 
         ui::Node* header = content->Add(ui::MakeBox(ui::Axis::Row, 16));
-        header->pad_right = svc.theme->margin;
+        header->pad_right = svc.theme->margin + SafeMargins().right;
         header->align = ui::Align::Center;
         name_ = header->Emplace<ui::Label>(Tr("home.title"), svc.theme->text_title, gfx::FONT_BOLD);
         name_->grow = 1;
@@ -134,7 +134,7 @@ public:
 
     void Draw(ui::Context& ctx, const gfx::Rect& area) override {
         // Behind the content only: the rail keeps its plain tint.
-        const float rail = RailWidth(ctx.canvas->Width());
+        const float rail = RailWidth(ctx.canvas->Width(), ctx.canvas->Height());
         backdrop_.Draw(ctx, gfx::Rect{rail, 0, ctx.canvas->Width() - rail, ctx.canvas->Height()});
         ui::Page::Draw(ctx, area);
     }
@@ -196,7 +196,8 @@ private:
     void BuildEmpty(ui::Node* content) {
         name_->text = Tr("home.empty_title");
         records_->text = Tr("home.empty_message");
-        ui::Node* row = content->Add(ui::MakeBox(ui::Axis::Row, 12));
+        ui::Node* row = content->Add(
+            ui::MakeBox(BottomRail(PageWidth(), PageHeight()) ? ui::Axis::Column : ui::Axis::Row, 12));
         row->pad_top = 12;
         const auto go = [&](const char* id, const std::string& text, const char* route) {
             if (!Svc().stage->HasRoute(route)) {
