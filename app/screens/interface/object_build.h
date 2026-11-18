@@ -40,8 +40,6 @@ void PaintFrom(std::vector<gfx::MeshVertex>& out, std::size_t from, gfx::Color c
 /// A console's own mould (game_moulds.cpp): gives `o` the shape, proportions and label of
 /// the mould named `style` and returns its plastic; nothing when there is no such mould.
 std::optional<gfx::Color> ApplyMould(GameObject& o, const std::string& style);
-/// Every mould's name, for reading looks.
-const std::vector<std::string>& MouldNames();
 /// The outline of the mould `o` is in; nothing when it is in none.
 std::optional<std::vector<gfx::Vec2>> MouldOutline(const GameObject& o);
 /// Builds `o` in its mould; false when it is in none.

@@ -12,11 +12,12 @@
 namespace den::app {
 
 enum class FaceKind {
-    Cover, // a box's front: margins cropped
-    Back,  // a box's back: margins cropped
-    Spine, // margins cropped, turned upright when it lies on its side
-    Cart,  // a photographed cartridge: the ground made clear, cropped to the cartridge
-    Disc,  // a disc: the ground made clear, cropped to the disc and squared
+    Cover,   // a box's front: margins cropped
+    Back,    // a box's back: margins cropped
+    Spine,   // margins cropped, turned upright when it lies on its side
+    Cart,    // a photographed cartridge: the ground made clear, cropped to the cartridge
+    Disc,    // a disc: the ground made clear (including spindle hole), cropped and squared
+    UmdDisc, // a PSP UMD: extracts the circular 60 mm disc from a caddy photo when present
 };
 
 /// Cleans `image` in place for a face of that kind. False when nothing usable is left.
@@ -24,11 +25,13 @@ bool CleanFace(gfx::ImageData& image, FaceKind kind);
 
 /// What a cleaned photograph of a cartridge tells: the plastic's colour along its edge, its
 /// width over its height, and the label, 0..1 of the picture (empty when it cannot be told:
-/// no part of the picture stands out from the plastic as a large rectangle).
+/// no part of the picture stands out from the plastic as a large rectangle), plus whether
+/// the picture appears to be a bare label scan rather than a full cartridge photo.
 struct CartReading {
     gfx::Color plastic;
     float aspect = 0;
     gfx::Rect label{0, 0, 0, 0};
+    bool label_only = false;
 };
 CartReading ReadCart(const gfx::ImageData& image);
 

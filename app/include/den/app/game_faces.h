@@ -34,6 +34,7 @@ struct LoadedFaces {
     gfx::Color plastic;
     float cart_aspect = 0;
     gfx::Rect cart_label{0, 0, 0, 0};
+    bool cart_is_label = false;
 };
 
 class FaceLoader {

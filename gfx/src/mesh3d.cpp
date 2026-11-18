@@ -64,16 +64,20 @@ void main() {
         gloss = 90.0; spec = 0.7; fresnel = 0.35;
     } else if (part == 3) {
         float r = length(v_uv - 0.5) * 2.0;
-        if (has_art(8)) {
+        if (r > 0.985) {
+            base = vec3(0.78, 0.80, 0.84);
+            gloss = 120.0; spec = 1.0; fresnel = 0.4;
+        } else if (has_art(8)) {
             vec4 d = texture(u_disc_art, clamp(v_uv, 0.0, 1.0));
-            base = mix(vec3(0.72, 0.74, 0.78), d.rgb, d.a);
-            gloss = mix(120.0, 16.0, d.a); spec = mix(1.1, 0.14, d.a);
-        } else if (r < 0.34) {
-            base = mix(vec3(0.78, 0.8, 0.84), vec3(0.62, 0.65, 0.7), smoothstep(0.30, 0.34, r));
-            gloss = 120.0; spec = 1.1; fresnel = 0.4;
+            vec3 mirror = vec3(0.76, 0.78, 0.82);
+            base = mix(mirror, d.rgb, d.a);
+            gloss = mix(130.0, 22.0, d.a); spec = mix(1.2, 0.18, d.a); fresnel = mix(0.45, 0.1, d.a);
+        } else if (r < 0.37) {
+            base = mix(vec3(0.78, 0.80, 0.84), vec3(0.66, 0.69, 0.74), smoothstep(0.35, 0.37, r));
+            gloss = 130.0; spec = 1.2; fresnel = 0.45;
         } else {
             base = u_has_tex == 1 ? cover(u_label).rgb : vec3(0.85);
-            gloss = 14.0; spec = 0.12;
+            gloss = 20.0; spec = 0.16;
         }
     } else if (part == 4) {
         base = u_shell.rgb * 0.42;
@@ -157,12 +161,38 @@ void main() {
     } else if (part == 14) {
         vec4 p = has_art(4) ? texture(u_cart_art, u_cart_uv.xy + clamp(v_uv, 0.0, 1.0) * u_cart_uv.zw) : vec4(0.0);
         base = mix(u_shell.rgb, p.rgb, p.a);
-        gloss = 36.0; spec = 0.3;
+        gloss = 36.0; spec = 0.32; fresnel = 0.16;
         vec2 s = (v_uv - u_sticker.xy) / max(u_sticker.zw, vec2(0.0001));
         if (u_has_tex == 1 && u_sticker.z > 0.0 && all(greaterThanEqual(s, vec2(0.0))) && all(lessThanEqual(s, vec2(1.0)))) {
             base = texture(u_tex, u_label.xy + s * u_label.zw).rgb;
-            gloss = 8.0; spec = 0.06;
+            gloss = 8.0; spec = 0.06; fresnel = 0.0;
         }
+    } else if (part == 20 || part == 21) {
+        if (part == 20) {
+            base = has_art(2) ? texture(u_spine_art, clamp(v_uv, 0.0, 1.0)).rgb
+                 : u_has_tex == 1 ? cover(u_spine).rgb * 0.94 : u_shell.rgb * 0.94;
+        } else {
+            base = has_art(1) ? texture(u_back_art, clamp(v_uv, 0.0, 1.0)).rgb : u_shell.rgb * 0.94;
+        }
+        float g = grain(v_uv * 900.0) - 0.5;
+        base *= 1.0 + g * 0.05;
+        gloss = 38.0; spec = 0.24; fresnel = 0.15;
+        if (u_foil == 1 && part == 20) {
+            float k = dot(base, vec3(0.333));
+            vec3 rainbow = 0.5 + 0.5 * cos(6.2832 * (v_uv.x * 1.3 + v_uv.y * 0.7 + n.x * 1.6 + n.y + vec3(0.0, 0.33, 0.67)));
+            base = mix(base, base * 0.55 + rainbow * 0.6, 0.35 * k + 0.12);
+            gloss = 70.0; spec = 0.9; fresnel = 0.6;
+        }
+    } else if (part == 22) {
+        float r = length(v_uv - 0.5) * 2.0;
+        float ridge = 0.05 * sin(r * 90.0);
+        base = vec3(0.84, 0.88, 0.94) + vec3(ridge);
+        gloss = 140.0; spec = 1.3; fresnel = 0.85; alpha = 0.22;
+    } else if (part == 23) {
+        float r = length(v_uv - 0.5) * 2.0;
+        vec3 rainbow = 0.5 + 0.5 * cos(6.2832 * (r * 2.2 + n.x * 0.6 + vec3(0.0, 0.33, 0.67)));
+        base = mix(vec3(0.06, 0.06, 0.08), rainbow, 0.18);
+        gloss = 130.0; spec = 1.25; fresnel = 0.65;
     }
     vec3 key = normalize(vec3(-0.45, 0.6, 0.66));
     vec3 fill = normalize(vec3(0.8, 0.05, 0.45));
@@ -322,7 +352,7 @@ void Renderer3D::Target(int width, int height) {
     gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, static_cast<int>(gl::CLAMP_TO_EDGE));
     gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, static_cast<int>(gl::CLAMP_TO_EDGE));
     gl::BindRenderbuffer(gl::RENDERBUFFER, depth_);
-    gl::RenderbufferStorage(gl::RENDERBUFFER, gl::DEPTH_COMPONENT16, fbo_w_, fbo_h_);
+    gl::RenderbufferStorage(gl::RENDERBUFFER, gl::DEPTH_COMPONENT24, fbo_w_, fbo_h_);
     gl::BindFramebuffer(gl::FRAMEBUFFER, fbo_);
     gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D, color_, 0);
     gl::FramebufferRenderbuffer(gl::FRAMEBUFFER, gl::DEPTH_ATTACHMENT, gl::RENDERBUFFER, depth_);

@@ -49,8 +49,40 @@ struct StyleDefaults {
 };
 
 constexpr StyleDefaults STYLES[] = {
-    {"pocket", 0.877f, 0.12f, {0.105f, 0.3f, 0.79f, 0.6f}, 5, "foil"},
+    {"pocket", 0.877f, 0.115f, {0.105f, 0.28f, 0.79f, 0.57f}, 5, "foil"},
 };
+
+gfx::Rect ClampStickerRect(gfx::Rect r) {
+    if (r.y < 0.018f) {
+        const float trim = 0.018f - r.y;
+        r.y = 0.018f;
+        r.h = std::max(0.05f, r.h - trim);
+    }
+    if (r.y + r.h > 0.982f) {
+        r.h = std::max(0.05f, 0.982f - r.y);
+    }
+    return r;
+}
+
+std::vector<gfx::Vec2> PocketOutline(float a) {
+    const float x = a * 0.5f, rt = 0.045f, rb = 0.02f;
+    const float notch_x = x - 0.11f * a, notch_y = 0.37f;
+    constexpr float PI = 3.14159265f;
+    std::vector<gfx::Vec2> pts;
+    const auto arc = [&](float cx, float cy, float r, float from, float to, int steps) {
+        for (int i = 0; i <= steps; ++i) {
+            const float ang = from + (to - from) * static_cast<float>(i) / steps;
+            pts.push_back({cx + std::cos(ang) * r, cy + std::sin(ang) * r});
+        }
+    };
+    arc(x - rb, -0.5f + rb, rb, -PI * 0.5f, 0.0f, 5);
+    pts.push_back({x, notch_y});
+    pts.push_back({notch_x, notch_y});
+    pts.push_back({notch_x, 0.5f});
+    arc(-x + rt, 0.5f - rt, rt, PI * 0.5f, PI, 5);
+    arc(-x + rb, -0.5f + rb, rb, PI, PI * 1.5f, 5);
+    return pts;
+}
 
 } // namespace
 
@@ -71,7 +103,7 @@ gfx::Vec2 Centre(const GameObject& o, const gfx::Rect& r) {
 // or foil when it has one.
 void AddSticker(std::vector<gfx::MeshVertex>& out, const GameObject& o, float z) {
     const float a = o.aspect;
-    const gfx::Rect c = o.CoverRect();
+    const gfx::Rect c = ClampStickerRect(o.CoverRect());
     const gfx::Vec2 cc = Centre(o, c);
     if (o.label_edge == "none") {
         SlabParts parts = All(Part::Paper);
@@ -81,8 +113,9 @@ void AddSticker(std::vector<gfx::MeshVertex>& out, const GameObject& o, float z)
         return;
     }
     const Part edge = o.label_edge == "foil" ? Part::Steel : Part::Paper;
-    const gfx::Vec2 sc = Centre(o, o.label);
-    gfx::AddSlab(out, RoundedOutline(o.label.w * a, o.label.h, 0.01f, 0.01f), 0.004f, 0.0012f, All(edge), z + 0.002f,
+    const gfx::Rect lbl = ClampStickerRect(o.label);
+    const gfx::Vec2 sc = Centre(o, lbl);
+    gfx::AddSlab(out, RoundedOutline(lbl.w * a, lbl.h, 0.01f, 0.01f), 0.004f, 0.0012f, All(edge), z + 0.002f,
                  sc.x, sc.y, 2);
     gfx::AddSlab(out, RoundedOutline(c.w * a, c.h, 0, 0), 0.0015f, 0, All(Part::Label), z + 0.0045f, cc.x, cc.y, 0);
 }
@@ -178,44 +211,54 @@ void BuildCartridge(Built& b, const GameObject& o) {
     AddBack(b.solid, o, true);
 }
 
-// A Game Boy's cartridge after the real mould: the top corners stepped down with grip ridges
-// on them, a sunk panel along the top, the label in a sunk well and an arrow under it. (The
-// Game Boy Advance's is in game_moulds.cpp.)
+// A Game Boy DMG cartridge after the real mould: asymmetric top-right power notch, upper side
+// grip ridges, a sunk pill panel along the top, the label in a sunk well and an arrow under it.
 void BuildPocket(Built& b, const GameObject& o) {
-    const float a = o.aspect, d = o.depth, face = d * 0.5f, z = face + 0.002f;
+    const float a = o.aspect, d = o.depth, face = d * 0.5f;
+    const float z = face + (o.photo ? 0.0012f : 0.002f);
     auto& shell = b.Shell(o);
     const Part part = ShellPart(o);
-    const float shoulder = a * 0.105f, drop = 0.035f;
-    gfx::AddSlab(shell, gfx::ShoulderedOutline(a, 1, shoulder, drop, 0.01f, 0.022f, 0.02f), d,
-                 std::min(0.012f, d * 0.2f), All(part));
+    const Part relief = o.photo ? Part::Photo : part;
+    const float photo_w = o.photo ? a : 0.0f;
+    SlabParts slab = All(part);
+    if (o.photo) {
+        slab.front = Part::Photo;
+        slab.bevel = Part::Photo;
+        slab.back = Part::Back;
+    }
+    gfx::AddSlab(shell, PocketOutline(a), d, std::min(0.012f, d * 0.2f), slab);
     const gfx::Rect& l = o.label;
     const gfx::Vec2 lc = Centre(o, l);
     const float margin = 0.022f, label_top = 0.5f - l.y, label_bottom = 0.5f - (l.y + l.h);
     const float well_top = label_top + margin, well_bottom = -0.5f + 0.035f;
     gfx::AddGroove(shell, RoundedOutline(l.w * a + 2 * margin, well_top - well_bottom, 0.03f, 0.03f), 0.012f, z, lc.x,
-                   (well_top + well_bottom) * 0.5f, part);
+                   (well_top + well_bottom) * 0.5f, relief, false, photo_w);
     // The arrow under the label, pointing the way in.
     const float ay = (label_bottom + well_bottom) * 0.5f;
-    gfx::AddGroove(shell, {{0, ay - 0.02f}, {0.05f, ay + 0.02f}, {-0.05f, ay + 0.02f}}, 0.014f, z, 0, 0, part);
-    // The panel along the top, round-ended.
-    const float top = 0.5f - 0.045f, bottom = well_top + 0.035f, px = a * 0.5f - shoulder - 0.03f;
+    gfx::AddGroove(shell, {{0, ay - 0.02f}, {0.05f, ay + 0.02f}, {-0.05f, ay + 0.02f}}, 0.014f, z, 0, 0, relief, false,
+                   photo_w);
+    // The sunken pill panel along the top.
+    const float top = 0.5f - 0.045f, bottom = well_top + 0.04f, px = a * 0.5f - a * 0.135f - 0.02f;
     const float r = (top - bottom) * 0.5f;
-    gfx::AddGroove(shell, RoundedOutline(2 * px, top - bottom, r, r, 0, 10), 0.014f, z, 0, (top + bottom) * 0.5f, part);
-    // Grip ridges on both stepped corners.
+    gfx::AddGroove(shell, RoundedOutline(2 * px, top - bottom, r, r, 0, 10), 0.014f, z, -a * 0.03f,
+                   (top + bottom) * 0.5f, relief, false, photo_w);
+    // Grip ridges along the upper left and right edges, below the DMG notch.
     const int ridges = std::clamp(o.grip, 0, 8);
-    const float rw = shoulder + 0.03f;
+    const float rw = a * 0.105f;
     for (int i = 0; i < ridges; ++i) {
-        const float y = 0.5f - drop - 0.03f - static_cast<float>(i) * 0.03f;
+        const float y = 0.345f - static_cast<float>(i) * 0.024f;
         for (const float side : {-1.0f, 1.0f}) {
-            gfx::AddGroove(shell, RoundedOutline(rw, 0.012f, 0.004f, 0.004f), 0.006f, z,
-                           side * (a * 0.5f - rw * 0.5f - 0.012f), y, part);
+            gfx::AddGroove(shell, RoundedOutline(rw, 0.011f, 0.004f, 0.004f), 0.005f, z,
+                           side * (a * 0.5f - rw * 0.5f - 0.012f), y, relief, false, photo_w);
         }
     }
-    AddSticker(b.solid, o, face);
+    if (!o.photo) {
+        AddSticker(b.solid, o, face);
+        AddBack(b.solid, o, true);
+    }
     if (o.smoke) {
         AddBoard(b.solid, o, false);
     }
-    AddBack(b.solid, o, true);
 }
 
 void BuildCard(std::vector<gfx::MeshVertex>& out, const GameObject& o) {
@@ -237,68 +280,108 @@ void BuildCard(std::vector<gfx::MeshVertex>& out, const GameObject& o) {
     }
 }
 
-// A cartridge or card from its photograph: the moulded body, the photo for a front and the
-// back's picture behind; the photo shows the relief and the label as they really are.
+// A cartridge or card from its photograph when it has no console mould.
 void BuildPhoto(Built& b, const GameObject& o) {
     const float a = o.aspect, d = o.depth;
     SlabParts parts = All(Part::Shell);
     parts.front = Part::Photo;
+    parts.bevel = Part::Photo;
     parts.back = Part::Back;
     const std::optional<std::vector<gfx::Vec2>> mould = MouldOutline(o);
     const std::vector<gfx::Vec2> outline =
-        mould                      ? *mould
-        : o.style == "pocket"      ? gfx::ShoulderedOutline(a, 1, a * 0.105f, 0.035f, 0.01f, 0.022f, 0.02f)
-                                   : RoundedOutline(a, 1, o.radius, std::max(0.02f, o.radius), o.notch);
+        mould                 ? *mould
+        : o.style == "pocket" ? PocketOutline(a)
+                              : RoundedOutline(a, 1, o.radius, std::max(0.02f, o.radius), o.notch);
     gfx::AddSlab(b.solid, outline, d, std::min(0.012f, d * 0.2f), parts);
 }
 
-// A cardboard box: the cover printed on its front, the back's and spine's pictures on theirs.
+// A cardboard box: the cover printed on its front, satin paper grain on back and spine.
 void BuildCarton(std::vector<gfx::MeshVertex>& out, const GameObject& o) {
     SlabParts parts = All(Part::Shell);
     parts.front = Part::Print;
-    parts.back = Part::Back;
-    parts.spine = Part::Spine;
-    const float r = o.radius > 0 ? o.radius : 0.006f;
-    gfx::AddSlab(out, RoundedOutline(o.aspect, 1, r, r), o.depth, std::min(0.004f + r * 0.3f, o.depth * 0.3f), parts, 0,
-                 0, 0, r > 0.01f ? 4 : 2);
+    parts.back = Part::CartonBack;
+    parts.spine = Part::CartonSpine;
+    const float r = o.radius > 0 ? o.radius : 0.005f;
+    gfx::AddSlab(out, RoundedOutline(o.aspect, 1, r, r), o.depth, std::min(0.004f + r * 0.25f, o.depth * 0.25f), parts,
+                 0, 0, 0, r > 0.01f ? 4 : 2);
+    gfx::AddBox(out, o.aspect * 0.94f, 0.0025f, 0.004f, Part::Dark, 0, 0.499f, o.depth * 0.34f);
+    gfx::AddBox(out, o.aspect * 0.94f, 0.0025f, 0.004f, Part::Dark, 0, -0.499f, o.depth * 0.34f);
 }
 
-void BuildCase(std::vector<gfx::MeshVertex>& out, const GameObject& o) {
+void BuildCase(Built& b, const GameObject& o) {
     const float a = o.aspect, d = o.depth;
-    SlabParts parts = All(Part::Shell);
-    parts.front = Part::Gloss;
-    parts.back = Part::Back;
-    parts.spine = Part::Spine;
-    gfx::AddSlab(out, RoundedOutline(a, 1, o.radius, o.radius), d, std::min(0.014f, d * 0.3f), parts);
+    const float r = o.radius > 0 ? o.radius : 0.025f;
+    const float bevel = std::min(0.012f, d * 0.25f);
+    if (o.smoke) {
+        gfx::AddSlab(b.clear, RoundedOutline(a, 1, r, r), d, bevel, All(Part::Smoke));
+    } else {
+        gfx::AddSlab(b.solid, RoundedOutline(a, 1, r, r), d, bevel, All(Part::Shell));
+        // Opening seam and recessed thumb-catch notch along the right wall.
+        gfx::AddBox(b.solid, 0.002f, 0.94f, 0.010f, Part::Dark, a * 0.5f - 0.0005f, 0, 0);
+        gfx::AddBox(b.solid, 0.008f, 0.14f, d * 0.52f, Part::Dark, a * 0.5f - 0.002f, 0, 0);
+    }
+    const float rim_y = 0.018f, rim_right = 0.022f;
+    const float sw = std::max(0.1f, a - rim_right + 0.0015f), sh = 1.0f - 2.0f * rim_y;
+    const float sx = -rim_right * 0.5f - 0.00075f;
+    SlabParts sleeve = All(Part::Shell);
+    sleeve.front = Part::Gloss;
+    sleeve.back = Part::Back;
+    sleeve.spine = Part::Spine;
+    gfx::AddSlab(b.solid, RoundedOutline(sw, sh, r * 0.5f, r * 0.5f), d + 0.003f, std::min(0.006f, d * 0.12f), sleeve,
+                 0, sx, 0, 3);
     // The crease of the sleeve along the hinge.
-    gfx::AddBox(out, 0.005f, 0.955f, 0.002f, Part::Dark, -a * 0.5f + 0.032f, 0, d * 0.5f + 0.0005f);
+    gfx::AddBox(b.solid, 0.004f, sh * 0.985f, 0.0015f, Part::Dark, -a * 0.5f + 0.028f, 0, d * 0.5f + 0.0018f);
+    // Clear outer protective sleeve over the paper insert.
+    gfx::AddSlab(b.clear, RoundedOutline(sw + 0.001f, sh + 0.001f, r * 0.5f, r * 0.5f), d + 0.005f,
+                 std::min(0.006f, d * 0.12f), All(Part::Clear), 0, sx, 0, 2);
 }
 
-void BuildJewel(std::vector<gfx::MeshVertex>& out, const GameObject& o) {
+void BuildJewel(Built& b, const GameObject& o) {
     const float a = o.aspect, d = o.depth;
-    const float hinge = a * 0.055f;
-    // The black tray at the back and the printed inlay under the lid.
+    const float r = o.radius > 0 ? o.radius : 0.012f;
+    const float hinge = o.full_inlay ? a * 0.028f : a * 0.095f;
+    // The black tray at the back and the left ribbed spine strip under the lid.
     SlabParts tray = All(Part::Dark);
     tray.back = Part::Back;
-    gfx::AddSlab(out, RoundedOutline(a * 0.99f, 0.99f, 0.01f, 0.01f), d * 0.6f, 0.006f, tray, -d * 0.2f);
-    SlabParts inlay = All(Part::Paper);
-    inlay.front = Part::Label;
-    gfx::AddSlab(out, RoundedOutline(a - hinge - 0.03f, 0.95f, 0, 0), 0.003f, 0, inlay, d * 0.5f - 0.016f,
-                 hinge * 0.5f + 0.004f, 0);
-    // The hinge, with the spine insert showing on its side.
+    tray.spine = Part::Spine;
+    gfx::AddSlab(b.solid, RoundedOutline(a * 0.995f, 0.995f, r, r), d * 0.58f, 0.005f, tray, -d * 0.21f);
     SlabParts spine = All(Part::Dark);
     spine.spine = Part::Spine;
-    gfx::AddSlab(out, RoundedOutline(hinge, 1, 0.01f, 0.01f), d, 0.008f, spine, 0, -a * 0.5f + hinge * 0.5f, 0);
+    gfx::AddSlab(b.solid, RoundedOutline(hinge, 0.995f, r, r), d * 0.62f, 0.004f, spine, -d * 0.19f,
+                 -a * 0.5f + hinge * 0.5f, 0);
+    if (!o.full_inlay && hinge > 0.04f) {
+        constexpr int RIBS = 6;
+        const float pitch = (hinge - 0.02f) / RIBS;
+        for (int i = 0; i < RIBS; ++i) {
+            const float rx = -a * 0.5f + 0.01f + pitch * (i + 0.5f);
+            gfx::AddGroove(b.solid, RoundedOutline(pitch * 0.45f, 0.94f, 0.002f, 0.002f), pitch * 0.18f,
+                           d * 0.12f + 0.001f, rx, 0, Part::Dark, true);
+        }
+    }
+    // Printed front booklet inside the tray.
+    SlabParts inlay = All(Part::Paper);
+    inlay.front = Part::Label;
+    gfx::AddSlab(b.solid, RoundedOutline(a - hinge - 0.022f, 0.955f, 0, 0), 0.005f, 0, inlay, d * 0.10f,
+                 hinge * 0.5f + 0.003f, 0, 0);
+    // Flush clear acrylic lid and hinge tabs.
+    gfx::AddSlab(b.clear, RoundedOutline(a, 1.0f, r, r), d * 0.42f, 0.006f, All(Part::Clear), d * 0.29f);
+    for (const float side : {-1.0f, 1.0f}) {
+        gfx::AddBox(b.clear, 0.008f, 0.045f, d * 0.85f, Part::Clear, -a * 0.5f - 0.003f, side * 0.38f, 0);
+    }
 }
 
-void BuildDisc(std::vector<gfx::MeshVertex>& out, float depth, bool hack = false) {
-    gfx::AddRing(out, 0.075f, 0.5f, depth, Part::DiscPrint, Part::DiscData);
+void BuildDisc(Built& b, float depth, bool hack = false, bool mini = false, bool dark = false) {
+    const float r_hole = mini ? 0.094f : 0.0625f;
+    const float r_hub = mini ? 0.23f : 0.165f;
+    const Part data_side = dark ? Part::DiscDataDark : Part::DiscData;
+    gfx::AddRing(b.solid, r_hub, 0.5f, depth, Part::DiscPrint, data_side);
+    gfx::AddRing(b.clear, r_hole, r_hub + 0.003f, depth * 1.05f, Part::DiscHub, Part::DiscHub);
     if (hack) {
         // On the print near the rim, turning with the disc.
         GameObject spot;
         spot.aspect = 1;
         spot.label = {0.3f, 0.06f, 0.4f, 0.4f};
-        AddHackSticker(out, spot, depth * 0.5f - 0.007f);
+        AddHackSticker(b.solid, spot, depth * 0.5f - 0.007f);
     }
 }
 
@@ -320,7 +403,7 @@ struct Meshes {
 // stays valid for the rest of its frame; all are freed while the GL context still exists.
 constexpr std::size_t MESH_CACHE_SIZE = 128;
 std::map<std::string, Meshes> g_meshes;
-std::unique_ptr<gfx::Mesh3D> g_disc_meshes[2];
+Meshes g_disc_meshes[8];
 Meshes g_umd;
 std::uint64_t g_frame = 0;
 
@@ -339,39 +422,38 @@ void TrimMeshes() {
 DEN_REGISTER_FRAME(TrimMeshes);
 DEN_REGISTER_SHUTDOWN([] {
     g_meshes.clear();
-    g_disc_meshes[0].reset();
-    g_disc_meshes[1].reset();
+    for (Meshes& m : g_disc_meshes) {
+        m = {};
+    }
     g_umd = {};
 });
 
 const Meshes& MeshesFor(const GameObject& o) {
-    const std::string key =
-        std::format("{} {} {} {} {} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {} {}", o.shape, o.style,
-                    o.label_edge, o.smoke, o.photo, o.aspect, o.depth, o.label.x, o.label.y, o.label.w, o.label.h, o.radius,
-                    o.notch, o.grip, o.hack);
+    const std::string key = std::format(
+        "{} {} {} {} {} {} {} {} {} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {} {}", o.shape, o.style,
+        o.label_edge, o.smoke, o.photo, o.case_box, o.full_inlay, o.mini_disc, o.dark_disc, o.aspect, o.depth,
+        o.label.x, o.label.y, o.label.w, o.label.h, o.radius, o.notch, o.grip, o.hack);
     Meshes& meshes = g_meshes[key];
     meshes.used = g_frame;
     if (!meshes.solid) {
         Built b;
-        if (o.photo) {
-            BuildPhoto(b, o);
-        } else if (o.shape == "carton") {
+        if (o.shape == "carton") {
             BuildCarton(b.solid, o);
         } else if (o.shape == "disc") {
-            BuildDisc(b.solid, o.depth);
+            BuildDisc(b, o.depth, o.hack, o.mini_disc, o.dark_disc);
         } else if (BuildMould(b, o)) {
         } else if (o.shape == "cartridge" && o.style != "plain") {
             BuildPocket(b, o);
+        } else if (o.photo) {
+            BuildPhoto(b, o);
         } else if (o.shape == "cartridge") {
             BuildCartridge(b, o);
         } else if (o.shape == "card") {
             BuildCard(b.solid, o);
         } else if (o.shape == "jewel") {
-            BuildJewel(b.solid, o);
-            gfx::AddSlab(b.clear, RoundedOutline(o.aspect, 1, o.radius, o.radius), o.depth * 0.26f, 0.008f,
-                         All(Part::Clear), o.depth * 0.5f - o.depth * 0.13f);
+            BuildJewel(b, o);
         } else {
-            BuildCase(b.solid, o);
+            BuildCase(b, o);
         }
         if (o.hack && (o.shape == "cartridge" || o.shape == "card")) {
             AddHackSticker(b.solid, o, o.depth * 0.5f);
@@ -411,7 +493,7 @@ GameObject Resolve(const ObjectLook& look) {
     o.aspect = look.aspect > 0 ? look.aspect : o.aspect;
     o.depth = look.depth > 0 ? look.depth : o.depth;
     o.shell = look.has_shell ? look.shell : mould_shell.value_or(shape->shell);
-    o.smoke = o.shell.a < 250 && (o.shape == "cartridge" || o.shape == "card");
+    o.smoke = o.shell.a < 250 && (o.shape == "cartridge" || o.shape == "card" || o.shape == "case");
     o.shell.a = o.smoke ? std::max<std::uint8_t>(o.shell.a, 60) : 255;
     o.label = look.label.w > 0 ? look.label : o.label;
     o.label_edge = look.label_edge.empty() ? o.label_edge : look.label_edge;
@@ -428,19 +510,43 @@ GameObject Resolve(const ObjectLook& look) {
 
 GameObject GameObject::Carton(float cover_aspect) const {
     GameObject o;
-    o.shape = "carton";
-    o.aspect = std::round(std::clamp(cover_aspect > 0 ? cover_aspect : box_aspect, 0.4f, 2.0f) * 100.0f) / 100.0f;
-    o.depth = 0.2f;
-    // Plastic cases (DS, 3DS, Game Boy Advance) are thinner, with rounded corners; cardboard
-    // boxes are square-cornered.
+    const float raw_aspect = cover_aspect > 0 ? cover_aspect : box_aspect;
     if (style == "nds" || style == "n3ds") {
-        o.depth = 0.085f;
-        o.radius = 0.03f;
-    } else if (style == "pocket_wide") {
-        o.depth = 0.1f;
-        o.radius = 0.02f;
-    } else if (style == "pocket") {
-        o.depth = 0.16f;
+        o.shape = "case";
+        o.case_box = true;
+        o.aspect = std::round(std::clamp(raw_aspect, 0.9f, 1.25f) * 100.0f) / 100.0f;
+        o.depth = 0.095f;
+        o.radius = 0.025f;
+        o.shell = style == "n3ds" ? gfx::Color{240, 240, 244, 255} : gfx::Color{40, 42, 48, 255};
+        return o;
+    }
+    if (style == "switch") {
+        o.shape = "case";
+        o.case_box = true;
+        o.aspect = std::round(std::clamp(raw_aspect, 0.55f, 0.72f) * 100.0f) / 100.0f;
+        o.depth = 0.068f;
+        o.radius = 0.025f;
+        o.shell = gfx::Color{200, 40, 50, 255};
+        return o;
+    }
+    if (style == "megadrive" || style == "mastersystem" || style == "32x") {
+        o.shape = "case";
+        o.case_box = true;
+        o.aspect = std::round(std::clamp(raw_aspect, 0.62f, 0.85f) * 100.0f) / 100.0f;
+        o.depth = 0.145f;
+        o.radius = 0.022f;
+        o.shell = gfx::Color{24, 25, 30, 255};
+        return o;
+    }
+    o.shape = "carton";
+    o.aspect = std::round(std::clamp(raw_aspect, 0.4f, 2.0f) * 100.0f) / 100.0f;
+    if (style == "nes" || style == "atari" || style == "atari5200" || style == "jaguar" ||
+        style == "colecovision" || style == "intellivision" || style == "vectrex") {
+        o.depth = 0.135f;
+    } else if (style == "snes" || style == "n64" || style == "virtualboy") {
+        o.depth = 0.23f;
+    } else {
+        o.depth = 0.18f;
     }
     o.shell = gfx::Color{236, 234, 228, 255};
     return o;
@@ -459,9 +565,21 @@ GameObject GameObject::WithPhoto(gfx::Color plastic, float photo_aspect) const {
 
 GameObject GameObject::WithCover(float cover_aspect) const {
     GameObject o = *this;
-    // A jewel case's inlay leaves room for the hinge; a keep case's sleeve covers its front.
-    const float wanted = shape == "jewel" ? cover_aspect + 0.09f : cover_aspect;
-    o.aspect = std::round(std::clamp(wanted, aspect * 0.82f, aspect * 1.2f) * 100.0f) / 100.0f;
+    if (shape == "jewel") {
+        if (cover_aspect < 0.80f) {
+            // Longbox jewel cases (Saturn / PS1) have tall covers with a left hinge spine.
+            const float wanted = cover_aspect + 0.065f;
+            o.aspect = std::round(std::clamp(wanted, 0.58f, 1.30f) * 100.0f) / 100.0f;
+            o.depth = 0.09f;
+            o.full_inlay = false;
+        } else {
+            o.full_inlay = cover_aspect >= 1.06f;
+            const float wanted = o.full_inlay ? cover_aspect + 0.03f : cover_aspect + 0.095f;
+            o.aspect = std::round(std::clamp(wanted, 0.58f, 1.30f) * 100.0f) / 100.0f;
+        }
+        return o;
+    }
+    o.aspect = std::round(std::clamp(cover_aspect, aspect * 0.82f, aspect * 1.2f) * 100.0f) / 100.0f;
     return o;
 }
 
@@ -482,20 +600,19 @@ const gfx::Mesh3D* GameObject::ClearMesh() const {
     return MeshesFor(*this).clear.get();
 }
 
-const gfx::Mesh3D* GameObject::DiscMesh() const {
-    if (!disc) {
-        return nullptr;
-    }
-    std::unique_ptr<gfx::Mesh3D>& mesh = g_disc_meshes[hack ? 1 : 0];
-    if (!mesh) {
-        std::vector<gfx::MeshVertex> vertices;
-        BuildDisc(vertices, 0.012f, hack);
-        mesh = Upload(vertices);
-    }
-    return mesh.get();
-}
-
 namespace {
+
+const Meshes& DiscMeshes(const GameObject& o) {
+    const std::size_t idx = (o.hack ? 1u : 0u) | (o.mini_disc ? 2u : 0u) | (o.dark_disc ? 4u : 0u);
+    Meshes& meshes = g_disc_meshes[idx];
+    if (!meshes.solid) {
+        Built b;
+        BuildDisc(b, 0.012f, o.hack, o.mini_disc, o.dark_disc);
+        meshes.solid = Upload(b.solid);
+        meshes.clear = Upload(b.clear);
+    }
+    return meshes;
+}
 
 const Meshes& Umd() {
     if (!g_umd.solid) {
@@ -508,6 +625,14 @@ const Meshes& Umd() {
 }
 
 } // namespace
+
+const gfx::Mesh3D* GameObject::DiscMesh() const {
+    return disc ? DiscMeshes(*this).solid.get() : nullptr;
+}
+
+const gfx::Mesh3D* GameObject::DiscClearMesh() const {
+    return disc ? DiscMeshes(*this).clear.get() : nullptr;
+}
 
 const gfx::Mesh3D* GameObject::UmdMesh() const {
     return umd ? Umd().solid.get() : nullptr;

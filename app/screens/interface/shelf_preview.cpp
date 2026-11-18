@@ -24,6 +24,8 @@ public:
         height = h;
         const auto console = Svc().plugins->FindConsole(game_.system);
         look_ = Resolve(spec.LookFor(game_.system, console ? console->group : std::string()).object);
+        look_.mini_disc = game_.system == "gamecube";
+        look_.dark_disc = game_.system == "psx";
         object_ = look_;
         if (look_.box) {
             box_ = look_.Carton(0);
@@ -63,11 +65,19 @@ protected:
         };
         const gfx::Mat4 cart = model(CartPieceOf(h, object_, box));
         const gfx::Material look = ShelfMaterial(ctx, game_, object_, faces, false, box != nullptr);
+        const gfx::Mat4 box_model = box != nullptr ? model(BoxPieceOf(h, object_)) : gfx::Mat4{};
+        const gfx::Material box_look =
+            box != nullptr ? ShelfMaterial(ctx, game_, *box, faces, true, true) : gfx::Material{};
         renderer->Begin(canvas, gfx::Rect{rect.x - rect.w * 0.1f, rect.y, rect.w * 1.2f, rect.h});
         if (box != nullptr) {
-            renderer->Draw(box->Mesh(), model(BoxPieceOf(h, object_)), ShelfMaterial(ctx, game_, *box, faces, true, true));
+            renderer->Draw(box->Mesh(), box_model, box_look);
         }
         renderer->Draw(object_.Mesh(), cart, look);
+        if (box != nullptr) {
+            if (const gfx::Mesh3D* box_clear = box->ClearMesh()) {
+                renderer->DrawClear(*box_clear, box_model, box_look);
+            }
+        }
         if (const gfx::Mesh3D* lid = object_.ClearMesh()) {
             renderer->DrawClear(*lid, cart, look);
         }

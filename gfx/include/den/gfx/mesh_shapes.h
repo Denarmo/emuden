@@ -52,7 +52,7 @@ void AddRing(std::vector<MeshVertex>& out, float r_in, float r_out, float depth,
 /// normals slope like the walls of a pocket sunk into the face (or of a ridge standing out
 /// of it when `raised`), so the light picks it out without cutting the face.
 void AddGroove(std::vector<MeshVertex>& out, const std::vector<Vec2>& outline, float width, float z, float cx = 0,
-               float cy = 0, Part part = Part::Shell, bool raised = false);
+               float cy = 0, Part part = Part::Shell, bool raised = false, float photo_width = 0);
 
 /// A box centred on (cx, cy, cz) with sharp edges; every face is `part`.
 void AddBox(std::vector<MeshVertex>& out, float w, float h, float d, Part part, float cx = 0, float cy = 0,

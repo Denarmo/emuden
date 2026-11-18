@@ -149,6 +149,9 @@ Result<std::vector<InterfaceSpec>> ParseInterfaces(std::string_view manifest_jso
 /// The layouts this app draws.
 bool KnownLayout(std::string_view layout);
 
+/// Every console-specific cartridge/card mould name supported by the 3D builder.
+const std::vector<std::string>& MouldNames();
+
 /// "#rrggbb" or "#rrggbbaa"; nothing for anything else.
 std::optional<gfx::Color> ParseHexColor(std::string_view text);
 

@@ -54,6 +54,10 @@ enum class Part : int {
     Print = 17,    // the cover printed on cardboard: fine grain, a satin sheen, or foil
     Paint = 18,    // plastic in the vertex's own colour: u = red * 256 + green, v = blue (0..255)
     Sticker = 19,  // a small foil sticker: Material::sticker_art over a holographic sheen
+    CartonSpine = 20, // a cardboard box's spine: printed paper grain, or foil
+    CartonBack = 21,  // a cardboard box's back: printed paper grain
+    DiscHub = 22,     // a disc's clear polycarbonate inner clamping ring (transparent pass)
+    DiscDataDark = 23,// a PS1 black polycarbonate data side: dark with rainbow sheen
 };
 
 struct MeshVertex {

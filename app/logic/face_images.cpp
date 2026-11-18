@@ -64,8 +64,9 @@ bool Ground(const gfx::ImageData& im, Rgb& out) {
     return true;
 }
 
-// Makes the ground clear: every pixel of its colour that the image's edge reaches.
-void ClearGround(gfx::ImageData& im, Rgb ground) {
+// Makes the ground clear: every pixel of its colour reached from the edges (and, for discs,
+// from inside the center spindle hole), then feathers adjacent fringe pixels.
+void ClearGround(gfx::ImageData& im, Rgb ground, bool disc_center) {
     const int w = im.width, h = im.height;
     std::vector<std::uint8_t> seen(static_cast<std::size_t>(w) * h, 0);
     std::vector<int> stack;
@@ -84,6 +85,18 @@ void ClearGround(gfx::ImageData& im, Rgb ground) {
         push(0, y);
         push(w - 1, y);
     }
+    if (disc_center) {
+        const int cx = w / 2, cy = h / 2;
+        const int r = std::max(2, std::min(w, h) / 18);
+        for (int dy = -r; dy <= r; ++dy) {
+            for (int dx = -r; dx <= r; ++dx) {
+                const int x = cx + dx, y = cy + dy;
+                if (dx * dx + dy * dy <= r * r && x >= 0 && x < w && y >= 0 && y < h) {
+                    push(x, y);
+                }
+            }
+        }
+    }
     while (!stack.empty()) {
         const int i = stack.back();
         stack.pop_back();
@@ -100,6 +113,28 @@ void ClearGround(gfx::ImageData& im, Rgb ground) {
         }
         if (y + 1 < h) {
             push(x, y + 1);
+        }
+    }
+    const int feather_limit = GROUND_TOLERANCE * 3 / 2;
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            const std::size_t i = static_cast<std::size_t>(y) * w + x;
+            if (seen[i]) {
+                continue;
+            }
+            const bool touches = (x > 0 && seen[i - 1]) || (x + 1 < w && seen[i + 1]) ||
+                                 (y > 0 && seen[i - static_cast<std::size_t>(w)]) ||
+                                 (y + 1 < h && seen[i + static_cast<std::size_t>(w)]);
+            if (!touches) {
+                continue;
+            }
+            std::uint8_t* p = At(im, x, y);
+            const int d = Distance(p, ground);
+            if (d < feather_limit) {
+                const float t = static_cast<float>(std::max(0, d - GROUND_TOLERANCE)) /
+                                static_cast<float>(std::max(1, feather_limit - GROUND_TOLERANCE));
+                p[3] = static_cast<std::uint8_t>(std::min<int>(p[3], static_cast<int>(t * 180.0f)));
+            }
         }
     }
 }
@@ -133,6 +168,47 @@ void Crop(gfx::ImageData& im, int x0, int y0, int x1, int y1) {
     im.width = w;
     im.height = h;
     im.rgba = std::move(out);
+}
+
+// Extracts the circular 60 mm disc from a cropped PSP UMD caddy image when lower caddy corners
+// are opaque plastic rather than transparent circular corners.
+void ExtractUmdDiscIfCaddy(gfx::ImageData& im) {
+    const int w = im.width, h = im.height;
+    if (w < 16 || h < 16) {
+        return;
+    }
+    const int lx = std::clamp(static_cast<int>(w * 0.14f), 0, w - 1);
+    const int rx = std::clamp(static_cast<int>(w * 0.86f), 0, w - 1);
+    const int by = std::clamp(static_cast<int>(h * 0.86f), 0, h - 1);
+    if (At(im, lx, by)[3] <= 180 || At(im, rx, by)[3] <= 180) {
+        return;
+    }
+    const float cx = w * 0.5f, cy = h * 0.47f;
+    const float side = static_cast<float>(std::min(w, h));
+    const float r_out = side * 0.435f;
+    const float r_in = side * 0.085f;
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            const float d = std::hypot(static_cast<float>(x) + 0.5f - cx, static_cast<float>(y) + 0.5f - cy);
+            std::uint8_t* p = At(im, x, y);
+            if (d > r_out + 1.0f || d < r_in - 1.0f) {
+                p[3] = 0;
+            } else if (d > r_out) {
+                const float k = std::clamp(r_out + 1.0f - d, 0.0f, 1.0f);
+                p[3] = static_cast<std::uint8_t>(std::min<int>(p[3], static_cast<int>(k * 255.0f)));
+            } else if (d < r_in) {
+                const float k = std::clamp(d - (r_in - 1.0f), 0.0f, 1.0f);
+                p[3] = static_cast<std::uint8_t>(std::min<int>(p[3], static_cast<int>(k * 255.0f)));
+            }
+        }
+    }
+    const int x0 = std::clamp(static_cast<int>(std::floor(cx - r_out)), 0, w - 1);
+    const int x1 = std::clamp(static_cast<int>(std::ceil(cx + r_out)), 0, w - 1);
+    const int y0 = std::clamp(static_cast<int>(std::floor(cy - r_out)), 0, h - 1);
+    const int y1 = std::clamp(static_cast<int>(std::ceil(cy + r_out)), 0, h - 1);
+    if (x1 - x0 >= 8 && y1 - y0 >= 8) {
+        Crop(im, x0, y0, x1, y1);
+    }
 }
 
 // A quarter turn clockwise: the left edge becomes the top.
@@ -180,18 +256,25 @@ bool LongestRun(const std::vector<bool>& v, int least, int& from, int& to) {
     return best >= least;
 }
 
+int Median(std::vector<int>& values) {
+    const std::size_t mid = values.size() / 2;
+    std::nth_element(values.begin(), values.begin() + static_cast<std::ptrdiff_t>(mid), values.end());
+    return values[mid];
+}
+
 } // namespace
 
 bool CleanFace(gfx::ImageData& im, FaceKind kind) {
     if (im.width < 8 || im.height < 8) {
         return false;
     }
-    const bool object = kind == FaceKind::Cart || kind == FaceKind::Disc;
+    const bool disc = kind == FaceKind::Disc || kind == FaceKind::UmdDisc;
+    const bool object = kind == FaceKind::Cart || disc;
     Rgb ground;
     const bool clear = HasClearPixels(im);
     const bool plain = !clear && Ground(im, ground);
     if (object && plain) {
-        ClearGround(im, ground);
+        ClearGround(im, ground, disc);
     }
     int x0 = 0, y0 = 0, x1 = im.width - 1, y1 = im.height - 1;
     if (clear || (object && plain)) {
@@ -213,7 +296,10 @@ bool CleanFace(gfx::ImageData& im, FaceKind kind) {
     if (kind == FaceKind::Spine && im.width > im.height) {
         TurnClockwise(im);
     }
-    if (kind == FaceKind::Disc) {
+    if (kind == FaceKind::UmdDisc) {
+        ExtractUmdDiscIfCaddy(im);
+    }
+    if (disc) {
         Square(im);
     }
     return true;
@@ -227,29 +313,42 @@ CartReading ReadCart(const gfx::ImageData& im) {
     out.aspect = static_cast<float>(im.width) / static_cast<float>(im.height);
     // The plastic: opaque pixels in a band along the sides and the bottom, where labels are not.
     const int band = std::max(2, std::min(im.width, im.height) / 14);
-    double sum[3] = {0, 0, 0};
-    int count = 0;
+    std::vector<int> rs, gs, bs;
+    std::vector<const std::uint8_t*> edge_pixels;
+    int opaque_total = 0;
     for (int y = 0; y < im.height; ++y) {
         for (int x = 0; x < im.width; ++x) {
-            const bool edge = x < band || im.width - 1 - x < band || im.height - 1 - y < band;
             const std::uint8_t* p = At(im, x, y);
-            if (edge && p[3] > 200) {
-                for (int c = 0; c < 3; ++c) {
-                    sum[c] += p[c];
+            if (p[3] > 200) {
+                ++opaque_total;
+                const bool edge = x < band || im.width - 1 - x < band || im.height - 1 - y < band;
+                if (edge) {
+                    rs.push_back(p[0]);
+                    gs.push_back(p[1]);
+                    bs.push_back(p[2]);
+                    edge_pixels.push_back(p);
                 }
-                ++count;
             }
         }
     }
-    if (count == 0) {
+    if (edge_pixels.empty()) {
         out.aspect = 0;
         return out;
     }
-    const Rgb plastic{static_cast<int>(sum[0] / count), static_cast<int>(sum[1] / count),
-                      static_cast<int>(sum[2] / count)};
+    const Rgb plastic{Median(rs), Median(gs), Median(bs)};
     // The edge is in shadow on most photographs: a little lighter is closer to the plastic.
-    const auto lift = [](int c) { return static_cast<std::uint8_t>(std::min(255.0, c * 1.12)); };
+    const auto lift = [](int c) { return static_cast<std::uint8_t>(std::min(255.0, c * 1.10)); };
     out.plastic = gfx::Color{lift(plastic.r), lift(plastic.g), lift(plastic.b), 255};
+
+    int uniform_edge = 0;
+    for (const std::uint8_t* p : edge_pixels) {
+        if (Distance(p, plastic) <= 42) {
+            ++uniform_edge;
+        }
+    }
+    const float opaque_share =
+        static_cast<float>(opaque_total) / static_cast<float>(static_cast<std::size_t>(im.width) * im.height);
+    const float edge_uniformity = static_cast<float>(uniform_edge) / static_cast<float>(edge_pixels.size());
 
     // The label: the rows, then the columns of those rows, that are mostly not plastic.
     const auto label_pixel = [&](int x, int y) {
@@ -265,25 +364,27 @@ CartReading ReadCart(const gfx::ImageData& im) {
         rows[static_cast<std::size_t>(y)] = n > im.width * 0.5f;
     }
     int top = 0, bottom = 0, left = 0, right = 0;
-    if (!LongestRun(rows, im.height / 4, top, bottom)) {
-        return out;
-    }
-    std::vector<bool> columns(static_cast<std::size_t>(im.width));
-    for (int x = 0; x < im.width; ++x) {
-        int n = 0;
-        for (int y = top; y <= bottom; ++y) {
-            n += label_pixel(x, y) ? 1 : 0;
+    if (LongestRun(rows, im.height / 4, top, bottom)) {
+        std::vector<bool> columns(static_cast<std::size_t>(im.width));
+        for (int x = 0; x < im.width; ++x) {
+            int n = 0;
+            for (int y = top; y <= bottom; ++y) {
+                n += label_pixel(x, y) ? 1 : 0;
+            }
+            columns[static_cast<std::size_t>(x)] = n > (bottom - top + 1) * 0.6f;
         }
-        columns[static_cast<std::size_t>(x)] = n > (bottom - top + 1) * 0.6f;
+        if (LongestRun(columns, im.width / 4, left, right)) {
+            const float w = static_cast<float>(im.width), h = static_cast<float>(im.height);
+            const gfx::Rect label{left / w, top / h, (right + 1 - left) / w, (bottom + 1 - top) / h};
+            // A label is a good part of the front, never all of it.
+            if (label.w * label.h > 0.12f && label.w * label.h < 0.85f) {
+                out.label = label;
+            }
+        }
     }
-    if (!LongestRun(columns, im.width / 4, left, right)) {
-        return out;
-    }
-    const float w = static_cast<float>(im.width), h = static_cast<float>(im.height);
-    const gfx::Rect label{left / w, top / h, (right + 1 - left) / w, (bottom + 1 - top) / h};
-    // A label is a good part of the front, never all of it.
-    if (label.w * label.h > 0.12f && label.w * label.h < 0.85f) {
-        out.label = label;
+    if (opaque_share > 0.965f && edge_uniformity < 0.55f) {
+        out.label_only = true;
+        out.label = {0, 0, 0, 0};
     }
     return out;
 }

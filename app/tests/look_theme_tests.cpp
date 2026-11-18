@@ -121,4 +121,29 @@ TEST_CASE("emuden.home-layouts has the grid, list, wheel and hero looks") {
         CHECK((*looks)[i].Key() == std::string("emuden.home-layouts/") + layouts[i]);
     }
 }
+
+TEST_CASE("emuden.shelf resolves console moulds and shapes from plugin.json") {
+    const fs::path dir = PathFromUtf8(DEN_EMUDEN_PLUGINS_DIR) / "plugins/emuden.shelf";
+    const auto text = ReadTextFile(dir / "plugin.json");
+    REQUIRE(text);
+    auto spec = ParseInterface(*text, dir, MouldNames());
+    INFO(spec.error());
+    REQUIRE(spec.ok());
+    CHECK(spec->layout == "shelf3d");
+    CHECK(spec->LookFor("gbc", "nintendo").object.style == "gbc");
+    const ObjectLook sw2 = spec->LookFor("switch2", "nintendo").object;
+    CHECK(sw2.shape == "card");
+    CHECK(sw2.style == "switch");
+    CHECK(spec->LookFor("nes", "nintendo").object.style == "nes");
+    CHECK(spec->LookFor("snes", "nintendo").object.style == "snes");
+    CHECK(spec->LookFor("n64", "nintendo").object.style == "n64");
+    CHECK(spec->LookFor("sms", "sega").object.style == "mastersystem");
+    const ObjectLook ps2 = spec->LookFor("ps2", "sony").object;
+    CHECK(ps2.shape == "case");
+    CHECK(ps2.disc);
+    const ObjectLook psp = spec->LookFor("psp", "sony").object;
+    CHECK(psp.shape == "case");
+    CHECK(psp.disc);
+    CHECK(psp.umd);
+}
 #endif

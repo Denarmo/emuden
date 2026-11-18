@@ -23,11 +23,11 @@ struct Usual {
     bool disc, umd;
 };
 constexpr Usual USUAL[] = {
-    {"gb", "cartridge", "pocket", 0, false, false},       {"gbc", "cartridge", "pocket", 0, false, false},
+    {"gb", "cartridge", "pocket", 0, false, false},       {"gbc", "cartridge", "gbc", 0, false, false},
     {"gba", "cartridge", "pocket_wide", 0, false, false}, {"nds", "cartridge", "nds", 0, false, false},
     {"3ds", "cartridge", "n3ds", 0, false, false},             {"nes", "cartridge", "nes", 0, false, false},
     {"snes", "cartridge", "snes", 0, false, false},       {"n64", "cartridge", "n64", 0, false, false},
-    {"switch", "card", "", 0.68f, false, false},          {"switch2", "card", "", 0.68f, false, false},
+    {"switch", "card", "switch", 0, false, false},        {"switch2", "card", "switch", 0, false, false},
     {"genesis", "cartridge", "megadrive", 0, false, false}, {"sms", "cartridge", "mastersystem", 0, false, false},
     {"gg", "cartridge", "gamegear", 0, false, false},     {"32x", "cartridge", "32x", 0, false, false},
     {"sg1000", "card", "mycard", 0, false, false},        {"pce", "card", "hucard", 0, false, false},
@@ -73,7 +73,10 @@ GameObject MediaFor(const library::Entry& game) {
         }
     }
     look.box = false;
-    return Resolve(look);
+    GameObject out = Resolve(look);
+    out.mini_disc = game.system == "gamecube";
+    out.dark_disc = game.system == "psx";
+    return out;
 }
 
 float MediaAspect(const GameObject& media) {
@@ -109,13 +112,17 @@ void DrawMedia(ui::Context& ctx, const library::Entry& game, const GameObject& m
     if (disc != nullptr) {
         // A UMD's shell stays still; only its disc turns.
         const gfx::Material d = DiscMaterial(ctx, game, media, faces);
-        const float size = media.umd ? h / 1.12f : h;
+        const float size = (media.umd ? h / 1.12f : h) * (media.mini_disc ? 0.68f : 1.0f);
         const gfx::Mat4 at = gfx::Renderer3D::Model(pose.x, pose.bottom - h * 0.5f, 0, pose.yaw) *
                              gfx::Mat4::Scale(size, size, size);
+        const gfx::Mat4 disc_at = at * gfx::Mat4::RotateZ(pose.spin);
         if (const gfx::Mesh3D* shell = media.UmdMesh()) {
             renderer->Draw(*shell, at, d);
         }
-        renderer->Draw(*disc, at * gfx::Mat4::RotateZ(pose.spin), d);
+        renderer->Draw(*disc, disc_at, d);
+        if (const gfx::Mesh3D* hub = media.DiscClearMesh()) {
+            renderer->DrawClear(*hub, disc_at, d);
+        }
         if (const gfx::Mesh3D* window = media.UmdClearMesh()) {
             renderer->DrawClear(*window, at, d);
         }

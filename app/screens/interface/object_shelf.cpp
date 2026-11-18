@@ -21,7 +21,7 @@ constexpr float HALF_FIELD = 0.26f; // half of Renderer3D's field of view
 constexpr float PUSH_BACK = 0.45f;  // how far side objects stand behind, in object heights
 // A case's disc, across, in case heights: a tall case holds a smaller disc than a jewel case.
 float DiscSize(const GameObject& object) {
-    return std::min(0.95f, object.aspect * 0.9f);
+    return std::min(0.95f, object.aspect * 0.9f) * (object.mini_disc ? 0.68f : 1.0f);
 }
 constexpr float REFLECTION_SHARE = 0.45f; // of the object's height shows under the floor
 
@@ -36,7 +36,10 @@ const GameObject& ObjectShelf::ObjectFor(const std::string& system) const {
     }
     const auto console = Svc().plugins->FindConsole(system);
     const ConsoleLook look = spec_->LookFor(system, console ? console->group : std::string());
-    return objects_[system] = Resolve(look.object);
+    GameObject resolved = Resolve(look.object);
+    resolved.mini_disc = system == "gamecube";
+    resolved.dark_disc = system == "psx";
+    return objects_[system] = std::move(resolved);
 }
 
 const GameObject& ObjectShelf::ObjectAt(std::size_t index) const {
@@ -224,11 +227,22 @@ void ObjectShelf::DrawContent(ui::Context& ctx) {
             d.light = p.light;
         }
         if (clear) {
+            if (p.box != nullptr) {
+                if (const gfx::Mesh3D* box_clear = p.box->ClearMesh()) {
+                    renderer->DrawClear(*box_clear, place * model(p, BoxPiece(p)), MaterialFor(ctx, p, true), mirrored);
+                }
+            }
             if (const gfx::Mesh3D* lid = p.object->ClearMesh()) {
                 renderer->DrawClear(*lid, m, look, mirrored);
             }
-            if (const gfx::Mesh3D* window = disc ? p.object->UmdClearMesh() : nullptr) {
-                renderer->DrawClear(*window, at, d, mirrored);
+            if (disc != nullptr) {
+                const gfx::Mat4 disc_at = at * gfx::Mat4::RotateZ(-time * 1.6f * slide_);
+                if (const gfx::Mesh3D* hub = p.object->DiscClearMesh()) {
+                    renderer->DrawClear(*hub, disc_at, d, mirrored);
+                }
+                if (const gfx::Mesh3D* window = p.object->UmdClearMesh()) {
+                    renderer->DrawClear(*window, at, d, mirrored);
+                }
             }
             return;
         }

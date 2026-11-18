@@ -29,17 +29,23 @@ struct GameObject {
     float radius = 0, notch = 0;
     int grip = 0;
     bool disc = false;
-    bool umd = false;      // the disc is a UMD
-    bool hack = false;     // a ROM hack's: a "HACK" sticker on the cartridge or disc
-    bool box = false;      // a cardboard box stands behind the cartridge or card
+    bool umd = false;       // the disc is a UMD
+    bool mini_disc = false; // 80 mm mini-DVD (GameCube)
+    bool dark_disc = false; // black polycarbonate data side (PS1)
+    bool hack = false;      // a ROM hack's: a "HACK" sticker on the cartridge or disc
+    bool box = false;       // a box stands behind the cartridge or card
+    bool case_box = false;  // that box is a plastic keep/clamshell case, not cardboard
+    bool full_inlay = false;// jewel case cover scan includes the left spine strip
     float box_aspect = 0.9f;
 
     /// The opaque parts, one unit high, centred on the origin, front towards +z.
     const gfx::Mesh3D& Mesh() const;
-    /// The clear plastic (a jewel case's lid), drawn after the opaque parts; null for none.
+    /// The clear plastic (a jewel case's lid or clear keep case), drawn after the opaque parts; null for none.
     const gfx::Mesh3D* ClearMesh() const;
     /// The disc that slides out of a case, one unit across; null when the object has none.
     const gfx::Mesh3D* DiscMesh() const;
+    /// The clear polycarbonate clamping hub of that disc, drawn in the transparent pass.
+    const gfx::Mesh3D* DiscClearMesh() const;
     /// A UMD's shell round that disc (which turns inside it) and its clear window; null for
     /// other discs.
     const gfx::Mesh3D* UmdMesh() const;

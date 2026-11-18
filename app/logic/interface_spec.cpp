@@ -147,6 +147,16 @@ bool KnownLayout(std::string_view layout) {
            layout == "wheel" || layout == "hero";
 }
 
+const std::vector<std::string>& MouldNames() {
+    static const std::vector<std::string> names = {
+        "pocket_wide", "gbc",   "nds",     "n3ds",         "switch",       "nes",         "snes",
+        "n64",         "megadrive", "32x", "gamegear",     "mastersystem", "atari",       "atari5200",
+        "jaguar",      "lynx",  "vectrex", "colecovision", "intellivision", "neogeopocket", "wonderswan",
+        "pokemini",    "virtualboy", "hucard", "mycard",
+    };
+    return names;
+}
+
 ConsoleLook InterfaceSpec::LookFor(std::string_view system, std::string_view group) const {
     for (const std::string& key : {std::string(system), "group:" + std::string(group), std::string("*")}) {
         if (const auto it = consoles.find(key); it != consoles.end()) {

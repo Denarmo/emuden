@@ -21,7 +21,7 @@ namespace {
 
 constexpr std::size_t MAX_QUEUED = 8; // older requests are dropped and asked again when seen
 constexpr int MAX_SIDE = 1024;
-constexpr int CLEAN_VERSION = 1; // bump when CleanFace changes, so pictures are cleaned again
+constexpr int CLEAN_VERSION = 2; // bump when CleanFace changes, so pictures are cleaned again
 
 // The cleaned copy of a picture, made once under the cache (never beside the original, which
 // may sit in a read-only games folder). `image` gets the cleaned pixels when asked for. ""
@@ -96,7 +96,7 @@ LoadedFaces Load(const std::string& id, Job& job) {
     f.back = Cleaned(f.back, FaceKind::Back);
     f.spine = Cleaned(f.spine, FaceKind::Spine);
     f.cart_back = Cleaned(f.cart_back, FaceKind::Cart);
-    f.disc = Cleaned(f.disc, FaceKind::Disc);
+    f.disc = Cleaned(f.disc, (self && self->system == "psp") ? FaceKind::UmdDisc : FaceKind::Disc);
     if (gfx::ImageData cart; !f.cart.empty()) {
         f.cart = Cleaned(f.cart, FaceKind::Cart, &cart);
         if (!f.cart.empty()) {
@@ -104,6 +104,7 @@ LoadedFaces Load(const std::string& id, Job& job) {
             out.plastic = reading.plastic;
             out.cart_aspect = reading.aspect;
             out.cart_label = reading.label;
+            out.cart_is_label = reading.label_only;
         }
     }
     if (const std::optional<library::Entry> entry = library.Find(id); entry && !entry->placeholder_cover) {
