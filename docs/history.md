@@ -4,6 +4,20 @@ Check records moved out of `docs/status.md` on 2026-11-16, newest first as they 
 Each says what was built and run then; the code may have changed since. What holds today is
 in `docs/status.md`. SteamOS feature by feature: `docs/steamos.md`.
 
+## Quick settings "performance" layout (2026-11-23)
+
+- **What was built:** `companion_layouts_perf.cpp`, the `performance` layout (Quick Layouts
+  1.1.0 in emuden-plugins): the frame rate, two graphs (frame rate over the last minute,
+  frame times) and the stats beside them, small action tiles below.
+- **Windows:** `tools\build.ps1 -Preset win -Test` passed 20/20. Smoke check from the build
+  folder with a portable `user` folder, the plugin in `plugins-dev`, Golden Sun on mGBA with
+  `EMUDEN_SECOND_WINDOW=1`: at 640x480 and 1000x600 the panel showed 60 of 60 fps, both
+  graphs moving between captures, the stats lines and two rows of tiles. Upright (540x900)
+  showed no graphs at first: the side-by-side test passed while leaving them under the
+  minimum width; fixed so they stack under the numbers whenever they would not fit beside.
+- **Not run on a device:** the Retroid Pocket Duo's `emuden.next` is signed with another debug
+  key, so this build could not be installed without uninstalling it (and its data).
+
 ## Android portrait mode and console touch controls (2026-11-18)
 
 - **What was built:**

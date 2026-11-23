@@ -79,6 +79,7 @@ void BuildGridLayout(QuickContext& ctx); // companion_layouts_tiles.cpp
 void BuildDockLayout(QuickContext& ctx);
 void BuildDockDrawer(QuickContext& ctx);
 void BuildSplitLayout(QuickContext& ctx);
+void BuildPerformanceLayout(QuickContext& ctx); // companion_layouts_perf.cpp
 
 // The parts the layouts share (companion_quick_parts.cpp).
 
