@@ -31,6 +31,8 @@ constexpr float PADDING = 32;           // the page's, top and bottom
 constexpr std::size_t SAMPLES = 120;    // points of each graph
 constexpr double FPS_EVERY = 0.5;       // seconds between frame rate points: a minute in all
 constexpr float FRAME_TOP_MS = 50;      // the frame time graph's top, as the main screen's overlay
+constexpr float GRAPHS_MIN_W = 260;     // both graphs side by side, at the least
+constexpr float GRAPHS_MIN_H = 90;      // the graphs' height when stacked under the numbers
 
 // What the graphs show, sampled while the panel is drawn.
 struct History {
@@ -114,11 +116,13 @@ protected:
         gfx::Text& t = ctx.Text();
         canvas.FillRect(rect, theme.panel, theme.radius);
         const gfx::Rect inner = rect.Inset(16);
-        const bool upright = inner.w < inner.h * 1.3f;
+        // Stacked when the two graphs would not fit beside the numbers column.
+        const float column_w = std::clamp(inner.w * 0.3f, 170.0f, 300.0f);
+        const bool upright = inner.w < inner.h * 1.3f || inner.w - column_w - GAP * 1.5f < GRAPHS_MIN_W;
 
         // The numbers: a column at the left, or a band across the top.
-        const float numbers_w = upright ? inner.w : std::clamp(inner.w * 0.3f, 170.0f, 300.0f);
-        const float big = std::clamp(std::min(inner.h * 0.34f, numbers_w * 0.32f), 28.0f, 72.0f);
+        const float numbers_w = upright ? inner.w : column_w;
+        const float big = std::clamp(std::min(inner.h * (upright ? 0.22f : 0.34f), numbers_w * 0.32f), 28.0f, 72.0f);
         const float body = theme.text_body, small = theme.text_small;
         const float small_line = t.Metrics(small).line_height;
         float y = inner.y;
@@ -151,7 +155,10 @@ protected:
         if (snapshot.frame_width > 0 && !snapshot.core_name.empty()) {
             lines.push_back(std::format("{} · {}×{}", snapshot.core_name, snapshot.frame_width, snapshot.frame_height));
         }
-        const float numbers_bottom = upright ? inner.y + inner.h * 0.45f : inner.Bottom();
+        // Stacked, the lines below the big number give way to the graphs when there is no room.
+        const float lines_h = static_cast<float>(lines.size()) * (small_line + 2);
+        const float numbers_bottom =
+            upright ? std::max(y, std::min(y + lines_h, inner.Bottom() - GRAPHS_MIN_H - GAP)) : inner.Bottom();
         for (const std::string& line : lines) {
             if (y + small_line > numbers_bottom) {
                 break;
@@ -164,7 +171,7 @@ protected:
         gfx::Rect area = upright ? gfx::Rect{inner.x, numbers_bottom + GAP, inner.w, inner.Bottom() - numbers_bottom - GAP}
                                  : gfx::Rect{inner.x + numbers_w + GAP * 1.5f, inner.y, inner.w - numbers_w - GAP * 1.5f,
                                              inner.h};
-        if (area.w < 120 || area.h < 60) {
+        if (area.w < 120 || area.h < GRAPHS_MIN_H * 0.66f) {
             return;
         }
         const float half = (area.w - GAP) * 0.5f;
@@ -251,7 +258,7 @@ void BuildPerformanceLayout(QuickContext& ctx) {
     ui::Node& list = *root.Add(ui::MakeList(GAP * 0.75f));
     list.id = "companion.page";
     const float wanted = static_cast<float>(rows) * (tile_h + GAP * 0.75f);
-    list.height = std::min(wanted, (height - PADDING) * (aspect < 0.95f ? 0.5f : 0.45f));
+    list.height = std::min(wanted, (height - PADDING) * (aspect < 0.95f ? 0.4f : 0.45f));
     for (int first = 0; first < count; first += columns) {
         ui::Node* row = list.Add(ui::MakeBox(ui::Axis::Row, GAP * 0.75f));
         row->height = tile_h;
