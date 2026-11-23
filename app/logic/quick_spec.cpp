@@ -115,7 +115,7 @@ bool KnownQuickAction(std::string_view id) {
 
 bool KnownQuickLayout(std::string_view layout) {
     return layout == "standard" || layout == "grid" || layout == "compact" || layout == "dock" ||
-           layout == "split";
+           layout == "split" || layout == "performance";
 }
 
 const std::vector<std::string>& DefaultQuickActions(std::string_view layout) {
@@ -134,7 +134,7 @@ const std::vector<std::string>& DefaultQuickActions(std::string_view layout) {
     if (layout == "dock") {
         return dock;
     }
-    if (layout == "grid" || layout == "compact" || layout == "split") {
+    if (layout == "grid" || layout == "compact" || layout == "split" || layout == "performance") {
         return tiles;
     }
     return standard;

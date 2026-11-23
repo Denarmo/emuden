@@ -25,8 +25,9 @@ bool KnownQuickAction(std::string_view id);
 
 /// The layouts: "standard" (EmuDEN's own: a card with the cover and the controls, then rows
 /// one step in), "grid" (big tiles), "compact" (one column of icon rows), "dock" (a large
-/// cover with a bar of the main actions and a drawer for the rest) and "split" (controls at
-/// the left, the state slots at the right).
+/// cover with a bar of the main actions and a drawer for the rest), "split" (controls at
+/// the left, the state slots at the right) and "performance" (the frame rate and frame time
+/// graphs, small tiles under them).
 bool KnownQuickLayout(std::string_view layout);
 /// The actions a layout shows, in its order, when a plugin says nothing.
 const std::vector<std::string>& DefaultQuickActions(std::string_view layout);

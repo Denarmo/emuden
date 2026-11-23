@@ -150,7 +150,7 @@ TEST_CASE("quick actions in a layout's order, the plugin's first, those there no
     CHECK(std::find(arranged.begin(), arranged.end(), "pause") == arranged.end());
     CHECK(std::count(arranged.begin(), arranged.end(), "swap") == 1);
     // Every section stays reachable in every layout.
-    for (const char* layout : {"standard", "grid", "compact", "dock", "split"}) {
+    for (const char* layout : {"standard", "grid", "compact", "dock", "split", "performance"}) {
         INFO(layout);
         CHECK(KnownQuickLayout(layout));
         QuickSpec spec;

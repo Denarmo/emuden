@@ -58,10 +58,12 @@ const QuickLayout& FindQuickLayout(std::string_view layout) {
     static const QuickLayout grid{BuildGridLayout};
     static const QuickLayout dock{BuildDockLayout, BuildDockDrawer};
     static const QuickLayout split{BuildSplitLayout};
+    static const QuickLayout performance{BuildPerformanceLayout};
     return layout == "compact" ? compact
            : layout == "grid"  ? grid
            : layout == "dock"  ? dock
            : layout == "split" ? split
+           : layout == "performance" ? performance
                                : standard;
 }
 
