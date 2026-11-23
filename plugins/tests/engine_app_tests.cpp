@@ -195,7 +195,7 @@ TEST_CASE("the built-in engine is downloaded into the folder the engine host loo
       "version":"1.1.0","kind":"console","engine":"switch2","publisher":"EmuDEN","api":1,"needs":["engine.switch2"],
       "systems":[{"id":"switch2","name":"Nintendo Switch 2","group":"nintendo","order":0,
         "content":{"extensions":["nup"],"scanner":"switch2","zip":"no"}}],
-      "components":[{"id":"nx2","type":"engine","name":"Switch 2 engine","version":"0.0.3",
+      "components":[{"id":"nx2","type":"engine","name":"DenNX","version":"0.0.3",
         "delivery":{"test-plat":"download"},
         "downloads":{"test-plat":{"url":"https://example.org/switch2.zip","sha256":")" + HashOf(zip) +
         R"(","size":)" + std::to_string(zip.size()) + R"(,"archive":"zip"}},
@@ -246,7 +246,7 @@ TEST_CASE("a console plugin without an engine download leaves the engine to the 
       "name":"Nintendo Switch 2","version":"1.0.5","kind":"console","engine":"switch2","publisher":"EmuDEN","api":1,
       "needs":["engine.switch2"],"systems":[{"id":"switch2","name":"Nintendo Switch 2","group":"nintendo","order":0,
         "content":{"extensions":["nup"],"scanner":"switch2","zip":"no"}}],
-      "components":[{"id":"nx2","type":"engine","name":"Switch 2 engine","delivery":{"test-plat":"manual"}}]})");
+      "components":[{"id":"nx2","type":"engine","name":"DenNX","delivery":{"test-plat":"manual"}}]})");
     store::Settings settings(scratch.dir / "settings.json");
     Config config;
     config.data_dir = scratch.dir;

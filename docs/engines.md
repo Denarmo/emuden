@@ -9,14 +9,14 @@ driven from EmuDEN's own pause menu, quick settings and companion panel, like a 
 console's `cores` beside its libretro cores; it is chosen per console or per game the same way
 (`Host::CoresFor`, `SelectCore`, the game's core setting).
 
-## Switch 2: EmuDEN's own engine, downloaded like a core
+## Switch 2: DenNX, EmuDEN's own engine, downloaded like a core
 
 Switch 2 is not shipped in any release (Windows zip, AppImage, APK). Its plugin,
 `emuden.switch2`, is in the official list like every other console, and its `engine` component
 pins the engine as a download per desktop platform:
 
 ```json
-{ "id": "nx2", "type": "engine", "name": "Switch 2 engine", "version": "0.0.3",
+{ "id": "nx2", "type": "engine", "name": "DenNX", "version": "0.0.3",
   "delivery": { "windows-x86_64": "download", "linux-x86_64": "download" },
   "downloads": { "windows-x86_64": { "url": "https://...", "sha256": "...", "size": 123, "archive": "zip" } },
   "executable": { "windows-x86_64": "bin/emuden-switch2.exe" } }
