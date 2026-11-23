@@ -61,23 +61,61 @@ Status ParseExecutables(const JsonValue& component, EngineAppSpec& spec) {
     return {};
 }
 
+namespace {
+
+Status ParseEcp(const JsonValue& ecp, EngineAppSpec& spec) {
+    if (ecp.kind != JsonValue::Kind::Object) {
+        return Status::Fail("an engine's \"ecp\" descriptor is not an object");
+    }
+    spec.ecp_id = ecp.String("id");
+    spec.level = static_cast<int>(json::Number(ecp, "level", 1));
+    // Level 0: an app that is only handed the game (Android) or given it on its command line.
+    if (spec.level < 0 || spec.level > 2) {
+        return Status::Fail("an engine app has an unknown protocol level");
+    }
+    spec.capabilities = json::Strings(ecp, "capabilities", false);
+    spec.needs = json::Strings(ecp, "needs", false);
+    return {};
+}
+
+} // namespace
+
+Status ParseBuiltinEngine(const JsonValue& component, EngineAppSpec& spec) {
+    if (Status status = ParseExecutables(component, spec); !status.ok) {
+        return status;
+    }
+    // On Android the built-in engine is an app of its own, started over the protocol.
+    if (component.Find("android") != nullptr) {
+        spec.level = 2;
+        if (const JsonValue* ecp = component.Find("ecp")) {
+            if (Status status = ParseEcp(*ecp, spec); !status.ok) {
+                return status;
+            }
+        }
+        return ParseAndroidApp(component, spec);
+    }
+    return {};
+}
+
 Result<EngineAppSpec> ParseEngineApp(const JsonValue& component) {
     EngineAppSpec spec;
     const JsonValue* ecp = component.Find("ecp");
     if (ecp == nullptr || ecp->kind != JsonValue::Kind::Object) {
         return Status::Fail("an engine app has no \"ecp\" descriptor");
     }
-    spec.ecp_id = ecp->String("id");
-    spec.level = static_cast<int>(json::Number(*ecp, "level", 1));
-    // Level 0: an app that is only handed the game (Android) or given it on its command line.
-    if (spec.level < 0 || spec.level > 2) {
-        return Status::Fail("an engine app has an unknown protocol level");
+    if (Status status = ParseEcp(*ecp, spec); !status.ok) {
+        return status;
     }
-    spec.capabilities = json::Strings(*ecp, "capabilities", false);
-    spec.needs = json::Strings(*ecp, "needs", false);
     if (Status status = ParseExecutables(component, spec); !status.ok) {
         return status;
     }
+    if (Status status = ParseAndroidApp(component, spec); !status.ok) {
+        return status;
+    }
+    return spec;
+}
+
+Status ParseAndroidApp(const JsonValue& component, EngineAppSpec& spec) {
     if (const JsonValue* android = component.Find("android")) {
         spec.package = android->String("package");
         spec.cert_sha256 = NormalCertDigest(android->String("cert_sha256"));
@@ -105,7 +143,7 @@ Result<EngineAppSpec> ParseEngineApp(const JsonValue& component) {
             return Status::Fail("an engine app's store page is not an https or market address");
         }
     }
-    return spec;
+    return {};
 }
 
 bool IsAndroidKey(std::string_view platform_key) {
@@ -118,12 +156,11 @@ std::string Component::ExecutableFor(std::string_view platform_key) const {
 }
 
 bool Component::OffersPlatform(std::string_view platform_key) const {
-    if (type == TYPE_ENGINE) {
-        // The built-in engine is a program the app starts: desktop only, with its executable.
-        return !IsAndroidKey(platform_key) && DownloadFor(platform_key) != nullptr &&
-               !ExecutableFor(platform_key).empty();
+    if (type == TYPE_ENGINE && !IsAndroidKey(platform_key)) {
+        // The built-in engine is a program the app starts on the desktop, with its executable.
+        return DownloadFor(platform_key) != nullptr && !ExecutableFor(platform_key).empty();
     }
-    if (type != TYPE_ENGINE_APP) {
+    if (type != TYPE_ENGINE_APP && type != TYPE_ENGINE) {
         return DownloadFor(platform_key) != nullptr;
     }
     if (IsAndroidKey(platform_key)) {

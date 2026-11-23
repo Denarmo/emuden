@@ -266,3 +266,56 @@ TEST_CASE("a console plugin without an engine download leaves the engine to the 
     CHECK(job->State() == JobState::Done);
     CHECK_FALSE(fs::exists(scratch.dir / "engines" / "switch2"));
 }
+
+TEST_CASE("on Android the built-in engine is an engine app", "[plugins][engine-app]") {
+    ScratchDir scratch;
+    Jobs jobs(1);
+    scratch.Write("plugins/emuden.switch2/plugin.json", R"({"manifest_version":1,"id":"emuden.switch2",
+      "name":"Nintendo Switch 2","version":"1.2.0","kind":"console","engine":"switch2","publisher":"EmuDEN","api":1,
+      "needs":["engine.switch2"],"systems":[{"id":"switch2","name":"Nintendo Switch 2","group":"nintendo","order":0,
+        "content":{"extensions":["nup"],"scanner":"switch2","zip":"no"}}],
+      "components":[{"id":"nx2","type":"engine","name":"DenNX","version":"0.0.4",
+        "delivery":{"test-plat":"download","android-arm64":"download"},
+        "downloads":{"test-plat":{"url":"https://example.org/switch2.zip","sha256":")" + std::string(64, 'a') +
+        R"(","size":10,"archive":"zip"}},
+        "executable":{"test-plat":"bin/emuden-switch2.exe"},
+        "ecp":{"id":"io.github.example.dennx","level":2,"capabilities":["pause","menu"]},
+        "android":{"package":"io.github.example.dennx","cert_sha256":")" + CERT + R"(","min_version_code":5,
+          "apk":{"url":"https://example.org/dennx.apk","sha256":")" + std::string(64, 'b') +
+        R"(","size":100,"archive":"none"}}}]})");
+
+    auto parsed = ParseManifest(*ReadTextFile(scratch.dir / "plugins/emuden.switch2/plugin.json"));
+    REQUIRE(parsed);
+    const Component* desktop = parsed->EngineDownloadFor("test-plat");
+    REQUIRE(desktop != nullptr);
+    CHECK(desktop->ExecutableFor("test-plat") == "bin/emuden-switch2.exe");
+    const Component* android = parsed->EngineDownloadFor("android-arm64");
+    REQUIRE(android != nullptr);
+    CHECK(android->engine_app.package == "io.github.example.dennx");
+    CHECK(android->engine_app.level == 2);
+    CHECK(android->engine_app.min_version_code == 5);
+    CHECK(android->engine_app.capabilities == std::vector<std::string>{"pause", "menu"});
+    REQUIRE(android->engine_app.apk);
+    CHECK(parsed->EngineDownloadFor("other-plat") == nullptr);
+
+    store::Settings settings(scratch.dir / "settings.json");
+    Config config;
+    config.data_dir = scratch.dir;
+    config.jobs = &jobs;
+    config.settings = &settings;
+    HostDeps deps;
+    deps.source = "github:tester/plugins@main";
+    deps.platform_key = "android-arm64";
+    deps.bundled = false;
+    auto host = CreateHostWith(config, std::move(deps));
+    const auto console = host->FindConsole("switch2");
+    REQUIRE(console);
+    CHECK(console->engine_download);
+    CHECK_FALSE(console->engine_downloaded); // not installed on this device
+    const auto core = host->CoreFor("switch2");
+    REQUIRE(core);
+    CHECK(core->runner == Runner::Engine);
+    CHECK(core->engine.package == "io.github.example.dennx");
+    CHECK(core->engine.level == 2);
+    CHECK_FALSE(core->installed);
+}

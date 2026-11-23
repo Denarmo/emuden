@@ -233,8 +233,11 @@ Status RealHost::DoInstall(Job& job, const std::string& system, const std::strin
             // The built-in engine: downloaded when the plugin offers it here, else the player
             // brings it (Settings > Consoles > the console > Engine program).
             const Component* engine = manifest.EngineDownloadFor(deps_.platform_key);
+            const bool android = IsAndroidKey(deps_.platform_key);
             if (engine == nullptr ||
-                (EngineFilesGood(manifest.engine, origin) && !EngineFilesUpdate(manifest.engine, *engine))) {
+                (android && AppMatches(*engine, QueryApp(engine->engine_app.package, true))) ||
+                (!android && EngineFilesGood(manifest.engine, origin) &&
+                 !EngineFilesUpdate(manifest.engine, *engine))) {
                 return result;
             }
             core = *engine;
@@ -255,6 +258,9 @@ Status RealHost::DoInstall(Job& job, const std::string& system, const std::strin
             core = *chosen;
             engine_app = core.type == TYPE_ENGINE_APP;
         }
+    }
+    if (builtin_engine && IsAndroidKey(deps_.platform_key)) {
+        return InstallAndroidApp(job, core, std::move(result));
     }
     if (builtin_engine) {
         // Its folder is the one engine::Locate looks in: engines/<engine>/ (switch2 for Switch

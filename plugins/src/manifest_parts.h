@@ -21,6 +21,11 @@ Status ParseDepends(const JsonValue& depends, Manifest& manifest);
 void ApplyCapabilities(const JsonValue* manifest_level, const JsonValue* system_level, Console& console);
 /// The "ecp", "executable" and "android" members of an engine-app component.
 Result<EngineAppSpec> ParseEngineApp(const JsonValue& component);
+/// The "android" member (package, pinned certificate, APK or store page) of an engine app.
+Status ParseAndroidApp(const JsonValue& component, EngineAppSpec& spec);
+/// The built-in engine's "executable", and on Android its "android" app with its "ecp" level
+/// and capabilities (level 2 when not given).
+Status ParseBuiltinEngine(const JsonValue& component, EngineAppSpec& spec);
 /// The "executable" member (desktop program by platform key) of an engine or engine app.
 Status ParseExecutables(const JsonValue& component, EngineAppSpec& spec);
 /// presentation.screens: the shapes a core's picture may have (manifest_presentation.cpp).

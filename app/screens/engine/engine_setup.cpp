@@ -207,6 +207,11 @@ engine::Install EngineInstallFor(const plugins::CoreInfo& core) {
 
 std::optional<plugins::CoreInfo> FoundEngineCore(const std::string& system) {
     const Services& svc = Svc();
+    // The built-in engine as an installed engine app (Android).
+    if (auto app = svc.plugins->CoreFor(system);
+        app && app->runner == plugins::Runner::Engine && app->installed && !app->engine.package.empty()) {
+        return app;
+    }
     const auto install = svc.engine ? svc.engine->Find(system) : std::nullopt;
     if (!install || install->level < 1 || !install->package.empty()) {
         return std::nullopt;

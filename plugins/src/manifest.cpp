@@ -140,8 +140,8 @@ Result<Component> ParseComponent(const JsonValue& value, bool developer) {
         }
         component.engine_app = spec.take();
     } else if (component.type == TYPE_ENGINE) {
-        // The built-in engine, when the plugin offers it as a download.
-        if (Status status = ParseExecutables(value, component.engine_app); !status.ok) {
+        // The built-in engine, when the plugin offers it as a download (or an app on Android).
+        if (Status status = ParseBuiltinEngine(value, component.engine_app); !status.ok) {
             return Status::Fail(component.id + ": " + status.error);
         }
     }
