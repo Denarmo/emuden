@@ -296,6 +296,13 @@ Console RealHost::Describe(const Loaded& loaded, const SystemDef& system) const 
     }
     if (console.runner == Runner::Engine) {
         console.installed = true;
+        // The built-in engine, when the plugin offers it as a download here; otherwise the
+        // player brings it.
+        if (const Component* engine = loaded.manifest.EngineDownloadFor(deps_.platform_key)) {
+            console.engine_download = true;
+            console.engine_downloaded = EngineFilesGood(console.id, origin);
+            console.update_available = console.engine_downloaded && EngineFilesUpdate(console.id, *engine);
+        }
     } else {
         const Component* core = ChosenCore(loaded, system);
         console.available = core != nullptr;

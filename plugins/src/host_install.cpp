@@ -215,6 +215,7 @@ Status RealHost::DoInstall(Job& job, const std::string& system, const std::strin
     Download download;
     bool have_core = false;
     bool engine_app = false;
+    bool builtin_engine = false;
     std::vector<std::pair<Component, Download>> companions; // cores chosen for listed games
     {
         std::lock_guard lock(mutex_);
@@ -229,22 +230,34 @@ Status RealHost::DoInstall(Job& job, const std::string& system, const std::strin
             return Status::Fail(manifest.name + " was withdrawn: " + *reason);
         }
         if (found.system->console.runner == Runner::Engine) {
-            return result; // the engine comes with the app
-        }
-        const Component* chosen = ChosenCore(*found.loaded, *found.system);
-        if (!core_id.empty()) {
-            chosen = nullptr;
-            for (const Component* option : manifest.CoresFor(*found.system, deps_.platform_key)) {
-                if (option->id == core_id) {
-                    chosen = option;
+            // The built-in engine: downloaded when the plugin offers it here, else the player
+            // brings it (Settings > Consoles > the console > Engine program).
+            const Component* engine = manifest.EngineDownloadFor(deps_.platform_key);
+            if (engine == nullptr || (EngineFilesGood(system, origin) && !EngineFilesUpdate(system, *engine))) {
+                return result;
+            }
+            core = *engine;
+            builtin_engine = true;
+        } else {
+            const Component* chosen = ChosenCore(*found.loaded, *found.system);
+            if (!core_id.empty()) {
+                chosen = nullptr;
+                for (const Component* option : manifest.CoresFor(*found.system, deps_.platform_key)) {
+                    if (option->id == core_id) {
+                        chosen = option;
+                    }
                 }
             }
+            if (chosen == nullptr) {
+                return Status::Fail(found.system->console.name + " is not available on this device yet.");
+            }
+            core = *chosen;
+            engine_app = core.type == TYPE_ENGINE_APP;
         }
-        if (chosen == nullptr) {
-            return Status::Fail(found.system->console.name + " is not available on this device yet.");
-        }
-        core = *chosen;
-        engine_app = core.type == TYPE_ENGINE_APP;
+    }
+    if (builtin_engine) {
+        // Its folder is the one engine::Locate looks in: engines/<system>/.
+        return InstallEngineFiles(job, loaded, system, core, false, std::move(result));
     }
     if (engine_app) {
         return InstallEngineApp(job, loaded, core, std::move(result));

@@ -11,7 +11,7 @@
 
 namespace den::plugins {
 
-Result<Download> ParseDownload(const JsonValue& value, bool local) {
+Result<Download> ParseDownload(const JsonValue& value, bool local, bool whole_zip) {
     static const char* const KNOWN[] = {"url",  "sha256",           "size",   "archive",
                                         "entry", "strip_components", "rename", "executable_bit"};
     if (value.kind != JsonValue::Kind::Object) {
@@ -45,7 +45,7 @@ Result<Download> ParseDownload(const JsonValue& value, bool local) {
     if (download.archive != "zip" && download.archive != "none") {
         return Status::Fail("a download has an unknown archive type");
     }
-    if (download.archive == "zip" && !IsSafeRelativePath(download.entry)) {
+    if (download.archive == "zip" && !(whole_zip && download.entry.empty()) && !IsSafeRelativePath(download.entry)) {
         return Status::Fail("a download names no file to unpack");
     }
     return download;
@@ -139,10 +139,15 @@ Result<Component> ParseComponent(const JsonValue& value, bool developer) {
             return Status::Fail(component.id + ": " + spec.error());
         }
         component.engine_app = spec.take();
+    } else if (component.type == TYPE_ENGINE) {
+        // The built-in engine, when the plugin offers it as a download.
+        if (Status status = ParseExecutables(value, component.engine_app); !status.ok) {
+            return Status::Fail(component.id + ": " + status.error);
+        }
     }
     if (const JsonValue* downloads = value.Find("downloads")) {
         for (const auto& [platform, entry] : downloads->members) {
-            Result<Download> download = ParseDownload(entry, developer);
+            Result<Download> download = ParseDownload(entry, developer, component.type == TYPE_ENGINE);
             // System files are a folder of a zip; a download that is not is left out, and
             // the console still plays.
             if (component.type == TYPE_SYSTEM_FILES &&
@@ -425,6 +430,15 @@ std::vector<const Component*> Manifest::CoresFor(const SystemDef& system,
         }
     }
     return out;
+}
+
+const Component* Manifest::EngineDownloadFor(std::string_view platform_key) const {
+    for (const Component& component : components) {
+        if (component.type == TYPE_ENGINE && component.OffersPlatform(platform_key)) {
+            return &component;
+        }
+    }
+    return nullptr;
 }
 
 std::vector<const Component*> Manifest::SystemFilesFor(std::string_view core_id,

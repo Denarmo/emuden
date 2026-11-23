@@ -57,10 +57,14 @@ std::optional<Install> InFolder(const KnownEngine& engine, const std::filesystem
     if (folder.empty() || !IsDirectory(folder)) {
         return std::nullopt;
     }
-    for (const KnownEngine::Name& name : engine.names) {
-        const std::filesystem::path file = folder / name.file;
-        if (IsRegularFile(file)) {
-            return Install{file, source, name.level};
+    // The engine EmuDEN downloads keeps its program in bin/, with its libraries; it comes
+    // before a copy the player put in the folder itself.
+    for (const std::filesystem::path& dir : {folder / "bin", folder}) {
+        for (const KnownEngine::Name& name : engine.names) {
+            const std::filesystem::path file = dir / name.file;
+            if (IsRegularFile(file)) {
+                return Install{file, source, name.level};
+            }
         }
     }
     return std::nullopt;

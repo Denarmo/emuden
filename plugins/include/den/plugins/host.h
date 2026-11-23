@@ -111,6 +111,10 @@ struct Console {
     bool update_available = false; // the index has a newer version than the one on disk
     /// False when no core of the console has a download for this device.
     bool available = true;
+    /// Engine consoles: the plugin offers the engine as a download for this device, and it is
+    /// on disk and matches its checksum. One without a download is the player's to bring.
+    bool engine_download = false;
+    bool engine_downloaded = false;
     std::string group;         // "nintendo", "sega", "sony", ...
     int order = 0;             // position on the home screen, ascending
     float cover_aspect = 1.0f; // width over height

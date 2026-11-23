@@ -9,24 +9,38 @@ driven from EmuDEN's own pause menu, quick settings and companion panel, like a 
 console's `cores` beside its libretro cores; it is chosen per console or per game the same way
 (`Host::CoresFor`, `SelectCore`, the game's core setting).
 
-## Switch 2: an engine the player brings
+## Switch 2: EmuDEN's own engine, downloaded like a core
 
-Switch 2 is not shipped: no release (Windows zip, AppImage, APK) holds its plugin or an engine,
-and no list offers it. The player installs the signed package
-`manual/emuden.switch2.emuplugin` of `Denarmo/emuden-plugins` with **Settings > Plugins >
-Install a console from a file** (`Host::ProbePackage`, `InstallPackage`); EmuDEN then asks for
-the engine program if `engine::Locate` does not find it. The chosen path
-(`engine.switch2.path`) is device-only and the first place `Locate` looks, for any console.
+Switch 2 is not shipped in any release (Windows zip, AppImage, APK). Its plugin,
+`emuden.switch2`, is in the official list like every other console, and its `engine` component
+pins the engine as a download per desktop platform:
+
+```json
+{ "id": "nx2", "type": "engine", "name": "Switch 2 engine", "version": "0.0.3",
+  "delivery": { "windows-x86_64": "download", "linux-x86_64": "download" },
+  "downloads": { "windows-x86_64": { "url": "https://...", "sha256": "...", "size": 123, "archive": "zip" } },
+  "executable": { "windows-x86_64": "bin/emuden-switch2.exe" } }
+```
+
+- **Install** on the console's page (Settings > Consoles > Nintendo Switch 2), or the prompt when
+  a game is started without the engine, downloads it into `<data>/engines/switch2/`
+  (`Host::Install`, `RealHost::InstallEngineFiles`). A zip without an `entry` is unpacked whole.
+  The folder is unpacked over, not emptied, so what the player keeps there stays.
+- The executable's SHA-256 is recorded in `engines/engines.json` under the key `switch2`;
+  `Console::engine_downloaded` is true while it matches, and `update_available` when the list
+  pins another download. Removing the console removes the plugin; games and the engine stay.
+- `engine::Locate` looks in `engines/switch2/bin/` and then `engines/switch2/`. The program the
+  player chose (`engine.switch2.path`, device-only) still comes first, so a build of their own
+  keeps working.
+- A platform without a download (`delivery` `manual`, or none) leaves the engine to the player:
+  EmuDEN asks for the engine program (Settings > Consoles > the console > Engine program).
+  Android has no download yet: the engine there is not an app EmuDEN can start.
+
 Its console, content rules and folder names (`SWITCH 2`, `nx2`, ...) come from that manifest;
-the library has no built-in Switch 2 entry, only its `switch2` scanner.
-
-A device that had Switch 2 while it was built in keeps it: on the first start of a version
-without it, the host notes the official console plugins its cached list named and it has no
-manifest of, or only a copy the list had brought (`Host::CarryOvers`,
-`<data>/plugins/carry-over.json`). The app keeps those with a copy on the device and those the
-library has records of (`Library::SystemsWithRecords`), bringing them up to date from the signed
-`manual/` package once the official list no longer offers them, and lets the others go. A new
-install has no cached list and never gets it.
+the library has no built-in Switch 2 entry, only its `switch2` scanner. A signed package can
+still be installed by hand with **Settings > Plugins > Install a console from a file**
+(`Host::ProbePackage`, `InstallPackage`), and a device that carried a console plugin over from an
+older version keeps it (`Host::CarryOvers`, `<data>/plugins/carry-over.json`).
 
 ## Declaring an engine core
 

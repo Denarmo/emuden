@@ -183,3 +183,86 @@ TEST_CASE("a desktop engine app is installed, verified and removed", "[plugins][
     CHECK(removed->State() == JobState::Done);
     CHECK_FALSE(fs::exists(scratch.dir / "engines" / "testengine"));
 }
+
+TEST_CASE("the built-in engine is downloaded into the folder the engine host looks in", "[plugins][engine-app]") {
+    ScratchDir scratch;
+    Jobs jobs(1);
+    FakeWeb web;
+    const std::string zip = StoredZipOf({{"bin/emuden-switch2.exe", EXE}, {"bin/avutil-60.dll", "lib"},
+                                         {"licenses/engine/LICENSE.txt", "GPL"}});
+    web.files["https://example.org/switch2.zip"] = zip;
+    const std::string manifest = R"({"manifest_version":1,"id":"emuden.switch2","name":"Nintendo Switch 2",
+      "version":"1.1.0","kind":"console","engine":"switch2","publisher":"EmuDEN","api":1,"needs":["engine.switch2"],
+      "systems":[{"id":"switch2","name":"Nintendo Switch 2","group":"nintendo","order":0,
+        "content":{"extensions":["nup"],"scanner":"switch2","zip":"no"}}],
+      "components":[{"id":"nx2","type":"engine","name":"Switch 2 engine","version":"0.0.3",
+        "delivery":{"test-plat":"download"},
+        "downloads":{"test-plat":{"url":"https://example.org/switch2.zip","sha256":")" + HashOf(zip) +
+        R"(","size":)" + std::to_string(zip.size()) + R"(,"archive":"zip"}},
+        "executable":{"test-plat":"bin/emuden-switch2.exe"}}]})";
+    scratch.Write("plugins/emuden.switch2/plugin.json", manifest);
+    // What the player put there by hand before stays.
+    scratch.Write("engines/switch2/user/profile.dat", "mine");
+
+    store::Settings settings(scratch.dir / "settings.json");
+    Config config;
+    config.data_dir = scratch.dir;
+    config.jobs = &jobs;
+    config.settings = &settings;
+    HostDeps deps;
+    deps.http = web.Getter();
+    deps.source = "github:tester/plugins@main";
+    deps.platform_key = "test-plat";
+    deps.bundled = false;
+    auto host = CreateHostWith(config, std::move(deps));
+
+    auto console = host->FindConsole("switch2");
+    REQUIRE(console);
+    CHECK(console->runner == Runner::Engine);
+    CHECK(console->installed);
+    CHECK(console->engine_download);
+    CHECK_FALSE(console->engine_downloaded);
+
+    const JobPtr job = host->Install("switch2");
+    jobs.Wait(job);
+    REQUIRE(job->State() == JobState::Done);
+    console = host->FindConsole("switch2");
+    REQUIRE(console);
+    CHECK(console->engine_downloaded);
+    CHECK_FALSE(console->update_available);
+    CHECK(fs::is_regular_file(scratch.dir / "engines" / "switch2" / "bin" / "emuden-switch2.exe"));
+    CHECK(fs::is_regular_file(scratch.dir / "engines" / "switch2" / "bin" / "avutil-60.dll"));
+    CHECK(fs::is_regular_file(scratch.dir / "engines" / "switch2" / "user" / "profile.dat"));
+
+    // A changed program is not the one that was downloaded.
+    { std::ofstream(scratch.dir / "engines" / "switch2" / "bin" / "emuden-switch2.exe", std::ios::binary) << "other"; }
+    CHECK_FALSE(host->FindConsole("switch2")->engine_downloaded);
+}
+
+TEST_CASE("a console plugin without an engine download leaves the engine to the player", "[plugins][engine-app]") {
+    ScratchDir scratch;
+    Jobs jobs(1);
+    scratch.Write("plugins/emuden.switch2/plugin.json", R"({"manifest_version":1,"id":"emuden.switch2",
+      "name":"Nintendo Switch 2","version":"1.0.5","kind":"console","engine":"switch2","publisher":"EmuDEN","api":1,
+      "needs":["engine.switch2"],"systems":[{"id":"switch2","name":"Nintendo Switch 2","group":"nintendo","order":0,
+        "content":{"extensions":["nup"],"scanner":"switch2","zip":"no"}}],
+      "components":[{"id":"nx2","type":"engine","name":"Switch 2 engine","delivery":{"test-plat":"manual"}}]})");
+    store::Settings settings(scratch.dir / "settings.json");
+    Config config;
+    config.data_dir = scratch.dir;
+    config.jobs = &jobs;
+    config.settings = &settings;
+    HostDeps deps;
+    deps.source = "github:tester/plugins@main";
+    deps.platform_key = "test-plat";
+    deps.bundled = false;
+    auto host = CreateHostWith(config, std::move(deps));
+    const auto console = host->FindConsole("switch2");
+    REQUIRE(console);
+    CHECK(console->installed);
+    CHECK_FALSE(console->engine_download);
+    const JobPtr job = host->Install("switch2");
+    jobs.Wait(job);
+    CHECK(job->State() == JobState::Done);
+    CHECK_FALSE(fs::exists(scratch.dir / "engines" / "switch2"));
+}

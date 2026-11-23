@@ -11,7 +11,8 @@
 namespace den::plugins {
 
 /// One pinned download object; `local` also takes a "file" of this device.
-Result<Download> ParseDownload(const JsonValue& value, bool local = false);
+/// `whole_zip`: a zip may name no entry, and is then unpacked whole (the built-in engine).
+Result<Download> ParseDownload(const JsonValue& value, bool local = false, bool whole_zip = false);
 /// settings[] (manifest_fields.cpp).
 void ParseSettings(const JsonValue& settings, Manifest& manifest);
 /// depends[]: a strict object each.
@@ -20,6 +21,8 @@ Status ParseDepends(const JsonValue& depends, Manifest& manifest);
 void ApplyCapabilities(const JsonValue* manifest_level, const JsonValue* system_level, Console& console);
 /// The "ecp", "executable" and "android" members of an engine-app component.
 Result<EngineAppSpec> ParseEngineApp(const JsonValue& component);
+/// The "executable" member (desktop program by platform key) of an engine or engine app.
+Status ParseExecutables(const JsonValue& component, EngineAppSpec& spec);
 /// presentation.screens: the shapes a core's picture may have (manifest_presentation.cpp).
 std::vector<ScreenShape> ParseScreens(const JsonValue& shapes);
 /// The members of a system's presentation and content beyond the scan rules.

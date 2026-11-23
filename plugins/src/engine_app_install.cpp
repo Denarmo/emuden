@@ -88,13 +88,15 @@ bool RealHost::EngineAppGood(const Loaded& loaded, const Component& core) const 
     if (IsAndroidKey(deps_.platform_key)) {
         return AppMatches(core, QueryApp(core.engine_app.package, false));
     }
+    return EngineFilesGood(LedgerKey(loaded, core), OriginOf(loaded));
+}
+
+bool RealHost::EngineFilesGood(const std::string& key, std::size_t origin) const {
     LoadEngines();
-    const std::string key = LedgerKey(loaded, core);
     const auto it = engines_.find(key);
     if (it == engines_.end()) {
         return false;
     }
-    const std::size_t origin = OriginOf(loaded);
     if (BlockedFor(views_, origin, it->second.download_sha256) ||
         BlockedFor(views_, origin, it->second.executable_sha256)) {
         return false;
@@ -118,8 +120,12 @@ bool RealHost::EngineAppUpdate(const Loaded& loaded, const Component& core) cons
     if (IsAndroidKey(deps_.platform_key)) {
         return false; // the system's installer and store update apps
     }
+    return EngineFilesUpdate(LedgerKey(loaded, core), core);
+}
+
+bool RealHost::EngineFilesUpdate(const std::string& key, const Component& core) const {
     LoadEngines();
-    const auto it = engines_.find(LedgerKey(loaded, core));
+    const auto it = engines_.find(key);
     const Download* download = core.DownloadFor(deps_.platform_key);
     return it != engines_.end() && download != nullptr && download->file.empty() &&
            it->second.download_sha256 != download->sha256;
@@ -158,16 +164,24 @@ Status RealHost::InstallEngineApp(Job& job, const Loaded& loaded, const Componen
     if (IsAndroidKey(deps_.platform_key)) {
         return InstallAndroidApp(job, core, std::move(result));
     }
+    std::string key;
+    {
+        std::lock_guard lock(mutex_);
+        key = LedgerKey(loaded, core);
+    }
+    return InstallEngineFiles(job, loaded, key, core, true, std::move(result));
+}
+
+Status RealHost::InstallEngineFiles(Job& job, const Loaded& loaded, const std::string& key, const Component& core,
+                                    bool own_folder, Status result) {
     const Download* found = core.DownloadFor(deps_.platform_key);
     const std::string executable = core.ExecutableFor(deps_.platform_key);
     if (found == nullptr || executable.empty()) {
         return Status::Fail(core.name + " is not available on this device.");
     }
     const Download download = *found;
-    std::string key;
     {
         std::lock_guard lock(mutex_);
-        key = LedgerKey(loaded, core);
         if (const auto reason = BlockedFor(views_, OriginOf(loaded), download.sha256)) {
             return Status::Fail(core.name + " must not be used: " + *reason);
         }
@@ -184,9 +198,13 @@ Status RealHost::InstallEngineApp(Job& job, const Loaded& loaded, const Componen
         return status;
     }
     job.SetMessage("Installing " + core.name);
-    fs::remove_all(dir, ec);
+    // An engine app's folder is EmuDEN's alone. The built-in engine's may also hold what the
+    // player put there before EmuDEN downloaded it (its own user folder): it is unpacked over.
+    if (own_folder) {
+        fs::remove_all(dir, ec);
+    }
     fs::create_directories(dir, ec);
-    if (download.archive == "zip" && download.entry.ends_with("/")) {
+    if (download.archive == "zip" && (download.entry.empty() || download.entry.ends_with("/"))) {
         status = UnpackFolder(temp, download.entry, dir, MAX_ENGINE_FILES, MAX_ENGINE_BYTES, &job);
     } else if (download.archive == "zip") {
         status = UnpackEntry(temp, download.entry, dir / PathFromUtf8(download.entry), 0, &job);
@@ -201,7 +219,9 @@ Status RealHost::InstallEngineApp(Job& job, const Loaded& loaded, const Componen
         status = Status::Fail("The download does not hold " + executable + ".");
     }
     if (!status.ok) {
-        fs::remove_all(dir, ec);
+        if (own_folder) {
+            fs::remove_all(dir, ec);
+        }
         return status;
     }
     fs::permissions(file, fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
@@ -284,12 +304,16 @@ Status RealHost::RemoveEngineApp(const Loaded& loaded, const Component& core) {
     if (IsAndroidKey(deps_.platform_key)) {
         return Status::Fail(core.name + " is an app of its own: uninstall it in Android's settings.");
     }
+    return RemoveEngineFiles(LedgerKey(loaded, core), core.name);
+}
+
+// Called with the lock held.
+Status RealHost::RemoveEngineFiles(const std::string& key, const std::string& name) {
     LoadEngines();
-    const std::string key = LedgerKey(loaded, core);
     std::error_code ec;
     fs::remove_all(EngineDir(key), ec);
     if (ec) {
-        return Status::Fail(core.name + " could not be removed (it may be running).");
+        return Status::Fail(name + " could not be removed (it may be running).");
     }
     engines_.erase(key);
     SaveEngines();
