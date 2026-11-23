@@ -28,7 +28,8 @@ which device, are in `docs/history.md`; add new ones there, newest first.
 - **Sync between devices** (`docs/sync.md`): saves, states, settings and games through Google
   Drive, RomM or Syncthing plugins. PC and Steam consoles never sync.
 - **Play together** (`net/`): two devices on one network, by core link (TGB Dual, gpSP,
-  melonDS DS) or input-delay lockstep.
+  melonDS DS) or input-delay lockstep. `den_net_tests` binds only to loopback
+  (`pal::net::SetLoopbackOnly`), so running it raises no Windows Firewall/UAC prompt.
 - **Library.** Scan by console folder, zip and 7z, downloads filed under clean names, ROM
   hacks patched from BPS, IPS, UPS, xdelta and other formats, covers (`docs/covers.md`), the library
   tidy-up.

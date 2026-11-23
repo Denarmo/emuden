@@ -46,6 +46,11 @@ public:
     virtual std::optional<Datagram> Receive() = 0;
 };
 
+/// Binds every socket opened from now on to loopback instead of every interface. For tests: a
+/// program listening on the network makes Windows Firewall ask for administrator rights, once
+/// for every new path of the program (every build folder).
+void SetLoopbackOnly(bool only);
+
 /// Bound to `port` on every interface (0: one the system picks), broadcast allowed. `shared`
 /// lets other sockets of this and other programs bind the same port (discovery).
 Result<std::unique_ptr<UdpSocket>> OpenUdp(std::uint16_t port, bool shared);

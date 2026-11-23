@@ -35,6 +35,13 @@ namespace den::pal::net {
 
 namespace {
 
+std::atomic<bool> loopback_only{false};
+
+// Every interface, or only loopback when SetLoopbackOnly asked for it.
+std::uint32_t BindIp() {
+    return loopback_only ? Address::Loopback(0).ip : 0;
+}
+
 void StartSockets() {
 #ifdef _WIN32
     static std::once_flag once;
@@ -246,6 +253,10 @@ std::optional<Address> Address::Parse(const std::string& text) {
     return Address{(a << 24) | (b << 16) | (c << 8) | d, static_cast<std::uint16_t>(read == 5 ? port : 0)};
 }
 
+void SetLoopbackOnly(bool only) {
+    loopback_only = only;
+}
+
 Result<std::unique_ptr<UdpSocket>> OpenUdp(std::uint16_t port, bool shared) {
     StartSockets();
     const SocketHandle socket = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -259,7 +270,7 @@ Result<std::unique_ptr<UdpSocket>> OpenUdp(std::uint16_t port, bool shared) {
         SetFlag(socket, SOL_SOCKET, SO_REUSEPORT);
 #endif
     }
-    const sockaddr_in address = ToSockaddr({0, port});
+    const sockaddr_in address = ToSockaddr({BindIp(), port});
     if (bind(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0) {
         DEN_CLOSE_SOCKET(socket);
         return Status::Fail("UDP port " + std::to_string(port) + " is taken");
@@ -279,7 +290,7 @@ Result<std::unique_ptr<TcpListener>> ListenTcp(std::uint16_t port) {
     // this flag would let two programs share the port instead).
     SetFlag(socket, SOL_SOCKET, SO_REUSEADDR);
 #endif
-    const sockaddr_in address = ToSockaddr({0, port});
+    const sockaddr_in address = ToSockaddr({BindIp(), port});
     if (bind(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0 || listen(socket, 4) != 0) {
         DEN_CLOSE_SOCKET(socket);
         return Status::Fail("TCP port " + std::to_string(port) + " is taken");
