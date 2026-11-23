@@ -277,6 +277,20 @@ private:
         }
         // The engine app draws the game on its own.
         rows.push_back(ValueRow("console.bfi", BFI_LABEL, [] { return std::string("Not with an engine"); }));
+        // On Android the engine is an app of its own (DenNX), installed and started by EmuDEN.
+        if (const auto app = Svc().plugins->CoreFor(system);
+            app && app->runner == plugins::Runner::Engine && !app->engine.package.empty()) {
+            ui::RowSpec row = ValueRow("console.engine", "Engine app", [system] {
+                const auto found = Svc().plugins->CoreFor(system);
+                return found && found->installed ? (found->name.empty() ? found->id : found->name)
+                                                 : std::string("Not installed");
+            });
+            row.description = "These games run in " + (app->name.empty() ? app->id : app->name) +
+                              ", an app of its own that EmuDEN starts";
+            rows.push_back(std::move(row));
+            RemoveRow(console, rows);
+            return;
+        }
         ui::RowSpec engine = ValueRow(
             "console.engine", "Engine program",
             [system] {
@@ -324,6 +338,10 @@ private:
         note.description = "Until the engine plugin exists, EmuDEN starts the emulator installed on this device, "
                            "and saves and settings stay in that emulator";
         rows.push_back(std::move(note));
+        RemoveRow(console, rows);
+    }
+
+    static void RemoveRow(const plugins::Console& console, std::vector<ui::RowSpec>& rows) {
         rows.push_back(ActionRow("console.remove", "Remove", [console] {
             Svc().stage->Confirm(TrF("Remove {}?", console.name),
                                  "Its plugin is removed; install it from a file to have it again. Games, saves "

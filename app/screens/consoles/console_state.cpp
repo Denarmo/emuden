@@ -5,6 +5,7 @@
 
 #include "den/app/console_state.h"
 #include "den/app/app.h"
+#include "den/app/engine_setup.h"
 #include "den/app/pages.h"
 #include "den/app/registry.h"
 
@@ -66,7 +67,7 @@ ConsoleState StateOf(const plugins::Console& console) {
         return ConsoleState::Busy;
     }
     if (console.runner == plugins::Runner::Engine) {
-        if (svc.engine->Available(console.id)) {
+        if (svc.engine->Available(console.id) || FoundEngineCore(console.id)) {
             return console.update_available ? ConsoleState::UpdateAvailable : ConsoleState::Ready;
         }
         // An engine EmuDEN downloads is installed like a core; another one the player brings.

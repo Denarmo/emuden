@@ -15,9 +15,9 @@ which device, are in `docs/history.md`; add new ones there, newest first.
   `.emuplugin` or a folder's `plugin.json`, shown with its trust (signed by EmuDEN, or a third
   party's, unchecked) before it is installed; an engine console then asks for its engine
   program when it is not found, and keeps that path on the device (`engine.<system>.path`, not
-  synced). This is the only way to get **Switch 2**: it is not built in, in no plugin list,
-  and no release carries or downloads its engine. Until its plugin is installed it shows
-  nowhere and a `SWITCH 2` folder is no console's (`docs/engines.md`).
+  synced). **Switch 2** is not built in: it comes from EmuDEN's plugin list (`emuden.switch2`),
+  which downloads DenNX (on Android, its app). Until its plugin is installed it shows nowhere
+  and a `SWITCH 2` folder is no console's (`docs/engines.md`).
 - **Player.** Software, OpenGL and Vulkan cores (`docs/vulkan.md`); save states, rewind,
   fast-forward, cheats (typed in or imported from RetroArch `.cht` files), picture presets on a multi-pass chain, per-game and per-console settings,
   button remapping, black frame insertion at whole multiples of the game's rate, two screens (DS layouts, quick settings and the pause menu on the second
@@ -45,7 +45,10 @@ which device, are in `docs/history.md`; add new ones there, newest first.
   `engine/src/host/locate.cpp` and its test, which the naming rule forbids; they go when the
   engine becomes a plugin.
 - Android: a picked folder is copied (`FolderImport.java`), not read in place, so it takes
-  its space twice. No Switch 2 engine.
+  its space twice.
+- Android Switch 1/2: the DenNX app boots Ocarina of Time from EmuDEN on the Retroid Pocket Duo
+  (title screen, Back to the menu, Resume, Exit to home); sound, pad input in game and EmuDEN's
+  own APK install were not checked yet.
 - ROM hack covers: the default fan collection (`tttrash/pokehackcovers`) has no licence and
   covers Pokemon hacks only; name matching has no typo tolerance and WebP pictures are
   skipped.

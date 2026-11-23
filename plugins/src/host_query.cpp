@@ -121,6 +121,13 @@ std::optional<CoreInfo> RealHost::CoreFor(const std::string& system) const {
     std::lock_guard lock(mutex_);
     const Found found = Find(system);
     const Component* core = found.system ? ChosenCore(*found.loaded, *found.system) : nullptr;
+    if (core == nullptr && found.system != nullptr && found.system->console.runner == Runner::Engine &&
+        IsAndroidKey(deps_.platform_key)) {
+        // On Android the built-in engine is an engine app, played like one.
+        if (const Component* engine = found.loaded->manifest.EngineDownloadFor(deps_.platform_key)) {
+            return DescribeEngineApp(*found.loaded, *found.system, *engine);
+        }
+    }
     return core ? std::optional<CoreInfo>(Describe(*found.loaded, *found.system, *core)) : std::nullopt;
 }
 
@@ -300,9 +307,14 @@ Console RealHost::Describe(const Loaded& loaded, const SystemDef& system) const 
         // player brings it.
         if (const Component* engine = loaded.manifest.EngineDownloadFor(deps_.platform_key)) {
             console.engine_download = true;
-            console.engine_downloaded = EngineFilesGood(loaded.manifest.engine, origin);
-            console.update_available =
-                console.engine_downloaded && EngineFilesUpdate(loaded.manifest.engine, *engine);
+            if (IsAndroidKey(deps_.platform_key)) {
+                // An app: the system's installer updates it.
+                console.engine_downloaded = AppMatches(*engine, QueryApp(engine->engine_app.package, false));
+            } else {
+                console.engine_downloaded = EngineFilesGood(loaded.manifest.engine, origin);
+                console.update_available =
+                    console.engine_downloaded && EngineFilesUpdate(loaded.manifest.engine, *engine);
+            }
         }
     } else {
         const Component* core = ChosenCore(loaded, system);

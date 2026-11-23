@@ -34,7 +34,14 @@ pins the engine as a download per desktop platform:
   keeps working.
 - A platform without a download (`delivery` `manual`, or none) leaves the engine to the player:
   EmuDEN asks for the engine program (Settings > Consoles > the console > Engine program).
-  Android has no download yet: the engine there is not an app EmuDEN can start.
+- On Android the engine is an app: the manifest's `engine` component carries an `android` block
+  (`package`, `cert_sha256`, `min_version_code`, `apk`) and `ecp`, like an engine app
+  (`ParseBuiltinEngine`). **Install** downloads and installs the APK (`InstallAndroidApp`);
+  `engine_downloaded` is true while the installed package matches the pinned certificate and
+  version (`AppMatches`), and the game starts over ECP like any engine app (`CoreFor` falls back to
+  `DescribeEngineApp`). The console's page shows an **Engine app** row instead of the engine
+  program rows. The DenNX app is `io.github.denarmo.dennx`, built by DenNX's
+  `tools/android_app.py`.
 
 Its consoles, content rules and folder names come from that manifest: `switch2` (Switch 2,
 `.nup`; `SWITCH 2`, `nx2`, ...) and `switch` (Switch 1, `.nsp`/`.xci`; `SWITCH`, `nx`, ...), both
