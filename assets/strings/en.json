@@ -78,6 +78,7 @@
 
   "core.needed_title": "Core needed",
   "core.needed_message": "{} games need the {} core. Download it now?",
+  "engine.needed_message": "{} games run in their own engine. Download it now?",
   "core.download": "Download",
 
   "install.title": "Installing {}",

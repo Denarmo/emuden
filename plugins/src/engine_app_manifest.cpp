@@ -49,6 +49,18 @@ std::string NormalCertDigest(std::string_view text) {
     return out;
 }
 
+Status ParseExecutables(const JsonValue& component, EngineAppSpec& spec) {
+    if (const JsonValue* executables = component.Find("executable")) {
+        for (const auto& [platform, path] : executables->members) {
+            if (path.kind != JsonValue::Kind::String || !IsSafeRelativePath(path.string) || path.string.ends_with("/")) {
+                return Status::Fail("an engine's executable is not a plain relative path");
+            }
+            spec.executables.emplace(platform, path.string);
+        }
+    }
+    return {};
+}
+
 Result<EngineAppSpec> ParseEngineApp(const JsonValue& component) {
     EngineAppSpec spec;
     const JsonValue* ecp = component.Find("ecp");
@@ -63,13 +75,8 @@ Result<EngineAppSpec> ParseEngineApp(const JsonValue& component) {
     }
     spec.capabilities = json::Strings(*ecp, "capabilities", false);
     spec.needs = json::Strings(*ecp, "needs", false);
-    if (const JsonValue* executables = component.Find("executable")) {
-        for (const auto& [platform, path] : executables->members) {
-            if (path.kind != JsonValue::Kind::String || !IsSafeRelativePath(path.string) || path.string.ends_with("/")) {
-                return Status::Fail("an engine app's executable is not a plain relative path");
-            }
-            spec.executables.emplace(platform, path.string);
-        }
+    if (Status status = ParseExecutables(component, spec); !status.ok) {
+        return status;
     }
     if (const JsonValue* android = component.Find("android")) {
         spec.package = android->String("package");
@@ -111,6 +118,11 @@ std::string Component::ExecutableFor(std::string_view platform_key) const {
 }
 
 bool Component::OffersPlatform(std::string_view platform_key) const {
+    if (type == TYPE_ENGINE) {
+        // The built-in engine is a program the app starts: desktop only, with its executable.
+        return !IsAndroidKey(platform_key) && DownloadFor(platform_key) != nullptr &&
+               !ExecutableFor(platform_key).empty();
+    }
     if (type != TYPE_ENGINE_APP) {
         return DownloadFor(platform_key) != nullptr;
     }

@@ -66,7 +66,12 @@ ConsoleState StateOf(const plugins::Console& console) {
         return ConsoleState::Busy;
     }
     if (console.runner == plugins::Runner::Engine) {
-        return svc.engine->Available(console.id) ? ConsoleState::Ready : ConsoleState::EngineMissing;
+        if (svc.engine->Available(console.id)) {
+            return console.update_available ? ConsoleState::UpdateAvailable : ConsoleState::Ready;
+        }
+        // An engine EmuDEN downloads is installed like a core; another one the player brings.
+        return console.engine_download && !console.engine_downloaded ? ConsoleState::NotInstalled
+                                                                     : ConsoleState::EngineMissing;
     }
     if (!console.installed) {
         return console.available ? ConsoleState::NotInstalled : ConsoleState::NotAvailable;

@@ -117,6 +117,18 @@ void StartGame(const std::string& game_id, bool restart, const ui::Params& extra
         return;
     }
     if (console->runner == plugins::Runner::Engine) {
+        // An engine EmuDEN downloads is fetched first, like a core.
+        if (console->engine_download && !console->engine_downloaded && !svc.engine->Available(game->system)) {
+            svc.stage->Confirm(Tr("core.needed_title"),
+                               TrF("engine.needed_message", SystemName(game->system)),
+                               Tr("core.download"), [system = game->system, id = game->id, restart] {
+                                   Svc().stage->Push("install", {{"system", system},
+                                                                 {"id", id},
+                                                                 {"restart", restart ? "1" : "0"}});
+                               },
+                               Tr("common.cancel"), true);
+            return;
+        }
         // One that speaks the protocol is played from the player screen, with its menu.
         if (const auto found = FoundEngineCore(game->system); found && svc.stage->HasRoute("player")) {
             StartInPlayer(*game, *found, restart, extra);

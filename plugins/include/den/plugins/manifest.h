@@ -89,7 +89,7 @@ struct Component {
     GameMatch games;
     std::map<std::string, Download, std::less<>> downloads; // by platform key or "any"
     std::vector<std::string> cores; // system files: the cores they are for (empty = all)
-    EngineAppSpec engine_app;       // type engine-app
+    EngineAppSpec engine_app;       // type engine-app; type engine uses its executables
     /// "language": the core option that sets the language of a game, and the option value of
     /// each app language code ("es" -> "Spanish"; "*" for any other). The app gives it the
     /// app's language before the manifest's other hints and the user's own options.
@@ -169,6 +169,9 @@ struct Manifest {
     /// The cores of the system with a download for the platform, best first.
     std::vector<const Component*> CoresFor(const SystemDef& system,
                                            std::string_view platform_key) const;
+    /// The built-in engine (type engine) the plugin offers as a download on the platform, or
+    /// null: the player brings it.
+    const Component* EngineDownloadFor(std::string_view platform_key) const;
     /// The system files that belong to a core and have a download for the platform.
     std::vector<const Component*> SystemFilesFor(std::string_view core_id,
                                                  std::string_view platform_key) const;

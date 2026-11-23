@@ -146,9 +146,13 @@ std::uint64_t FileSize(const fs::path& file) {
     return ec ? 0 : static_cast<std::uint64_t>(size);
 }
 
-void AddSwitch2(Scan& scan, const fs::path& file, const std::string& stem, const std::string& relative) {
+// A Switch 2 package (.nup), or a Switch 1 container (.nsp, .xci) of the "switch" console, which
+// the same engine plays. A Switch 1 container is not read here: its title id comes from its
+// name, and its title from there too.
+void AddSwitch2(Scan& scan, const fs::path& file, const std::string& stem, const std::string& relative,
+                const std::string& system) {
     Entry entry;
-    entry.system = "switch2";
+    entry.system = system;
     entry.path = PathToUtf8(file);
     entry.original_name = stem;
     entry.size_bytes = FileSize(file);
@@ -175,7 +179,9 @@ void AddSwitch2(Scan& scan, const fs::path& file, const std::string& stem, const
             icon = FindImage(scan.options.icons_dir, Switch2Id(program_id).substr(8));
         }
     }
-    entry.id = program_id != 0 ? Switch2Id(program_id) : RomId("switch2", relative);
+    entry.id = program_id == 0 ? RomId(system, relative)
+               : system == "switch2" ? Switch2Id(program_id)
+                                     : system + ":" + Switch2Id(program_id).substr(8);
     if (!scan.seen.insert(entry.id).second) {
         return;
     }
@@ -253,7 +259,7 @@ void AddRom(Scan& scan, const fs::path& file, const SystemDef* def, const fs::pa
         }
     }
     if (def->scanner == "switch2") {
-        AddSwitch2(scan, file, stem, relative);
+        AddSwitch2(scan, file, stem, relative, def->id);
         return;
     }
     Entry entry;

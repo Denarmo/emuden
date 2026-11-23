@@ -265,6 +265,16 @@ private:
 
     static void EngineRows(const plugins::Console& console, std::vector<ui::RowSpec>& rows) {
         const std::string system = console.id;
+        if (const JobPtr job = ConsoleJob(system)) {
+            rows.push_back(ActionRow("console.cancel", "Cancel", [job] { job->Cancel(); }));
+        } else if (console.engine_download && !console.engine_downloaded) {
+            rows.push_back(ActionRow("console.install", "Install", [console] { Start(console, "installed"); },
+                                     "Downloads the engine that plays these games"));
+        } else if (console.engine_download) {
+            if (console.update_available) {
+                rows.push_back(ActionRow("console.update", "Update", [console] { Start(console, "updated"); }));
+            }
+        }
         // The engine app draws the game on its own.
         rows.push_back(ValueRow("console.bfi", BFI_LABEL, [] { return std::string("Not with an engine"); }));
         ui::RowSpec engine = ValueRow(

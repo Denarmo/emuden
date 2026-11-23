@@ -133,7 +133,8 @@ Status UnpackFolder(const fs::path& archive, std::string_view prefix, const fs::
     if (!entries) {
         return Status::Fail("The download is not a zip archive.");
     }
-    if (!prefix.ends_with("/") || !IsSafeRelativePath(prefix)) {
+    // An empty prefix unpacks the whole archive.
+    if (!prefix.empty() && (!prefix.ends_with("/") || !IsSafeRelativePath(prefix))) {
         return Status::Fail("The archive names no folder to unpack.");
     }
     std::vector<const ZipEntry*> wanted;
