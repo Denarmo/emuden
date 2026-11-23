@@ -146,15 +146,22 @@ public:
             AddScreens(root);
             return;
         }
+        // The games' row, with a Continue card's moment beside it on the right.
+        ui::Node* stage = root.Add(ui::MakeBox(ui::Axis::Row, 16));
+        stage->grow = 1;
         if (std::unique_ptr<GameView> view = MakeGameView(spec_)) {
             view_ = view.get();
             carousel_ = view_;
-            root.Add(std::move(view));
+            stage->Add(std::move(view));
         } else if (spec_->layout == "shelf3d") {
-            carousel_ = root.Emplace<ObjectShelf>(spec_);
+            carousel_ = stage->Emplace<ObjectShelf>(spec_);
         } else {
-            carousel_ = root.Emplace<CoverCarousel>(spec_);
+            carousel_ = stage->Emplace<CoverCarousel>(spec_);
         }
+        carousel_->width = 0; // the room the moment leaves
+        moment_ = stage->Emplace<MomentPicture>(0, ui::AUTO);
+        moment_->grow = 0.6f; // a little over a third of the row
+        moment_->visible = false;
         carousel_->on_select = [this](const library::Entry& game) { ShowGame(game); };
         carousel_->on_activate = [this] {
             const library::Entry* game = carousel_->Selected();
@@ -177,8 +184,6 @@ public:
         info->align = ui::Align::Center;
         info->pad_bottom = 8;
         info->visible = view_ == nullptr; // those layouts show the game themselves
-        moment_ = info->Emplace<MomentPicture>(224, 126);
-        moment_->visible = false;
         name_ = info->Emplace<ui::Label>(" ", theme_.text_title, gfx::FONT_BOLD);
         name_->text_align = ui::Align::Center;
         records_ = info->Emplace<ui::Label>(" ");
@@ -441,7 +446,7 @@ private:
         const std::string moment = card != nullptr ? PathToUtf8(card->item.screenshot) : std::string();
         records_->text = card != nullptr ? ContinueLine(*card) : RecordsLine(game);
         moment_->path = moment;
-        moment_->visible = !moment.empty();
+        moment_->visible = view_ == nullptr && !moment.empty(); // those layouts show it themselves
         backdrop_.Set(moment.empty() ? game.cover : moment);
     }
 
