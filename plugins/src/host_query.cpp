@@ -300,8 +300,9 @@ Console RealHost::Describe(const Loaded& loaded, const SystemDef& system) const 
         // player brings it.
         if (const Component* engine = loaded.manifest.EngineDownloadFor(deps_.platform_key)) {
             console.engine_download = true;
-            console.engine_downloaded = EngineFilesGood(console.id, origin);
-            console.update_available = console.engine_downloaded && EngineFilesUpdate(console.id, *engine);
+            console.engine_downloaded = EngineFilesGood(loaded.manifest.engine, origin);
+            console.update_available =
+                console.engine_downloaded && EngineFilesUpdate(loaded.manifest.engine, *engine);
         }
     } else {
         const Component* core = ChosenCore(loaded, system);

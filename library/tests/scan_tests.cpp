@@ -333,3 +333,36 @@ TEST_CASE("Switch 2 games") {
     CHECK(ByName(entries, "Loose Package")->id == "switch2:0400000000001000");
     CHECK_FALSE(ReadSwitch2Package(root / "SWITCH 2" / "Unknown Game (v2).xci", false));
 }
+
+TEST_CASE("Switch 1 games are their own console, beside Switch 2") {
+    const fs::path root = FreshDir("switch1");
+    Put(root / "SWITCH 2" / "Mario Tennis Fever [0400D4201C6EA000].nup", Package(0x0400D4201C6EA000, ""));
+    Put(root / "SWITCH" / "Super Mario Odyssey [0100000000010000].nsp");
+    Put(root / "SWITCH" / "Unknown Cart.xci");
+
+    ScanOptions options = Options(root);
+    options.icons_dir = root / "icons";
+    SystemTable systems;
+    std::vector<SystemDef> both = ParseSystems(SWITCH2_SYSTEM);
+    for (SystemDef& def : ParseSystems(SWITCH_SYSTEM)) {
+        both.push_back(std::move(def));
+    }
+    // The Switch 2 console of the plugin has only NUP packages now.
+    both.front().extensions = {"nup"};
+    systems.Set(std::move(both));
+    options.systems = &systems;
+    const std::vector<Entry> entries = ScanFolders(options);
+    REQUIRE(entries.size() == 3);
+    const Entry* odyssey = ByName(entries, "Super Mario Odyssey");
+    REQUIRE(odyssey != nullptr);
+    CHECK(odyssey->system == "switch");
+    CHECK(odyssey->id == "switch:0100000000010000");
+    const Entry* unknown = ByName(entries, "Unknown Cart");
+    REQUIRE(unknown != nullptr);
+    CHECK(unknown->system == "switch");
+    CHECK(unknown->id == RomId("switch", "Unknown Cart.xci"));
+    const Entry* tennis = ByName(entries, "Mario Tennis Fever");
+    REQUIRE(tennis != nullptr);
+    CHECK(tennis->system == "switch2");
+    CHECK(tennis->id == "switch2:0400D4201C6EA000");
+}

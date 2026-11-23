@@ -236,8 +236,8 @@ private:
     Status InstallAndroidApp(Job& job, const Component& core, Status result);
     Status RemoveEngineApp(const Loaded& loaded, const Component& core);
     // The desktop files of an engine app, or of the built-in engine a console plugin downloads
-    // (type engine), under engines/<key>/. The built-in engine's key is its system's id, the
-    // folder engine::Locate looks in.
+    // (type engine), under engines/<key>/. The built-in engine's key is the manifest's engine
+    // ("switch2"), the folder engine::Locate looks in for each of its consoles.
     bool EngineFilesGood(const std::string& key, std::size_t origin) const;
     bool EngineFilesUpdate(const std::string& key, const Component& core) const;
     Status InstallEngineFiles(Job& job, const Loaded& loaded, const std::string& key, const Component& core,

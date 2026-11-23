@@ -233,7 +233,8 @@ Status RealHost::DoInstall(Job& job, const std::string& system, const std::strin
             // The built-in engine: downloaded when the plugin offers it here, else the player
             // brings it (Settings > Consoles > the console > Engine program).
             const Component* engine = manifest.EngineDownloadFor(deps_.platform_key);
-            if (engine == nullptr || (EngineFilesGood(system, origin) && !EngineFilesUpdate(system, *engine))) {
+            if (engine == nullptr ||
+                (EngineFilesGood(manifest.engine, origin) && !EngineFilesUpdate(manifest.engine, *engine))) {
                 return result;
             }
             core = *engine;
@@ -256,8 +257,9 @@ Status RealHost::DoInstall(Job& job, const std::string& system, const std::strin
         }
     }
     if (builtin_engine) {
-        // Its folder is the one engine::Locate looks in: engines/<system>/.
-        return InstallEngineFiles(job, loaded, system, core, false, std::move(result));
+        // Its folder is the one engine::Locate looks in: engines/<engine>/ (switch2 for Switch
+        // 2 and Switch 1 alike).
+        return InstallEngineFiles(job, loaded, loaded.manifest.engine, core, false, std::move(result));
     }
     if (engine_app) {
         return InstallEngineApp(job, loaded, core, std::move(result));

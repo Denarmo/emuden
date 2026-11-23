@@ -10,3 +10,9 @@ inline constexpr const char* SWITCH2_SYSTEM = R"json({"id":"switch2","name":"Nin
     "short_name":"Switch 2","order":0,"content":{"extensions":["nup","nsp","xci"],"scanner":"switch2",
     "folder_aliases":["switch 2","ns2","nx2","nintendo switch 2","nintendoswitch2"],"zip":"no"},
     "artwork":{"launchbox":"Nintendo Switch 2"}})json";
+
+// The Switch 1 console of the same plugin: its containers, played by the same engine.
+inline constexpr const char* SWITCH_SYSTEM = R"json({"id":"switch","name":"Nintendo Switch",
+    "short_name":"Switch","order":1,"content":{"extensions":["nsp","xci"],"scanner":"switch2",
+    "folder_aliases":["ns","nx","nintendo switch","nintendoswitch"],"zip":"no"},
+    "artwork":{"launchbox":"Nintendo Switch"}})json";

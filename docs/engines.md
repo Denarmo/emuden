@@ -36,8 +36,11 @@ pins the engine as a download per desktop platform:
   EmuDEN asks for the engine program (Settings > Consoles > the console > Engine program).
   Android has no download yet: the engine there is not an app EmuDEN can start.
 
-Its console, content rules and folder names (`SWITCH 2`, `nx2`, ...) come from that manifest;
-the library has no built-in Switch 2 entry, only its `switch2` scanner. A signed package can
+Its consoles, content rules and folder names come from that manifest: `switch2` (Switch 2,
+`.nup`; `SWITCH 2`, `nx2`, ...) and `switch` (Switch 1, `.nsp`/`.xci`; `SWITCH`, `nx`, ...), both
+played by DenNX. The library has no built-in entry for either, only the `switch2` scanner, which
+files each game under the console whose folder or extension found it (`switch:<title id>` for
+Switch 1). Both consoles share the engine's folder and its settings (`engine.switch2.path`). A signed package can
 still be installed by hand with **Settings > Plugins > Install a console from a file**
 (`Host::ProbePackage`, `InstallPackage`), and a device that carried a console plugin over from an
 older version keeps it (`Host::CarryOvers`, `<data>/plugins/carry-over.json`).

@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright 2026 EmuDEN contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <algorithm>
+
 #include "den/base/files.h"
 #include "den/store/settings.h"
 #include "host/locate.h"
@@ -10,7 +12,8 @@ namespace den::engine {
 namespace {
 
 struct KnownEngine {
-    const char* system;
+    const char* system;  // its settings and its folder under engines/ are named after this one
+    std::vector<std::string> also; // other consoles it plays
     // Executable names, most capable first, with the protocol level each is driven at.
     struct Name {
         const char* file;
@@ -23,7 +26,9 @@ struct KnownEngine {
 // EmuDEN's own Switch 2 engine speaks ECP; the previous emulator only takes a game file.
 const std::vector<KnownEngine>& Known() {
     static const std::vector<KnownEngine> known = {
+        // DenNX plays Switch 2 and Switch 1 games.
         {"switch2",
+         {"switch"},
          {{"emuden-switch2.exe", 2}, {"emuden-switch2", 2}, {"lichii.exe", 0}, {"lichii", 0}},
          "Lichii"},
     };
@@ -32,7 +37,8 @@ const std::vector<KnownEngine>& Known() {
 
 const KnownEngine* FindKnown(const std::string& system) {
     for (const KnownEngine& engine : Known()) {
-        if (system == engine.system) {
+        if (system == engine.system ||
+            std::find(engine.also.begin(), engine.also.end(), system) != engine.also.end()) {
             return &engine;
         }
     }
@@ -80,12 +86,18 @@ std::filesystem::path HomeDir() {
 
 } // namespace
 
+// The consoles of one engine share its settings.
+std::string EngineName(const std::string& system) {
+    const KnownEngine* engine = FindKnown(system);
+    return engine ? std::string(engine->system) : system;
+}
+
 std::string PathKey(const std::string& system) {
-    return "engine." + system + ".path";
+    return "engine." + EngineName(system) + ".path";
 }
 
 std::string ArgsKey(const std::string& system) {
-    return "engine." + system + ".args";
+    return "engine." + EngineName(system) + ".args";
 }
 
 bool KnownSystem(const std::string& system) {
@@ -108,7 +120,7 @@ std::optional<Install> Locate(const std::string& system, const std::filesystem::
         return std::nullopt;
     }
     for (const char* folder : {"engines", "emulators"}) {
-        if (auto found = InFolder(*engine, data_dir / folder / system, "plugin")) {
+        if (auto found = InFolder(*engine, data_dir / folder / engine->system, "plugin")) {
             return found;
         }
     }
