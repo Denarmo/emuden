@@ -15,8 +15,17 @@ in `docs/status.md`. SteamOS feature by feature: `docs/steamos.md`.
   graphs moving between captures, the stats lines and two rows of tiles. Upright (540x900)
   showed no graphs at first: the side-by-side test passed while leaving them under the
   minimum width; fixed so they stack under the numbers whenever they would not fit beside.
-- **Not run on a device:** the Retroid Pocket Duo's `emuden.next` is signed with another debug
-  key, so this build could not be installed without uninstalling it (and its data).
+- **Retroid Pocket Duo:** after the owner approved wiping its data, the old `emuden.next`
+  was uninstalled and `405c547` installed with `toolsndroidun.ps1`; first-run setup with
+  `/storage/emulated/0/ROMS` (25 games) and Install all. Quick Layouts 1.1.0 downloaded from the
+  official index when "Quick Layouts: Performance" was picked. Gran Turismo 2 (PCSX ReARMed,
+  PAL): the lower screen (1280x960) showed 50 of 50 fps, about 20 ms a frame, sound 53-65 ms
+  queued with 0 gaps, both graphs moving between captures 3 s apart, and 14 tiles in three
+  rows; its Exit tile ended the game. The lower screen fades to the dim logo after 10 s
+  untouched, as designed; a touch brings the panel back. No fix was needed.
+- **Switch 2 on Android:** the console shows "Engine not set up" and Play says it is not
+  available on this device: the app starts no engine processes on Android
+  (`caps.child_processes`), and DenNX has no Android app yet.
 
 ## Android portrait mode and console touch controls (2026-11-18)
 

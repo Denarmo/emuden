@@ -22,8 +22,8 @@ which device, are in `docs/history.md`; add new ones there, newest first.
   fast-forward, cheats (typed in or imported from RetroArch `.cht` files), picture presets on a multi-pass chain, per-game and per-console settings,
   button remapping, black frame insertion at whole multiples of the game's rate, two screens (DS layouts, quick settings and the pause menu on the second
   display, an Android app beside the game; quick settings layouts from interface plugins,
-  including `performance`: frame rate and frame time graphs above small tiles, not yet run on
-  a device), and console-inspired multi-touch controls across all 37 bundled systems (below the game in portrait, peripheral overlay in landscape).
+  including `performance`: frame rate and frame time graphs above small tiles, checked on
+  the Retroid Pocket Duo), and console-inspired multi-touch controls across all 37 bundled systems (below the game in portrait, peripheral overlay in landscape).
 - **Feature plugins** (Lua 5.4 in a sandbox, `docs/feature-plugins.md`): the in-app browser
   (`docs/in-app-browser.md`), four ROM hack site plugins, RetroAchievements, interface
   plugins for the home screen, tuning advice, and sync providers.
